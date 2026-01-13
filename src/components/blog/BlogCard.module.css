@@ -1,0 +1,95 @@
+.card {
+    display: block;
+    background: var(--surface-color);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-primary);
+}
+
+.imageWrapper {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+}
+
+.image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.card:hover .image {
+    transform: scale(1.05);
+}
+
+.placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--surface-hover);
+}
+
+.badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.intelBadge {
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.content {
+    padding: 1.5rem;
+}
+
+.meta {
+    margin-bottom: 0.75rem;
+}
+
+.date {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+}
+
+.title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+    color: var(--text-primary);
+}
+
+.excerpt {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .content {
+        padding: 1.25rem;
+    }
+
+    .title {
+        font-size: 1.15rem;
+    }
+
+    .excerpt {
+        font-size: 0.85rem;
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "crons": [
+        {
+            "path": "/api/cron/run-blog-engine?slot=08:00",
+            "schedule": "0 8 * * *"
+        },
+        {
+            "path": "/api/cron/run-blog-engine?slot=12:00",
+            "schedule": "0 12 * * *"
+        },
+        {
+            "path": "/api/cron/run-blog-engine?slot=15:00",
+            "schedule": "0 15 * * *"
+        },
+        {
+            "path": "/api/cron/run-blog-engine?slot=21:00",
+            "schedule": "0 21 * * *"
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "kumolab_anime",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "engine:08:00": "tsx scripts/run-engine.ts 08:00",
+    "engine:12:00": "tsx scripts/run-engine.ts 12:00",
+    "engine:15:00": "tsx scripts/run-engine.ts 15:00"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.88",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.90.1",
+    "lucide-react": "^0.562.0",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

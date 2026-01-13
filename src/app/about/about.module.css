@@ -1,0 +1,111 @@
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: calc(var(--header-height) + 4rem) 2rem 4rem;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.title {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+}
+
+.section {
+    margin-bottom: 4rem;
+}
+
+.section h2 {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: var(--accent-primary);
+}
+
+.section p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.offerList {
+    list-style: disc;
+    padding-left: 1.5rem;
+}
+
+.offerList li {
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.contact {
+    background: var(--surface-color);
+    padding: 3rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-subtle);
+}
+
+.contact h2 {
+    margin-bottom: 2rem;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.formGroup label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.formGroup input,
+.formGroup textarea {
+    background: var(--bg-color);
+    border: 1px solid var(--border-subtle);
+    padding: 0.8rem;
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.submitBtn {
+    background: var(--accent-primary);
+    color: #fff;
+    border: none;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: opacity 0.2s;
+}
+
+.submitBtn:hover {
+    opacity: 0.9;
+}
