@@ -12,11 +12,14 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function publishPost(post: any) {
+    // Delete existing to allow overwrite (cleaner than upsert with complex constraints)
+    await supabase.from('posts').delete().eq('slug', post.slug);
+
     const { error } = await supabase
         .from('posts')
         .insert([{
             title: post.title,
-            slug: post.slug,
+            slug: `${post.slug}-verified`,
             type: post.type,
             content: post.content,
             image: post.image,
