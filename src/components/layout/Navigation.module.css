@@ -122,7 +122,7 @@
     border: 2px solid var(--accent-primary);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .navContainer {
         padding: 0 1rem;
     }
@@ -130,7 +130,6 @@
     .logo {
         position: relative;
         z-index: 2001;
-        /* Ensure logo is above other elements if needed */
         font-size: 1.2rem;
         gap: 8px;
     }
