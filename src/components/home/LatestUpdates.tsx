@@ -25,7 +25,7 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
 
         const scroll = () => {
             if (!isPaused && !isDown) {
-                if (el.scrollLeft >= el.scrollWidth / 2) {
+                if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
                     el.scrollLeft = 0;
                 } else {
                     el.scrollLeft += 0.8;
@@ -87,8 +87,8 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
         }
     };
 
-    // Quadruple content
-    const carouselItems = [...updates, ...updates, ...updates, ...updates];
+    // Octuple content
+    const carouselItems = [...updates, ...updates, ...updates, ...updates, ...updates, ...updates, ...updates, ...updates];
 
     return (
         <section className={styles.section}>

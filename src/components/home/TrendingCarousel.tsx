@@ -14,6 +14,11 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);
 
+    // Drag State
+    const [isDown, setIsDown] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeftStart, setScrollLeftStart] = useState(0);
+
     useEffect(() => {
         setMinutesAgo(Math.floor(Math.random() * 59) + 1);
     }, []);
@@ -25,14 +30,12 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
         let animId: number;
 
         const scroll = () => {
-            if (!isPaused) {
-                // If we've scrolled past the first set of items (halfway), snap back to start
-                // We use >= here, and since the content is duplicated, 
-                // the visuals at scrollLeft=0 and scrollLeft=halfWidth should be identical.
-                if (el.scrollLeft >= el.scrollWidth / 2) {
+            if (!isPaused && !isDown) {
+                // Tolerance of 1px to prevent sticking
+                if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
                     el.scrollLeft = 0;
                 } else {
-                    el.scrollLeft += 0.8; // Speed (approx matches 40s/120s visually)
+                    el.scrollLeft += 0.8;
                 }
             }
             animId = requestAnimationFrame(scroll);
@@ -40,9 +43,59 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
 
         animId = requestAnimationFrame(scroll);
         return () => cancelAnimationFrame(animId);
-    }, [isPaused]);
+    }, [isPaused, isDown]);
 
-    const carouselItems = [...posts, ...posts];
+    // Global Drag Handlers
+    useEffect(() => {
+        if (!isDown) return;
+
+        const handleGlobalMove = (e: MouseEvent) => {
+            if (!scrollRef.current) return;
+            e.preventDefault();
+            const x = e.pageX - scrollRef.current.offsetLeft;
+            const walk = (x - startX) * 2;
+            scrollRef.current.scrollLeft = scrollLeftStart - walk;
+        };
+
+        const handleGlobalUp = () => {
+            setIsDown(false);
+            setIsPaused(false);
+        };
+
+        document.addEventListener('mousemove', handleGlobalMove);
+        document.addEventListener('mouseup', handleGlobalUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleGlobalMove);
+            document.removeEventListener('mouseup', handleGlobalUp);
+        };
+    }, [isDown, startX, scrollLeftStart]);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        // Disable drag logic on touch devices
+        if (!window.matchMedia('(hover: hover)').matches) return;
+
+        if (!scrollRef.current) return;
+        setIsDown(true);
+        setIsPaused(true);
+        setStartX(e.pageX - scrollRef.current.offsetLeft);
+        setScrollLeftStart(scrollRef.current.scrollLeft);
+    };
+
+    const handlePointerEnter = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') {
+            setIsPaused(true);
+        }
+    };
+
+    const handlePointerLeave = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') {
+            setIsPaused(false);
+        }
+    };
+
+    // Octuple content to guarantee seamless loop on all viewports
+    const carouselItems = [...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts];
 
     return (
         <section className={styles.container}>
@@ -54,10 +107,13 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
             <div
                 className={styles.carouselContainer}
                 ref={scrollRef}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
+                onPointerEnter={handlePointerEnter}
+                onPointerLeave={handlePointerLeave}
+                onMouseDown={handleMouseDown}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
+                onTouchCancel={() => setIsPaused(false)}
+                style={{ cursor: isDown ? 'grabbing' : 'grab' }}
             >
                 <div className={styles.track}>
                     {carouselItems.map((post, index) => (
