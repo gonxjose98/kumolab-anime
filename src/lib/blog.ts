@@ -20,12 +20,23 @@ export async function getPosts(): Promise<BlogPost[]> {
         }
 
         // Map snake_case from DB to camelCase for the app
-        return (data || []).map(post => ({
-            ...post,
-            isPublished: post.is_published,
-            claimType: post.claim_type,
-            premiereDate: post.premiere_date
-        }));
+        return (data || []).map(post => {
+            let image = post.image;
+
+            // EMERGENCY OVERRIDE: Fix Frieren post image if it's missing or broken in DB
+            // We force it to our local social image which HAS the required text.
+            if (post.slug === 'frieren-s2-announced-2026-01-15') {
+                image = '/blog/intel/frieren-s2-announced-2026-01-15-social.png';
+            }
+
+            return {
+                ...post,
+                image,
+                isPublished: post.is_published,
+                claimType: post.claim_type,
+                premiereDate: post.premiere_date
+            };
+        });
     }
 
     // Local JSON Fallback

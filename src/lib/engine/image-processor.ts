@@ -199,8 +199,10 @@ export async function generateIntelImage({
                 console.error('Supabase Storage Upload Error:', error);
 
                 // FINAL FALLBACK: Base64 Data URI (Ensures text rules are followed even without storage)
-                console.log('Falling back to Base64 encoding for generated image...');
-                return `data:image/png;base64,${finalBuffer.toString('base64')}`;
+                // Using compressed JPEG to stay within database/network limits (~200KB vs ~2MB)
+                console.log('Falling back to compressed JPEG Base64 encoding...');
+                const jpegBuffer = await sharp(finalBuffer).jpeg({ quality: 80 }).toBuffer();
+                return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
             }
 
             // Get Public URL
