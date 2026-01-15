@@ -6,7 +6,7 @@ const path = require('path');
 const envPath = path.resolve(__dirname, '../.env.local');
 if (fs.existsSync(envPath)) {
     const envConfig = fs.readFileSync(envPath, 'utf8');
-    envConfig.split('\n').forEach(line => {
+    envConfig.split('\n').forEach((line: string) => {
         const [key, value] = line.split('=');
         if (key && value) {
             process.env[key.trim()] = value.trim();
@@ -28,7 +28,7 @@ async function main() {
     console.log(`[${new Date().toISOString()}] Running Blog Engine for slot: ${slot}`);
 
     try {
-        const post = await runBlogEngine(slot, true);
+        const post = await runBlogEngine(slot as any, true);
         if (post) {
             console.log(`[SUCCESS] Published post: ${post.title}`);
         } else {
