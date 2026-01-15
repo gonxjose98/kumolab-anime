@@ -77,6 +77,9 @@
     border-radius: 99px;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .submitBtn:hover {
@@ -101,4 +104,25 @@
     .submitBtn {
         padding: 0.8rem;
     }
+}
+
+.submitBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.successMessage {
+    color: var(--accent-primary);
+    font-weight: 500;
+    padding: 1rem;
+    background: rgba(124, 58, 237, 0.1);
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.errorMessage {
+    color: #ef4444;
+    margin-top: 1rem;
+    font-size: 0.9rem;
 }
