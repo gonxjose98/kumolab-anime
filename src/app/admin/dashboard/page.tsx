@@ -105,6 +105,9 @@ export default async function DashboardPage() {
                         Last 30 Days
                     </p>
                 </div>
+
+                {/* Analytics Chart */}
+                <AnalyticsDashboard initialData={stats.chartData} />
             </div>
 
             {/* 2. POST MANAGEMENT */}
