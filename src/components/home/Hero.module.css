@@ -174,12 +174,12 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     /* .headline font-size is now handled by min-width media queries above */
 
     .heroContent {
-        padding-top: var(--header-height);
-        /* Ensure content clears the fixed header */
+        padding-top: calc(var(--header-height) + 40px);
+        /* Add extra buffer beyond header */
     }
 
     .subheadline {
