@@ -17,6 +17,11 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
     const accumulatorRef = useRef(0);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -132,7 +137,7 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
                             <div className={styles.content}>
                                 <div className={styles.meta}>
                                     <span className={styles.time}>
-                                        {new Date(post.timestamp).toLocaleDateString()}
+                                        {mounted ? new Date(post.timestamp).toLocaleDateString() : ''}
                                     </span>
                                 </div>
                                 <h3 className={styles.cardTitle}>{post.title}</h3>
