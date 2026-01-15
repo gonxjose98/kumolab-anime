@@ -5,6 +5,12 @@
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 
+export interface VerificationProvenance {
+    tier: 'streamer' | 'popularity' | 'format_exception';
+    reason: string;
+    sources: any;
+}
+
 export interface AiringEpisode {
     id: number;
     episode: number;
@@ -25,6 +31,7 @@ export interface AiringEpisode {
             site: string;
         }[];
     };
+    provenance?: VerificationProvenance;
 }
 
 /**
@@ -50,6 +57,9 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
                         format
                         popularity
                         isAdult
+                        status
+                        seasonYear
+
                         coverImage {
                             extraLarge
                             large
@@ -92,10 +102,22 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
         }
 
         const json = await response.json();
+
         const rawEpisodes = json.data?.Page?.airingSchedules || [];
 
-        // STRICT VALIDATION GATE
-        return rawEpisodes.filter((ep: any) => validateAiringDrop(ep));
+        // STRICT VALIDATION & PROVENANCE ATTACHMENT
+        const verifiedEpisodes: AiringEpisode[] = [];
+
+        for (const ep of rawEpisodes) {
+            const provenance = validateAiringDrop(ep);
+            if (provenance) {
+                // Attach provenance and add to list
+                ep.provenance = provenance;
+                verifiedEpisodes.push(ep);
+            }
+        }
+
+        return verifiedEpisodes;
 
     } catch (error) {
         console.error('Error fetching from AniList:', error);
@@ -124,53 +146,69 @@ const TRUSTED_STREAMERS = [
     'Crunchyroll', 'Netflix', 'Hulu', 'Disney Plus', 'Hidive', 'Amazon Prime Video', 'Bilibili Global', 'Muse Asia', 'Ani-One'
 ];
 
-export function validateAiringDrop(episode: any): boolean {
+export function validateAiringDrop(episode: any): VerificationProvenance | null {
     const media = episode.media;
 
     // 0. EXCLUDE ADULT CONTENT
-    if (media.isAdult) return false;
+    if (media.isAdult) return null;
 
     // 1. FORMAT LOCK
     const isMainFormat = ['TV', 'MOVIE', 'OVA', 'ONA'].includes(media.format);
     const isNicheFormat = ['TV_SHORT', 'SPECIAL', 'MUSIC'].includes(media.format);
 
-    if (!isMainFormat && !isNicheFormat) return false; // Reject unknown formats
+    if (!isMainFormat && !isNicheFormat) return null; // Reject unknown formats
 
     // 2. CHECK FOR TRUSTED STREAMERS
-    const hasTrustedStreamer = media.externalLinks.some((link: any) =>
+    const trustedLink = media.externalLinks.find((link: any) =>
         TRUSTED_STREAMERS.some(trusted => link.site.toLowerCase().includes(trusted.toLowerCase()))
     );
 
     // 3. APPLY TIERS
 
     // TIER 1: Streamer Verified (Accept immediately if format is standard)
-    if (hasTrustedStreamer && isMainFormat) {
-        return true;
+    if (trustedLink && isMainFormat) {
+        return {
+            tier: 'streamer',
+            reason: `Verified on ${trustedLink.site}`,
+            sources: { externalLinks: [trustedLink.site] }
+        };
     }
 
-    // TIER 2: Crowd Wisdom (Popularity Safeguard)
-    // "Easygoing Territory Defense" likely has < 5,000 popularity.
-    // "Oshi no Ko" has > 100,000.
+    // TIER 2: Crowd Wisdom (Popularity Safeguard) + STATE CHECK
+    // Requirements: > 20k Pop AND (Releasing OR Recent Season)
     const HIGH_POPULARITY_THRESHOLD = 20000;
     const MEGA_POPULARITY_THRESHOLD = 50000; // For shorts/specials
 
-    if (media.popularity >= HIGH_POPULARITY_THRESHOLD && isMainFormat) {
-        return true;
+    // State Check (Anti-Ghosting)
+    const currentYear = new Date().getFullYear();
+    const isRecent = media.seasonYear ? Math.abs(media.seasonYear - currentYear) <= 1 : false;
+    const isActive = media.status === 'RELEASING' || (media.status === 'FINISHED' && isRecent);
+
+    if (isActive && media.popularity >= HIGH_POPULARITY_THRESHOLD && isMainFormat) {
+        return {
+            tier: 'popularity',
+            reason: `High Popularity (${media.popularity}) + Active Status`,
+            sources: { popularity: media.popularity, status: media.status }
+        };
     }
 
-    // Exception for Shorts/Specials: Must be MEGA popular (e.g. One Piece Special)
-    if (media.popularity >= MEGA_POPULARITY_THRESHOLD && isNicheFormat) {
-        return true;
+    // TIER 3: Format Exception (Shorts/Specials)
+    if (isActive && media.popularity >= MEGA_POPULARITY_THRESHOLD && isNicheFormat) {
+        return {
+            tier: 'format_exception',
+            reason: `Special Format with Mega Popularity (${media.popularity})`,
+            sources: { popularity: media.popularity, format: media.format }
+        };
     }
 
-    // If it fails all tiers -> REJECT (Scraped/Unverified/Obscure)
-    console.log(`[Validation Reject] ${media.title.english || media.title.romaji} (Pop: ${media.popularity}, Format: ${media.format})`);
-    return false;
+    // If it fails all tiers -> REJECT
+    console.log(`[Validation Reject] ${media.title.english || media.title.romaji} (Pop: ${media.popularity}, Format: ${media.format}, Status: ${media.status})`);
+    return null;
 }
 
 // Deprecated old function, kept just in case but redirects to new logic
 export async function verifyOnCrunchyroll(episode: AiringEpisode): Promise<boolean> {
-    return validateAiringDrop(episode);
+    return !!validateAiringDrop(episode);
 }
 
 /**

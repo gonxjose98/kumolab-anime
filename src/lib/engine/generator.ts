@@ -23,7 +23,19 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
     const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}`;
 
     // Use the first episode's cover image as the main post image
-    const mainImage = episodes[0].media.coverImage.extraLarge || episodes[0].media.coverImage.large;
+    const primaryEp = episodes[0];
+    const mainImage = primaryEp.media.coverImage.extraLarge || primaryEp.media.coverImage.large;
+
+    // Aggregated Provenance
+    const sourcesMap: Record<string, any> = {};
+    episodes.forEach(ep => {
+        const title = ep.media.title.english || ep.media.title.romaji;
+        if (ep.provenance) {
+            sourcesMap[title] = ep.provenance;
+        }
+    });
+
+    const primaryProvenance = primaryEp.provenance;
 
     return {
         id: `drop-${dateString}`,
@@ -33,7 +45,11 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
         content,
         image: mainImage,
         timestamp: date.toISOString(),
-        isPublished: true
+        isPublished: true,
+        // Provenance Data
+        verification_tier: primaryProvenance?.tier,
+        verification_reason: primaryProvenance ? `Primary: ${primaryProvenance.reason}` : 'Aggregated Drop',
+        verification_sources: sourcesMap
     };
 }
 

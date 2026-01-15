@@ -23,7 +23,10 @@ async function publishPost(post: any) {
             timestamp: post.timestamp,
             is_published: post.isPublished,
             claim_type: post.claimType,
-            premiere_date: post.premiereDate
+            premiere_date: post.premiereDate,
+            verification_tier: post.verification_tier,
+            verification_reason: post.verification_reason,
+            verification_sources: post.verification_sources
         }]);
 
     if (error) {
@@ -61,7 +64,7 @@ async function runBackfill() {
 
         // 2. INTEL (12:00 EST)
         console.log('- Generating Intel...');
-        let intelItem;
+        let intelItem: any;
         if (dateStr.includes('13')) {
             // Jan 13: Frieren
             intelItem = {
@@ -96,7 +99,7 @@ async function runBackfill() {
 
         // 3. TRENDING (15:00 EST)
         console.log('- Generating Trending...');
-        let trendItem;
+        let trendItem: any;
         if (dateStr.includes('13')) {
             // Jan 13: Solo Leveling
             trendItem = {

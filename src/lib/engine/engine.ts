@@ -36,15 +36,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00')
             Math.floor(endOfDay.getTime() / 1000)
         );
 
-        // Verify on Crunchyroll
-        const verifiedEpisodes = [];
-        for (const ep of episodes) {
-            if (await verifyOnCrunchyroll(ep)) {
-                verifiedEpisodes.push(ep);
-            }
-        }
-
-        newPost = generateDailyDropsPost(verifiedEpisodes, now);
+        newPost = generateDailyDropsPost(episodes, now);
 
         // FALLBACK: If zero drops, trigger Intel
         if (!newPost) {
@@ -91,7 +83,11 @@ async function publishPost(post: BlogPost) {
                 timestamp: post.timestamp,
                 is_published: post.isPublished,
                 claim_type: post.claimType,
-                premiere_date: post.premiereDate
+                premiere_date: post.premiereDate,
+                // Provenance Columns
+                verification_tier: post.verification_tier,
+                verification_reason: post.verification_reason,
+                verification_sources: post.verification_sources
             }]);
 
         if (error) {

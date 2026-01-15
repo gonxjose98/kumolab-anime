@@ -13,6 +13,9 @@ export interface BlogPost {
     image?: string;
     timestamp: string; // ISO string
     isPublished: boolean;
+    verification_tier?: 'streamer' | 'popularity' | 'format_exception';
+    verification_reason?: string;
+    verification_sources?: any;
 }
 
 export interface Product {
