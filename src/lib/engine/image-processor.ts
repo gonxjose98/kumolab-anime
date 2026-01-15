@@ -152,19 +152,19 @@ export async function generateIntelImage({
 
         ctx.textBaseline = 'top';
 
-        // --- DRAW ANIME TITLE (PRIMARY: WHITE / HEAVY) ---
+        // --- DRAW ANIME TITLE (PRIMARY: PURPLE / HEAVY) ---
         ctx.font = `900 ${titleSize}px ${fontName}`;
-        ctx.fillStyle = '#FFFFFF'; // White for Primary
+        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for Primary Title
 
         titleLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
             currentY += lineSpacingTitle;
         });
 
-        // --- DRAW HEADLINE (EMPHASIS: PURPLE / HEAVY) ---
+        // --- DRAW HEADLINE (SUPPORTING: WHITE / HEAVY) ---
         currentY += gap;
         ctx.font = `900 ${headlineSize}px ${fontName}`;
-        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for EMPHASIS
+        ctx.fillStyle = '#FFFFFF'; // White for Supporting Line
 
         headlineLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
@@ -198,13 +198,9 @@ export async function generateIntelImage({
             if (error) {
                 console.error('Supabase Storage Upload Error:', error);
 
-                // FALLBACK: Write to specific public dir if storage fails (for local dev resilience)
-                if (process.env.NODE_ENV === 'development') {
-                    console.log('Falling back to local write for dev...');
-                    fs.writeFileSync(outputPath, finalBuffer);
-                    return `/blog/intel/${outputFileName}`;
-                }
-                return null;
+                // FINAL FALLBACK: Base64 Data URI (Ensures text rules are followed even without storage)
+                console.log('Falling back to Base64 encoding for generated image...');
+                return `data:image/png;base64,${finalBuffer.toString('base64')}`;
             }
 
             // Get Public URL
