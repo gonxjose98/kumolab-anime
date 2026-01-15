@@ -9,7 +9,6 @@ const Manifesto = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('Submitting email:', email);
         setStatus('loading');
         setMessage('');
 
@@ -21,11 +20,10 @@ const Manifesto = () => {
             });
 
             const data = await res.json();
-            console.log('Subscription response:', res.status, data);
 
             if (res.ok) {
                 setStatus('success');
-                setMessage('Welcome to the inner circle. Check your inbox.');
+                setMessage('Welcome to the KumoLab family! Check your inbox.');
                 setEmail('');
             } else {
                 setStatus('error');
