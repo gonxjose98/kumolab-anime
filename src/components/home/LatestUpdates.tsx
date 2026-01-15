@@ -65,6 +65,9 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
     }, [isDown, startX, scrollLeftStart]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // Disable drag logic on touch devices
+        if (!window.matchMedia('(hover: hover)').matches) return;
+
         if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
