@@ -75,14 +75,14 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
         setScrollLeftStart(scrollRef.current.scrollLeft);
     };
 
-    const handleMouseEnter = () => {
-        if (window.matchMedia('(hover: hover)').matches) {
+    const handlePointerEnter = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') {
             setIsPaused(true);
         }
     };
 
-    const handleMouseLeave = () => {
-        if (window.matchMedia('(hover: hover)').matches) {
+    const handlePointerLeave = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') {
             setIsPaused(false);
         }
     };
@@ -100,8 +100,8 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
             <div
                 className={styles.carouselContainer}
                 ref={scrollRef}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                onPointerEnter={handlePointerEnter}
+                onPointerLeave={handlePointerLeave}
                 onMouseDown={handleMouseDown}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
