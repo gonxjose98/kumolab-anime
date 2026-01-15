@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
     LineChart,
     Line,
@@ -21,6 +22,14 @@ interface TrafficChartProps {
 }
 
 export default function TrafficChart({ data }: TrafficChartProps) {
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) return <div className="h-[300px] w-full flex items-center justify-center text-neutral-800">Loading Chart...</div>;
+
     if (!data || data.length === 0) {
         return <div className="h-64 flex items-center justify-center text-neutral-500 text-sm">No data available for chart.</div>;
     }
