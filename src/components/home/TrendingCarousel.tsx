@@ -11,48 +11,51 @@ interface TrendingCarouselProps {
 
 const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
     const [minutesAgo, setMinutesAgo] = useState(0);
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const trackRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);
+
+    // Animation State
+    const xRef = useRef(0);
+    const rafIdRef = useRef<number>(0);
 
     // Drag State
     const [isDown, setIsDown] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeftStart, setScrollLeftStart] = useState(0);
-    const accumulatorRef = useRef(0);
+    const startXRef = useRef(0);
+    const startTranslateRef = useRef(0);
 
+    // Initial Mount
+    const [mounted, setMounted] = useState(false);
     useEffect(() => {
+        setMounted(true);
         setMinutesAgo(Math.floor(Math.random() * 59) + 1);
     }, []);
 
+    // Animation Loop
     useEffect(() => {
-        const el = scrollRef.current;
-        if (!el) return;
+        const animate = () => {
+            if (!isPaused && !isDown && trackRef.current) {
+                xRef.current += 1.0;
 
-        let animId: number;
+                const totalWidth = trackRef.current.scrollWidth;
+                // Since content is repeated 8 times, resetting at half width is safe
+                // but checking full scrollWidth vs infinite loop logic:
+                // We want to reset when we've scrolled past 1 full set of items.
+                // If items are 8x, we can reset after 1/8th or 1/2.
+                // To be safe and identical to previous logic: Reset at Half.
+                const halfWidth = totalWidth / 2;
 
-        const scroll = () => {
-            if (!isPaused && !isDown) {
-                // Infinite Loop Check (Reset)
-                // Use tolerance of 1px
-                if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
-                    el.scrollLeft = 0;
-                    accumulatorRef.current = 0;
-                } else {
-                    // Accumulate fractional scroll amounts to handle integer-pixel browsers
-                    accumulatorRef.current += 0.8;
-                    const wholePixels = Math.floor(accumulatorRef.current);
-
-                    if (wholePixels >= 1) {
-                        el.scrollLeft += wholePixels;
-                        accumulatorRef.current -= wholePixels;
-                    }
+                if (xRef.current >= halfWidth) {
+                    xRef.current = 0;
                 }
+
+                trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
             }
-            animId = requestAnimationFrame(scroll);
+            rafIdRef.current = requestAnimationFrame(animate);
         };
 
-        animId = requestAnimationFrame(scroll);
-        return () => cancelAnimationFrame(animId);
+        rafIdRef.current = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(rafIdRef.current);
     }, [isPaused, isDown]);
 
     // Global Drag Handlers
@@ -60,11 +63,12 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
         if (!isDown) return;
 
         const handleGlobalMove = (e: MouseEvent) => {
-            if (!scrollRef.current) return;
+            if (!trackRef.current) return;
             e.preventDefault();
-            const x = e.pageX - scrollRef.current.offsetLeft;
-            const walk = (x - startX); // 1:1 movement (removed * 2)
-            scrollRef.current.scrollLeft = scrollLeftStart - walk;
+            const currentX = e.pageX;
+            const walk = (currentX - startXRef.current);
+            xRef.current = startTranslateRef.current - walk;
+            trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
         };
 
         const handleGlobalUp = () => {
@@ -79,52 +83,46 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
             document.removeEventListener('mousemove', handleGlobalMove);
             document.removeEventListener('mouseup', handleGlobalUp);
         };
-    }, [isDown, startX, scrollLeftStart]);
+    }, [isDown]);
 
+    // Event Handlers
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Disable drag logic on touch devices
         if (!window.matchMedia('(hover: hover)').matches) return;
-
-        if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
-        setStartX(e.pageX - scrollRef.current.offsetLeft);
-        setScrollLeftStart(scrollRef.current.scrollLeft);
-    };
-
-    const handlePointerEnter = (e: React.PointerEvent) => {
-        if (e.pointerType === 'mouse') {
-            setIsPaused(true);
-        }
-    };
-
-    const handlePointerLeave = (e: React.PointerEvent) => {
-        if (e.pointerType === 'mouse') {
-            setIsPaused(false);
-        }
+        startXRef.current = e.pageX;
+        startTranslateRef.current = xRef.current;
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
-        setStartX(e.touches[0].pageX - scrollRef.current.offsetLeft);
-        setScrollLeftStart(scrollRef.current.scrollLeft);
+        startXRef.current = e.touches[0].pageX;
+        startTranslateRef.current = xRef.current;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (!isDown || !scrollRef.current) return;
-        const x = e.touches[0].pageX - scrollRef.current.offsetLeft;
-        const walk = (x - startX);
-        scrollRef.current.scrollLeft = scrollLeftStart - walk;
+        if (!isDown || !trackRef.current) return;
+        const currentX = e.touches[0].pageX;
+        const walk = (currentX - startXRef.current);
+        xRef.current = startTranslateRef.current - walk;
+        trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
     };
 
-    const handleTouchEnd = () => {
+    const handleInteractionEnd = () => {
         setIsDown(false);
         setIsPaused(false);
     };
 
-    // Octuple content to guarantee seamless loop on all viewports
+    const handlePointerEnter = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') setIsPaused(true);
+    };
+
+    const handlePointerLeave = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') setIsPaused(false);
+    };
+
+    // Octuple content
     const carouselItems = [...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts];
 
     return (
@@ -136,17 +134,17 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
 
             <div
                 className={styles.carouselContainer}
-                ref={scrollRef}
+                ref={containerRef}
                 onPointerEnter={handlePointerEnter}
                 onPointerLeave={handlePointerLeave}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                style={{ cursor: isDown ? 'grabbing' : 'grab' }}
+                onTouchEnd={handleInteractionEnd}
+                onTouchCancel={handleInteractionEnd}
+                style={{ cursor: isDown ? 'grabbing' : 'grab', overflow: 'hidden' }}
             >
-                <div className={styles.track}>
+                <div className={styles.track} ref={trackRef}>
                     {carouselItems.map((post, index) => (
                         <Link href={`/blog/${post.slug}`} key={`${post.id}-${index}`} className={styles.card}>
                             <div className={styles.imageWrapper}>
@@ -159,7 +157,7 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
                             </div>
                             <div className={styles.content}>
                                 <span className={styles.timestamp}>
-                                    {new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {mounted ? new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                 </span>
                                 <h3 className={styles.cardTitle}>{post.title}</h3>
                             </div>

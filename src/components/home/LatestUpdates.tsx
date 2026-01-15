@@ -11,45 +11,44 @@ interface LatestUpdatesProps {
 
 const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
     const updates = posts.filter(p => p.type !== 'DROP');
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const trackRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);
-    const [isDown, setIsDown] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeftStart, setScrollLeftStart] = useState(0);
-    const accumulatorRef = useRef(0);
-    const [mounted, setMounted] = useState(false);
 
+    // Animation State
+    const xRef = useRef(0);
+    const rafIdRef = useRef<number>(0);
+
+    // Drag State
+    const [isDown, setIsDown] = useState(false);
+    const startXRef = useRef(0);
+    const startTranslateRef = useRef(0);
+
+    const [mounted, setMounted] = useState(false);
     useEffect(() => {
         setMounted(true);
     }, []);
 
+    // Animation Loop
     useEffect(() => {
-        const el = scrollRef.current;
-        if (!el) return;
+        const animate = () => {
+            if (!isPaused && !isDown && trackRef.current) {
+                xRef.current += 1.0;
 
-        let animId: number;
+                const totalWidth = trackRef.current.scrollWidth;
+                const halfWidth = totalWidth / 2;
 
-        const scroll = () => {
-            if (!isPaused && !isDown) {
-                if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
-                    el.scrollLeft = 0;
-                    accumulatorRef.current = 0;
-                } else {
-                    // Accumulate fractional pixels
-                    accumulatorRef.current += 0.8;
-                    const wholePixels = Math.floor(accumulatorRef.current);
-
-                    if (wholePixels >= 1) {
-                        el.scrollLeft += wholePixels;
-                        accumulatorRef.current -= wholePixels;
-                    }
+                if (xRef.current >= halfWidth) {
+                    xRef.current = 0;
                 }
+
+                trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
             }
-            animId = requestAnimationFrame(scroll);
+            rafIdRef.current = requestAnimationFrame(animate);
         };
 
-        animId = requestAnimationFrame(scroll);
-        return () => cancelAnimationFrame(animId);
+        rafIdRef.current = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(rafIdRef.current);
     }, [isPaused, isDown]);
 
     // Global Drag Handlers
@@ -57,11 +56,12 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
         if (!isDown) return;
 
         const handleGlobalMove = (e: MouseEvent) => {
-            if (!scrollRef.current) return;
+            if (!trackRef.current) return;
             e.preventDefault();
-            const x = e.pageX - scrollRef.current.offsetLeft;
-            const walk = (x - startX); // 1:1 movement
-            scrollRef.current.scrollLeft = scrollLeftStart - walk;
+            const currentX = e.pageX;
+            const walk = (currentX - startXRef.current);
+            xRef.current = startTranslateRef.current - walk;
+            trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
         };
 
         const handleGlobalUp = () => {
@@ -76,49 +76,42 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
             document.removeEventListener('mousemove', handleGlobalMove);
             document.removeEventListener('mouseup', handleGlobalUp);
         };
-    }, [isDown, startX, scrollLeftStart]);
+    }, [isDown]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Disable drag logic on touch devices
         if (!window.matchMedia('(hover: hover)').matches) return;
-
-        if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
-        setStartX(e.pageX - scrollRef.current.offsetLeft);
-        setScrollLeftStart(scrollRef.current.scrollLeft);
-    };
-
-    const handlePointerEnter = (e: React.PointerEvent) => {
-        if (e.pointerType === 'mouse') {
-            setIsPaused(true);
-        }
-    };
-
-    const handlePointerLeave = (e: React.PointerEvent) => {
-        if (e.pointerType === 'mouse') {
-            setIsPaused(false);
-        }
+        startXRef.current = e.pageX;
+        startTranslateRef.current = xRef.current;
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
-        setStartX(e.touches[0].pageX - scrollRef.current.offsetLeft);
-        setScrollLeftStart(scrollRef.current.scrollLeft);
+        startXRef.current = e.touches[0].pageX;
+        startTranslateRef.current = xRef.current;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (!isDown || !scrollRef.current) return;
-        const x = e.touches[0].pageX - scrollRef.current.offsetLeft;
-        const walk = (x - startX);
-        scrollRef.current.scrollLeft = scrollLeftStart - walk;
+        if (!isDown || !trackRef.current) return;
+        const currentX = e.touches[0].pageX;
+        const walk = (currentX - startXRef.current);
+        xRef.current = startTranslateRef.current - walk;
+        trackRef.current.style.transform = `translateX(-${xRef.current}px)`;
     };
 
-    const handleTouchEnd = () => {
+    const handleInteractionEnd = () => {
         setIsDown(false);
         setIsPaused(false);
+    };
+
+    const handlePointerEnter = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') setIsPaused(true);
+    };
+
+    const handlePointerLeave = (e: React.PointerEvent) => {
+        if (e.pointerType === 'mouse') setIsPaused(false);
     };
 
     // Octuple content
@@ -133,17 +126,17 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
 
             <div
                 className={styles.carouselContainer}
-                ref={scrollRef}
+                ref={containerRef}
                 onPointerEnter={handlePointerEnter}
                 onPointerLeave={handlePointerLeave}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                style={{ cursor: isDown ? 'grabbing' : 'grab' }}
+                onTouchEnd={handleInteractionEnd}
+                onTouchCancel={handleInteractionEnd}
+                style={{ cursor: isDown ? 'grabbing' : 'grab', overflow: 'hidden' }}
             >
-                <div className={styles.track}>
+                <div className={styles.track} ref={trackRef}>
                     {carouselItems.map((post, index) => (
                         <Link href={`/blog/${post.slug}`} key={`${post.id}-${index}`} className={styles.card}>
                             <div className={styles.imageWrapper}>
