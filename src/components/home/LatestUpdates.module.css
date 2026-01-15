@@ -22,34 +22,25 @@
 
 .carouselContainer {
     width: 100%;
-    overflow: hidden;
+    overflow-x: auto;
     position: relative;
     padding: 1rem 0;
     /* Masking for fade effect on edges */
     -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
     mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.carouselContainer::-webkit-scrollbar {
+    display: none;
 }
 
 .track {
     display: flex;
     gap: 2rem;
     width: max-content;
-    animation: scroll 120s linear infinite;
-}
-
-/* Pause on hover */
-.track:hover {
-    animation-play-state: paused;
-}
-
-@keyframes scroll {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-50%);
-    }
+    /* Animation removed */
 }
 
 .card {

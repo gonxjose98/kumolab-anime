@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { BlogPost } from '@/types';
 import styles from './LatestUpdates.module.css';
 
@@ -11,18 +11,29 @@ interface LatestUpdatesProps {
 
 const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
     const updates = posts.filter(p => p.type !== 'DROP');
-    const scrollerRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [isPaused, setIsPaused] = useState(false);
 
     useEffect(() => {
-        const scroller = scrollerRef.current;
-        if (!scroller) return;
+        const el = scrollRef.current;
+        if (!el) return;
 
-        // Clone the content to ensure seamless scrolling
-        // If we don't have enough content to scroll, do nothing
-        if (scroller.scrollWidth <= scroller.clientWidth) return;
+        let animId: number;
 
-        // Use a CSS-based animation class if possible, or simple JS loop
-    }, []);
+        const scroll = () => {
+            if (!isPaused) {
+                if (el.scrollLeft >= el.scrollWidth / 2) {
+                    el.scrollLeft = 0;
+                } else {
+                    el.scrollLeft += 0.8; // Matched speed
+                }
+            }
+            animId = requestAnimationFrame(scroll);
+        };
+
+        animId = requestAnimationFrame(scroll);
+        return () => cancelAnimationFrame(animId);
+    }, [isPaused]);
 
     return (
         <section className={styles.section}>
@@ -31,11 +42,14 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
                 <p className={styles.subtitle}>Stay current with what’s happening right now.</p>
             </div>
 
-            <div className={styles.carouselContainer}>
-                {/* 
-                   Double the content for seamless infinite loop using CSS animation.
-                   We need a wrapper track that moves.
-                */}
+            <div
+                className={styles.carouselContainer}
+                ref={scrollRef}
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+                onTouchStart={() => setIsPaused(true)}
+                onTouchEnd={() => setIsPaused(false)}
+            >
                 <div className={styles.track}>
                     {/* First set */}
                     {updates.map((post) => (

@@ -30,36 +30,33 @@
 
 .carouselContainer {
     width: 100%;
-    overflow: hidden;
+    overflow-x: auto;
+    /* Enable native scroll */
     position: relative;
     padding: 1rem 0;
     /* Masking for fade effect on edges */
     -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
     mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE/Edge */
+}
+
+/* Hide Scrollbar Chrome/Safari */
+.carouselContainer::-webkit-scrollbar {
+    display: none;
 }
 
 .track {
     display: flex;
     gap: 1.5rem;
     width: max-content;
-    animation: scroll 40s linear infinite;
+    /* Animation removed - handled by JS */
     padding: 0 2rem;
 }
 
-/* Pause on hover */
-.track:hover {
-    animation-play-state: paused;
-}
-
-@keyframes scroll {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-50%);
-    }
-}
+/* Pause on hover not needed via CSS anymore */
 
 .card {
     min-width: 320px;
