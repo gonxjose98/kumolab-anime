@@ -1,8 +1,0 @@
-{
-    "crons": [
-        {
-            "path": "/api/cron/run-blog-engine",
-            "schedule": "0 * * * *"
-        }
-    ]
-}

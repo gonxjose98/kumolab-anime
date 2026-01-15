@@ -1,0 +1,16 @@
+name: KumoLab Automation Heartbeat
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour on the hour
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  trigger_engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PING KumoLab Engine
+        run: |
+          # Pings the blog engine endpoint.
+          # The endpoint itself handles EST time validation and scheduling.
+          curl -L -X GET "https://kumolab-anime.vercel.app/api/cron/run-blog-engine"
