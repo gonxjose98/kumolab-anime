@@ -1,38 +1,86 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-    const res = NextResponse.next();
-    const supabase = createMiddlewareClient({ req, res });
+export async function middleware(request: NextRequest) {
+    let response = NextResponse.next({
+        request: {
+            headers: request.headers,
+        },
+    })
 
-    const {
-        data: { session },
-    } = await supabase.auth.getSession();
+    // 1. Init Supabase SSR Client
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return request.cookies.get(name)?.value
+                },
+                set(name: string, value: string, options: CookieOptions) {
+                    request.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    })
+                    response.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                },
+                remove(name: string, options: CookieOptions) {
+                    request.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    })
+                    response.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
+                },
+            },
+        }
+    )
 
-    const url = req.nextUrl;
+    // 2. Refresh Session
+    const { data: { user } } = await supabase.auth.getUser()
 
-    // 1. ADMIN ROUTE PROTECTION
+
+    // 3. ADMIN ROUTE PROTECTION
+    const url = request.nextUrl;
     if (url.pathname.startsWith('/admin')) {
 
         // EXCEPTION: Login page is public (if not already logged in)
         if (url.pathname === '/admin/login') {
-            if (session) {
+            if (user) {
                 // Already logged in? Go to dashboard
-                return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+                return NextResponse.redirect(new URL('/admin/dashboard', request.url));
             }
-            return res; // Allow access to login page
+            return response; // Allow access to login page
         }
 
         // LISTENER: All other /admin routes require session
-        if (!session) {
+        if (!user) {
             // "Unauthenticated access should redirect to /404"
             // We rewrite the URL to the 404 page internally, hiding the existence of the route
-            return NextResponse.rewrite(new URL('/404', req.url));
+            return NextResponse.rewrite(new URL('/404', request.url));
         }
     }
 
-    return res;
+    return response
 }
 
 export const config = {

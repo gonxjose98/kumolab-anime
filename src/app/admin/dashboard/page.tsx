@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,19 @@ async function getPosts(supabase: any) {
 }
 
 export default async function DashboardPage() {
-    const supabase = createServerComponentClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value
+                },
+            },
+        }
+    );
+
     const stats = await getStats(supabase);
     const posts = await getPosts(supabase);
 
@@ -65,8 +77,8 @@ export default async function DashboardPage() {
                                 <tr key={post.id} className="hover:bg-neutral-800/50 transition-colors">
                                     <td className="p-4">
                                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${post.is_published
-                                                ? 'bg-green-900/30 text-green-400 border border-green-900'
-                                                : 'bg-red-900/30 text-red-400 border border-red-900'
+                                            ? 'bg-green-900/30 text-green-400 border border-green-900'
+                                            : 'bg-red-900/30 text-red-400 border border-red-900'
                                             }`}>
                                             {post.is_published ? 'LIVE' : 'HIDDEN'}
                                         </span>

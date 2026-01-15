@@ -1,6 +1,6 @@
 'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -10,7 +10,12 @@ export default function AdminLogin() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const supabase = createClientComponentClient();
+
+    // Create client-side supabase client
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -51,7 +56,7 @@ export default function AdminLogin() {
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-500"
+                            className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-400"
                             required
                         />
                     </div>
@@ -61,7 +66,7 @@ export default function AdminLogin() {
                             placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-500"
+                            className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-400"
                             required
                         />
                     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -16,7 +16,11 @@ export default function PostEditor({ params }: { params: { id: string } }) {
     const [views, setViews] = useState(0);
 
     const router = useRouter();
-    const supabase = createClientComponentClient();
+    // Create client-side supabase client
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     const id = params.id;
 
     useEffect(() => {
@@ -142,8 +146,8 @@ export default function PostEditor({ params }: { params: { id: string } }) {
                     <button
                         onClick={() => setIsPublished(!isPublished)}
                         className={`px-4 py-2 rounded text-sm font-bold transition-all ${isPublished
-                                ? 'bg-green-900 text-green-400 border border-green-700 hover:bg-green-800'
-                                : 'bg-red-900 text-red-400 border border-red-700 hover:bg-red-800'
+                            ? 'bg-green-900 text-green-400 border border-green-700 hover:bg-green-800'
+                            : 'bg-red-900 text-red-400 border border-red-700 hover:bg-red-800'
                             }`}
                     >
                         {isPublished ? 'PUBLISHED' : 'UNPUBLISHED'}
