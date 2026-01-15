@@ -28,7 +28,8 @@ export default function AdminLogin() {
         });
 
         if (error) {
-            setError('Invalid credentials.');
+            console.error('Login error:', error);
+            setError(error.message);
             setLoading(false);
         } else {
             // Success -> Redirect to dashboard
