@@ -40,7 +40,7 @@ export default function AdminLogin() {
     };
 
     return (
-        <div style={{ zIndex: 9999, position: 'relative', paddingTop: '100px', backgroundColor: 'black' }} className="flex items-center justify-center min-h-screen text-white p-4">
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'black' }} className="flex items-center justify-center p-4">
             <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 p-8 rounded-lg shadow-2xl relative">
                 <div className="mb-8 text-center">
                     <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
