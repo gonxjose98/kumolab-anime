@@ -218,7 +218,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 /**
  * Validates post before publishing (non-duplication, image validation).
  */
-export function validatePost(post: BlogPost, existingPosts: BlogPost[]): boolean {
+export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): boolean {
     // 1. Check for duplicates in the same day (UTC)
     const postDate = post.timestamp.split('T')[0];
     const isDuplicate = existingPosts.some(p =>
@@ -226,7 +226,7 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[]): boolean
         p.title === post.title
     );
 
-    if (isDuplicate) return false;
+    if (isDuplicate && !force) return false;
 
     // 2. Image validation: allow http URLs and local paths (starting with /)
     if (post.image && !post.image.startsWith('http') && !post.image.startsWith('/')) {

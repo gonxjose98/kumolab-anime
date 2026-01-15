@@ -19,7 +19,7 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Main engine function to run for a specific slot.
  * Now triggered by a single hourly cron (see vercel.json)
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00') {
+export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00', force: boolean = false) {
     const now = new Date();
     const existingPosts = await getPosts();
     let newPost: BlogPost | null = null;
@@ -81,7 +81,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00')
         newPost = await generateCommunityNightPost(now);
     }
 
-    if (newPost && validatePost(newPost, existingPosts)) {
+    if (newPost && validatePost(newPost, existingPosts, force)) {
         await publishPost(newPost);
         return newPost;
     }
@@ -97,7 +97,7 @@ async function publishPost(post: BlogPost) {
         // Map to snake_case for Supabase
         const { error } = await supabase
             .from('posts')
-            .insert([{
+            .upsert([{
                 title: post.title,
                 slug: post.slug,
                 type: post.type,
@@ -111,7 +111,7 @@ async function publishPost(post: BlogPost) {
                 verification_tier: post.verification_tier,
                 verification_reason: post.verification_reason,
                 verification_sources: post.verification_sources
-            }]);
+            }], { onConflict: 'slug' });
 
         if (error) {
             console.error('Supabase publish error:', error);
