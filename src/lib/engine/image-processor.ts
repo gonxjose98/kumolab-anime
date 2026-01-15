@@ -154,19 +154,19 @@ export async function generateIntelImage({
 
         ctx.textBaseline = 'top';
 
-        // --- DRAW ANIME TITLE (PRIMARY: PURPLE / HEAVY) ---
+        // --- DRAW ANIME TITLE (PRIMARY: WHITE / HEAVY) ---
         ctx.font = `900 ${globalFontSize}px ${fontName}`;
-        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for Primary Title
+        ctx.fillStyle = '#FFFFFF'; // White for Primary Title
 
         titleLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
             currentY += lineSpacing;
         });
 
-        // --- DRAW HEADLINE (SUPPORTING: WHITE / HEAVY) ---
+        // --- DRAW HEADLINE (SUPPORTING: PURPLE / HEAVY) ---
         currentY += gap;
         ctx.font = `900 ${globalFontSize}px ${fontName}`;
-        ctx.fillStyle = '#FFFFFF'; // White for Supporting Line
+        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for Hype Words (status)
 
         headlineLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);

@@ -196,9 +196,22 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
-        // We might want a different spec for Trending, but for now, we follow the locked relevance
-        // Trending posts currently don't use the Intel Image spec but we enforce official sources
-        finalImage = officialSourceImage;
+        // Enforce KumoLab branding for Trending posts as requested by User
+        const overlayTag = (trendingItem.trendReason || "TRENDING").toUpperCase();
+
+        const processedImageUrl = await generateIntelImage({
+            sourceUrl: officialSourceImage,
+            animeTitle: trendingItem.title,
+            headline: overlayTag,
+            slug: trendingItem.slug || 'trending'
+        });
+
+        if (processedImageUrl) {
+            finalImage = processedImageUrl;
+        } else {
+            console.warn('Trending image generation failed. Falling back to raw official source.');
+            finalImage = officialSourceImage;
+        }
     }
 
     return {
