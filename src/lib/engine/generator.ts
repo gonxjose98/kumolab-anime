@@ -148,10 +148,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         if (processedImageUrl) {
             finalImage = processedImageUrl;
         } else {
-            // If generation failed even with fallback, alert but do not block (or maybe block?)
-            // User said "NEEDS to generate". If generation fails, we are in trouble.
-            // But valid processedImageUrl returns path.
-            console.warn('Image generation returned null even with source.');
+            console.warn('Image generation/upload failed. Falling back to raw official source.');
+            finalImage = officialSourceImage;
         }
     }
 
