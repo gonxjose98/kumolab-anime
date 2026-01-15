@@ -23,7 +23,7 @@ const Manifesto = () => {
 
             if (res.ok) {
                 setStatus('success');
-                setMessage('Welcome to the KumoLab family! Check your inbox.');
+                setMessage('Welcome to the family! Check your spam!');
                 setEmail('');
             } else {
                 setStatus('error');
