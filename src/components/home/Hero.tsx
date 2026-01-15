@@ -1,5 +1,5 @@
 'use client';
-
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import styles from './Hero.module.css';
 
@@ -17,9 +17,9 @@ const Hero = () => {
                 </p>
 
                 <div className={styles.buttons}>
-                    <button className={styles.primaryBtn}>
+                    <Link href="/latest-daily-drop" className={styles.primaryBtn}>
                         View Today&apos;s Drops <ArrowRight size={20} />
-                    </button>
+                    </Link>
                 </div>
             </div>
 

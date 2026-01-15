@@ -1,10 +1,12 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export default function PostEditor({ params }: { params: { id: string } }) {
+export default function PostEditor() {
+    const params = useParams();
+    const id = params?.id as string;
     const [post, setPost] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -21,7 +23,7 @@ export default function PostEditor({ params }: { params: { id: string } }) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const id = params.id;
+    // const id = params.id; // Removed duplicate id declaration
 
     useEffect(() => {
         async function fetchPost() {

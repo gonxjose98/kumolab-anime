@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Bell, User, LogOut, Sun, Moon, Cloud } from 'lucide-react';
+import { Bell, User, LogOut, Sun, Moon, Cloud } from 'lucide-react';
 import styles from './Navigation.module.css';
 
 const Navigation = () => {
@@ -40,10 +40,6 @@ const Navigation = () => {
                 </ul>
 
                 <div className={styles.actions}>
-                    <button className={styles.iconBtn}>
-                        <ShoppingCart size={20} />
-                        <span className={styles.badge}>0</span>
-                    </button>
                     <button className={styles.iconBtn} onClick={toggleTheme} aria-label="Toggle Theme">
                         {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
