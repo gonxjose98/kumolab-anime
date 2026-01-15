@@ -145,19 +145,19 @@ export async function fetchAnimeIntel(): Promise<any[]> {
             title: "Frieren: Beyond Journey's End",
             claimType: "confirmed",
             premiereDate: "2026-10-01",
-            fullTitle: "Frieren: Beyond Journey's End Season 2 Officially Announced!",
+            fullTitle: "Frieren Season 2 Officially Confirmed",
             slug: "frieren-s2-announced",
-            content: "The journey continues beyond the end. Studio Madhouse has officially confirmed that Frieren Season 2 is in production, covering the El Dorado arc.",
+            content: "Studio Madhouse has officially confirmed Frieren Season 2 is in production. The sequel will follow the El Dorado arc.",
             imageSearchTerm: "Frieren: Beyond Journey's End",
             source: "Official Website"
         },
         {
             title: "Oshi no Ko",
             claimType: "confirmed",
-            premiereDate: "2026-04-10", // Future date
-            fullTitle: "Oshi no Ko Season 3 Officially Confirmed for April 2026",
+            premiereDate: "2026-04-10",
+            fullTitle: "Oshi no Ko Season 3 Set for Spring 2026",
             slug: "oshi-no-ko-s3-confirmed",
-            content: "The stardom continues. Oshi no Ko Season 3 has been officially greenlit for a Spring 2026 premiere.",
+            content: "Oshi no Ko Season 3 has been officially greenlit for a Spring 2026 premiere. Production details remain with Doga Kobo.",
             imageSearchTerm: "Oshi no Ko",
             source: "Official Website"
         }
@@ -170,12 +170,22 @@ export async function fetchAnimeIntel(): Promise<any[]> {
 export async function fetchTrendingSignals(): Promise<any[]> {
     return [
         {
-            title: "Frieren: Beyond Journey's End",
-            fullTitle: "Why 'Frieren' is Still the Highest Rated Anime Today",
-            slug: "frieren-trending-momentum",
-            content: "Months after its finale, Frieren continues to dominate discussion boards with its masterful storytelling.",
-            imageSearchTerm: "Frieren: Beyond Journey's End",
-            momentum: 0.98
+            title: "Solo Leveling",
+            fullTitle: "Jin-Woo’s Shadow Army Debut",
+            slug: "solo-leveling-shadows-debut",
+            content: "Episode 12’s climax introduces the Shadow Army, marking Jin-Woo’s class change. Visuals shift to a purple-black palette as Igris triggers the loyalty system.",
+            imageSearchTerm: "Solo Leveling",
+            momentum: 0.98,
+            trendReason: "Power debut"
+        },
+        {
+            title: "Kaiju No. 8",
+            fullTitle: "Kafka’s Transformation Revealed",
+            slug: "kaiju-no8-transformation",
+            content: "Kafka’s partial transformation in Episode 4 exposes his identity to Kikoru. The scene emphasizes the contrast between his comedic human form and the kaiju scale.",
+            imageSearchTerm: "Kaiju No. 8",
+            momentum: 0.92,
+            trendReason: "Character reveal"
         }
     ];
 }

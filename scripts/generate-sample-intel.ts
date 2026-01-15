@@ -4,7 +4,6 @@
  */
 
 import { generateIntelPost } from '../src/lib/engine/generator';
-import { getPosts } from '../src/lib/blog';
 import fs from 'fs';
 import path from 'path';
 import { BlogPost } from '../src/types';

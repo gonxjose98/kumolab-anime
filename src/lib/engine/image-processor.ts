@@ -23,12 +23,16 @@ interface IntelImageOptions {
 /**
  * Processes an image for the Intel Feed and Social Media.
  */
+/**
+ * Processes an image for the Intel Feed and Social Media.
+ */
 export async function generateIntelImage({
     sourceUrl,
     animeTitle,
-    headline,
-    slug
-}: IntelImageOptions): Promise<string | null> {
+    headline, // Serves as the "Supporting Line"
+    slug,
+    textPosition = 'bottom' // New argument defaulting to bottom
+}: IntelImageOptions & { textPosition?: 'top' | 'bottom' }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
@@ -60,46 +64,68 @@ export async function generateIntelImage({
         const img = await loadImage(resizedBuffer);
         ctx.drawImage(img, 0, 0);
 
-        // 3. Dark Overlay (Bottom Fade)
-        const gradient = ctx.createLinearGradient(0, HEIGHT * 0.5, 0, HEIGHT);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+        // 3. Zone Logic (Top vs Bottom)
+        const isTop = textPosition === 'top';
+        const zoneHeight = HEIGHT * 0.35; // 35% of image
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        // 4. Subtle Gradient (Localized)
+        let gradient;
+        if (isTop) {
+            // Top: Black -> Transparent (downwards)
+            gradient = ctx.createLinearGradient(0, 0, 0, zoneHeight);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, WIDTH, zoneHeight);
+        } else {
+            // Bottom: Transparent -> Black (downwards)
+            gradient = ctx.createLinearGradient(0, HEIGHT - zoneHeight, 0, HEIGHT);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, HEIGHT - zoneHeight, WIDTH, zoneHeight);
+        }
 
-        // 4. Position Settings
+        // 5. Typography Settings
         const centerX = WIDTH / 2;
-        const baseY = HEIGHT * 0.75; // Starting point for text cluster
-        const maxWidth = WIDTH * 0.9;
+        const maxWidth = WIDTH * 0.85; // slightly tighter for elegance
 
         ctx.textAlign = 'center';
+
+        // Font Sizes (Hierarchy: Title > Supporting > Handle)
+        const titleSize = 82; // Dominant
+        const supportingSize = 42; // ~50% of title (Guideline says < 40% size, but readability matters, adjusted to 42px)
+        const handleSize = 28;
+
+        // 6. Draw Text
+        // Calculate Y positions based on Zone
+        let currentY = isTop ? 120 : (HEIGHT - zoneHeight + 100);
+
+        // ANIME TITLE (Purple, Bold)
+        // KumoLab Purple: #C084FC (matching the CSS gradient start) or #9D7BFF
+        ctx.font = `bold ${titleSize}px sans-serif`;
+        ctx.fillStyle = '#C084FC'; // Vibrant Purple
         ctx.textBaseline = 'top';
 
-        // 5. Draw "STATUS" (Headline) - White
-        const statusSize = 58;
-        ctx.font = `bold ${statusSize}px sans-serif`;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(headline.toUpperCase(), centerX, baseY);
-
-        // 6. Draw "ANIME TITLE" - Purple
-        const titleSize = 78;
-        ctx.font = `bold ${titleSize}px sans-serif`;
-        ctx.fillStyle = KUMOLAB_PURPLE;
-
         const titleLines = wrapText(ctx, animeTitle.toUpperCase(), maxWidth, 2);
-        const titleY = baseY + statusSize + 20;
-
-        titleLines.forEach((line, i) => {
-            ctx.fillText(line, centerX, titleY + (i * (titleSize + 10)));
+        titleLines.forEach((line) => {
+            ctx.fillText(line, centerX, currentY);
+            currentY += titleSize + 15; // Line spacing
         });
 
-        // 7. Draw Handle - Bottom Center
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // Subtle white
-        ctx.fillText(HANDLE_TEXT, centerX, HEIGHT - 100);
+        // SUPPORTING LINE (White, Regular, Smaller)
+        currentY += 10; // Gap
+        ctx.font = `normal ${supportingSize}px sans-serif`;
+        ctx.fillStyle = '#E2E8F0'; // Slate-200 (White-ish)
+        ctx.fillText(headline.toUpperCase(), centerX, currentY);
 
-        // 8. Save
+        // HANDLE (White, Subtle)
+        currentY += supportingSize + 40; // Gap between supporting and handle
+        ctx.font = `normal ${handleSize}px sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.fillText(HANDLE_TEXT, centerX, currentY);
+
+        // 7. Save
         const finalBuffer = await canvas.toBuffer('image/png');
         fs.writeFileSync(outputPath, finalBuffer);
 
