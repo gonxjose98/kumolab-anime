@@ -171,6 +171,27 @@
         font-size: 1.25rem;
     }
 
+    /* Enable manual scrolling on mobile */
+    .carouselContainer {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        mask-image: none;
+        -webkit-mask-image: none;
+    }
+
+    .carouselContainer::-webkit-scrollbar {
+        display: none;
+        /* Hide scrollbar for Chrome/Safari/Opera */
+    }
+
+    .track {
+        animation: none;
+        /* Disable auto-scroll */
+        padding: 0 1rem;
+        gap: 1rem;
+    }
+
     .card {
         min-width: 280px;
         max-width: 280px;

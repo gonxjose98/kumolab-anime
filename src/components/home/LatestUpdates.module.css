@@ -149,6 +149,25 @@
         font-size: 1.5rem;
     }
 
+    /* Enable manual scrolling on mobile */
+    .carouselContainer {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        mask-image: none;
+        -webkit-mask-image: none;
+    }
+
+    .carouselContainer::-webkit-scrollbar {
+        display: none;
+    }
+
+    .track {
+        animation: none;
+        padding: 0 1rem;
+        gap: 1rem;
+    }
+
     .card {
         min-width: 260px;
         max-width: 260px;
