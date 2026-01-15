@@ -104,6 +104,26 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
         }
     };
 
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (!scrollRef.current) return;
+        setIsDown(true);
+        setIsPaused(true);
+        setStartX(e.touches[0].pageX - scrollRef.current.offsetLeft);
+        setScrollLeftStart(scrollRef.current.scrollLeft);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDown || !scrollRef.current) return;
+        const x = e.touches[0].pageX - scrollRef.current.offsetLeft;
+        const walk = (x - startX);
+        scrollRef.current.scrollLeft = scrollLeftStart - walk;
+    };
+
+    const handleTouchEnd = () => {
+        setIsDown(false);
+        setIsPaused(false);
+    };
+
     // Octuple content to guarantee seamless loop on all viewports
     const carouselItems = [...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts, ...posts];
 
@@ -120,9 +140,10 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
                 onPointerEnter={handlePointerEnter}
                 onPointerLeave={handlePointerLeave}
                 onMouseDown={handleMouseDown}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
-                onTouchCancel={() => setIsPaused(false)}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
                 style={{ cursor: isDown ? 'grabbing' : 'grab' }}
             >
                 <div className={styles.track}>
