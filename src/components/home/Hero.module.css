@@ -41,7 +41,139 @@
     animation: floatUp 0.8s ease-out forwards;
 }
 
-/* ... existing styles ... */
+.headline {
+    font-family: var(--font-display);
+    /* Mobile: text-5xl (3rem/48px) */
+    font-size: 3rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+    /* Heavy shadows for readability on a 100% bright background */
+    text-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.9),
+        0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Tablet: text-6xl (3.75rem/60px) */
+@media (min-width: 640px) {
+    .headline {
+        font-size: 3.75rem;
+    }
+}
+
+/* Desktop: text-7xl (4.5rem/72px) */
+@media (min-width: 1024px) {
+    .headline {
+        font-size: 4.5rem;
+    }
+}
+
+.accentText {
+    background: linear-gradient(to right, #C084FC, #60A5FA);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-weight: 700;
+    /* CRITICAL: Remove inherited text-shadow to match reference image strictly */
+    text-shadow: none;
+    padding-bottom: 0.1em;
+    /* Prevent descender clipping */
+    /* Subtle shadow using filter to respect the transparent gradient text */
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.subheadline {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    color: #FFFFFF;
+    font-weight: 600;
+    line-height: 1.4;
+    max-width: 800px;
+    margin: 0 auto 40px;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.9);
+    font-style: normal;
+}
+
+.buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+}
+
+.primaryBtn {
+    /* Glassmorphism — REQUIRED */
+    background: rgba(124, 58, 237, 0.3);
+    /* Translucent purple */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 16px 42px;
+    border-radius: 99px;
+    /* Pill */
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    /* Soft glow around edges */
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+}
+
+.primaryBtn:hover {
+    /* Slight brightness increase & glow intensification */
+    background: rgba(124, 58, 237, 0.45);
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
+}
+
+.scrollIndicator {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+}
+
+.mouse {
+    width: 26px;
+    height: 42px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    position: relative;
+}
+
+.mouse::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 8px;
+    background: #fff;
+    border-radius: 2px;
+    animation: scroll 1.5s infinite;
+}
+
+@keyframes scroll {
+    0% {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, 15px);
+        opacity: 0;
+    }
+}
 
 @media (max-width: 900px) {
     /* .headline font-size is now handled by min-width media queries above */
@@ -53,167 +185,19 @@
     }
 
     .subheadline {
-        .headline {
-            font-family: var(--font-display);
-            /* Mobile: text-5xl (3rem/48px) */
-            font-size: 3rem;
-            font-weight: 700;
-            color: #FFFFFF;
-            line-height: 1.25;
-            letter-spacing: -0.01em;
-            margin-bottom: 16px;
-            /* Heavy shadows for readability on a 100% bright background */
-            text-shadow:
-                0 4px 12px rgba(0, 0, 0, 0.9),
-                0 0 40px rgba(0, 0, 0, 0.6);
-        }
+        font-size: 1.1rem;
+        padding: 0 1rem;
+    }
 
-        /* Tablet: text-6xl (3.75rem/60px) */
-        @media (min-width: 640px) {
-            .headline {
-                font-size: 3.75rem;
-            }
-        }
+    .buttons {
+        flex-direction: column;
+        width: 100%;
+        padding: 0 2rem;
+    }
 
-        /* Desktop: text-7xl (4.5rem/72px) */
-        @media (min-width: 1024px) {
-            .headline {
-                font-size: 4.5rem;
-            }
-        }
-
-        .accentText {
-            background: linear-gradient(to right, #C084FC, #60A5FA);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            color: transparent;
-            font-weight: 700;
-            /* CRITICAL: Remove inherited text-shadow to match reference image strictly */
-            text-shadow: none;
-            padding-bottom: 0.1em;
-            /* Prevent descender clipping */
-            /* Subtle shadow using filter to respect the transparent gradient text */
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-        }
-
-        .subheadline {
-            font-family: var(--font-display);
-            font-size: 1.4rem;
-            color: #FFFFFF;
-            font-weight: 600;
-            line-height: 1.4;
-            max-width: 800px;
-            margin: 0 auto 40px;
-            text-shadow: 0 4px 15px rgba(0, 0, 0, 0.9);
-            font-style: normal;
-        }
-
-        .buttons {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 24px;
-        }
-
-        .primaryBtn {
-            /* Glassmorphism — REQUIRED */
-            background: rgba(124, 58, 237, 0.3);
-            /* Translucent purple */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            padding: 16px 42px;
-            border-radius: 99px;
-            /* Pill */
-            font-family: var(--font-display);
-            font-size: 1.1rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            /* Soft glow around edges */
-            box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
-        }
-
-        .primaryBtn:hover {
-            /* Slight brightness increase & glow intensification */
-            background: rgba(124, 58, 237, 0.45);
-            transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
-        }
-
-        .scrollIndicator {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2;
-        }
-
-        .mouse {
-            width: 26px;
-            height: 42px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 20px;
-            position: relative;
-        }
-
-        .mouse::before {
-            content: '';
-            position: absolute;
-            top: 6px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 8px;
-            background: #fff;
-            border-radius: 2px;
-            animation: scroll 1.5s infinite;
-        }
-
-        @keyframes scroll {
-            0% {
-                transform: translate(-50%, 0);
-                opacity: 1;
-            }
-
-            100% {
-                transform: translate(-50%, 15px);
-                opacity: 0;
-            }
-        }
-
-        @media (max-width: 900px) {
-            /* .headline font-size is now handled by min-width media queries above */
-
-            .hero {
-                align-items: flex-start;
-                padding-top: calc(var(--header-height) + 120px);
-                /* Aggressive manual offset */
-            }
-
-            .heroContent {
-                padding-top: 0;
-            }
-
-            .subheadline {
-                font-size: 1.1rem;
-                padding: 0 1rem;
-            }
-
-            .buttons {
-                flex-direction: column;
-                width: 100%;
-                padding: 0 2rem;
-            }
-
-            .primaryBtn {
-                width: 100%;
-                justify-content: center;
-                padding: 14px 24px;
-            }
-        }
+    .primaryBtn {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 24px;
+    }
+}
