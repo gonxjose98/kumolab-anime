@@ -105,11 +105,11 @@ export async function generateIntelImage({
 
         ctx.textAlign = 'center';
 
-        // Shadow Settings
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-        ctx.shadowBlur = 25;
+        // Shadow Settings (Stronger & more prominent per USER request)
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+        ctx.shadowBlur = 35;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 4;
+        ctx.shadowOffsetY = 8;
 
         // Equalized font size per USER request: "make sure the text is all the same size"
         const fontName = 'sans-serif';
