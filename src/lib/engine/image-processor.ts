@@ -186,10 +186,10 @@ export async function generateIntelImage({
             const bucketName = 'blog-images';
             const finalBuffer = await canvas.toBuffer('image/png');
 
-            // Dynamic import to avoid circular dep issues in some envs, though engine.ts is server-side
-            const { supabase } = await import('../supabase/client');
+            // Dynamic import to avoid circular dep issues in some envs
+            const { supabaseAdmin } = await import('../supabase/admin');
 
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .storage
                 .from(bucketName)
                 .upload(`${outputFileName}`, finalBuffer, {
@@ -208,7 +208,7 @@ export async function generateIntelImage({
             }
 
             // Get Public URL
-            const { data: { publicUrl } } = supabase
+            const { data: { publicUrl } } = supabaseAdmin
                 .storage
                 .from(bucketName)
                 .getPublicUrl(`${outputFileName}`);
