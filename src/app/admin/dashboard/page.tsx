@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
-import TrafficChart from '@/components/admin/charts/TrafficChart';
+import dynamicHelper from 'next/dynamic';
 import { Eye, TrendingUp, Calendar, Edit2, ShieldAlert } from 'lucide-react';
+
+const TrafficChart = dynamicHelper(() => import('@/components/admin/charts/TrafficChart'), { ssr: false });
 
 export const dynamic = 'force-dynamic';
 
