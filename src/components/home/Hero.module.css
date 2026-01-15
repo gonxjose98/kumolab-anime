@@ -177,6 +177,11 @@
 @media (max-width: 768px) {
     /* .headline font-size is now handled by min-width media queries above */
 
+    .heroContent {
+        padding-top: var(--header-height);
+        /* Ensure content clears the fixed header */
+    }
+
     .subheadline {
         font-size: 1.1rem;
         padding: 0 1rem;
