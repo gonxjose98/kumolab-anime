@@ -20,12 +20,22 @@ export async function getPosts(): Promise<BlogPost[]> {
         }
 
         // Map snake_case from DB to camelCase for the app
-        return (data || []).map(post => ({
-            ...post,
-            isPublished: post.is_published,
-            claimType: post.claim_type,
-            premiereDate: post.premiere_date
-        }));
+        return (data || []).map(post => {
+            let image = post.image;
+
+            // EMERGENCY OVERRIDE: Fix Frieren post image if it's missing or broken in DB
+            if (post.slug === 'frieren-s2-announced-2026-01-15' && (!image || image === 'null')) {
+                image = 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170068-ijY3tCP8KoWP.jpg';
+            }
+
+            return {
+                ...post,
+                image,
+                isPublished: post.is_published,
+                claimType: post.claim_type,
+                premiereDate: post.premiere_date
+            };
+        });
     }
 
     // Local JSON Fallback
