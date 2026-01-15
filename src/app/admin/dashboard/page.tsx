@@ -1,160 +1,93 @@
-'use client';
+import Link from 'next/link';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-import { useState, useEffect } from 'react';
-import { BlogPost, Product } from '@/types';
-import styles from './dashboard.module.css';
+export const dynamic = 'force-dynamic';
 
-export default function DashboardPage() {
-    const [activeTab, setActiveTab] = useState<'ANALYTICS' | 'POSTS' | 'MERCH'>('ANALYTICS');
-    const [posts, setPosts] = useState<BlogPost[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
+async function getStats(supabase: any) {
+    // 1. Total Site Views (Last 30 Days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Post Form State
-    const [newPost, setNewPost] = useState({
-        title: '',
-        slug: '',
-        type: 'INTEL',
-        content: '',
-        image: ''
-    });
+    const { count: totalViews } = await supabase
+        .from('page_views')
+        .select('*', { count: 'exact', head: true })
+        .gt('timestamp', thirtyDaysAgo.toISOString())
+        .eq('is_bot', false); // Exclude bots
 
-    useEffect(() => {
-        fetchPosts();
-        // fetchProducts(); // Assume similar API for products exists or reuse mock
-    }, []);
+    return { totalViews: totalViews || 0 };
+}
 
-    const fetchPosts = async () => {
-        const res = await fetch('/api/posts');
-        if (res.ok) setPosts(await res.json());
-    };
+async function getPosts(supabase: any) {
+    const { data: posts } = await supabase
+        .from('posts')
+        .select('id, title, type, is_published, timestamp, slug')
+        .order('timestamp', { ascending: false })
+        .limit(50);
+    return posts || [];
+}
 
-    const handleCreatePost = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await fetch('/api/posts', {
-            method: 'POST',
-            body: JSON.stringify({ ...newPost, isPublished: true }),
-        });
-        setNewPost({ title: '', slug: '', type: 'INTEL', content: '', image: '' });
-        fetchPosts();
-    };
-
-    const handleDeletePost = async (id: string) => {
-        if (confirm('Delete this post?')) {
-            await fetch('/api/posts', {
-                method: 'DELETE',
-                body: JSON.stringify({ id }),
-            });
-            fetchPosts();
-        }
-    };
+export default async function DashboardPage() {
+    const supabase = createServerComponentClient({ cookies });
+    const stats = await getStats(supabase);
+    const posts = await getPosts(supabase);
 
     return (
-        <div className={styles.container}>
-            <nav className={styles.sidebar}>
-                <h2 className={styles.brand}>Kumo Admin</h2>
-                <button onClick={() => setActiveTab('ANALYTICS')} className={activeTab === 'ANALYTICS' ? styles.active : ''}>Analytics</button>
-                <button onClick={() => setActiveTab('POSTS')} className={activeTab === 'POSTS' ? styles.active : ''}>Content</button>
-                <button onClick={() => setActiveTab('MERCH')} className={activeTab === 'MERCH' ? styles.active : ''}>Merch</button>
-            </nav>
-
-            <main className={styles.main}>
-                {activeTab === 'ANALYTICS' && (
-                    <div className={styles.statsGrid}>
-                        <div className={styles.statCard}>
-                            <h3>Daily Views</h3>
-                            <p>12,405</p>
-                        </div>
-                        <div className={styles.statCard}>
-                            <h3>Active Users</h3>
-                            <p>842</p>
-                        </div>
-                        <div className={styles.statCard}>
-                            <h3>Merch Clicks</h3>
-                            <p>156</p>
-                        </div>
+        <div className="max-w-5xl mx-auto space-y-8">
+            {/* 1. ANALYTICS CARD */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-6 rounded-lg bg-neutral-900 border border-neutral-800">
+                    <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-2">Total Site Views</h3>
+                    <div className="text-4xl font-bold text-white">
+                        {stats.totalViews.toLocaleString()}
                     </div>
-                )}
+                    <p className="text-xs text-neutral-500 mt-2">Last 30 Days (Excluding Bots)</p>
+                </div>
+                {/* Future: Add more stats here */}
+            </div>
 
-                {activeTab === 'POSTS' && (
-                    <div className={styles.contentSection}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                            <h2>Create New Post</h2>
-                            <button
-                                onClick={async () => {
-                                    const simulatedDrop = {
-                                        title: `Daily Drops - ${new Date().toLocaleDateString()}`,
-                                        slug: `daily-drops-${Date.now()}`,
-                                        type: 'DROP',
-                                        content: 'Good morning, Kumo Fam.\n\nHere are today’s drops:\n- Simulated Anime 1 — Episode 12\n- Simulated Anime 2 — Episode 5',
-                                        image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&q=80&w=1000'
-                                    };
-                                    await fetch('/api/posts', { method: 'POST', body: JSON.stringify({ ...simulatedDrop, isPublished: true }) });
-                                    fetchPosts();
-                                }}
-                                style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '0.8rem 1.5rem', borderRadius: '4px', cursor: 'pointer' }}
-                            >
-                                Simulate Daily Drop
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreatePost} className={styles.form}>
-                            <input
-                                placeholder="Title"
-                                value={newPost.title}
-                                onChange={e => setNewPost({ ...newPost, title: e.target.value })}
-                                required
-                            />
-                            <input
-                                placeholder="Slug"
-                                value={newPost.slug}
-                                onChange={e => setNewPost({ ...newPost, slug: e.target.value })}
-                                required
-                            />
-                            <select
-                                value={newPost.type}
-                                onChange={e => setNewPost({ ...newPost, type: e.target.value })}
-                            >
-                                <option value="DROP">DROP</option>
-                                <option value="INTEL">INTEL</option>
-                                <option value="TRENDING">TRENDING</option>
-                                <option value="COMMUNITY">COMMUNITY</option>
-                            </select>
-                            <input
-                                placeholder="Image URL"
-                                value={newPost.image}
-                                onChange={e => setNewPost({ ...newPost, image: e.target.value })}
-                            />
-                            <textarea
-                                placeholder="Content"
-                                value={newPost.content}
-                                onChange={e => setNewPost({ ...newPost, content: e.target.value })}
-                                rows={5}
-                                required
-                            />
-                            <button type="submit">Publish Post</button>
-                        </form>
-
-                        <h2>Recent Posts</h2>
-                        <div className={styles.postList}>
-                            {posts.map(post => (
-                                <div key={post.id} className={styles.postItem}>
-                                    <span>{post.title}</span>
-                                    <div className={styles.actions}>
-                                        <span className={styles.badge}>{post.type}</span>
-                                        <button onClick={() => handleDeletePost(post.id)} className={styles.deleteBtn}>Delete</button>
-                                    </div>
-                                </div>
+            {/* 2. POST MANAGEMENT */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-white">Recent Posts</h2>
+                <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-neutral-950 text-neutral-400 border-b border-neutral-800">
+                            <tr>
+                                <th className="p-4 font-medium">Status</th>
+                                <th className="p-4 font-medium">Type</th>
+                                <th className="p-4 font-medium w-full">Title</th>
+                                <th className="p-4 font-medium text-right">Date</th>
+                                <th className="p-4 font-medium text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-800">
+                            {posts.map((post: any) => (
+                                <tr key={post.id} className="hover:bg-neutral-800/50 transition-colors">
+                                    <td className="p-4">
+                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${post.is_published
+                                                ? 'bg-green-900/30 text-green-400 border border-green-900'
+                                                : 'bg-red-900/30 text-red-400 border border-red-900'
+                                            }`}>
+                                            {post.is_published ? 'LIVE' : 'HIDDEN'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-neutral-400 font-mono text-xs">{post.type}</td>
+                                    <td className="p-4 font-medium text-white">{post.title}</td>
+                                    <td className="p-4 text-neutral-500 text-right whitespace-nowrap">
+                                        {new Date(post.timestamp).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        {/* Placeholder for Editor Link */}
+                                        <Link href={`/admin/post/${post.id}`} className="text-purple-400 hover:text-purple-300 font-medium">
+                                            Edit
+                                        </Link>
+                                    </td>
+                                </tr>
                             ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'MERCH' && (
-                    <div>
-                        <h2>Merch Management</h2>
-                        <p>Feature in progress. Use JSON file to update products.</p>
-                    </div>
-                )}
-            </main>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 }

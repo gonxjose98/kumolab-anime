@@ -1,43 +1,84 @@
 'use client';
 
-import { useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-export default function LoginPage() {
+export default function AdminLogin() {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const [error, setError] = useState(false);
+    const supabase = createClientComponentClient();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        const res = await fetch('/api/auth', {
-            method: 'POST',
-            body: JSON.stringify({ password }),
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
         });
 
-        if (res.ok) {
-            router.push('/admin/dashboard');
+        if (error) {
+            setError('Invalid credentials.');
+            setLoading(false);
         } else {
-            setError(true);
+            // Success -> Redirect to dashboard
+            router.push('/admin/dashboard');
+            router.refresh(); // Refresh middleware/server state
         }
     };
 
     return (
-        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px' }}>
-                <h1 style={{ textAlign: 'center' }}>Admin Access</h1>
-                <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    style={{ padding: '0.8rem', borderRadius: '4px', border: '1px solid #333', background: '#111', color: '#fff' }}
-                />
-                {error && <p style={{ color: 'red', fontSize: '0.9rem' }}>Invalid password</p>}
-                <button type="submit" style={{ padding: '0.8rem', background: '#6d28d9', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                    Enter
-                </button>
-            </form>
+        <div className="flex items-center justify-center min-h-screen bg-black text-white p-4">
+            <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 p-8 rounded-lg shadow-2xl">
+                <div className="mb-8 text-center">
+                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
+                        KumoLab Access
+                    </h1>
+                    <p className="text-sm text-neutral-500 mt-2">Restricted Area</p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                            required
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="text-red-500 text-xs text-center">
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-white text-black font-semibold rounded hover:bg-neutral-200 transition-colors disabled:opacity-50 text-sm"
+                    >
+                        {loading ? 'Authenticating...' : 'Enter'}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }
