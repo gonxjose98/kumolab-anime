@@ -159,7 +159,9 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
                                 <span className={styles.timestamp}>
                                     {mounted ? new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                 </span>
-                                <h3 className={styles.cardTitle}>{post.title}</h3>
+                                <h3 className={styles.cardTitle}>
+                                    {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                                </h3>
                             </div>
                         </Link>
                     ))}

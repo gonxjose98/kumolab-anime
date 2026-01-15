@@ -154,7 +154,9 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
                                         {mounted ? new Date(post.timestamp).toLocaleDateString() : ''}
                                     </span>
                                 </div>
-                                <h3 className={styles.cardTitle}>{post.title}</h3>
+                                <h3 className={styles.cardTitle}>
+                                    {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                                </h3>
                             </div>
                         </Link>
                     ))}
