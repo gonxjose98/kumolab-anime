@@ -179,11 +179,46 @@ export async function generateIntelImage({
         ctx.fillText(HANDLE_TEXT, centerX, HEIGHT - 30);
 
 
-        // 7. Save
-        const finalBuffer = await canvas.toBuffer('image/png');
-        fs.writeFileSync(outputPath, finalBuffer);
+        // 7. Upload to Supabase Storage (Persistent & Accessible)
+        try {
+            const bucketName = 'blog-images';
+            const finalBuffer = await canvas.toBuffer('image/png');
 
-        return `/blog/intel/${outputFileName}`;
+            // Dynamic import to avoid circular dep issues in some envs, though engine.ts is server-side
+            const { supabase } = await import('../supabase/client');
+
+            const { data, error } = await supabase
+                .storage
+                .from(bucketName)
+                .upload(`${outputFileName}`, finalBuffer, {
+                    contentType: 'image/png',
+                    upsert: true
+                });
+
+            if (error) {
+                console.error('Supabase Storage Upload Error:', error);
+
+                // FALLBACK: Write to specific public dir if storage fails (for local dev resilience)
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Falling back to local write for dev...');
+                    fs.writeFileSync(outputPath, finalBuffer);
+                    return `/blog/intel/${outputFileName}`;
+                }
+                return null;
+            }
+
+            // Get Public URL
+            const { data: { publicUrl } } = supabase
+                .storage
+                .from(bucketName)
+                .getPublicUrl(`${outputFileName}`);
+
+            return publicUrl;
+
+        } catch (uploadError) {
+            console.error('Storage operation failed:', uploadError);
+            return null;
+        }
     } catch (error) {
         console.error('Image Generation Error:', error);
         return null;
