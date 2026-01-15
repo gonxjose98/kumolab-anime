@@ -127,16 +127,17 @@ export async function generateIntelImage({
         const headlineBlockHeight = headlineLines.length * lineSpacingHeadline;
         const gap = 20;
 
-        // Determine Start Y (Anchored from Bottom)
-        // If bottom zone is 35% (approx 470px).
-        // Text should sit comfortably there.
-        let currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight + titleSize;
-        // Note: Canvas fillText positions are usually baseline or top. 
-        // Let's use 'alphabetic' (default) or 'middle'. 
-        // Actually, previous code used 'top'. Let's stick to 'top' but calculate upwards from bottom.
+        // Determine Start Y based on Zone
+        let currentY = 0;
+
+        if (isTop) {
+            currentY = 120; // Anchor to Top with padding
+        } else {
+            // Anchor to Bottom
+            currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight;
+        }
 
         ctx.textBaseline = 'top';
-        currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight;
 
         // --- DRAW ANIME TITLE (PRIMARY: WHITE / HEAVY) ---
         ctx.font = `900 ${titleSize}px ${fontName}`;
@@ -158,13 +159,10 @@ export async function generateIntelImage({
         });
 
         // --- DRAW HANDLE (Subtle) ---
-        // (Optional: If room permits, or just omit if "taking up room" with main text is priority)
-        // Let's add it very small at the very bottom if needed, or skip to clear clutter.
-        // User asked for "Clear headline hierarchy". Handle might distract.
-        // Let's Put it tiny at the very bottom edge.
         ctx.font = `bold 24px ${fontName}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 0; // No shadow for handle
+        ctx.shadowBlur = 0;
+        // If Top, put handle at top padding? Or Bottom? Keep it bottom consistent.
         ctx.fillText(HANDLE_TEXT, centerX, HEIGHT - 30);
 
 
