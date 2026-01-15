@@ -16,6 +16,7 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
     const [isDown, setIsDown] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
+    const accumulatorRef = useRef(0);
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -27,8 +28,16 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
             if (!isPaused && !isDown) {
                 if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
                     el.scrollLeft = 0;
+                    accumulatorRef.current = 0;
                 } else {
-                    el.scrollLeft += 0.8;
+                    // Accumulate fractional pixels
+                    accumulatorRef.current += 0.8;
+                    const wholePixels = Math.floor(accumulatorRef.current);
+
+                    if (wholePixels >= 1) {
+                        el.scrollLeft += wholePixels;
+                        accumulatorRef.current -= wholePixels;
+                    }
                 }
             }
             animId = requestAnimationFrame(scroll);
@@ -46,7 +55,7 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
             if (!scrollRef.current) return;
             e.preventDefault();
             const x = e.pageX - scrollRef.current.offsetLeft;
-            const walk = (x - startX) * 2;
+            const walk = (x - startX); // 1:1 movement
             scrollRef.current.scrollLeft = scrollLeftStart - walk;
         };
 

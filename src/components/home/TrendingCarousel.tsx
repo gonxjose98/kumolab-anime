@@ -18,6 +18,7 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
     const [isDown, setIsDown] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
+    const accumulatorRef = useRef(0);
 
     useEffect(() => {
         setMinutesAgo(Math.floor(Math.random() * 59) + 1);
@@ -31,11 +32,20 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
 
         const scroll = () => {
             if (!isPaused && !isDown) {
-                // Tolerance of 1px to prevent sticking
+                // Infinite Loop Check (Reset)
+                // Use tolerance of 1px
                 if (el.scrollLeft >= (el.scrollWidth / 2) - 1) {
                     el.scrollLeft = 0;
+                    accumulatorRef.current = 0;
                 } else {
-                    el.scrollLeft += 0.8;
+                    // Accumulate fractional scroll amounts to handle integer-pixel browsers
+                    accumulatorRef.current += 0.8;
+                    const wholePixels = Math.floor(accumulatorRef.current);
+
+                    if (wholePixels >= 1) {
+                        el.scrollLeft += wholePixels;
+                        accumulatorRef.current -= wholePixels;
+                    }
                 }
             }
             animId = requestAnimationFrame(scroll);
@@ -53,7 +63,7 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
             if (!scrollRef.current) return;
             e.preventDefault();
             const x = e.pageX - scrollRef.current.offsetLeft;
-            const walk = (x - startX) * 2;
+            const walk = (x - startX); // 1:1 movement (removed * 2)
             scrollRef.current.scrollLeft = scrollLeftStart - walk;
         };
 
