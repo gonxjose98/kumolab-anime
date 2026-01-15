@@ -43,7 +43,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                         })}
                     </time>
                 </div>
-                <h1 className={styles.title}>{post.title}</h1>
+                <h1 className={styles.title}>
+                    {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                </h1>
             </div>
 
             <div className={styles.content}>
