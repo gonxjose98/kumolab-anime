@@ -119,13 +119,24 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     // IMAGE RELEVANCE PROMPT (LOCKED)
     let officialSourceImage = topItem.image;
     if (!officialSourceImage && topItem.imageSearchTerm) {
-        officialSourceImage = await fetchOfficialAnimeImage(topItem.imageSearchTerm);
+        try {
+            officialSourceImage = await fetchOfficialAnimeImage(topItem.imageSearchTerm);
+        } catch (e) {
+            console.error('Failed to fetch official image via custom search:', e);
+        }
+    }
+
+    // HARD RULE: FALLBACK IF NO IMAGE FOUND
+    // If we still don't have an image, use the branded fallback background.
+    if (!officialSourceImage) {
+        console.warn('No official source image found. Using fallback background to ensure generation.');
+        officialSourceImage = '/hero-bg-final.png'; // Make sure this file exists in public/
     }
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Construct social headline: "ANIME_TITLE: STATUS"
-        const socialHeadline = `${topItem.title} ${overlayTag}`;
+        const overlayTag = overlayTextMap[claimType]; // Ensure overlayTag is accessible here
 
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
@@ -136,6 +147,11 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
         if (processedImageUrl) {
             finalImage = processedImageUrl;
+        } else {
+            // If generation failed even with fallback, alert but do not block (or maybe block?)
+            // User said "NEEDS to generate". If generation fails, we are in trouble.
+            // But valid processedImageUrl returns path.
+            console.warn('Image generation returned null even with source.');
         }
     }
 

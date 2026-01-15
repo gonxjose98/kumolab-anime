@@ -46,9 +46,22 @@ export async function generateIntelImage({
 
     try {
         // 1. Download and Resize/Crop to 1080x1350
-        const response = await fetch(sourceUrl);
-        if (!response.ok) throw new Error('Failed to fetch image');
-        const buffer = Buffer.from(await response.arrayBuffer());
+        let buffer: Buffer;
+
+        if (sourceUrl.startsWith('http')) {
+            const response = await fetch(sourceUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+            buffer = Buffer.from(await response.arrayBuffer());
+        } else {
+            // Assume local public path (remove leading slash if needed or join with cwd)
+            // If it starts with /, assuming relative to public for usage, but for server-side fs read:
+            const localPath = path.join(process.cwd(), 'public', sourceUrl.startsWith('/') ? sourceUrl.slice(1) : sourceUrl);
+            if (fs.existsSync(localPath)) {
+                buffer = fs.readFileSync(localPath);
+            } else {
+                throw new Error(`Local source image not found: ${localPath}`);
+            }
+        }
 
         const resizedBuffer = await sharp(buffer)
             .resize(WIDTH, HEIGHT, {

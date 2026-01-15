@@ -36,10 +36,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                         {new Date(post.timestamp).toLocaleDateString(undefined, {
                             weekday: 'long',
                             year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
+                            day: 'numeric'
                         })}
                     </time>
                 </div>
