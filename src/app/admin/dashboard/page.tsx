@@ -2,27 +2,61 @@ import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
 import { Eye, Calendar, Edit2, TrendingUp } from 'lucide-react';
+import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 
 export const dynamic = 'force-dynamic';
 
-// Helper to format dates (unused now but kept for future)
+// Helper to format dates for chart
 function formatDate(dateString: string) {
     const d = new Date(dateString);
     return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 async function getStats(supabase: any) {
-    // 1. Total Site Views (Last 30 Days)
+    // 1. Fetch raw view timestamps for last 30 days (excluding bots)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { count: totalViews } = await supabase
+    const { data: viewsData, error } = await supabase
         .from('page_views')
-        .select('*', { count: 'exact', head: true })
+        .select('timestamp')
         .gt('timestamp', thirtyDaysAgo.toISOString())
-        .eq('is_bot', false); // Exclude bots
+        .eq('is_bot', false);
 
-    return { totalViews: totalViews || 0 };
+    if (error || !viewsData) return { totalViews: 0, chartData: [] };
+
+    // 2. Process for Chart (Group by Day)
+    const dailyCounts: Record<string, number> = {};
+    const chartData = [];
+
+    // Initialize last 30 days with 0
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        dailyCounts[key] = 0;
+    }
+
+    // Fill counts
+    viewsData.forEach((row: any) => {
+        const dateKey = new Date(row.timestamp).toISOString().split('T')[0];
+        if (dailyCounts[dateKey] !== undefined) {
+            dailyCounts[dateKey]++;
+        }
+    });
+
+    // Convert to array
+    for (const [date, count] of Object.entries(dailyCounts)) {
+        chartData.push({
+            date: formatDate(date),
+            views: count,
+        });
+    }
+
+    return {
+        totalViews: viewsData.length,
+        chartData
+    };
 }
 
 async function getPosts(supabase: any) {
