@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
-import TrafficChart from '@/components/admin/charts/TrafficChart';
+// import TrafficChart from '@/components/admin/charts/TrafficChart';
 import { Eye, TrendingUp, Calendar, Edit2, ShieldAlert } from 'lucide-react';
 
 // Removed dynamic import to fix build issues. TrafficChart handles client-side rendering internally.
@@ -122,8 +122,9 @@ export default async function DashboardPage() {
                             Traffic Overview
                         </h3>
                     </div>
-                    <div className="h-[220px] -ml-2">
-                        <TrafficChart data={stats.chartData} />
+                    <div className="h-[220px] -ml-2 flex items-center justify-center text-neutral-500 text-xs">
+                        {/* <TrafficChart data={stats.chartData} /> */}
+                        Chart Temporarily Unavailable
                     </div>
                 </div>
             </div>
