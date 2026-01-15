@@ -99,76 +99,78 @@ export async function generateIntelImage({
             ctx.fillRect(0, HEIGHT - zoneHeight, WIDTH, zoneHeight);
         }
 
-        // 5. Typography Settings (BOLD & INDUSTRIAL)
+        // 5. Typography Settings (IMPACTFUL & EQUALIZED)
         const centerX = WIDTH / 2;
-        const availableWidth = WIDTH * 0.90; // Uses 90% of width for impact
+        const availableWidth = WIDTH * 0.90;
 
         ctx.textAlign = 'center';
 
-        // Shadow Settings (Subtle but grounded)
+        // Shadow Settings
         ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
         ctx.shadowBlur = 25;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 4;
 
-        // Font Config
-        // We use system sans-serif with weight 900 for that "Heavy" look.
-        // If 'Impact' or 'Arial Black' were available, we'd use them, but 'sans-serif' 900 is safe.
+        // Equalized font size per USER request: "make sure the text is all the same size"
         const fontName = 'sans-serif';
-        const titleSize = 100; // Large & Impactful
-        const headlineSize = 55; // Clear hierarchy
+        const globalFontSize = 95; // Balanced large size for both
+
+        // --- DEDUPLICATION LOGIC ---
+        // "detect duplicate words... it says 'officially officially'. That should never happen!"
+        const titleWords = animeTitle.toUpperCase().split(/\s+/);
+        let cleanedHeadline = headline.toUpperCase();
+
+        // Remove words from headline if they are already prominent in the title
+        const headlineWords = cleanedHeadline.split(/\s+/);
+        const uniqueHeadlineWords = headlineWords.filter(word => !titleWords.includes(word));
+        cleanedHeadline = uniqueHeadlineWords.join(' ');
 
         // 6. Draw Text
-        // Calculate total text height to center it vertically within the bottom zone if needed,
-        // OR just anchor it firmly to the bottom with padding.
-        // User wants it to "Fill the space".
-
         const bottomPadding = 80;
-        const lineSpacingTitle = titleSize * 0.95; // Tight leading
-        const lineSpacingHeadline = headlineSize * 1.0;
+        const lineSpacing = globalFontSize * 0.95;
 
         // Prepare Title Lines
-        ctx.font = `900 ${titleSize}px ${fontName}`;
+        ctx.font = `900 ${globalFontSize}px ${fontName}`;
         const titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
 
-        // Prepare Headline Lines
-        ctx.font = `900 ${headlineSize}px ${fontName}`;
-        const headlineLines = wrapText(ctx, headline.toUpperCase(), availableWidth, 2);
+        // Prepare Headline Lines (if any words remain after cleaning)
+        const headlineLines = cleanedHeadline.length > 0
+            ? wrapText(ctx, cleanedHeadline, availableWidth, 2)
+            : [];
 
         // Calculate Block Height
-        const titleBlockHeight = titleLines.length * lineSpacingTitle;
-        const headlineBlockHeight = headlineLines.length * lineSpacingHeadline;
-        const gap = 20;
+        const titleBlockHeight = titleLines.length * lineSpacing;
+        const headlineBlockHeight = headlineLines.length * lineSpacing;
+        const gap = headlineLines.length > 0 ? 20 : 0;
 
         // Determine Start Y based on Zone
         let currentY = 0;
 
         if (isTop) {
-            currentY = 120; // Anchor to Top with padding
+            currentY = 120;
         } else {
-            // Anchor to Bottom
             currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight;
         }
 
         ctx.textBaseline = 'top';
 
         // --- DRAW ANIME TITLE (PRIMARY: PURPLE / HEAVY) ---
-        ctx.font = `900 ${titleSize}px ${fontName}`;
+        ctx.font = `900 ${globalFontSize}px ${fontName}`;
         ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for Primary Title
 
         titleLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
-            currentY += lineSpacingTitle;
+            currentY += lineSpacing;
         });
 
         // --- DRAW HEADLINE (SUPPORTING: WHITE / HEAVY) ---
         currentY += gap;
-        ctx.font = `900 ${headlineSize}px ${fontName}`;
+        ctx.font = `900 ${globalFontSize}px ${fontName}`;
         ctx.fillStyle = '#FFFFFF'; // White for Supporting Line
 
         headlineLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
-            currentY += lineSpacingHeadline;
+            currentY += lineSpacing;
         });
 
         // --- DRAW HANDLE (Subtle) ---
