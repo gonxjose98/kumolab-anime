@@ -86,44 +86,87 @@ export async function generateIntelImage({
             ctx.fillRect(0, HEIGHT - zoneHeight, WIDTH, zoneHeight);
         }
 
-        // 5. Typography Settings
+        // 5. Typography Settings (BOLD & INDUSTRIAL)
         const centerX = WIDTH / 2;
-        const maxWidth = WIDTH * 0.85; // slightly tighter for elegance
+        const availableWidth = WIDTH * 0.90; // Uses 90% of width for impact
 
         ctx.textAlign = 'center';
 
-        // Font Sizes (Hierarchy: Title > Supporting > Handle)
-        const titleSize = 82; // Dominant
-        const supportingSize = 42; // ~50% of title (Guideline says < 40% size, but readability matters, adjusted to 42px)
-        const handleSize = 28;
+        // Shadow Settings (Subtle but grounded)
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+        ctx.shadowBlur = 25;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+
+        // Font Config
+        // We use system sans-serif with weight 900 for that "Heavy" look.
+        // If 'Impact' or 'Arial Black' were available, we'd use them, but 'sans-serif' 900 is safe.
+        const fontName = 'sans-serif';
+        const titleSize = 100; // Large & Impactful
+        const headlineSize = 55; // Clear hierarchy
 
         // 6. Draw Text
-        // Calculate Y positions based on Zone
-        let currentY = isTop ? 120 : (HEIGHT - zoneHeight + 100);
+        // Calculate total text height to center it vertically within the bottom zone if needed,
+        // OR just anchor it firmly to the bottom with padding.
+        // User wants it to "Fill the space".
 
-        // ANIME TITLE (Purple, Bold)
-        // KumoLab Purple: #C084FC (matching the CSS gradient start) or #9D7BFF
-        ctx.font = `bold ${titleSize}px sans-serif`;
-        ctx.fillStyle = '#C084FC'; // Vibrant Purple
+        const bottomPadding = 80;
+        const lineSpacingTitle = titleSize * 0.95; // Tight leading
+        const lineSpacingHeadline = headlineSize * 1.0;
+
+        // Prepare Title Lines
+        ctx.font = `900 ${titleSize}px ${fontName}`;
+        const titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
+
+        // Prepare Headline Lines
+        ctx.font = `900 ${headlineSize}px ${fontName}`;
+        const headlineLines = wrapText(ctx, headline.toUpperCase(), availableWidth, 2);
+
+        // Calculate Block Height
+        const titleBlockHeight = titleLines.length * lineSpacingTitle;
+        const headlineBlockHeight = headlineLines.length * lineSpacingHeadline;
+        const gap = 20;
+
+        // Determine Start Y (Anchored from Bottom)
+        // If bottom zone is 35% (approx 470px).
+        // Text should sit comfortably there.
+        let currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight + titleSize;
+        // Note: Canvas fillText positions are usually baseline or top. 
+        // Let's use 'alphabetic' (default) or 'middle'. 
+        // Actually, previous code used 'top'. Let's stick to 'top' but calculate upwards from bottom.
+
         ctx.textBaseline = 'top';
+        currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight;
 
-        const titleLines = wrapText(ctx, animeTitle.toUpperCase(), maxWidth, 2);
+        // --- DRAW ANIME TITLE (PRIMARY: WHITE / HEAVY) ---
+        ctx.font = `900 ${titleSize}px ${fontName}`;
+        ctx.fillStyle = '#FFFFFF'; // White for Primary
+
         titleLines.forEach((line) => {
             ctx.fillText(line, centerX, currentY);
-            currentY += titleSize + 15; // Line spacing
+            currentY += lineSpacingTitle;
         });
 
-        // SUPPORTING LINE (White, Regular, Smaller)
-        currentY += 10; // Gap
-        ctx.font = `normal ${supportingSize}px sans-serif`;
-        ctx.fillStyle = '#E2E8F0'; // Slate-200 (White-ish)
-        ctx.fillText(headline.toUpperCase(), centerX, currentY);
+        // --- DRAW HEADLINE (EMPHASIS: PURPLE / HEAVY) ---
+        currentY += gap;
+        ctx.font = `900 ${headlineSize}px ${fontName}`;
+        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for EMPHASIS
 
-        // HANDLE (White, Subtle)
-        currentY += supportingSize + 40; // Gap between supporting and handle
-        ctx.font = `normal ${handleSize}px sans-serif`;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.fillText(HANDLE_TEXT, centerX, currentY);
+        headlineLines.forEach((line) => {
+            ctx.fillText(line, centerX, currentY);
+            currentY += lineSpacingHeadline;
+        });
+
+        // --- DRAW HANDLE (Subtle) ---
+        // (Optional: If room permits, or just omit if "taking up room" with main text is priority)
+        // Let's add it very small at the very bottom if needed, or skip to clear clutter.
+        // User asked for "Clear headline hierarchy". Handle might distract.
+        // Let's Put it tiny at the very bottom edge.
+        ctx.font = `bold 24px ${fontName}`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.shadowBlur = 0; // No shadow for handle
+        ctx.fillText(HANDLE_TEXT, centerX, HEIGHT - 30);
+
 
         // 7. Save
         const finalBuffer = await canvas.toBuffer('image/png');
