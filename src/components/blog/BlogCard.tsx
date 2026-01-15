@@ -51,7 +51,9 @@ const BlogCard = ({ post }: BlogCardProps) => {
                         })}
                     </span>
                 </div>
-                <h3 className={styles.title}>{post.title}</h3>
+                <h3 className={styles.title}>
+                    {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                </h3>
                 {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
             </div>
         </Link>
