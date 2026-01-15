@@ -11,11 +11,11 @@ export default async function MerchPage() {
             <header className={styles.header}>
                 <h1 className={styles.title}>The Collection</h1>
                 <p className={styles.subtitle}>Curated artifacts for the discerning collector.</p>
-                <div className={styles.headerActions}>
+                {/* <div className={styles.headerActions}>
                     <a href="https://kumolab-originals.printful.me" target="_blank" rel="noopener noreferrer" className={styles.storeLink}>
                         Visit Official Store
                     </a>
-                </div>
+                </div> */}
             </header>
 
             <div className={styles.grid}>
