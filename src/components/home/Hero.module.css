@@ -177,9 +177,14 @@
 @media (max-width: 900px) {
     /* .headline font-size is now handled by min-width media queries above */
 
+    .hero {
+        align-items: flex-start;
+        padding-top: calc(var(--header-height) + 120px);
+        /* Aggressive manual offset */
+    }
+
     .heroContent {
-        padding-top: calc(var(--header-height) + 40px);
-        /* Add extra buffer beyond header */
+        padding-top: 0;
     }
 
     .subheadline {
