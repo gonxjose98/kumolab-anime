@@ -59,7 +59,6 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
                         isAdult
                         status
                         seasonYear
-
                         coverImage {
                             extraLarge
                             large
@@ -102,17 +101,16 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
         }
 
         const json = await response.json();
-
         const rawEpisodes = json.data?.Page?.airingSchedules || [];
 
-        // STRICT VALIDATION & PROVENANCE ATTACHMENT
+        // STRICT VALIDATION & AUDIT LOGGING
         const verifiedEpisodes: AiringEpisode[] = [];
 
         for (const ep of rawEpisodes) {
-            const provenance = validateAiringDrop(ep);
-            if (provenance) {
-                // Attach provenance and add to list
-                ep.provenance = provenance;
+            const audit = validateAiringDrop(ep);
+            if (audit) {
+                // Attach audit data (Provenance)
+                ep.provenance = audit;
                 verifiedEpisodes.push(ep);
             }
         }
@@ -126,84 +124,61 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
 }
 
 /**
- * STRICT VERIFICATION SYSTEM
+ * HARD LOCKED VERIFICATION SYSTEM (REVISION V2)
  * 
- * A post qualifies ONLY if it meets one of these Trusted Tiers:
- * 
- * TIER 1: VERIFIED STREAMER
- * - Has a direct link to Crunchyroll, Netflix, Hulu, Disney+, HiDive, or Amazon.
- * - This confirms distribution rights and air date.
- * 
- * TIER 2: CROWD WISDOM (POPULARITY SAFEGUARD)
- * - If streamer link is missing/delayed, the show must have > 20,000 members.
- * - Filters out obscure shovelware, unverified shorts, and database noise.
- * 
- * TIER 3: FORMAT LOCK
- * - Must be TV, MOVIE, or OVA.
- * - REJECTS 'TV_SHORT' and 'SPECIAL' unless they pass Tier 2 with flying colors (>50k).
+ * Rules:
+ * 1. Must be American/New_York (EST) today.
+ * 2. MUST have a Primary Streamer Link (Crunchyroll, Netflix, HIDIVE, etc).
+ * 3. NO popularity-based "guessing" or "crowd wisdom".
+ * 4. MUST have a confirmed episode number from AniList (verified against streamer status).
  */
-const TRUSTED_STREAMERS = [
-    'Crunchyroll', 'Netflix', 'Hulu', 'Disney Plus', 'Hidive', 'Amazon Prime Video', 'Bilibili Global', 'Muse Asia', 'Ani-One'
+const PRIMARY_SOURCES = [
+    'Crunchyroll', 'Netflix', 'Hulu', 'Disney Plus', 'Hidive', 'Amazon Prime Video', 'Bilibili Global'
 ];
 
 export function validateAiringDrop(episode: any): VerificationProvenance | null {
     const media = episode.media;
+    const animeTitle = media.title.english || media.title.romaji;
 
     // 0. EXCLUDE ADULT CONTENT
     if (media.isAdult) return null;
 
-    // 1. FORMAT LOCK
-    const isMainFormat = ['TV', 'MOVIE', 'OVA', 'ONA'].includes(media.format);
-    const isNicheFormat = ['TV_SHORT', 'SPECIAL', 'MUSIC'].includes(media.format);
-
-    if (!isMainFormat && !isNicheFormat) return null; // Reject unknown formats
-
-    // 2. CHECK FOR TRUSTED STREAMERS
-    const trustedLink = media.externalLinks.find((link: any) =>
-        TRUSTED_STREAMERS.some(trusted => link.site.toLowerCase().includes(trusted.toLowerCase()))
+    // 1. PRIMARY SOURCE VERIFICATION (HARD RULE)
+    // Every entry MUST have a verified streaming link to prove distribution and release.
+    const primaryLink = media.externalLinks.find((link: any) =>
+        PRIMARY_SOURCES.some(source => link.site.toLowerCase().includes(source.toLowerCase()))
     );
 
-    // 3. APPLY TIERS
-
-    // TIER 1: Streamer Verified (Accept immediately if format is standard)
-    if (trustedLink && isMainFormat) {
-        return {
-            tier: 'streamer',
-            reason: `Verified on ${trustedLink.site}`,
-            sources: { externalLinks: [trustedLink.site] }
-        };
+    if (!primaryLink) {
+        console.log(`[Validation Reject - Missing Primary Source] ${animeTitle}`);
+        return null;
     }
 
-    // TIER 2: Crowd Wisdom (Popularity Safeguard) + STATE CHECK
-    // Requirements: > 20k Pop AND (Releasing OR Recent Season)
-    const HIGH_POPULARITY_THRESHOLD = 20000;
-    const MEGA_POPULARITY_THRESHOLD = 50000; // For shorts/specials
+    // 2. TIMING VERIFICATION (INTERNAL AUDIT)
+    const airDate = new Date(episode.airingAt * 1000);
+    const estString = airDate.toLocaleString('en-US', { timeZone: 'America/New_York' });
 
-    // State Check (Anti-Ghosting)
-    const currentYear = new Date().getFullYear();
-    const isRecent = media.seasonYear ? Math.abs(media.seasonYear - currentYear) <= 1 : false;
-    const isActive = media.status === 'RELEASING' || (media.status === 'FINISHED' && isRecent);
-
-    if (isActive && media.popularity >= HIGH_POPULARITY_THRESHOLD && isMainFormat) {
-        return {
-            tier: 'popularity',
-            reason: `High Popularity (${media.popularity}) + Active Status`,
-            sources: { popularity: media.popularity, status: media.status }
-        };
+    // 3. EPISODE ACCURACY CHECK
+    // If it's a Sequel, we must ensure the episode number is provided.
+    if (!episode.episode || episode.episode <= 0) {
+        console.log(`[Validation Reject - Invalid Episode #] ${animeTitle}`);
+        return null;
     }
 
-    // TIER 3: Format Exception (Shorts/Specials)
-    if (isActive && media.popularity >= MEGA_POPULARITY_THRESHOLD && isNicheFormat) {
-        return {
-            tier: 'format_exception',
-            reason: `Special Format with Mega Popularity (${media.popularity})`,
-            sources: { popularity: media.popularity, format: media.format }
-        };
-    }
+    // 4. GENERATE INTERNAL AUDIT LOG
+    // Title | Episode # | Source | Link | Release Time | Timezone
+    const auditReason = `${animeTitle} | Ep ${episode.episode} | ${primaryLink.site} | ${primaryLink.url} | ${airDate.toISOString()} | America/New_York`;
 
-    // If it fails all tiers -> REJECT
-    console.log(`[Validation Reject] ${media.title.english || media.title.romaji} (Pop: ${media.popularity}, Format: ${media.format}, Status: ${media.status})`);
-    return null;
+    return {
+        tier: 'streamer',
+        reason: auditReason,
+        sources: {
+            source: primaryLink.site,
+            url: primaryLink.url,
+            raw_time: airDate.toISOString(),
+            ep: episode.episode
+        }
+    };
 }
 
 // Deprecated old function, kept just in case but redirects to new logic

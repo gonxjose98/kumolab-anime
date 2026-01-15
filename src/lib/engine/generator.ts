@@ -15,18 +15,25 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
     if (episodes.length === 0) return null;
 
     const dateString = date.toISOString().split('T')[0];
+
+    // 1. Build the visible list
     const episodeList = episodes.map(ep => {
         const title = ep.media.title.english || ep.media.title.romaji;
         return `- ${title} — Episode ${ep.episode}`;
     }).join('\n');
 
-    const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}`;
+    // 2. Build the INTERNAL AUDIT LOG (Hard Requirement)
+    const auditLog = episodes.map(ep => {
+        return ep.provenance?.reason || 'Audit Missing';
+    }).join('\n');
+
+    const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}\n\n---\n**INTERNAL VERIFICATION AUDIT LOG (LOCKED)**\n${auditLog}`;
 
     // Use the first episode's cover image as the main post image
     const primaryEp = episodes[0];
     const mainImage = primaryEp.media.coverImage.extraLarge || primaryEp.media.coverImage.large;
 
-    // Aggregated Provenance
+    // Aggregated Provenance for DB
     const sourcesMap: Record<string, any> = {};
     episodes.forEach(ep => {
         const title = ep.media.title.english || ep.media.title.romaji;
@@ -34,8 +41,6 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
             sourcesMap[title] = ep.provenance;
         }
     });
-
-    const primaryProvenance = primaryEp.provenance;
 
     return {
         id: `drop-${dateString}`,
@@ -46,9 +51,8 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
         image: mainImage,
         timestamp: date.toISOString(),
         isPublished: true,
-        // Provenance Data
-        verification_tier: primaryProvenance?.tier,
-        verification_reason: primaryProvenance ? `Primary: ${primaryProvenance.reason}` : 'Aggregated Drop',
+        verification_tier: primaryEp.provenance?.tier,
+        verification_reason: 'Strict Primary Source Verified',
         verification_sources: sourcesMap
     };
 }

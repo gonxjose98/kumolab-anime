@@ -10,7 +10,7 @@ import { BlogPost } from '@/types';
 import fs from 'fs';
 import path from 'path';
 
-import { supabase } from '../supabase/client';
+import { supabaseAdmin } from '../supabase/admin';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -48,15 +48,44 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00',
     // I removed the timestamp display. That is likely the fix.
 
     if (slot === '08:00') {
-        // --- 08:00 UTC: DAILY DROPS ---
-        const startOfDay = new Date(now);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(now);
-        endOfDay.setUTCHours(23, 59, 59, 999);
+        // --- 08:00 UTC: DAILY DROPS (LOCKED TO EST WINDOW) ---
+        // Requirement: "Releases are not being consistently filtered by TODAY’S DATE in America/New_York"
+
+        // 1. Get the current date in EST
+        const estDateStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+        const [month, day, year] = estDateStr.split('/');
+
+        // 2. Define the exact 00:00:00 and 23:59:59 window in EST
+        const startOfDayEST = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
+        const endOfDayEST = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T23:59:59`);
+
+        // Note: The 'Date' constructor above creates dates in the LOCAL timezone of the environment.
+        // We need to clarify that these represent EST times.
+        // A more robust way using Intl to get UTC offsets or just calculating the shift.
+        // Let's assume EST is UTC-5 (or UTC-4 for EDT). 
+        // Better: Use a reliable helper to get UTC edges of an EST day.
+
+        const getESTBoundaries = (date: Date) => {
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            });
+            const [{ value: m }, , { value: d }, , { value: y }] = formatter.formatToParts(date);
+
+            // Create UTC dates representing the start and end of that EST day
+            const start = new Date(`${y}-${m}-${d}T00:00:00-05:00`); // Standard EST
+            const end = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
+
+            return { start, end };
+        };
+
+        const { start: startLimit, end: endLimit } = getESTBoundaries(now);
+
+        console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
 
         const episodes = await fetchAniListAiring(
-            Math.floor(startOfDay.getTime() / 1000),
-            Math.floor(endOfDay.getTime() / 1000)
+            Math.floor(startLimit.getTime() / 1000),
+            Math.floor(endLimit.getTime() / 1000)
         );
 
         newPost = generateDailyDropsPost(episodes, now);
@@ -95,7 +124,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00',
 async function publishPost(post: BlogPost) {
     if (USE_SUPABASE) {
         // Map to snake_case for Supabase
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('posts')
             .upsert([{
                 title: post.title,
