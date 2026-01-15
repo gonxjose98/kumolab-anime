@@ -1,6 +1,11 @@
 'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -10,7 +15,7 @@ export default function AdminLogin() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const supabase = createClientComponentClient();
+
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,7 +54,7 @@ export default function AdminLogin() {
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-500"
                             required
                         />
                     </div>
@@ -59,7 +64,7 @@ export default function AdminLogin() {
                             placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                            className="w-full px-4 py-3 bg-black border border-neutral-800 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm text-white placeholder-neutral-500"
                             required
                         />
                     </div>
