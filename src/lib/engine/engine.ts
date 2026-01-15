@@ -17,6 +17,7 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
 
 /**
  * Main engine function to run for a specific slot.
+ * Now triggered by a single hourly cron (see vercel.json)
  */
 export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00') {
     const now = new Date();
