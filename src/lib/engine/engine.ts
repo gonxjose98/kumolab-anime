@@ -18,7 +18,7 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
 /**
  * Main engine function to run for a specific slot.
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '21:00') {
+export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00') {
     const now = new Date();
     const existingPosts = await getPosts();
     let newPost: BlogPost | null = null;
@@ -60,8 +60,8 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '21:00')
         const signals = await fetchTrendingSignals();
         const topTrend = signals[0];
         newPost = await generateTrendsPost(topTrend, now);
-    } else if (slot === '21:00') {
-        // --- 21:00 UTC: COMMUNITY NIGHT ---
+    } else if (slot === '20:00') {
+        // --- 20:00 EST: COMMUNITY NIGHT ---
         newPost = await generateCommunityNightPost(now);
     }
 
