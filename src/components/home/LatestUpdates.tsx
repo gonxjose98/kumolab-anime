@@ -38,31 +38,50 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
         return () => cancelAnimationFrame(animId);
     }, [isPaused, isDown]);
 
+    // Global Drag Handlers
+    useEffect(() => {
+        if (!isDown) return;
+
+        const handleGlobalMove = (e: MouseEvent) => {
+            if (!scrollRef.current) return;
+            e.preventDefault();
+            const x = e.pageX - scrollRef.current.offsetLeft;
+            const walk = (x - startX) * 2;
+            scrollRef.current.scrollLeft = scrollLeftStart - walk;
+        };
+
+        const handleGlobalUp = () => {
+            setIsDown(false);
+            setIsPaused(false);
+        };
+
+        document.addEventListener('mousemove', handleGlobalMove);
+        document.addEventListener('mouseup', handleGlobalUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleGlobalMove);
+            document.removeEventListener('mouseup', handleGlobalUp);
+        };
+    }, [isDown, startX, scrollLeftStart]);
+
     const handleMouseDown = (e: React.MouseEvent) => {
-        const el = scrollRef.current;
-        if (!el) return;
+        if (!scrollRef.current) return;
         setIsDown(true);
         setIsPaused(true);
-        setStartX(e.pageX - el.offsetLeft);
-        setScrollLeftStart(el.scrollLeft);
+        setStartX(e.pageX - scrollRef.current.offsetLeft);
+        setScrollLeftStart(scrollRef.current.scrollLeft);
+    };
+
+    const handleMouseEnter = () => {
+        if (window.matchMedia('(hover: hover)').matches) {
+            setIsPaused(true);
+        }
     };
 
     const handleMouseLeave = () => {
-        setIsDown(false);
-        setIsPaused(false);
-    };
-
-    const handleMouseUp = () => {
-        setIsDown(false);
-        setIsPaused(false);
-    };
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDown || !scrollRef.current) return;
-        e.preventDefault();
-        const x = e.pageX - scrollRef.current.offsetLeft;
-        const walk = (x - startX) * 2;
-        scrollRef.current.scrollLeft = scrollLeftStart - walk;
+        if (window.matchMedia('(hover: hover)').matches) {
+            setIsPaused(false);
+        }
     };
 
     // Quadruple content
@@ -78,13 +97,12 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
             <div
                 className={styles.carouselContainer}
                 ref={scrollRef}
-                onMouseEnter={() => setIsPaused(true)}
+                onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
                 onMouseDown={handleMouseDown}
-                onMouseUp={handleMouseUp}
-                onMouseMove={handleMouseMove}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
+                onTouchCancel={() => setIsPaused(false)}
                 style={{ cursor: isDown ? 'grabbing' : 'grab' }}
             >
                 <div className={styles.track}>
