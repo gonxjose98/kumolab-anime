@@ -29,23 +29,21 @@
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-weight: 700;
-    font-size: 1.5rem;
-    color: var(--text-primary);
     text-decoration: none;
-    font-family: var(--font-outfit), sans-serif;
+    height: 100%;
 }
 
-.logoIcon {
-    background: linear-gradient(135deg, var(--accent-primary), #3b82f6);
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
+.logoImg {
+    height: 48px;
+    /* Balanced height for the navbar */
+    width: auto;
+    object-fit: contain;
+    transition: filter 0.3s ease;
+}
+
+[data-theme='dark'] .logoImg {
+    filter: invert(1) brightness(2);
+    /* Invert black logo for dark theme */
 }
 
 .actions {

@@ -30,10 +30,7 @@ const Navigation = () => {
         <nav className={styles.nav}>
             <div className={`container ${styles.navContainer}`}>
                 <Link href="/" className={styles.logo} onClick={closeMenu}>
-                    <div className={styles.logoIcon}>
-                        <Cloud size={24} fill="currentColor" />
-                    </div>
-                    KumoLab
+                    <img src="/logo.png" alt="KumoLab Logo" className={styles.logoImg} />
                 </Link>
 
                 <div className={styles.actions}>
