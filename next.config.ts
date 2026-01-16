@@ -1,13 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   serverExternalPackages: ["@napi-rs/canvas"],
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-} as any;
+};
 
 export default nextConfig;
