@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sun, Moon, Cloud, Menu, X } from 'lucide-react';
+import { Sun, Moon, Cloud, Menu, X, ShoppingCart } from 'lucide-react';
+import { useCartStore } from '@/store/useCartStore';
 import styles from './Navigation.module.css';
 
 const Navigation = () => {
     const [theme, setTheme] = useState('dark');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const cartItems = useCartStore((state) => state.items);
+    const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
     // Initialize theme from localStorage or system preference
     useEffect(() => {
@@ -34,6 +37,12 @@ const Navigation = () => {
                 </Link>
 
                 <div className={styles.actions}>
+                    {/* Cart Link */}
+                    <Link href="/merch/cart" className={styles.cartBtn} onClick={closeMenu}>
+                        <ShoppingCart size={22} />
+                        {cartCount > 0 && <span className={styles.cartBadge}>{cartCount}</span>}
+                    </Link>
+
                     {/* Theme Toggle */}
                     <div className={styles.themeToggle} onClick={toggleTheme} role="button" aria-label="Toggle Theme">
                         <div className={`${styles.themeIcon} ${theme === 'light' ? styles.active : ''}`}>
@@ -60,6 +69,7 @@ const Navigation = () => {
                         <li><Link href="/" onClick={closeMenu}>Home</Link></li>
                         <li><Link href="/blog" onClick={closeMenu}>Blog</Link></li>
                         <li><Link href="/merch" onClick={closeMenu}>Merch</Link></li>
+                        <li><Link href="/merch/cart" onClick={closeMenu}>Cart ({cartCount})</Link></li>
                         <li><Link href="/about" onClick={closeMenu}>About</Link></li>
                     </ul>
                 </div>

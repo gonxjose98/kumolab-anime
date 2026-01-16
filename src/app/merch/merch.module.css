@@ -1,102 +1,102 @@
 .container {
-    max-width: var(--container-width);
+    padding: 80px 2rem;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: calc(var(--header-height) + 4rem) 2rem 4rem;
+    min-height: 100vh;
 }
 
 .header {
     text-align: center;
-    margin-bottom: 4rem;
+    margin-bottom: 80px;
 }
 
 .title {
-    font-size: 3rem;
-    font-weight: 800;
+    font-family: var(--font-outfit), sans-serif;
+    font-size: 4rem;
+    font-weight: 900;
     margin-bottom: 1rem;
+    background: linear-gradient(to right, #fff, #a1a1aa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .subtitle {
+    font-size: 1.25rem;
     color: var(--text-secondary);
-    font-size: 1.1rem;
-    margin-bottom: 2rem;
-}
-
-.headerActions {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-}
-
-.storeLink {
-    padding: 0.8rem 2rem;
-    background: var(--accent-primary);
-    color: white;
-    border-radius: 2rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-}
-
-.storeLink:hover {
-    transform: scale(1.05);
-    background: var(--accent-secondary, #9D7BFF);
-    box-shadow: 0 4px 20px rgba(124, 92, 255, 0.4);
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 2.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 3rem;
 }
 
 .card {
-    display: flex;
-    flex-direction: column;
     background: var(--surface-color);
     border: 1px solid var(--border-subtle);
-    border-radius: 0.5rem;
+    border-radius: 20px;
     overflow: hidden;
-    transition: transform 0.2s, border-color 0.2s;
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
 }
 
 .card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-10px);
     border-color: var(--accent-primary);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 .imageWrapper {
     aspect-ratio: 1;
     overflow: hidden;
-    background: #fff;
-    /* Merch usually on white/neutral */
+    background: #000;
 }
 
 .image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.5s ease;
+    transition: transform 0.6s ease;
 }
 
 .card:hover .image {
-    transform: scale(1.05);
+    transform: scale(1.1);
 }
 
 .info {
     padding: 1.5rem;
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .name {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
 .price {
+    font-size: 1.125rem;
+    font-weight: 600;
     color: var(--accent-primary);
-    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 40px 1rem;
+    }
+
+    .title {
+        font-size: 2.5rem;
+    }
+
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
 }
