@@ -42,18 +42,18 @@
 }
 
 .headline {
-    font-family: var(--font-display);
-    /* Mobile: text-5xl (4rem/64px) - even larger */
+    font-family: var(--font-outfit), sans-serif;
+    /* Mobile: 4rem/64px */
     font-size: 4rem;
-    font-weight: 800;
+    font-weight: 900;
     color: #FFFFFF;
     line-height: 1.1;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
     margin-bottom: 24px;
-    /* Heavy shadows for readability on a 100% bright background */
+    /* Extra deep shadows for maximum pop */
     text-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.9),
-        0 0 40px rgba(0, 0, 0, 0.6);
+        0 8px 16px rgba(0, 0, 0, 0.9),
+        0 0 50px rgba(0, 0, 0, 0.4);
 }
 
 /* Tablet: text-6xl (6rem/96px) */
@@ -81,24 +81,28 @@
     /* CRITICAL: Remove inherited text-shadow to match reference image strictly */
     text-shadow: none;
     padding-bottom: 0.16em;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
+    /* even bubblier */
     /* Subtle shadow using filter to respect the transparent gradient text */
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6));
 }
 
 .subheadline {
     font-family: var(--font-display);
-    font-size: 1.1rem;
-    /* Smaller than title but strong */
+    font-size: 1.25rem;
+    /* Larger for readability */
     color: #FFFFFF;
-    font-weight: 500;
-    line-height: 1.5;
-    max-width: 600px;
+    font-weight: 600;
+    line-height: 1.6;
+    max-width: 800px;
     margin: 0 auto 48px;
-    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.9);
+    /* Strong shadow for readability against bright backgrounds */
+    text-shadow:
+        0 4px 8px rgba(0, 0, 0, 1),
+        0 0 20px rgba(0, 0, 0, 0.8);
     font-style: normal;
-    opacity: 0.95;
-    letter-spacing: 0.02em;
+    opacity: 1;
+    letter-spacing: 0.03em;
 }
 
 .buttons {
