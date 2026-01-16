@@ -19,7 +19,7 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Main engine function to run for a specific slot.
  * Now triggered by a single hourly cron (see vercel.json)
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00', force: boolean = false) {
+export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '16:00' | '20:00', force: boolean = false) {
     const now = new Date();
     const existingPosts = await getPosts();
     let newPost: BlogPost | null = null;
@@ -100,8 +100,8 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '20:00',
         // --- 12:00 UTC: ANIME INTEL ---
         const intelItems = await fetchAnimeIntel();
         newPost = await generateIntelPost(intelItems, now);
-    } else if (slot === '15:00') {
-        // --- 15:00 UTC: TRENDING NOW ---
+    } else if (slot === '16:00') {
+        // --- 16:00 EST: TRENDING NOW ---
         const signals = await fetchTrendingSignals();
         const topTrend = signals[0];
         newPost = await generateTrendsPost(topTrend, now);

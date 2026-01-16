@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         console.log(`[CRON] Woke up at ${now.toISOString()} (UTC). EST Hour: ${hourEST}`);
 
         // 2. Map EST Hour to Slot
-        let slot: '08:00' | '12:00' | '15:00' | '20:00' | null = null;
+        let slot: '08:00' | '12:00' | '16:00' | '20:00' | null = null;
 
         switch (hourEST) {
             case 8:
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
             case 12:
                 slot = '12:00';
                 break;
-            case 15:
-                slot = '15:00';
+            case 16: // Changed from 15 to 16
+                slot = '16:00'; // Changed from '15:00' to '16:00'
                 break;
             case 20:
                 slot = '20:00';

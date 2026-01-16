@@ -1,0 +1,34 @@
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { createClient } from '@supabase/supabase-js';
+
+const envPath = path.resolve(__dirname, '../.env.local');
+if (fs.existsSync(envPath)) {
+    const envConfig = fs.readFileSync(envPath, 'utf8');
+    envConfig.split('\n').forEach((line: string) => {
+        const [key, value] = line.split('=');
+        if (key && value) {
+            process.env[key.trim()] = value.trim();
+        }
+    });
+}
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function findAny() {
+    const { data: posts } = await supabase.from('posts').select('*');
+    let found = false;
+    posts?.forEach(p => {
+        if (p.content.toLowerCase().includes('audit log') || p.content.toLowerCase().includes('internal verification')) {
+            console.log(`[FOUND] ${p.title} (ID: ${p.id})`);
+            console.log(`CONTENT: ${p.content}`);
+            found = true;
+        }
+    });
+    if (!found) console.log('NO LEAKS FOUND IN DATABASE.');
+}
+
+findAny().catch(console.error);
