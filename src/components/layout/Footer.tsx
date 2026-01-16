@@ -7,7 +7,7 @@ const Footer = () => {
             <div className={`container ${styles.footerContainer}`}>
                 <div className={styles.brand}>
                     <h2 className={styles.logo}>KUMOLAB</h2>
-                    <p className={styles.tagline}>Anime Intelligence. Daily. v1.3</p>
+                    <p className={styles.tagline}>Anime Intelligence. Daily. v1.4</p>
                 </div>
                 <div className={styles.links}>
                     <div>
