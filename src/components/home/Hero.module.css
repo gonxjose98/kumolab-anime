@@ -43,30 +43,30 @@
 
 .headline {
     font-family: var(--font-display);
-    /* Mobile: text-5xl (3rem/48px) */
-    font-size: 3rem;
-    font-weight: 700;
+    /* Mobile: text-5xl (4rem/64px) - even larger */
+    font-size: 4rem;
+    font-weight: 800;
     color: #FFFFFF;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-    margin-bottom: 16px;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
     /* Heavy shadows for readability on a 100% bright background */
     text-shadow:
         0 4px 12px rgba(0, 0, 0, 0.9),
         0 0 40px rgba(0, 0, 0, 0.6);
 }
 
-/* Tablet: text-6xl (3.75rem/60px) */
+/* Tablet: text-6xl (6rem/96px) */
 @media (min-width: 640px) {
     .headline {
-        font-size: 3.75rem;
+        font-size: 6rem;
     }
 }
 
-/* Desktop: text-7xl (4.5rem/72px) */
+/* Desktop: text-7xl (8rem/128px) */
 @media (min-width: 1024px) {
     .headline {
-        font-size: 4.5rem;
+        font-size: 8rem;
     }
 }
 
@@ -76,25 +76,29 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
-    font-weight: 700;
+    font-weight: 900;
+    /* Max boldness */
     /* CRITICAL: Remove inherited text-shadow to match reference image strictly */
     text-shadow: none;
-    padding-bottom: 0.1em;
-    /* Prevent descender clipping */
+    padding-bottom: 0.16em;
+    letter-spacing: -0.02em;
     /* Subtle shadow using filter to respect the transparent gradient text */
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
 }
 
 .subheadline {
     font-family: var(--font-display);
-    font-size: 1.4rem;
+    font-size: 1.1rem;
+    /* Smaller than title but strong */
     color: #FFFFFF;
-    font-weight: 600;
-    line-height: 1.4;
-    max-width: 800px;
-    margin: 0 auto 40px;
+    font-weight: 500;
+    line-height: 1.5;
+    max-width: 600px;
+    margin: 0 auto 48px;
     text-shadow: 0 4px 15px rgba(0, 0, 0, 0.9);
     font-style: normal;
+    opacity: 0.95;
+    letter-spacing: 0.02em;
 }
 
 .buttons {

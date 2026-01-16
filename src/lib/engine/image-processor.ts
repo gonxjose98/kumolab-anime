@@ -79,78 +79,79 @@ export async function generateIntelImage({
 
         // 3. Zone Logic (Top vs Bottom)
         const isTop = textPosition === 'top';
-        const zoneHeight = HEIGHT * 0.35; // 35% of image
+        const TARGET_ZONE_HEIGHT = HEIGHT * 0.35;
 
-        // 4. Subtle Gradient (Localized)
-        let gradient;
-        if (isTop) {
-            // Top: Black -> Transparent (downwards)
-            gradient = ctx.createLinearGradient(0, 0, 0, zoneHeight);
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, WIDTH, zoneHeight);
-        } else {
-            // Bottom: Transparent -> Black (downwards)
-            gradient = ctx.createLinearGradient(0, HEIGHT - zoneHeight, 0, HEIGHT);
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, HEIGHT - zoneHeight, WIDTH, zoneHeight);
-        }
-
-        // 5. Typography Settings (IMPACTFUL & EQUALIZED)
+        // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
+        const fontName = '"Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", sans-serif';
 
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
 
-        // Shadow Settings (Stronger & more prominent per USER request)
+        // Shadow Settings (Maximum Contrast)
         ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
         ctx.shadowBlur = 35;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 8;
 
-        // Equalized font size per USER request: "make sure the text is all the same size"
-        const fontName = 'sans-serif';
-        const globalFontSize = 95; // Balanced large size for both
-
         // --- DEDUPLICATION LOGIC ---
-        // "detect duplicate words... it says 'officially officially'. That should never happen!"
         const titleWords = animeTitle.toUpperCase().split(/\s+/);
         let cleanedHeadline = headline.toUpperCase();
-
-        // Remove words from headline if they are already prominent in the title
         const headlineWords = cleanedHeadline.split(/\s+/);
         const uniqueHeadlineWords = headlineWords.filter(word => !titleWords.includes(word));
         cleanedHeadline = uniqueHeadlineWords.join(' ');
 
-        // 6. Draw Text
-        const bottomPadding = 80;
-        const lineSpacing = globalFontSize * 0.95;
+        // --- DYNAMIC FONT SCALING ENGINE ---
+        // Goal: Fill ~35% of the screen height without overflowing
+        let globalFontSize = 130; // Start big
+        let titleLines: string[] = [];
+        let headlineLines: string[] = [];
+        let lineSpacing = 0;
+        let totalBlockHeight = 0;
+        let gap = 0;
 
-        // Prepare Title Lines
-        ctx.font = `900 ${globalFontSize}px ${fontName}`;
-        const titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
+        while (globalFontSize >= 60) {
+            ctx.font = `900 ${globalFontSize}px ${fontName}`;
+            lineSpacing = globalFontSize * 0.95;
+            gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
-        // Prepare Headline Lines (if any words remain after cleaning)
-        const headlineLines = cleanedHeadline.length > 0
-            ? wrapText(ctx, cleanedHeadline, availableWidth, 2)
-            : [];
+            titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
+            headlineLines = cleanedHeadline.length > 0
+                ? wrapText(ctx, cleanedHeadline, availableWidth, 2)
+                : [];
 
-        // Calculate Block Height
-        const titleBlockHeight = titleLines.length * lineSpacing;
-        const headlineBlockHeight = headlineLines.length * lineSpacing;
-        const gap = headlineLines.length > 0 ? 20 : 0;
+            totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
 
-        // Determine Start Y based on Zone
-        let currentY = 0;
+            // If we fit in the zone or if it's already quite small, stop
+            if (totalBlockHeight <= TARGET_ZONE_HEIGHT) break;
+            globalFontSize -= 5;
+        }
+
+        // 6. Localized High-Contrast Gradient
+        // "I just want to make the text a little easier to see"
+        const gradientHeight = totalBlockHeight + 250;
+        const gradientYStart = isTop ? 0 : HEIGHT - gradientHeight;
+        const gradient = ctx.createLinearGradient(0, gradientYStart, 0, isTop ? gradientHeight : HEIGHT);
 
         if (isTop) {
-            currentY = 120;
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.98)');
+            gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.7)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         } else {
-            currentY = HEIGHT - bottomPadding - headlineBlockHeight - gap - titleBlockHeight;
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.7)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');
         }
+
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, gradientYStart, WIDTH, gradientHeight);
+        ctx.restore();
+
+        // 7. Draw Text
+        let currentY = isTop ? 80 : HEIGHT - totalBlockHeight - 80;
 
         ctx.textBaseline = 'top';
 

@@ -181,11 +181,11 @@ async function generateCommunityNightPost(date: Date): Promise<BlogPost | null> 
 
         const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
 
-        const content = `Hey Kumo Fam! 🌙\n\nIt's ${dayOfWeek} night — time to wind down and chat.\n\n${randomPrompt}\n\nLet's hear it! Drop your thoughts below. 💬`;
+        const content = `Hey Kumo Fam! 🌙\n\nIt's ${dayOfWeek} night - time to wind down and chat.\n\n${randomPrompt}\n\nLet's hear it! Drop your thoughts below. 💬`;
 
         return {
             id: `community-${dateString}`,
-            title: `Community Night — ${dateString}`,
+            title: `Community Night - ${dateString}`,
             slug: `community-night-${dateString}`,
             type: 'COMMUNITY',
             content,

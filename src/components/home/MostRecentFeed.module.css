@@ -1,0 +1,125 @@
+.section {
+    padding: 4rem 0;
+    background: var(--bg-color);
+}
+
+.sectionTitle {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    text-align: left;
+    position: relative;
+    padding-left: 12px;
+}
+
+.sectionTitle::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 16px;
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+.feed {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+    /* Spaced out for mobile scrolling */
+    max-width: 800px;
+    /* Centered feed column */
+    margin: 0 auto;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+}
+
+.imageWrapper {
+    position: relative;
+    width: 100%;
+    background: var(--surface-color);
+    border-radius: 12px;
+    overflow: hidden;
+    /* User wants NO aggressive cropping. We'll allow the image to maintain its natural height */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    /* Ensures full image visibility */
+}
+
+.badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(124, 58, 237, 0.9);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(8px);
+    z-index: 2;
+}
+
+.content {
+    padding: 0 4px;
+}
+
+.meta {
+    margin-bottom: 0.5rem;
+}
+
+.date {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.25;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .section {
+        padding: 2rem 0;
+    }
+
+    .feed {
+        gap: 2.5rem;
+    }
+
+    .title {
+        font-size: 1.4rem;
+    }
+
+    .imageWrapper {
+        border-radius: 8px;
+    }
+}

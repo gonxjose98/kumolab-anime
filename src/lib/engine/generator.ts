@@ -16,18 +16,18 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
 
     const dateString = date.toISOString().split('T')[0];
 
-    // 1. Build the visible list
+    // 1. Build the visible list (NO EM DASHES PER USER RULE)
     const episodeList = episodes.map(ep => {
         const title = ep.media.title.english || ep.media.title.romaji;
-        return `- ${title} — Episode ${ep.episode}`;
+        return `- ${title} - Episode ${ep.episode}`;
     }).join('\n');
 
-    // 2. Build the INTERNAL AUDIT LOG (Hard Requirement)
+    // 2. Build the INTERNAL AUDIT LOG (Hard Requirement - HIDDEN FROM PUBLIC)
     const auditLog = episodes.map(ep => {
         return ep.provenance?.reason || 'Audit Missing';
     }).join('\n');
 
-    const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}\n\n---\n**INTERNAL VERIFICATION AUDIT LOG (LOCKED)**\n${auditLog}`;
+    const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}`;
 
     // Use the first episode's cover image as the main post image
     const primaryEp = episodes[0];
@@ -44,7 +44,7 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
 
     return {
         id: `drop-${dateString}`,
-        title: `Daily Drops — ${dateString}`,
+        title: `Daily Drops - ${dateString}`,
         slug: `daily-drops-${dateString}`,
         type: 'DROP',
         content,

@@ -40,9 +40,14 @@ const Navigation = () => {
                 </ul>
 
                 <div className={styles.actions}>
-                    <button className={styles.iconBtn} onClick={toggleTheme} aria-label="Toggle Theme">
-                        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                    </button>
+                    <div className={styles.themeToggle} onClick={toggleTheme} role="button" aria-label="Toggle Theme">
+                        <div className={`${styles.themeIcon} ${theme === 'light' ? styles.active : ''}`}>
+                            <Sun size={18} />
+                        </div>
+                        <div className={`${styles.themeIcon} ${theme === 'dark' ? styles.active : ''}`}>
+                            <Moon size={18} />
+                        </div>
+                    </div>
                 </div>
             </div>
         </nav>

@@ -140,8 +140,21 @@ export function validateAiringDrop(episode: any): VerificationProvenance | null 
     const media = episode.media;
     const animeTitle = media.title.english || media.title.romaji;
 
-    // 0. EXCLUDE ADULT CONTENT
+    // 0. EXCLUDE ADULT CONTENT & NON-TV FORMATS & PLACEHOLDERS
     if (media.isAdult) return null;
+
+    // REQUIRE RELEASING STATUS (Prevents placeholder/rumor dates)
+    if (media.status !== 'RELEASING') {
+        console.log(`[Validation Reject - Not Releasing] ${animeTitle} (Status: ${media.status})`);
+        return null;
+    }
+
+    // REQUIRE TV/ONA FORMAT (Prevents random specials/PVs)
+    const validFormats = ['TV', 'TV_SHORT', 'ONA'];
+    if (!validFormats.includes(media.format)) {
+        console.log(`[Validation Reject - Invalid Format] ${animeTitle} (Format: ${media.format})`);
+        return null;
+    }
 
     // 1. PRIMARY SOURCE VERIFICATION (HARD RULE)
     // Every entry MUST have a verified streaming link to prove distribution and release.
@@ -225,11 +238,11 @@ export async function fetchAnimeIntel(): Promise<any[]> {
     return [
         {
             title: "Frieren: Beyond Journey's End",
-            claimType: "confirmed",
-            premiereDate: "2026-10-01",
-            fullTitle: "Frieren Season 2 Officially Confirmed",
-            slug: "frieren-s2-announced",
-            content: "Studio Madhouse has officially confirmed Frieren Season 2 is in production. The sequel will follow the El Dorado arc.",
+            claimType: "now_streaming",
+            premiereDate: "2026-01-16",
+            fullTitle: "Frieren Season 2: The Journey Continues (OUT NOW)",
+            slug: "frieren-s2-now-streaming",
+            content: "The wait is over. Frieren Season 2 has officially premiered today. The story picks up with the El Dorado arc as Frieren continues her quest to understand the human heart.",
             imageSearchTerm: "Frieren: Beyond Journey's End",
             source: "Official Website"
         },

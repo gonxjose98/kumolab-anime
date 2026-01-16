@@ -10,10 +10,10 @@ const Hero = () => {
 
             <div className={styles.heroContent}>
                 <h1 className={styles.headline}>
-                    Welcome to <span className={styles.accentText}>KumoLab</span>
+                    <span className={styles.accentText}>KumoLab</span>
                 </h1>
                 <p className={styles.subheadline}>
-                    Anime updates, drops, and intel, updated daily.
+                    Anime Updates. Episodes. News. Trends. What’s next? Without the noise.
                 </p>
 
                 <div className={styles.buttons}>
