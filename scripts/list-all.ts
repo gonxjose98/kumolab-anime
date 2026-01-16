@@ -1,3 +1,4 @@
+export {};
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,3 +30,4 @@ async function listAll() {
 }
 
 listAll().catch(console.error);
+

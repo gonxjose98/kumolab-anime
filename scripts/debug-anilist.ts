@@ -1,3 +1,4 @@
+export {};
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 
@@ -36,3 +37,4 @@ async function query() {
 }
 
 query().catch(console.error);
+

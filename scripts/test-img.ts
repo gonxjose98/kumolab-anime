@@ -1,3 +1,4 @@
+export {};
 import { generateIntelImage } from '../src/lib/engine/image-processor';
 
 async function test() {
@@ -11,3 +12,4 @@ async function test() {
 }
 
 test().catch(console.error);
+

@@ -1,3 +1,4 @@
+export {};
 
 import { validateAiringDrop } from '../src/lib/engine/fetchers';
 
@@ -93,3 +94,4 @@ cases.forEach(c => {
         console.log('   Provenance:', JSON.stringify(result));
     }
 });
+

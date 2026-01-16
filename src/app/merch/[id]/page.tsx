@@ -3,7 +3,7 @@ import { getProduct } from '@/lib/merch';
 import ProductClient from '@/components/merch/ProductClient';
 import { notFound } from 'next/navigation';
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const productData = await getProduct(id);
 

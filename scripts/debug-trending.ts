@@ -1,3 +1,4 @@
+export {};
 
 import dotenv from 'dotenv';
 import path from 'path';
@@ -26,3 +27,4 @@ async function manualRun() {
 }
 
 manualRun();
+

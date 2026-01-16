@@ -1,3 +1,4 @@
+export {};
 /**
  * generate-sample-intel.ts
  * Manually generates realistic Intel posts for the last 3 days using the official spec.
@@ -66,3 +67,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

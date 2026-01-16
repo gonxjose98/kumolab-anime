@@ -1,3 +1,4 @@
+export {};
 
 import { generateDailyDropsPost, generateIntelPost, generateTrendingPost } from '../src/lib/engine/generator';
 import { fetchAniListAiring, fetchOfficialAnimeImage } from '../src/lib/engine/fetchers';
@@ -174,3 +175,4 @@ async function runBackfill() {
 }
 
 runBackfill();
+

@@ -1,3 +1,4 @@
+export {};
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,3 +36,4 @@ async function inspect() {
 }
 
 inspect().catch(console.error);
+
