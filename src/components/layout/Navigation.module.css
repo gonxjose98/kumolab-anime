@@ -10,7 +10,7 @@
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
-    opacity: 0.98;
+    opacity: 1;
 }
 
 .navContainer {
@@ -22,6 +22,8 @@
     max-width: var(--container-width);
     margin: 0 auto;
     padding: 0 2rem;
+    position: relative;
+    z-index: 1001;
 }
 
 .logo {
@@ -32,64 +34,24 @@
     font-size: 1.5rem;
     color: var(--text-primary);
     text-decoration: none;
+    font-family: var(--font-outfit), sans-serif;
 }
 
 .logoIcon {
     background: linear-gradient(135deg, var(--accent-primary), #3b82f6);
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
 }
 
-.links {
-    display: flex;
-    gap: 32px;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(8px);
-    padding: 8px 24px;
-    border-radius: 99px;
-    border: 1px solid var(--border-subtle);
-}
-
-.links a {
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: color 0.2s;
-}
-
-.links a:hover,
-.links a:active {
-    color: var(--text-primary);
-}
-
 .actions {
     display: flex;
     align-items: center;
     gap: 16px;
-}
-
-.iconBtn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    padding: 8px;
-    border-radius: 50%;
-}
-
-.iconBtn:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
 }
 
 .themeToggle {
@@ -109,8 +71,8 @@
 }
 
 .themeIcon {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -122,82 +84,96 @@
 .themeIcon.active {
     background: rgba(148, 163, 184, 0.2);
     color: var(--text-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 [data-theme='light'] .themeIcon.active {
     background: #ffffff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.themeIcon:not(.active):hover {
-    color: var(--text-secondary);
-}
-
-.badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    background: var(--accent-primary);
-    color: white;
-    font-size: 10px;
-    font-weight: bold;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
+.menuBtn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.2s;
 }
 
-.profileBtn {
-    background: none;
-    border: none;
-    cursor: pointer;
+.menuBtn:hover {
+    background: var(--surface-hover);
+}
+
+/* Dropdown Menu Styles */
+.dropdown {
+    position: absolute;
+    top: var(--header-height);
+    right: 1.5rem;
+    width: 280px;
+    background: var(--surface-color);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 1rem;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    z-index: 1000;
+}
+
+.dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(12px);
+}
+
+.dropdownLinks {
+    list-style: none;
     padding: 0;
+    margin: 0;
     display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
-.profileBtn img {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 2px solid var(--accent-primary);
+.dropdownLinks li a {
+    display: block;
+    padding: 12px 20px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all 0.2s;
 }
 
-@media (max-width: 1200px) {
+.dropdownLinks li a:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    padding-left: 28px;
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+}
+
+@media (max-width: 768px) {
     .navContainer {
         padding: 0 1rem;
     }
 
-    .logo {
-        position: relative;
-        z-index: 2001;
-        font-size: 1.2rem;
-        gap: 8px;
-    }
-
-    .logoIcon {
-        width: 32px;
-        height: 32px;
-    }
-
-    .links {
-        gap: 12px;
-        padding: 6px 16px;
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--bg-color);
-        border: 1px solid var(--border-subtle);
-        backdrop-filter: blur(12px);
-        width: auto;
-        z-index: 2000;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    }
-
-    .actions {
-        gap: 12px;
+    .dropdown {
+        right: 1rem;
+        width: calc(100% - 2rem);
     }
 }
