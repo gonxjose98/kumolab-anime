@@ -53,9 +53,11 @@ export async function generateIntelImage({
             if (!response.ok) throw new Error('Failed to fetch image');
             buffer = Buffer.from(await response.arrayBuffer());
         } else {
-            // Assume local public path (remove leading slash if needed or join with cwd)
-            // If it starts with /, assuming relative to public for usage, but for server-side fs read:
-            const localPath = path.join(process.cwd(), 'public', sourceUrl.startsWith('/') ? sourceUrl.slice(1) : sourceUrl);
+            // Support both absolute paths and relative public paths
+            const localPath = path.isAbsolute(sourceUrl)
+                ? sourceUrl
+                : path.join(process.cwd(), 'public', sourceUrl.startsWith('/') ? sourceUrl.slice(1) : sourceUrl);
+
             if (fs.existsSync(localPath)) {
                 buffer = fs.readFileSync(localPath);
             } else {
@@ -79,7 +81,38 @@ export async function generateIntelImage({
 
         // 3. Zone Logic (Top vs Bottom)
         const isTop = textPosition === 'top';
-        const TARGET_ZONE_HEIGHT = HEIGHT * 0.35;
+        let targetZonePercentage = 0.35;
+
+        // --- AUTOMATIC OBSTRUCTION DETECTION (HEURISTIC) ---
+        // Requirement: "If its hiding a characters face, then text can drop down to only 30% coverage."
+        try {
+            const detectionZoneY = isTop ? 0 : HEIGHT * 0.65; // Bottom 35%
+            const detectionZoneHeight = HEIGHT * 0.35;
+            const imageData = ctx.getImageData(0, detectionZoneY, WIDTH, detectionZoneHeight);
+            const pixels = imageData.data;
+            let skinTonePixels = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                // Heuristic for Anime Skin Tones (Pale, Tan, and Peach ranges)
+                // Typically R > G > B with high luminance
+                const isSkin = r > 200 && g > 160 && b > 130 && r > g && (r - b) < 100;
+                if (isSkin) skinTonePixels++;
+            }
+
+            const skinPercentage = (skinTonePixels / (WIDTH * detectionZoneHeight)) * 100;
+            if (skinPercentage > 2.5) { // 2.5% threshold for facial/skin presence
+                console.log(`[Image Engine] Character face detected in ${textPosition} zone (${skinPercentage.toFixed(1)}%). Reducing text limit to 30%.`);
+                targetZonePercentage = 0.30;
+            }
+        } catch (e) {
+            console.warn('[Image Engine] Obstruction detection failed, falling back to 35%.', e);
+        }
+
+        const TARGET_ZONE_HEIGHT = HEIGHT * targetZonePercentage;
 
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
