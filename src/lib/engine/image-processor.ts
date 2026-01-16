@@ -41,8 +41,11 @@ export async function generateIntelImage({
     const outputFileName = `${slug}-social.png`;
     const outputPath = path.join(outputDir, outputFileName);
 
+    // TEMPORARY BYPASS TO TEST BUILD
+    console.log('[Image Engine] Bypassing canvas logic for build test');
     const WIDTH = 1080;
     const HEIGHT = 1350;
+    return null;
 
     try {
         // 1. Download and Resize/Crop to 1080x1350
