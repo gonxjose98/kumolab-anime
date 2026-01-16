@@ -34,8 +34,8 @@
 }
 
 .logoImg {
-    height: 48px;
-    /* Balanced height for the navbar */
+    height: 58px;
+    /* Balanced height - increased by 20% */
     width: auto;
     object-fit: contain;
     transition: filter 0.3s ease;

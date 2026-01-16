@@ -18,7 +18,7 @@ const Hero = () => {
 
                 <div className={styles.buttons}>
                     <Link href="/latest-daily-drop" className={styles.primaryBtn}>
-                        View Today&apos;s Drops <ArrowRight size={20} />
+                        View Today&apos;s Drops <span className={styles.arrow}><ArrowRight size={20} /></span>
                     </Link>
                 </div>
             </div>

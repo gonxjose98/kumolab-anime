@@ -10,6 +10,37 @@
     }
 }
 
+@keyframes gradientDrift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+@keyframes gentlePulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+    }
+
+    50% {
+        transform: scale(1.03);
+        box-shadow: 0 0 35px rgba(124, 58, 237, 0.35);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+    }
+}
+
 .hero {
     position: relative;
     height: calc(100vh - var(--header-height));
@@ -114,7 +145,11 @@
 
 .primaryBtn {
     /* Glassmorphism — REQUIRED */
-    background: rgba(124, 58, 237, 0.3);
+    background: linear-gradient(90deg,
+            rgba(124, 58, 237, 0.35),
+            rgba(124, 58, 237, 0.2),
+            rgba(124, 58, 237, 0.35));
+    background-size: 200% auto;
     /* Translucent purple */
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -130,16 +165,42 @@
     align-items: center;
     gap: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition:
+        transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+        box-shadow 0.3s ease,
+        background-color 0.3s ease;
+    /* Initial float + Idle Gradient + Initial Pulse (delayed) */
+    animation:
+        floatUp 0.8s ease-out forwards,
+        gradientDrift 8s linear infinite,
+        gentlePulse 1.5s ease-out 1.5s 1;
     /* Soft glow around edges */
     box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .primaryBtn:hover {
-    /* Slight brightness increase & glow intensification */
-    background: rgba(124, 58, 237, 0.45);
+    /* Slight brightness increase & glow intensification (20-30% purple glow requested) */
+    background-color: rgba(124, 58, 237, 0.45);
     transform: translateY(-2px);
-    box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
+    box-shadow: 0 0 25px rgba(124, 58, 237, 0.3);
+}
+
+.primaryBtn:active {
+    /* Tactile feedback scale down requested (~0.97-0.98) */
+    transform: scale(0.97) translateY(0);
+}
+
+.arrow {
+    display: flex;
+    align-items: center;
+    transition: transform 0.2s ease;
+}
+
+.primaryBtn:hover .arrow {
+    /* Slide 2-4px to the right as requested */
+    transform: translateX(4px);
 }
 
 .scrollIndicator {
