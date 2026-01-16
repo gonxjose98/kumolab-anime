@@ -24,5 +24,7 @@ export interface Product {
     price: number;
     image: string;
     isVisible: boolean;
+    description?: string;
+    variants?: any[];
     link?: string; // Printful link (optional)
 }
