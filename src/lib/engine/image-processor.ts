@@ -4,7 +4,6 @@
  * Format: 4:5 Portrait (1080x1350)
  */
 
-import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
@@ -48,7 +47,10 @@ export async function generateIntelImage({
     return null;
 
     try {
-        // 1. Download and Resize/Crop to 1080x1350
+        // 1. Dynamic Import (Prevents build-time binary resolution issues)
+        const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+
+        // 2. Download and Resize/Crop to 1080x1350
         let buffer: Buffer;
 
         if (sourceUrl.startsWith('http')) {
@@ -75,14 +77,14 @@ export async function generateIntelImage({
             })
             .toBuffer();
 
-        // 2. Setup Canvas
+        // 3. Setup Canvas
         const canvas = createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
 
         const img = await loadImage(resizedBuffer);
         ctx.drawImage(img, 0, 0);
 
-        // 3. Zone Logic (Top vs Bottom)
+        // 4. Zone Logic (Top vs Bottom)
         const isTop = textPosition === 'top';
         let targetZonePercentage = 0.35;
 
