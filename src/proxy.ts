@@ -83,6 +83,8 @@ export async function proxy(request: NextRequest) {
     return response
 }
 
+export default proxy;
+
 export const config = {
     matcher: [
         /*
