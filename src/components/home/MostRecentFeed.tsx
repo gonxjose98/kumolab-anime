@@ -47,7 +47,10 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
 
                             <div className={styles.imageWrapper}>
                                 {post.image ? (
-                                    <img src={post.image} alt={post.title} className={styles.image} />
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={post.image} alt={post.title} className={styles.image} />
+                                    </>
                                 ) : (
                                     <div className={styles.placeholder} />
                                 )}
