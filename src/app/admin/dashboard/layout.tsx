@@ -32,9 +32,7 @@ export default async function AdminLayout({
     return (
         <div className="min-h-screen bg-black text-white">
             {/* Simple Admin Header - Not Visible via Main Nav */}
-            import LogoutButton from '@/components/admin/LogoutButton';
 
-            // ... (inside the component) ...
 
             <header className="border-b border-neutral-800 p-4 flex justify-between items-center bg-black/50 backdrop-blur sticky top-0 z-50">
                 <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500">

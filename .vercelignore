@@ -1,4 +1,8 @@
-scripts/
-.github/
-README.md
-*.sql
+.env
+.env.*
+!.env.example
+.git
+.vercel
+node_modules
+/scripts
+/test

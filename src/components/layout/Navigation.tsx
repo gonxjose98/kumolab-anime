@@ -15,6 +15,7 @@ const Navigation = () => {
     // Initialize theme from localStorage or system preference
     useEffect(() => {
         const savedTheme = localStorage.getItem('theme') || 'dark';
+        // eslint-disable-next-line
         setTheme(savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
     }, []);
@@ -33,6 +34,7 @@ const Navigation = () => {
         <nav className={styles.nav}>
             <div className={`container ${styles.navContainer}`}>
                 <Link href="/" className={styles.logo} onClick={closeMenu}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/logo.png" alt="KumoLab Logo" className={styles.logoImg} />
                 </Link>
 

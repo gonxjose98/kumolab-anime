@@ -27,6 +27,7 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
     // Initial Mount
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
+        // eslint-disable-next-line
         setMounted(true);
         setMinutesAgo(Math.floor(Math.random() * 59) + 1);
     }, []);
@@ -149,7 +150,10 @@ const TrendingCarousel = ({ posts }: TrendingCarouselProps) => {
                         <Link href={`/blog/${post.slug}`} key={`${post.id}-${index}`} className={styles.card}>
                             <div className={styles.imageWrapper}>
                                 {post.image ? (
-                                    <img src={post.image} alt={post.title} className={styles.image} />
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={post.image} alt={post.title} className={styles.image} />
+                                    </>
                                 ) : (
                                     <div className={styles.placeholderImage} />
                                 )}

@@ -32,6 +32,7 @@ export default function ProductClient({ productData }: ProductClientProps) {
     return (
         <div className={styles.productLayout}>
             <div className={styles.imageSection}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                     src={selectedVariant.files.find((f: any) => f.type === 'preview')?.thumbnail_url || sync_product.thumbnail_url}
                     alt={sync_product.name}

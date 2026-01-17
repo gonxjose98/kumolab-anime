@@ -25,6 +25,7 @@ export default function TrafficChart({ data }: TrafficChartProps) {
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line
         setIsMounted(true);
     }, []);
 

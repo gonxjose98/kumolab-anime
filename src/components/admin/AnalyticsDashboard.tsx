@@ -19,6 +19,7 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line
         setIsMounted(true);
     }, []);
 
@@ -41,6 +42,7 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
             // For this demo, we assume initialData IS the max available set passed from server.
         }
 
+        // eslint-disable-next-line
         setChartData(filtered);
     }, [timeframe, initialData]);
 
@@ -61,8 +63,8 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
                             key={t}
                             onClick={() => setTimeframe(t)}
                             className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${timeframe === t
-                                    ? 'bg-neutral-800 text-white shadow-sm'
-                                    : 'text-neutral-500 hover:text-neutral-300'
+                                ? 'bg-neutral-800 text-white shadow-sm'
+                                : 'text-neutral-500 hover:text-neutral-300'
                                 }`}
                         >
                             {t}

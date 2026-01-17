@@ -19,7 +19,7 @@ export default function AboutPage() {
                     handpick premium collectibles that celebrate the artistry and storytelling that makes anime special.
                 </p>
                 <p>
-                    Whether you're seeking the latest industry news, in-depth reviews, or that perfect addition to
+                    Whether you&apos;re seeking the latest industry news, in-depth reviews, or that perfect addition to
                     your collection, KumoLab is your gateway to the vibrant world of anime.
                 </p>
             </div>
