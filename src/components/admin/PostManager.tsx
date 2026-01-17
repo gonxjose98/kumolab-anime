@@ -84,6 +84,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setFilter('HIDDEN'); // Switch to Hidden tab to see it
     };
 
+    const handleCancel = async () => {
+        if (previewPost) {
+            // Remove from local state immediately so it 'disappears' for user
+            setPosts(posts.filter(p => p.id !== previewPost.id));
+        }
+        setShowModal(false);
+        setPreviewPost(null);
+    };
+
+
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -307,7 +318,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         {previewPost && (
                             <div className="p-6 border-t border-neutral-800 bg-neutral-950/50 flex justify-end gap-3">
                                 <button
-                                    onClick={() => setShowModal(false)}
+                                    onClick={handleCancel}
                                     className="px-4 py-2 text-sm font-semibold text-neutral-400 hover:text-white"
                                 >
                                     Cancel
