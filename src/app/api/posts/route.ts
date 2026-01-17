@@ -1,44 +1,46 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { BlogPost } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
-const postsDirectory = path.join(process.cwd(), 'src/data/posts.json');
+export async function GET(req: NextRequest) {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
 
-function getPosts(): BlogPost[] {
-    const fileContents = fs.readFileSync(postsDirectory, 'utf8');
-    return JSON.parse(fileContents);
+    if (id) {
+        const { data, error } = await supabaseAdmin
+            .from('posts')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(data);
+    }
+
+    const { data, error } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
 }
 
-function savePosts(posts: BlogPost[]) {
-    fs.writeFileSync(postsDirectory, JSON.stringify(posts, null, 2));
-}
+export async function DELETE(req: NextRequest) {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
 
-export async function GET() {
-    const posts = getPosts();
-    return NextResponse.json(posts);
-}
+    if (!id) {
+        return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+    }
 
-export async function POST(request: Request) {
-    const newPost = await request.json();
-    const posts = getPosts();
+    const { error } = await supabaseAdmin
+        .from('posts')
+        .delete()
+        .eq('id', id);
 
-    const postToAdd: BlogPost = {
-        ...newPost,
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-    };
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    posts.unshift(postToAdd);
-    savePosts(posts);
-
-    return NextResponse.json(postToAdd);
-}
-
-export async function DELETE(request: Request) {
-    const { id } = await request.json();
-    let posts = getPosts();
-    posts = posts.filter(p => p.id !== id);
-    savePosts(posts);
     return NextResponse.json({ success: true });
 }

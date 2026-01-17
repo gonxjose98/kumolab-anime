@@ -88,6 +88,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (previewPost) {
             // Remove from local state immediately so it 'disappears' for user
             setPosts(posts.filter(p => p.id !== previewPost.id));
+
+            // Delete from DB (Cleanup)
+            try {
+                // Fire and forget (don't await strictly to block UI, but good to perform)
+                await fetch(`/api/posts?id=${previewPost.id}`, { method: 'DELETE' });
+            } catch (e) {
+                console.error("Failed to delete draft:", e);
+            }
         }
         setShowModal(false);
         setPreviewPost(null);
