@@ -26,9 +26,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [overlayTag, setOverlayTag] = useState('');
     const [customImage, setCustomImage] = useState<File | null>(null);
     const [customImagePreview, setCustomImagePreview] = useState<string>('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+
+    // Multi-select state
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isPublishingToX, setIsPublishingToX] = useState(false);
 
     const filteredPosts = posts.filter(post => {
         if (filter === 'LIVE') return post.isPublished;
@@ -41,6 +46,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic('');
         setTitle('');
         setContent('');
+        setOverlayTag('');
         setCustomImage(null);
         setCustomImagePreview('');
         setPreviewPost(null);
@@ -65,6 +71,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 formData.append('title', title);
                 formData.append('content', content || `Check out: ${title}`);
                 formData.append('type', 'COMMUNITY');
+                formData.append('headline', overlayTag || 'FEATURED');
                 formData.append('image', customImage);
 
                 const response = await fetch('/api/admin/custom-post', {
@@ -136,6 +143,55 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPreviewPost(null);
     };
 
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredPosts.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredPosts.map(p => p.id));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handlePublishToX = async () => {
+        if (selectedIds.length === 0) return;
+
+        // Respecting user rule: DO NOT PUBLISH ANYTHING UNLESS I APPROVE
+        if (!confirm(`Are you sure you want to publish ${selectedIds.length} selected post(s) to X?`)) {
+            return;
+        }
+
+        setIsPublishingToX(true);
+        try {
+            for (const id of selectedIds) {
+                const post = posts.find(p => p.id === id);
+                if (!post) continue;
+
+                const res = await fetch('/api/admin/social/x/publish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ postId: id })
+                });
+
+                const data = await res.json();
+                if (!data.success) {
+                    alert(`Failed to publish "${post.title}" to X: ${data.error}`);
+                    break;
+                }
+            }
+            alert('Publishing process complete.');
+            setSelectedIds([]);
+        } catch (e: any) {
+            alert('Error publishing to X: ' + e.message);
+        } finally {
+            setIsPublishingToX(false);
+        }
+    };
+
 
 
     return (
@@ -166,6 +222,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 {/* Generator Buttons */}
                 <div className="flex gap-2">
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={handlePublishToX}
+                            disabled={isPublishingToX}
+                            className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-500 transition-all text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                        >
+                            {isPublishingToX ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                            Publish to X ({selectedIds.length})
+                        </button>
+                    )}
                     <button
                         onClick={() => handleGenerateClick('INTEL')}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-900/30 text-blue-400 border border-blue-800/50 rounded-lg hover:bg-blue-900/50 transition-all text-xs font-bold uppercase tracking-wider"
@@ -195,7 +261,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-neutral-950/50 text-neutral-400 border-b border-neutral-800">
                         <tr>
-                            <th className="p-4 font-medium pl-6 text-xs uppercase tracking-wider">Status</th>
+                            <th className="p-4 pl-6 w-[40px]">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.length === filteredPosts.length && filteredPosts.length > 0}
+                                    onChange={toggleSelectAll}
+                                    className="rounded border-neutral-700 bg-neutral-950 text-purple-600 focus:ring-purple-500"
+                                />
+                            </th>
+                            <th className="p-4 font-medium text-xs uppercase tracking-wider">Status</th>
                             <th className="p-4 font-medium text-xs uppercase tracking-wider">Process Preview</th>
                             <th className="p-4 font-medium w-full text-xs uppercase tracking-wider">Details</th>
                             <th className="p-4 font-medium text-right text-xs uppercase tracking-wider pr-6">Action</th>
@@ -203,8 +277,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </thead>
                     <tbody className="divide-y divide-neutral-800">
                         {filteredPosts.map((post) => (
-                            <tr key={post.id} className="hover:bg-neutral-800/30 transition-colors group">
-                                <td className="p-4 pl-6 align-top w-[100px]">
+                            <tr key={post.id} className={`hover:bg-neutral-800/30 transition-colors group ${selectedIds.includes(post.id) ? 'bg-purple-900/10' : ''}`}>
+                                <td className="p-4 pl-6 align-top">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.includes(post.id)}
+                                        onChange={() => toggleSelect(post.id)}
+                                        className="rounded border-neutral-700 bg-neutral-950 text-purple-600 focus:ring-purple-500"
+                                    />
+                                </td>
+                                <td className="p-4 align-top w-[100px]">
                                     <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold tracking-wider border mb-2 ${post.isPublished
                                         ? 'bg-green-950/30 text-green-400 border-green-900/50'
                                         : 'bg-red-950/30 text-red-500 border-red-900/50'
@@ -326,6 +408,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     <img src={customImagePreview} alt="Preview" className="w-full h-full object-cover" />
                                                 </div>
                                             )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Overlay Tag (Purple Text - Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="E.g. SEASON 2, TRAILER, REVEALED"
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-green-500 outline-none"
+                                                value={overlayTag}
+                                                onChange={(e) => setOverlayTag(e.target.value)}
+                                            />
+                                            <p className="text-[10px] text-neutral-500 mt-1">
+                                                This text will appear in purple below the main title.
+                                            </p>
                                         </div>
 
                                         <div>

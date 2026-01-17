@@ -12,6 +12,7 @@ export default function PostEditor() {
     const [saving, setSaving] = useState(false);
     const [title, setTitle] = useState('');
     const [type, setType] = useState('');
+    const [content, setContent] = useState('');
     const [isPublished, setIsPublished] = useState(false);
 
     // Analytics for this post
@@ -41,8 +42,9 @@ export default function PostEditor() {
             }
 
             setPost(data);
-            setTitle(data.title);
-            setType(data.type);
+            setTitle(data.title || '');
+            setType(data.type || '');
+            setContent(data.content || '');
             setIsPublished(data.is_published);
 
             // 2. Fetch Analytics for this Post
@@ -75,7 +77,10 @@ export default function PostEditor() {
             .update({
                 title,
                 type,
-                is_published: isPublished
+                content,
+                is_published: isPublished,
+                claim_type: post.claim_type,
+                premiere_date: post.premiere_date
             })
             .eq('id', id);
 
@@ -150,41 +155,51 @@ export default function PostEditor() {
                     </div>
                 )}
 
-                {/* 5. Current Content */}
-                {post.content && (
+                {/* 5. Content Editor */}
+                <div>
+                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                        Content / Description
+                    </label>
+                    <textarea
+                        value={content || ''}
+                        onChange={(e) => setContent(e.target.value)}
+                        rows={6}
+                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none resize-none"
+                    />
+                </div>
+
+                {/* 6. Metadata Editor (for INTEL/DROP posts) */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-800">
                     <div>
                         <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                            Content
+                            Claim Type / Status
                         </label>
-                        <div className="bg-black border border-neutral-700 rounded p-4 text-neutral-300 text-sm leading-relaxed">
-                            {post.content}
-                        </div>
+                        <select
+                            value={post.claim_type || ''}
+                            onChange={(e) => setPost({ ...post, claim_type: e.target.value })}
+                            className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                        >
+                            <option value="">None</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="premiered">Premiered</option>
+                            <option value="now_streaming">Now Streaming</option>
+                            <option value="delayed">Delayed</option>
+                            <option value="postponed">Postponed</option>
+                            <option value="rumor">Rumor</option>
+                        </select>
                     </div>
-                )}
-
-                {/* 6. Additional Metadata (for INTEL posts) */}
-                {post.claim_type && (
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                                Claim Type
-                            </label>
-                            <div className="bg-black border border-neutral-700 rounded px-4 py-3 text-white">
-                                {post.claim_type}
-                            </div>
-                        </div>
-                        {post.premiere_date && (
-                            <div>
-                                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                                    Premiere Date
-                                </label>
-                                <div className="bg-black border border-neutral-700 rounded px-4 py-3 text-white">
-                                    {new Date(post.premiere_date).toLocaleDateString()}
-                                </div>
-                            </div>
-                        )}
+                    <div>
+                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                            Premiere Date
+                        </label>
+                        <input
+                            type="date"
+                            value={post.premiere_date ? new Date(post.premiere_date).toISOString().split('T')[0] : ''}
+                            onChange={(e) => setPost({ ...post, premiere_date: e.target.value })}
+                            className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                        />
                     </div>
-                )}
+                </div>
 
                 {/* 3. Published Toggle */}
                 <div className="flex items-center justify-between bg-black p-4 rounded border border-neutral-800">

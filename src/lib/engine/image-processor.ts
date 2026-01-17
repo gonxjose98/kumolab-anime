@@ -206,13 +206,39 @@ export async function generateIntelImage({
             currentY += lineSpacing;
         });
 
-        // --- DRAW HEADLINE (SUPPORTING: PURPLE / HEAVY) ---
+        // --- DRAW HEADLINE (SUPPORTING: DYNAMIC COLOR / HEAVY) ---
         currentY += gap;
         ctx.font = `900 ${globalFontSize}px ${fontName}`;
-        ctx.fillStyle = '#9D7BFF'; // KumoLab Purple for Hype Words (status)
 
         headlineLines.forEach((line) => {
-            ctx.fillText(line, centerX, currentY);
+            const words = line.split(' ');
+            if (words.length > 1) {
+                // Multi-word line: Color all but the last word white, last word purple
+                const lastWord = words.pop() || '';
+                const prefix = words.join(' ') + ' ';
+
+                const prefixWidth = ctx.measureText(prefix).width;
+                const lastWordWidth = ctx.measureText(lastWord).width;
+                const totalLineWidth = prefixWidth + lastWordWidth;
+
+                const startX = centerX - totalLineWidth / 2;
+
+                // Draw Prefix (White)
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText(prefix, startX, currentY);
+
+                // Draw Accent (Purple)
+                ctx.fillStyle = '#9D7BFF';
+                ctx.fillText(lastWord, startX + prefixWidth, currentY);
+
+                // Reset for next lines if any
+                ctx.textAlign = 'center';
+            } else {
+                // Single word line: Just purple
+                ctx.fillStyle = '#9D7BFF';
+                ctx.fillText(line, centerX, currentY);
+            }
             currentY += lineSpacing;
         });
 

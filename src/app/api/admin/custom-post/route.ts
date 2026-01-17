@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
         const title = formData.get('title') as string;
         const content = formData.get('content') as string;
         const type = formData.get('type') as string || 'COMMUNITY';
+        const headline = formData.get('headline') as string || 'FEATURED';
         const imageFile = formData.get('image') as File;
 
         if (!title || !imageFile) {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: publicUrl,
             animeTitle: title,
-            headline: type === 'INTEL' ? 'LATEST NEWS' : 'FEATURED',
+            headline: headline,
             slug: slug,
             textPosition: 'bottom'
         });

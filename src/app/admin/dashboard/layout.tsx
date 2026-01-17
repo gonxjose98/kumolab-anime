@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import LogoutButton from '@/components/admin/LogoutButton';
 
 export default async function AdminLayout({
@@ -27,6 +28,7 @@ export default async function AdminLayout({
     // Redundant server-side check (Middleware handles this, but good for safety)
     if (!session) {
         redirect('/admin/login');
+        return null;
     }
 
     return (
@@ -35,9 +37,13 @@ export default async function AdminLayout({
 
 
             <header className="border-b border-neutral-800 p-4 flex justify-between items-center bg-black/50 backdrop-blur sticky top-0 z-50">
-                <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500">
-                    KumoLab Admin
-                </span>
+                <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo.png" alt="" className="h-8 w-auto invert brightness-200" />
+                    <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500">
+                        KumoLab Admin
+                    </span>
+                </Link>
                 <div className="flex items-center gap-4">
                     <div className="text-xs text-neutral-500 font-mono">
                         {session.user.email}
