@@ -29,10 +29,6 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
 
     const content = `Good morning, Kumo Fam.\n\nHere are today’s drops:\n\n${episodeList}`;
 
-    // Use the first episode's cover image as the main post image
-    const primaryEp = episodes[0];
-    const mainImage = primaryEp.media.coverImage.extraLarge || primaryEp.media.coverImage.large;
-
     // Aggregated Provenance for DB
     const sourcesMap: Record<string, any> = {};
     episodes.forEach(ep => {
@@ -48,10 +44,10 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
         slug: `daily-drops-${dateString}`,
         type: 'DROP',
         content,
-        image: mainImage,
+        image: undefined, // Text-only as requested
         timestamp: date.toISOString(),
         isPublished: true,
-        verification_tier: primaryEp.provenance?.tier,
+        verification_tier: episodes[0].provenance?.tier,
         verification_reason: 'Strict Primary Source Verified',
         verification_sources: sourcesMap
     };
@@ -334,8 +330,9 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
 
     if (isDuplicate && !force) return false;
 
-    // 2. Image validation: allow http URLs and local paths (starting with /)
-    if (post.image && !post.image.startsWith('http') && !post.image.startsWith('/')) {
+    // 2. Image validation: allow http URLs, local paths (/), and data URIs (data:)
+    if (post.image && !post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
+        console.warn(`[Validator] Stripping invalid image path: ${post.image.substring(0, 50)}...`);
         post.image = undefined; // Fallback to text-only if image fails validation
     }
 

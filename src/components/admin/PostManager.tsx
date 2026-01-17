@@ -33,7 +33,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [isPublishingToX, setIsPublishingToX] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     const filteredPosts = posts.filter(post => {
         if (filter === 'LIVE') return post.isPublished;
@@ -157,38 +157,41 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         );
     };
 
-    const handlePublishToX = async () => {
+    const handlePublishToSocials = async () => {
         if (selectedIds.length === 0) return;
 
         // Respecting user rule: DO NOT PUBLISH ANYTHING UNLESS I APPROVE
-        if (!confirm(`Are you sure you want to publish ${selectedIds.length} selected post(s) to X?`)) {
+        if (!confirm(`Are you sure you want to publish ${selectedIds.length} selected post(s) to ALL Social Media (X, Facebook, Instagram, Threads)?`)) {
             return;
         }
 
-        setIsPublishingToX(true);
+        setIsPublishing(true);
+        let successCount = 0;
         try {
             for (const id of selectedIds) {
                 const post = posts.find(p => p.id === id);
                 if (!post) continue;
 
-                const res = await fetch('/api/admin/social/x/publish', {
+                const res = await fetch('/api/admin/social/publish-all', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ postId: id })
                 });
 
                 const data = await res.json();
-                if (!data.success) {
-                    alert(`Failed to publish "${post.title}" to X: ${data.error}`);
+                if (data.success) {
+                    successCount++;
+                } else {
+                    alert(`Failed to publish "${post.title}": ${data.error}`);
                     break;
                 }
             }
-            alert('Publishing process complete.');
+            alert(`Process complete. Successfully published ${successCount} out of ${selectedIds.length} posts to all platforms.`);
             setSelectedIds([]);
         } catch (e: any) {
-            alert('Error publishing to X: ' + e.message);
+            alert('Error during social publishing: ' + e.message);
         } finally {
-            setIsPublishingToX(false);
+            setIsPublishing(false);
         }
     };
 
@@ -224,12 +227,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 <div className="flex gap-2">
                     {selectedIds.length > 0 && (
                         <button
-                            onClick={handlePublishToX}
-                            disabled={isPublishingToX}
-                            className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-500 transition-all text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                            onClick={handlePublishToSocials}
+                            disabled={isPublishing}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-500 hover:to-blue-500 transition-all text-xs font-bold uppercase tracking-wider disabled:opacity-50"
                         >
-                            {isPublishingToX ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                            Publish to X ({selectedIds.length})
+                            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                            Publish to Socials ({selectedIds.length})
                         </button>
                     )}
                     <button

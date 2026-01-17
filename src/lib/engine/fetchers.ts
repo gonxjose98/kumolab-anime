@@ -330,7 +330,9 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                             'Original', 'TV', 'Anime', 'The Movie', 'Movie',
                             'Season', 'Cour', 'Part',
                             'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff',
-                            'Release Date', 'Delay', 'Postponed', 'Info'
+                            'Release Date', 'Delay', 'Postponed', 'Info',
+                            'Channel', 'Views', 'Million', 'Billion', 'Subscriber', 'Platform',
+                            'Surpasses', 'Attracts', 'Streaming', 'Service', 'English-Language'
                         ];
 
                         noiseWords.forEach(word => {
@@ -338,9 +340,9 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                             searchName = searchName.replace(regex, '');
                         });
 
-                        // Remove numbers (Season 2 -> Season) to help fuzzy match if needed, 
-                        // but actually AniList handles "Season 2" well. removing numbers might be bad for "Code Geass" vs "Code Geass R2".
-                        // Let's keep numbers but trim spaces.
+                        // Remove common news-style artifacts
+                        searchName = searchName.replace(/["'']/g, ''); // Fix quotes
+
                         searchName = searchName.replace(/\s+/g, ' ').trim();
 
                         // Fallback: If we stripped it to death, take the first 3 words of the ORIGINAL title (ignoring noise)
