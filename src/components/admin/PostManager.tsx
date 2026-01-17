@@ -87,12 +87,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleCancel = async () => {
         if (previewPost) {
             // Remove from local state immediately so it 'disappears' for user
-            setPosts(posts.filter(p => p.id !== previewPost.id));
+            // Use functional update to ensure we have latest state
+            setPosts(currentPosts => currentPosts.filter(p => p.id !== previewPost.id));
 
             // Delete from DB (Cleanup)
             try {
-                // Fire and forget (don't await strictly to block UI, but good to perform)
-                await fetch(`/api/posts?id=${previewPost.id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/posts?id=${encodeURIComponent(previewPost.id)}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    console.error("Delete draft failed:", await res.text());
+                } else {
+                    console.log("Draft deleted successfully");
+                }
             } catch (e) {
                 console.error("Failed to delete draft:", e);
             }

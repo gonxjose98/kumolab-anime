@@ -303,42 +303,48 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                         }
 
                         // CLEAN TITLE LOGIC
-                        // User banned "Original TV", "TV Anime" from display
+                        // User banned "Original TV", "TV Anime", and now "Anime" global
                         let cleanTitle = title
-                            .replace(/Original TV Anime/gi, 'Anime')
-                            .replace(/TV Anime/gi, 'Anime')
-                            .replace(/Original Anime/gi, 'Anime')
+                            .replace(/Original TV Anime/gi, '')
+                            .replace(/TV Anime/gi, '')
+                            .replace(/Original Anime/gi, '')
+                            .replace(/Anime/gi, '') // BANNED WORD: Anime
                             .replace(/\s+/g, ' ').trim();
 
                         // OPTIMIZED SEARCH TERM EXTRACTION
                         // Goal: Get JUST the anime name. "Inherit the Winds Original TV Anime..." -> "Inherit the Winds"
-                        // Remove noise words that confuse AniList search
-                        const noiseWords = [
-                            'Original TV Anime', 'TV Anime', 'Anime', 'The Movie', 'Movie',
-                            'Season', 'Cour', 'Part',
-                            'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff',
-                            'Release Date', 'Delay', 'Postponed'
-                        ];
 
-                        let searchName = title.split(':')[0]; // First priority: Pre-colon (usually the show name)
+                        let searchName = "";
 
-                        // If pre-colon is too long or doesn't exist, try cleaning the whole string
-                        if (searchName.length > 40 || !searchName) {
+                        // Strategy A: Pre-colon (Highest confidence)
+                        // "Frieren: Beyond Journey's End" -> "Frieren"
+                        if (title.includes(':')) {
+                            searchName = title.split(':')[0].trim();
+                        } else {
+                            // Strategy B: Clean the whole string
                             searchName = title;
                         }
 
-                        // Strip noise
+                        // Remove all noise words from search term
+                        const noiseWords = [
+                            'Original', 'TV', 'Anime', 'The Movie', 'Movie',
+                            'Season', 'Cour', 'Part',
+                            'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff',
+                            'Release Date', 'Delay', 'Postponed', 'Info'
+                        ];
+
                         noiseWords.forEach(word => {
                             const regex = new RegExp(`\\b${word}\\b`, 'gi');
                             searchName = searchName.replace(regex, '');
                         });
 
-                        // Clean up
-                        searchName = searchName.replace(/[0-9]+/g, ''); // Remove numbers (often Season 2, etc, which breaks strict name search sometimes)
+                        // Remove numbers (Season 2 -> Season) to help fuzzy match if needed, 
+                        // but actually AniList handles "Season 2" well. removing numbers might be bad for "Code Geass" vs "Code Geass R2".
+                        // Let's keep numbers but trim spaces.
                         searchName = searchName.replace(/\s+/g, ' ').trim();
 
-                        // Fallback: if we stripped everything, revert to first 3 words
-                        if (searchName.length < 3) {
+                        // Fallback: If we stripped it to death, take the first 3 words of the ORIGINAL title (ignoring noise)
+                        if (searchName.length < 2) {
                             searchName = title.split(' ').slice(0, 3).join(' ');
                         }
 
