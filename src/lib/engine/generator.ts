@@ -236,14 +236,56 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     const dateString = date.toISOString().split('T')[0];
 
     // Trending also follows the strict relevance rule
+    // "An anime always has to be chosen. Fallback image should never be used."
     let officialSourceImage = trendingItem.image;
+
+    // HELPER: Robust Searcher (Duplicated for safety/isolation)
+    const findImageWithRetries = async (term: string) => {
+        if (!term) return null;
+
+        // Strategy 1: Exact Term
+        let img = await fetchOfficialAnimeImage(term);
+        if (img) return img;
+
+        console.log(`[Generator-Trending] Strategy 1 failed for "${term}". Trying Search Strategy 2...`);
+
+        // Strategy 2: Remove Numbers and "Season" keywords explicitly
+        let clean = term.replace(/[0-9]+/g, '').replace(/Season/gi, '').replace(/\s+/g, ' ').trim();
+        if (clean !== term) {
+            img = await fetchOfficialAnimeImage(clean);
+            if (img) return img;
+        }
+
+        console.log(`[Generator-Trending] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
+
+        // Strategy 3: First 3 Words
+        const simpleWords = term.split(' ');
+        if (simpleWords.length > 2) {
+            const shortTerm = simpleWords.slice(0, 3).join(' ');
+            img = await fetchOfficialAnimeImage(shortTerm);
+            if (img) return img;
+        }
+
+        return null;
+    };
+
     if (!officialSourceImage && trendingItem.imageSearchTerm) {
-        officialSourceImage = await fetchOfficialAnimeImage(trendingItem.imageSearchTerm);
+        // Try the robust search
+        officialSourceImage = await findImageWithRetries(trendingItem.imageSearchTerm);
+
+        // DESPERATE RESORT logic for Trending too
+        if (!officialSourceImage) {
+            const firstWord = trendingItem.imageSearchTerm.split(' ')[0];
+            if (firstWord.length > 4) {
+                console.log(`[Generator-Trending] DESPERATE LAST RESORT: Searching for "${firstWord}"`);
+                officialSourceImage = await fetchOfficialAnimeImage(firstWord);
+            }
+        }
     }
 
     // Universal Image Fallback
     if (!officialSourceImage) {
-        console.warn("Trending post missing image. Applying universal fallback.");
+        console.warn("Trending post missing image after ALL strategies. Applying universal fallback.");
         officialSourceImage = '/hero-bg-final.png';
     }
 
