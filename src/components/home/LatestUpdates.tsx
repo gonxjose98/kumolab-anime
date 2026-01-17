@@ -10,7 +10,7 @@ interface LatestUpdatesProps {
 }
 
 const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
-    const updates = posts.filter(p => p.type !== 'DROP');
+    const updates = posts.filter(p => p.type !== 'DROP' && p.isPublished);
     const containerRef = useRef<HTMLDivElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);

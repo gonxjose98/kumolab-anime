@@ -8,8 +8,8 @@ interface MostRecentFeedProps {
 }
 
 const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
-    // Filter out: Daily Drops (DROP) and Community Night (COMMUNITY)
-    let filteredPosts = posts.filter(p => p.type !== 'DROP' && p.type !== 'COMMUNITY');
+    // Filter out: Daily Drops (DROP), Community Night (COMMUNITY), and HIDDEN posts
+    let filteredPosts = posts.filter(p => p.type !== 'DROP' && p.type !== 'COMMUNITY' && p.isPublished);
 
     // Deduplicate by Title (Simple heuristic: first 15 chars)
     const seenTitles = new Set();
