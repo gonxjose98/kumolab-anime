@@ -13,9 +13,11 @@ Identify anime moments that are actively being discussed right now and explain W
 
 A post qualifies as TRENDING only if ALL conditions are met:
 
-1) TIME WINDOW
-- The moment must have occurred within the last 12–48 hours
-- If older than 48 hours, reject as Trending
+1) TIME WINDOW (CRITICAL)
+- The moment must have occurred within the last 12-48 hours relative to the CURRENT DATE.
+- ABSOLUTELY NO historical events, reruns, or old plot points.
+- If the event is older than 48 hours, REJECT it as Trending.
+- CHECK THE CURRENT DATE. If the info is from a previous year or month, it is INVALID.
 
 2) MOMENT-BASED (REQUIRED)
 Trending is about ONE specific moment, scene, or episode.
