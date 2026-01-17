@@ -417,6 +417,7 @@ async function fetchAniListTrendingRaw(): Promise<any[]> {
                         romaji
                         english
                     }
+                    description
                     coverImage {
                         extraLarge
                     }
@@ -481,8 +482,19 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
             candidates[key].score += 1;
         }
         // Upgrade image/desc if missing and this source has it
+        // We prefer News/AniList descriptions over Reddit self-text often, unless Reddit is the ONLY source.
+        // Actually, AniList description is usually the synopsis. News description is the news itself. 
+        // We prioritize News Description > AniList Synopsis (stripped) > Reddit Content > Placeholder.
         if (!candidates[key].image && image) candidates[key].image = image;
-        if (!candidates[key].description && desc) candidates[key].description = desc;
+
+        const isSynopsis = desc && desc.length > 50;
+        if (source === 'Crunchyroll/News' && desc) {
+            candidates[key].description = desc; // News is most relevant/current
+        } else if (source === 'AniList' && !candidates[key].description && isSynopsis) {
+            candidates[key].description = desc; // Fallback to synopsis
+        } else if (!candidates[key].description && desc) {
+            candidates[key].description = desc;
+        }
     };
 
     // 2. Process Sources
@@ -491,7 +503,9 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     aniList.forEach((item: any) => {
         const t = item.title.english || item.title.romaji;
         const img = item.bannerImage || item.coverImage?.extraLarge;
-        addVote(t, 'AniList', img, `Trending on AniList with high activity.`);
+        // Strip HTML from AniList description
+        const cleanDesc = item.description ? item.description.replace(/<[^>]*>?/gm, '') : '';
+        addVote(t, 'AniList', img, cleanDesc);
     });
 
     // Reddit (Discussion & Buzz)
@@ -523,12 +537,15 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     // Pick Winner
     const winner = ranked[0];
 
+    // Clean Description Logic: Ensure it's not empty, otherwise generic.
+    const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
+
     // Construct final Signal Item
     return {
         title: winner.title,
-        fullTitle: `${winner.title} - Trending Everywhere`,
+        fullTitle: `${winner.title}`, // REMOVED "Trending Everywhere" suffix per user request
         slug: `trending-${winner.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-        content: winner.description || `The anime community is focused on ${winner.title} today. Trending on ${winner.sources.join(', ')}.`,
+        content: finalContent, // Now uses real description/news/synopsis
         image: winner.image, // May need fetching if undefined
         imageSearchTerm: winner.title, // Critical for fallback image fetching
         trendReason: `Trending on: ${winner.sources.join(', ')}`,
