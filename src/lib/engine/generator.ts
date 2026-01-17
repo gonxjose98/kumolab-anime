@@ -90,12 +90,12 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         // Calculate difference in days (positive means premiered/past)
         const diffDays = Math.floor((today.getTime() - premiereDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        // DATE LOGIC (HARD RULE)
+        // DATE LOGIC (Autocorrect instead of Abort)
         if (claimType === 'confirmed') {
             if (today >= premiereDate) {
-                // "If today >= premiere_date -> abort publish (do NOT downgrade silently)"
-                console.error(`Abort: "confirmed" post rejected because today (${todayStr}) >= premiere_date (${premiereDateStr}).`);
-                return null;
+                // Was "confirmed" but date is past/today? Switch to 'premiered'
+                console.warn(`[Generator] Autocorrecting 'confirmed' post to 'premiered' because date ${premiereDateStr} is today/past.`);
+                claimType = 'premiered';
             }
         }
 
@@ -118,7 +118,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         finale_aired: "FINALE AIRED"
     };
 
-    const overlayTag = overlayTextMap[claimType];
+    const overlayTag = overlayTextMap[claimType] || "LATEST NEWS";
 
     // IMAGE RELEVANCE PROMPT (LOCKED)
     let officialSourceImage = topItem.image;
@@ -131,17 +131,14 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     }
 
     // HARD RULE: FALLBACK IF NO IMAGE FOUND
-    // If we still don't have an image, use the branded fallback background.
     if (!officialSourceImage) {
-        console.warn('No official source image found. Using fallback background to ensure generation.');
-        officialSourceImage = '/hero-bg-final.png'; // Make sure this file exists in public/
+        console.warn('No official source image found. Using fallback background.');
+        // Ensure we always return an image.
+        officialSourceImage = '/hero-bg-final.png';
     }
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
-        // Construct social headline: "ANIME_TITLE: STATUS"
-        const overlayTag = overlayTextMap[claimType]; // Ensure overlayTag is accessible here
-
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: topItem.title,
@@ -165,7 +162,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         claimType,
         premiereDate: premiereDateStr,
         content: topItem.content,
-        image: finalImage,
+        image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
         timestamp: date.toISOString(),
         isPublished: true
     };
@@ -198,6 +195,12 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         officialSourceImage = await fetchOfficialAnimeImage(trendingItem.imageSearchTerm);
     }
 
+    // Universal Image Fallback
+    if (!officialSourceImage) {
+        console.warn("Trending post missing image. Applying universal fallback.");
+        officialSourceImage = '/hero-bg-final.png';
+    }
+
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Enforce KumoLab branding for Trending posts as requested by User
@@ -224,7 +227,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
         type: 'TRENDING',
         content: trendingItem.content,
-        image: finalImage,
+        image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
         timestamp: date.toISOString(),
         isPublished: true
     };
