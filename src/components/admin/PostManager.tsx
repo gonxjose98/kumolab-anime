@@ -550,6 +550,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </div>
             )}
+            <div className="mt-8 pt-4 border-t border-white/10 text-white/20 text-[10px] uppercase tracking-widest flex justify-between items-center">
+                <span>KumoLab Admin Engine v1.2.0</span>
+                <span>Last Push: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</span>
+            </div>
         </div>
     );
 }
