@@ -39,11 +39,13 @@ const Navigation = () => {
                 </Link>
 
                 <div className={styles.actions}>
-                    {/* Cart Link */}
-                    <Link href="/merch/cart" className={styles.cartBtn} onClick={closeMenu}>
-                        <ShoppingCart size={22} />
-                        {cartCount > 0 && <span className={styles.cartBadge}>{cartCount}</span>}
-                    </Link>
+                    {/* Cart Link - Only show when cart has items */}
+                    {cartCount > 0 && (
+                        <Link href="/merch/cart" className={styles.cartBtn} onClick={closeMenu}>
+                            <ShoppingCart size={22} />
+                            <span className={styles.cartBadge}>{cartCount}</span>
+                        </Link>
+                    )}
 
                     {/* Theme Toggle */}
                     <div className={styles.themeToggle} onClick={toggleTheme} role="button" aria-label="Toggle Theme">

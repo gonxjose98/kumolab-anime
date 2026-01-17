@@ -22,10 +22,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [showModal, setShowModal] = useState(false);
 
     // Modal State
-    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | null>(null);
+    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | null>(null);
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [customImage, setCustomImage] = useState<File | null>(null);
+    const [customImagePreview, setCustomImagePreview] = useState<string>('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
 
     const filteredPosts = posts.filter(post => {
@@ -34,11 +36,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         return true;
     });
 
-    const handleGenerateClick = (type: 'INTEL' | 'TRENDING') => {
+    const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM') => {
         setGenType(type);
         setTopic('');
         setTitle('');
         setContent('');
+        setCustomImage(null);
+        setCustomImagePreview('');
         setPreviewPost(null);
         setShowModal(true);
     };
@@ -49,26 +53,52 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPreviewPost(null);
 
         try {
-            const response = await fetch('/api/admin/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: genType,
-                    topic: topic || undefined,
-                    title: title || undefined,
-                    content: content || undefined
-                })
-            });
+            if (genType === 'CUSTOM') {
+                // Handle custom post creation
+                if (!title || !customImage) {
+                    alert('Title and image are required for custom posts');
+                    setIsGenerating(false);
+                    return;
+                }
 
-            const data = await response.json();
-            if (data.success && data.post) {
-                setPreviewPost(data.post);
-                // Also update the list immediately so it shows in HIDDEN tab
-                // But since it's a draft, logic matches.
-                // We add it to the top.
-                setPosts([data.post, ...posts]);
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('content', content || `Check out: ${title}`);
+                formData.append('type', 'COMMUNITY');
+                formData.append('image', customImage);
+
+                const response = await fetch('/api/admin/custom-post', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success && data.post) {
+                    setPreviewPost(data.post);
+                    setPosts([data.post, ...posts]);
+                } else {
+                    alert('Generation failed: ' + (data.error || 'Unknown error'));
+                }
             } else {
-                alert('Generation failed: ' + (data.error || 'Unknown error'));
+                // Handle Intel/Trending generation
+                const response = await fetch('/api/admin/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: genType,
+                        topic: topic || undefined,
+                        title: title || undefined,
+                        content: content || undefined
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success && data.post) {
+                    setPreviewPost(data.post);
+                    setPosts([data.post, ...posts]);
+                } else {
+                    alert('Generation failed: ' + (data.error || 'Unknown error'));
+                }
             }
         } catch (e: any) {
             alert('Error generating post: ' + e.message);
@@ -150,6 +180,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <Zap size={14} />
                         Gen Trending
                     </button>
+                    <button
+                        onClick={() => handleGenerateClick('CUSTOM' as any)}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-900/30 text-green-400 border border-green-800/50 rounded-lg hover:bg-green-900/50 transition-all text-xs font-bold uppercase tracking-wider"
+                    >
+                        <Plus size={14} />
+                        Custom Post
+                    </button>
                 </div>
             </div>
 
@@ -229,8 +266,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     <div className="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-950/50">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                {genType === 'INTEL' ? <Newspaper size={18} className="text-blue-400" /> : <Zap size={18} className="text-purple-400" />}
-                                Generate {genType === 'INTEL' ? 'Anime Intel' : 'Trending Post'}
+                                {genType === 'INTEL' ? <Newspaper size={18} className="text-blue-400" /> :
+                                    genType === 'TRENDING' ? <Zap size={18} className="text-purple-400" /> :
+                                        <Plus size={18} className="text-green-400" />}
+                                {genType === 'INTEL' ? 'Generate Anime Intel' :
+                                    genType === 'TRENDING' ? 'Generate Trending Post' :
+                                        'Create Custom Post'}
                             </h3>
                             <button
                                 onClick={() => setShowModal(false)}
@@ -243,46 +284,107 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
                             {/* Input Section */}
                             <div className="grid gap-4 p-4 bg-neutral-950 rounded-lg border border-neutral-800">
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
-                                        Topic / Anime (Optional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="E.g. Solo Leveling, Demon Slayer, or leave empty for auto-search"
-                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none"
-                                        value={topic}
-                                        onChange={(e) => setTopic(e.target.value)}
-                                    />
-                                    <p className="text-[10px] text-neutral-500 mt-1">
-                                        If left empty, the engine will search for the latest live {genType === 'INTEL' ? 'news' : 'trends'} automatically.
-                                    </p>
-                                </div>
+                                {genType === 'CUSTOM' ? (
+                                    <>
+                                        {/* Custom Post Form */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Post Title (Required)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter post title (will appear on image)"
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-green-500 outline-none"
+                                                value={title}
+                                                onChange={(e) => setTitle(e.target.value)}
+                                            />
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
-                                        Custom Title (Optional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Headline for the post image"
-                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                    />
-                                </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Upload Image (Required)
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setCustomImage(file);
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setCustomImagePreview(reader.result as string);
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-green-500 outline-none file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-900/30 file:text-green-400 hover:file:bg-green-900/50"
+                                            />
+                                            {customImagePreview && (
+                                                <div className="mt-3 aspect-[4/5] max-w-xs bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={customImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                                </div>
+                                            )}
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
-                                        Custom Description (Optional)
-                                    </label>
-                                    <textarea
-                                        placeholder="The main body text of the post. If empty, it will be auto-generated."
-                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none h-24 resize-none"
-                                        value={content}
-                                        onChange={(e) => setContent(e.target.value)}
-                                    />
-                                </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Description (Optional)
+                                            </label>
+                                            <textarea
+                                                placeholder="Post description..."
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-green-500 outline-none h-24 resize-none"
+                                                value={content}
+                                                onChange={(e) => setContent(e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Intel/Trending Form */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Topic / Anime (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="E.g. Solo Leveling, Demon Slayer, or leave empty for auto-search"
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none"
+                                                value={topic}
+                                                onChange={(e) => setTopic(e.target.value)}
+                                            />
+                                            <p className="text-[10px] text-neutral-500 mt-1">
+                                                If left empty, the engine will search for the latest live {genType === 'INTEL' ? 'news' : 'trends'} automatically.
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Custom Title (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Headline for the post image"
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none"
+                                                value={title}
+                                                onChange={(e) => setTitle(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                                Custom Description (Optional)
+                                            </label>
+                                            <textarea
+                                                placeholder="The main body text of the post. If empty, it will be auto-generated."
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none h-24 resize-none"
+                                                value={content}
+                                                onChange={(e) => setContent(e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                )}
 
                                 <button
                                     onClick={handleGeneratePreview}
@@ -290,7 +392,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <ImageIcon size={18} />}
-                                    {isGenerating ? 'Generating Preview...' : 'Generate Preview'}
+                                    {isGenerating ? 'Generating Preview...' : genType === 'CUSTOM' ? 'Create Preview' : 'Generate Preview'}
                                 </button>
                             </div>
 

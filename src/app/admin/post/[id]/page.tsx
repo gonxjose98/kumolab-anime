@@ -137,6 +137,55 @@ export default function PostEditor() {
                     </select>
                 </div>
 
+                {/* 4. Image Preview */}
+                {post.image && (
+                    <div>
+                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                            Post Image
+                        </label>
+                        <div className="aspect-[4/5] max-w-sm bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. Current Content */}
+                {post.content && (
+                    <div>
+                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                            Content
+                        </label>
+                        <div className="bg-black border border-neutral-700 rounded p-4 text-neutral-300 text-sm leading-relaxed">
+                            {post.content}
+                        </div>
+                    </div>
+                )}
+
+                {/* 6. Additional Metadata (for INTEL posts) */}
+                {post.claim_type && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                                Claim Type
+                            </label>
+                            <div className="bg-black border border-neutral-700 rounded px-4 py-3 text-white">
+                                {post.claim_type}
+                            </div>
+                        </div>
+                        {post.premiere_date && (
+                            <div>
+                                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                                    Premiere Date
+                                </label>
+                                <div className="bg-black border border-neutral-700 rounded px-4 py-3 text-white">
+                                    {new Date(post.premiere_date).toLocaleDateString()}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* 3. Published Toggle */}
                 <div className="flex items-center justify-between bg-black p-4 rounded border border-neutral-800">
                     <div>
