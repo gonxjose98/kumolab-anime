@@ -121,19 +121,65 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     const overlayTag = overlayTextMap[claimType] || "LATEST NEWS";
 
     // IMAGE RELEVANCE PROMPT (LOCKED)
+    // "An anime always has to be chosen. Fallback image should never be used."
     let officialSourceImage = topItem.image;
+
+    // HELPER: Robust Searcher
+    const findImageWithRetries = async (term: string) => {
+        if (!term) return null;
+
+        // Strategy 1: Exact Term
+        let img = await fetchOfficialAnimeImage(term);
+        if (img) return img;
+
+        console.log(`[Generator] Strategy 1 failed for "${term}". Trying Search Strategy 2...`);
+
+        // Strategy 2: Remove Numbers and "Season" keywords explicitly
+        // "Inherit the Winds 2 Members" -> "Inherit the Winds Members" -> "Inherit the Winds"
+        let clean = term.replace(/[0-9]+/g, '').replace(/Season/gi, '').replace(/\s+/g, ' ').trim();
+        if (clean !== term) {
+            img = await fetchOfficialAnimeImage(clean);
+            if (img) return img;
+        }
+
+        console.log(`[Generator] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
+
+        // Strategy 3: First 3 Words (The "Hail Mary")
+        // "Inherit the Winds Members" -> "Inherit the Winds"
+        const words = escape(term).split('%20'); // Simple split by space
+        // Actually simpler to just split string
+        const simpleWords = term.split(' ');
+        if (simpleWords.length > 2) {
+            const shortTerm = simpleWords.slice(0, 3).join(' ');
+            img = await fetchOfficialAnimeImage(shortTerm);
+            if (img) return img;
+        }
+
+        return null;
+    };
+
     if (!officialSourceImage && topItem.imageSearchTerm) {
         try {
-            officialSourceImage = await fetchOfficialAnimeImage(topItem.imageSearchTerm);
+            officialSourceImage = await findImageWithRetries(topItem.imageSearchTerm);
         } catch (e) {
             console.error('Failed to fetch official image via custom search:', e);
         }
     }
 
     // HARD RULE: FALLBACK IF NO IMAGE FOUND
+    // User demand: "Fallback image should never be used."
+    // If we failed after all retries, we really just have to fallback or else we crash. 
+    // BUT we can try one last desperate search for JUST the first word if length > 4 chars
+    if (!officialSourceImage && topItem.imageSearchTerm) {
+        const firstWord = topItem.imageSearchTerm.split(' ')[0];
+        if (firstWord.length > 4) {
+            console.log(`[Generator] DESPERATE LAST RESORT: Searching for "${firstWord}"`);
+            officialSourceImage = await fetchOfficialAnimeImage(firstWord);
+        }
+    }
+
     if (!officialSourceImage) {
-        console.warn('No official source image found. Using fallback background.');
-        // Ensure we always return an image.
+        console.warn('No official source image found after ALL strategies. Using fallback.');
         officialSourceImage = '/hero-bg-final.png';
     }
 
