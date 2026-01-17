@@ -17,8 +17,10 @@ export async function POST(req: NextRequest) {
         if (topic || title || content) {
             // Manual Mode
             let officialImage = undefined;
-            if (topic) {
-                officialImage = await fetchOfficialAnimeImage(topic);
+            const searchTerm = topic || title;
+
+            if (searchTerm) {
+                officialImage = await fetchOfficialAnimeImage(searchTerm);
             }
 
             signalItem = {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
                 slug: (title || topic || 'manual').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
                 content: content || `Manual post generation for ${title || topic}.`,
                 image: officialImage,
-                imageSearchTerm: topic,
+                imageSearchTerm: searchTerm,
                 // Intel specific defaults that PASS validation
                 claimType: 'confirmed',
                 premiereDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow (safe from "past date" check)
