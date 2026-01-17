@@ -5,6 +5,9 @@ const nextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
+    env: {
+        BUILD_TIME: new Date().toISOString(),
+    },
 };
 
 export default nextConfig;
