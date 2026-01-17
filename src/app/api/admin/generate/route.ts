@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateIntelPost, generateTrendingPost } from '@/lib/engine/generator';
 // We need raw data fetchers or manual construction
-import { fetchAnimeIntel, fetchTrendingSignals, fetchOfficialAnimeImage } from '@/lib/engine/fetchers';
+import { fetchAnimeIntel, fetchTrendingSignals, fetchOfficialAnimeImage, fetchSmartTrendingCandidates } from '@/lib/engine/fetchers';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Re-export this if cleaner, but logic is custom here
@@ -44,8 +44,20 @@ export async function POST(req: NextRequest) {
                 const items = await fetchAnimeIntel();
                 if (items.length > 0) signalItem = items[0];
             } else if (type === 'TRENDING') {
-                const items = await fetchTrendingSignals();
-                if (items.length > 0) signalItem = items[0];
+                // Fetch existing posts for duplicate checking
+                const { data: existingPosts } = await supabaseAdmin
+                    .from('posts')
+                    .select('title, slug')
+                    .order('timestamp', { ascending: false })
+                    .limit(50);
+
+                const blockedTitles = existingPosts ? existingPosts.map((p: any) => p.title) : [];
+
+                // USE SMART ALGORITHM
+                console.log("Engaging Smart Trending Algorithm...");
+                signalItem = await fetchSmartTrendingCandidates(blockedTitles);
+
+                // If Smart Algo filtered out everything (or failed), fallback is handled below
             }
         }
 

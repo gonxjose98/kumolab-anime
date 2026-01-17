@@ -385,3 +385,154 @@ export async function fetchTrendingSignals(): Promise<any[]> {
         return [];
     }
 }
+
+/**
+ * SUPERIOR TRENDING ALGORITHM (User Requested)
+ * Sources: AniList (Trending), Reddit (Hot), News (ANN/Crunchyroll Proxy)
+ * Logic: Priority = 3 Matches > 2 Matches > News Only
+ */
+
+export interface TrendingCandidate {
+    title: string;
+    score: number;
+    sources: string[];
+    image?: string;
+    description?: string;
+}
+
+// Helper to normalize titles for comparison
+function normalizeTitle(t: string): string {
+    return t.toLowerCase().replace(/[^\w\s]/g, '').trim();
+}
+
+/**
+ * Fetches proper Trending Anime from AniList (Metric: Trending)
+ */
+async function fetchAniListTrendingRaw(): Promise<any[]> {
+    const query = `
+        query {
+            Page(page: 1, perPage: 10) {
+                media(sort: TRENDING_DESC, type: ANIME) {
+                    title {
+                        romaji
+                        english
+                    }
+                    coverImage {
+                        extraLarge
+                    }
+                    bannerImage
+                }
+            }
+        }
+    `;
+    try {
+        const res = await fetch(ANILIST_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const json = await res.json();
+        return json.data?.Page?.media || [];
+    } catch (e) {
+        console.error("AniList Trending Failed:", e);
+        return [];
+    }
+}
+
+/**
+ * The Master Aggregator Function
+ */
+export async function fetchSmartTrendingCandidates(excludeTitles: string[] = []): Promise<any> {
+    // 1. Fetch All Sources in Parallel
+    const [aniList, reddit, news] = await Promise.all([
+        fetchAniListTrendingRaw(),
+        fetchTrendingSignals(), // From Reddit
+        fetchAnimeIntel()       // From News (ANN as proxy for 'Crunchyroll'/News ecosystem)
+    ]);
+
+    const candidates: Record<string, TrendingCandidate> = {};
+    const normalizedExcludes = excludeTitles.map(normalizeTitle);
+
+    // Helper to Add/Update Candidate
+    const addVote = (title: string, source: string, image?: string, desc?: string) => {
+        if (!title) return;
+        const norm = normalizeTitle(title);
+
+        // DUPLICATE CHECK (Strict)
+        if (normalizedExcludes.some(ex => norm.includes(ex) || ex.includes(norm))) {
+            return; // Skip already published topics
+        }
+
+        let key = Object.keys(candidates).find(k => k === norm || k.includes(norm) || norm.includes(k));
+        if (!key) {
+            key = norm;
+            candidates[key] = {
+                title: title,
+                score: 0,
+                sources: [],
+                image: image,
+                description: desc
+            };
+        }
+
+        // Update entry
+        if (!candidates[key].sources.includes(source)) {
+            candidates[key].sources.push(source);
+            candidates[key].score += 1;
+        }
+        // Upgrade image/desc if missing and this source has it
+        if (!candidates[key].image && image) candidates[key].image = image;
+        if (!candidates[key].description && desc) candidates[key].description = desc;
+    };
+
+    // 2. Process Sources
+
+    // AniList (Visuals & Popularity)
+    aniList.forEach((item: any) => {
+        const t = item.title.english || item.title.romaji;
+        const img = item.bannerImage || item.coverImage?.extraLarge;
+        addVote(t, 'AniList', img, `Trending on AniList with high activity.`);
+    });
+
+    // Reddit (Discussion & Buzz)
+    reddit.forEach((item: any) => {
+        addVote(item.title, 'Reddit', undefined, item.content);
+    });
+
+    // News (Crunchyroll/ANN - "Official" updates)
+    news.forEach((item: any) => {
+        addVote(item.title, 'Crunchyroll/News', undefined, item.content);
+    });
+
+    // 3. Ranking & Selection
+    const ranked = Object.values(candidates).sort((a, b) => {
+        // Priority 1: More Sources (3 > 2 > 1)
+        if (b.score !== a.score) return b.score - a.score;
+
+        // Priority 2: News Source takes precedence for "Breaking" feel if scores are tied
+        const aHasNews = a.sources.includes('Crunchyroll/News');
+        const bHasNews = b.sources.includes('Crunchyroll/News');
+        if (bHasNews && !aHasNews) return 1;
+        if (aHasNews && !bHasNews) return -1;
+
+        return 0; // Equal
+    });
+
+    if (ranked.length === 0) return null;
+
+    // Pick Winner
+    const winner = ranked[0];
+
+    // Construct final Signal Item
+    return {
+        title: winner.title,
+        fullTitle: `${winner.title} - Trending Everywhere`,
+        slug: `trending-${winner.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+        content: winner.description || `The anime community is focused on ${winner.title} today. Trending on ${winner.sources.join(', ')}.`,
+        image: winner.image, // May need fetching if undefined
+        imageSearchTerm: winner.title, // Critical for fallback image fetching
+        trendReason: `Trending on: ${winner.sources.join(', ')}`,
+        momentum: 1.0,
+        source: 'KumoLab SmartSync'
+    };
+}
