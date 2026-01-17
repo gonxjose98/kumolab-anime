@@ -51,8 +51,15 @@ export async function generateIntelImage({
         let buffer: Buffer;
 
         if (sourceUrl.startsWith('http')) {
-            const response = await fetch(sourceUrl);
-            if (!response.ok) throw new Error('Failed to fetch image');
+            const response = await fetch(sourceUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+            if (!response.ok) {
+                console.error(`[Image Engine] Fetch failed: ${response.status} ${response.statusText} for ${sourceUrl}`);
+                throw new Error('Failed to fetch image');
+            }
             buffer = Buffer.from(await response.arrayBuffer());
         } else {
             // Support both absolute paths and relative public paths
