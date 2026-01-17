@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         const { data, error } = await supabaseAdmin
             .from('posts')
             .upsert([{
-                id: post.id,
+                // id is auto-generated UUID by DB
                 title: post.title,
                 slug: post.type === 'TRENDING' ? post.slug : post.slug + '-draft-' + Date.now().toString().slice(-4),
                 type: post.type,
