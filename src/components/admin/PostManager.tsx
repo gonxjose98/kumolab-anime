@@ -20,6 +20,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | null>(null);
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
+    const [content, setContent] = useState('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
 
     const filteredPosts = posts.filter(post => {
@@ -32,6 +33,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setGenType(type);
         setTopic('');
         setTitle('');
+        setContent('');
         setPreviewPost(null);
         setShowModal(true);
     };
@@ -48,7 +50,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({
                     type: genType,
                     topic: topic || undefined,
-                    title: title || undefined
+                    title: title || undefined,
+                    content: content || undefined
                 })
             });
 
@@ -233,10 +236,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="This will appear as the text on the generated image"
+                                        placeholder="Headline for the post image"
                                         className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                                        Custom Description (Optional)
+                                    </label>
+                                    <textarea
+                                        placeholder="The main body text of the post. If empty, it will be auto-generated."
+                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white text-sm focus:border-purple-500 outline-none h-24 resize-none"
+                                        value={content}
+                                        onChange={(e) => setContent(e.target.value)}
                                     />
                                 </div>
 
