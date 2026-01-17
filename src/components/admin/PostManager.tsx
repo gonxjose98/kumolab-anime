@@ -11,7 +11,12 @@ interface PostManagerProps {
 }
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
-    const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
+    // Normalize posts to ensure isPublished is present (Supabase returns is_published)
+    const normalizedPosts = initialPosts.map(p => ({
+        ...p,
+        isPublished: (p as any).is_published ?? p.isPublished
+    }));
+    const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN'>('ALL');
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
