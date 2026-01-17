@@ -264,20 +264,49 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                 const title = titleMatch[1].replace('<![CDATA[', '').replace(']]>', '');
                 const description = descMatch ? descMatch[1].replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '') : ''; // Strip HTML
 
-                // Simple keyword filter for high-value intel
-                if (title.includes('Season') || title.includes('Announced') || title.includes('Confirmed') || title.includes('Release Date') || title.includes('Trailer') || title.includes('Visual') || title.includes('PV')) {
+                // INTEL KEYWORDS (User Requested Expansion)
+                // Topics: Season confirmations, delays, announcements, movies, studio changes, major industry news
+                const strictKeywords = [
+                    'Season', 'Announced', 'Confirmed', 'Release Date',
+                    'Trailer', 'Visual', 'PV',
+                    'Delay', 'Postponed', 'Hiatus',
+                    'Movie', 'Film',
+                    'Studio', 'Staff', 'Production'
+                ];
+
+                const hasKeyword = strictKeywords.some(k => title.includes(k));
+
+                if (hasKeyword) {
                     const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
 
-                    // Recent news (last 72h) - slightly relaxed for Admin Generator reliability
+                    // Recent news (last 72h)
                     if (Date.now() - pubDate.getTime() < 72 * 60 * 60 * 1000) {
+
+                        // Smart Claim Type Detection
+                        let claimType = 'confirmed';
+                        if (title.includes('Delay') || title.includes('Postponed') || title.includes('Hiatus')) {
+                            claimType = 'delayed';
+                        } else if (title.includes('Trailer') || title.includes('PV')) {
+                            claimType = 'trailer';
+                        } else if (title.includes('Visual')) {
+                            claimType = 'confirmed'; // Visuals usually confirm a look/season
+                        }
+
+                        // Sanitize Title for Search (Remove "Announced", "Revealed", etc to get Anime Name)
+                        // Simple heuristic: Take portion before ':' or first 4 words
+                        let searchName = title.split(':')[0];
+                        if (searchName.length > 50) {
+                            searchName = title.split(' ').slice(0, 4).join(' ');
+                        }
+
                         items.push({
-                            title: title, // Use headline as title
+                            title: title,
                             fullTitle: title,
-                            claimType: 'confirmed', // Defaulting to confirmed for ANN news
-                            premiereDate: new Date().toISOString().split('T')[0], // Placeholder, ideally parsed
+                            claimType: claimType,
+                            premiereDate: new Date().toISOString().split('T')[0],
                             slug: 'intel-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                            content: description.substring(0, 280), // Cap length
-                            imageSearchTerm: title.split(':')[0], // Guess anime name
+                            content: description.substring(0, 280),
+                            imageSearchTerm: searchName,
                             source: 'AnimeNewsNetwork'
                         });
                     }
