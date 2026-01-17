@@ -302,19 +302,52 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                             claimType = 'confirmed'; // Visuals usually confirm a look/season
                         }
 
-                        // Sanitize Title for Search (Remove "Announced", "Revealed", etc to get Anime Name)
-                        // Simple heuristic: Take portion before ':' or first 4 words
-                        let searchName = title.split(':')[0];
-                        if (searchName.length > 50) {
-                            searchName = title.split(' ').slice(0, 4).join(' ');
+                        // CLEAN TITLE LOGIC
+                        // User banned "Original TV", "TV Anime" from display
+                        let cleanTitle = title
+                            .replace(/Original TV Anime/gi, 'Anime')
+                            .replace(/TV Anime/gi, 'Anime')
+                            .replace(/Original Anime/gi, 'Anime')
+                            .replace(/\s+/g, ' ').trim();
+
+                        // OPTIMIZED SEARCH TERM EXTRACTION
+                        // Goal: Get JUST the anime name. "Inherit the Winds Original TV Anime..." -> "Inherit the Winds"
+                        // Remove noise words that confuse AniList search
+                        const noiseWords = [
+                            'Original TV Anime', 'TV Anime', 'Anime', 'The Movie', 'Movie',
+                            'Season', 'Cour', 'Part',
+                            'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff',
+                            'Release Date', 'Delay', 'Postponed'
+                        ];
+
+                        let searchName = title.split(':')[0]; // First priority: Pre-colon (usually the show name)
+
+                        // If pre-colon is too long or doesn't exist, try cleaning the whole string
+                        if (searchName.length > 40 || !searchName) {
+                            searchName = title;
+                        }
+
+                        // Strip noise
+                        noiseWords.forEach(word => {
+                            const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                            searchName = searchName.replace(regex, '');
+                        });
+
+                        // Clean up
+                        searchName = searchName.replace(/[0-9]+/g, ''); // Remove numbers (often Season 2, etc, which breaks strict name search sometimes)
+                        searchName = searchName.replace(/\s+/g, ' ').trim();
+
+                        // Fallback: if we stripped everything, revert to first 3 words
+                        if (searchName.length < 3) {
+                            searchName = title.split(' ').slice(0, 3).join(' ');
                         }
 
                         items.push({
-                            title: title,
-                            fullTitle: title,
+                            title: cleanTitle,
+                            fullTitle: cleanTitle,
                             claimType: claimType,
                             premiereDate: new Date().toISOString().split('T')[0],
-                            slug: 'intel-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
+                            slug: 'intel-' + cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
                             content: description.substring(0, 280),
                             imageSearchTerm: searchName,
                             source: 'AnimeNewsNetwork'
