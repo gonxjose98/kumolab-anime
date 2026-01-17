@@ -234,53 +234,119 @@ export async function fetchOfficialAnimeImage(title: string): Promise<string | n
 /**
  * Placeholder for News Aggregation (Intel)
  */
+/**
+ * Fetches real Anime News from ANN/Crunchyroll RSS (Simulated parsing)
+ */
 export async function fetchAnimeIntel(): Promise<any[]> {
-    return [
-        {
-            title: "Frieren: Beyond Journey's End",
-            claimType: "now_streaming",
-            premiereDate: "2026-01-16",
-            fullTitle: "Frieren Season 2: The Journey Continues (OUT NOW)",
-            slug: "frieren-s2-now-streaming",
-            content: "The wait is over. Frieren Season 2 has officially premiered today. The story picks up with the El Dorado arc as Frieren continues her quest to understand the human heart.",
-            imageSearchTerm: "Frieren: Beyond Journey's End",
-            source: "Official Website"
-        },
-        {
-            title: "Oshi no Ko",
-            claimType: "confirmed",
-            premiereDate: "2026-04-10",
-            fullTitle: "Oshi no Ko Season 3 Set for Spring 2026",
-            slug: "oshi-no-ko-s3-confirmed",
-            content: "Oshi no Ko Season 3 has been officially greenlit for a Spring 2026 premiere. Production details remain with Doga Kobo.",
-            imageSearchTerm: "Oshi no Ko",
-            source: "Official Website"
+    try {
+        // Using AnimeNewsNetwork RSS
+        const response = await fetch('https://www.animenewsnetwork.com/news/rss.xml');
+        const text = await response.text();
+
+        // Simple regex RSS parser (lightweight, no deps)
+        const items = [];
+        const itemRegex = /<item>[\s\S]*?<\/item>/g;
+        const titleRegex = /<title>(.*?)<\/title>/;
+        const linkRegex = /<link>(.*?)<\/link>/;
+        const descRegex = /<description>([\s\S]*?)<\/description>/;
+        const pubDateRegex = /<pubDate>(.*?)<\/pubDate>/;
+
+        let match;
+        while ((match = itemRegex.exec(text)) !== null) {
+            const itemBlock = match[0];
+            const titleMatch = titleRegex.exec(itemBlock);
+            const linkMatch = linkRegex.exec(itemBlock);
+            const descMatch = descRegex.exec(itemBlock);
+            const dateMatch = pubDateRegex.exec(itemBlock);
+
+            if (titleMatch && linkMatch) {
+                // Filter for "Season" or "Announced" or "Movie" to match 'Intel' criteria
+                const title = titleMatch[1].replace('<![CDATA[', '').replace(']]>', '');
+                const description = descMatch ? descMatch[1].replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '') : ''; // Strip HTML
+
+                // Simple keyword filter for high-value intel
+                if (title.includes('Season') || title.includes('Announced') || title.includes('Confirmed') || title.includes('Release Date')) {
+                    const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
+
+                    // Only recent news (last 48h)
+                    if (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000) {
+                        items.push({
+                            title: title, // Use headline as title
+                            fullTitle: title,
+                            claimType: 'confirmed', // Defaulting to confirmed for ANN news
+                            premiereDate: new Date().toISOString().split('T')[0], // Placeholder, ideally parsed
+                            slug: 'intel-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
+                            content: description.substring(0, 280), // Cap length
+                            imageSearchTerm: title.split(':')[0], // Guess anime name
+                            source: 'AnimeNewsNetwork'
+                        });
+                    }
+                }
+            }
         }
-    ];
+
+        return items.slice(0, 3); // Return top 3 matches
+    } catch (e) {
+        console.error("Failed to fetch RSS Intel:", e);
+        // Fallback to empty to allow safe failure
+        return [];
+    }
 }
 
 /**
- * Placeholder for Trend Analysis
+ * Fetches real Trending discussions from Reddit r/anime (Hot/Top)
  */
 export async function fetchTrendingSignals(): Promise<any[]> {
-    return [
-        {
-            title: "Solo Leveling",
-            fullTitle: "Jin-Woo’s Shadow Army Debut",
-            slug: "solo-leveling-shadows-debut",
-            content: "Episode 12’s climax introduces the Shadow Army, marking Jin-Woo’s class change. Visuals shift to a purple-black palette as Igris triggers the loyalty system.",
-            imageSearchTerm: "Solo Leveling",
-            momentum: 0.98,
-            trendReason: "Power debut"
-        },
-        {
-            title: "Kaiju No. 8",
-            fullTitle: "Kafka’s Transformation Revealed",
-            slug: "kaiju-no8-transformation",
-            content: "Kafka’s partial transformation in Episode 4 exposes his identity to Kikoru. The scene emphasizes the contrast between his comedic human form and the kaiju scale.",
-            imageSearchTerm: "Kaiju No. 8",
-            momentum: 0.92,
-            trendReason: "Character reveal"
+    try {
+        // Reddit JSON API (No auth needed for read-only public)
+        const response = await fetch('https://www.reddit.com/r/anime/top.json?t=day&limit=10', {
+            headers: {
+                'User-Agent': 'KumoLab-Bot/1.0'
+            }
+        });
+
+        if (!response.ok) throw new Error('Reddit API failed');
+
+        const json = await response.json();
+        const posts = json.data?.children || [];
+
+        const validTrends = [];
+
+        for (const post of posts) {
+            const data = post.data;
+            // Filter: No meta discussions, must be substantial
+            if (data.stickied || data.is_meta) continue;
+
+            // Exclude "Episode Discussion" threads if we want specific *moments*, 
+            // OR include them if we want to extract the moment.
+            // For now, let's treat popular episode threads as trending moments.
+
+            let trendReason = "Community Hype";
+            if (data.title.includes('Episode') && data.title.includes('Discussion')) {
+                trendReason = "Episode Climax";
+            } else if (data.title.includes('Visual') || data.title.includes('Trailer')) {
+                trendReason = "Visual Reveal";
+            }
+
+            // Extract anime name attempt
+            // "Frieren: Beyond Journey's End - Episode 15 Discussion" -> "Frieren: Beyond Journey's End"
+            const titleClean = data.title.split(' - ')[0].replace(' [Spoilers]', '');
+
+            validTrends.push({
+                title: titleClean,
+                fullTitle: data.title,
+                slug: 'trending-' + data.id,
+                content: data.selftext ? data.selftext.substring(0, 200) + '...' : data.title,
+                imageSearchTerm: titleClean,
+                momentum: data.score / 10000, // Normalized score
+                trendReason: trendReason,
+                source: `Reddit r/anime (Score: ${data.score})`
+            });
         }
-    ];
+
+        return validTrends.slice(0, 3);
+    } catch (e) {
+        console.error("Failed to fetch Reddit Trending:", e);
+        return [];
+    }
 }
