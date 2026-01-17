@@ -271,12 +271,22 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                     'Trailer', 'Visual', 'PV',
                     'Delay', 'Postponed', 'Hiatus',
                     'Movie', 'Film',
-                    'Studio', 'Staff', 'Production'
+                    'Studio', 'Staff', 'Production',
+                    'Anime', 'Adaptation'
                 ];
 
-                const hasKeyword = strictKeywords.some(k => title.includes(k));
+                // NEGATIVE KEYWORDS (Strict Exclusion)
+                // We strictly want ANIME. No Games, No Manga, No Live Action, No Stage Plays.
+                const negativeKeywords = [
+                    'Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', // Gaming
+                    'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', // Print
+                    'Live-Action', 'Stage Play', 'Musical', 'Live Action', 'Play' // Theatrical/Live
+                ];
 
-                if (hasKeyword) {
+                const hasPositive = strictKeywords.some(k => title.includes(k));
+                const hasNegative = negativeKeywords.some(k => title.includes(k) || description.includes(k));
+
+                if (hasPositive && !hasNegative) {
                     const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
 
                     // Recent news (last 72h)
@@ -311,10 +321,11 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                         });
                     }
                 } else {
-                    // 1. Create a "Generic" items list as backup in case no "Hyped" keywords are found
-                    // We still want recent news.
+                    // Fallback Logic (Same strictness applied to Generic fallback to prevent Games slipping in)
                     const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
-                    if (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000) { // 48h for generic
+
+                    // Also check negatives here
+                    if (!hasNegative && (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000)) {
                         items.push({
                             title: title,
                             fullTitle: title,
