@@ -265,11 +265,11 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                 const description = descMatch ? descMatch[1].replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '') : ''; // Strip HTML
 
                 // Simple keyword filter for high-value intel
-                if (title.includes('Season') || title.includes('Announced') || title.includes('Confirmed') || title.includes('Release Date')) {
+                if (title.includes('Season') || title.includes('Announced') || title.includes('Confirmed') || title.includes('Release Date') || title.includes('Trailer') || title.includes('Visual') || title.includes('PV')) {
                     const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
 
-                    // Only recent news (last 48h)
-                    if (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000) {
+                    // Recent news (last 72h) - slightly relaxed for Admin Generator reliability
+                    if (Date.now() - pubDate.getTime() < 72 * 60 * 60 * 1000) {
                         items.push({
                             title: title, // Use headline as title
                             fullTitle: title,
