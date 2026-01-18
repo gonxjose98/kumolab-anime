@@ -30,8 +30,9 @@ export async function generateIntelImage({
     animeTitle,
     headline, // Serves as the "Supporting Line"
     slug,
-    textPosition = 'bottom' // New argument defaulting to bottom
-}: IntelImageOptions & { textPosition?: 'top' | 'bottom' }): Promise<string | null> {
+    textPosition = 'bottom', // New argument defaulting to bottom
+    skipUpload = false // Return Base64 instead of uploading
+}: IntelImageOptions & { textPosition?: 'top' | 'bottom', skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
@@ -252,6 +253,15 @@ export async function generateIntelImage({
 
         // 7. Upload to Supabase Storage (Persistent & Accessible)
         try {
+            if (skipUpload) {
+                // Return Base64 directly for preview
+                const bucketName = 'blog-images'; // kept for variable continuity if needed later
+                const finalBuffer = await canvas.toBuffer('image/png');
+                // Use JPEG for lighter weight preview transport if needed, or PNG for quality.
+                // Let's stick to PNG for high quality preview but maybe Base64 size is large.
+                return `data:image/png;base64,${finalBuffer.toString('base64')}`;
+            }
+
             const bucketName = 'blog-images';
             const finalBuffer = await canvas.toBuffer('image/png');
 

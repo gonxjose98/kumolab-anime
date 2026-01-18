@@ -1,4 +1,4 @@
-export {};
+export { };
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,20 +20,18 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function inspect() {
-    const { data: posts } = await supabase.from('posts').select('*').order('timestamp', { ascending: false }).limit(5);
+    const { data: posts } = await supabase.from('posts').select('*').order('timestamp', { ascending: false }).limit(10);
+
+    console.log(`Found ${posts?.length} posts.`);
 
     posts?.forEach(p => {
         console.log(`=== POST: ${p.title} ===`);
         console.log(`ID: ${p.id}`);
-        console.log(`SLUG: ${p.slug}`);
         console.log(`TYPE: ${p.type}`);
-        console.log(`CONTENT (RAW):`);
-        console.log(JSON.stringify(p.content));
-        console.log(`HAS — (em dash): ${p.content.includes('—')}`);
-        console.log(`HAS - (hyphen): ${p.content.includes('-')}`);
+        console.log(`IMAGE: ${p.image}`); // Checking this specifically
+        console.log(`CONTENT (Snippet): ${p.content?.substring(0, 50)}...`);
         console.log(`---`);
     });
 }
 
 inspect().catch(console.error);
-

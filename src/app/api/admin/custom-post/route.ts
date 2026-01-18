@@ -41,14 +41,27 @@ export async function POST(req: NextRequest) {
             .getPublicUrl(tempFileName);
 
         // Generate processed image with text overlay
+        const skipProcessing = formData.get('skipProcessing') === 'true';
+
+        // Generate processed image with text overlay
         const slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
-        const processedImageUrl = await generateIntelImage({
-            sourceUrl: publicUrl,
-            animeTitle: title,
-            headline: headline,
-            slug: slug,
-            textPosition: 'bottom'
-        });
+        let processedImageUrl: string | null = null;
+
+        if (skipProcessing) {
+            // If skipping processing, the uploaded image is ALREADY the final processed image.
+            // We just need to ensure it persists. The temp upload is fine, but let's be cleaner and rename it or just use it.
+            // Since we plan to delete 'tempFileName', we should probably copy it or just use a final filename initially?
+            // Let's just use the Public URL of the uploaded file and NOT delete it.
+            processedImageUrl = publicUrl;
+        } else {
+            processedImageUrl = await generateIntelImage({
+                sourceUrl: publicUrl,
+                animeTitle: title,
+                headline: headline,
+                slug: slug,
+                textPosition: 'bottom'
+            });
+        }
 
         // Create post in database
         const post = {
@@ -82,8 +95,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Failed to create post' }, { status: 500 });
         }
 
-        // Clean up temp file
-        await supabaseAdmin.storage.from('blog-images').remove([tempFileName]);
+        // Clean up temp file ONLY if we generated a new one via processing
+        if (!skipProcessing) {
+            await supabaseAdmin.storage.from('blog-images').remove([tempFileName]);
+        }
 
         return NextResponse.json({
             success: true,

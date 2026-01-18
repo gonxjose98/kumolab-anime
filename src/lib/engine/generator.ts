@@ -332,8 +332,15 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
 
     // 2. Image validation: allow http URLs, local paths (/), and data URIs (data:)
     if (post.image && !post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
-        console.warn(`[Validator] Stripping invalid image path: ${post.image.substring(0, 50)}...`);
-        post.image = undefined; // Fallback to text-only if image fails validation
+        console.warn(`[Validator] Invalid image path detected: ${post.image.substring(0, 50)}...`);
+        console.warn(`[Validator] Applying safety fallback: /hero-bg-final.png`);
+        post.image = '/hero-bg-final.png';
+    }
+
+    // 3. FINAL SAFETY CHECK: Ensure Image is NEVER null/undefined
+    if (!post.image) {
+        console.warn(`[Validator] Post ${post.title} has NO image. Applying safety fallback.`);
+        post.image = '/hero-bg-final.png';
     }
 
     return true;

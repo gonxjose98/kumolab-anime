@@ -634,3 +634,47 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         source: 'KumoLab SmartSync'
     };
 }
+
+/**
+ * Searches AniList for multiple official media images by title.
+ * Returns up to 3 high-quality images (Cover or Banner).
+ */
+export async function fetchOfficialAnimeImages(title: string): Promise<string[]> {
+    const query = `
+        query ($search: String) {
+            Page(page: 1, perPage: 3) {
+                media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
+                    id
+                    coverImage {
+                        extraLarge
+                        large
+                    }
+                    bannerImage
+                }
+            }
+        }
+    `;
+
+    try {
+        const response = await fetch(ANILIST_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ query, variables: { search: title } })
+        });
+        const json = await response.json();
+        const mediaList = json.data?.Page?.media || [];
+
+        const images: string[] = [];
+
+        mediaList.forEach((media: any) => {
+            if (media.bannerImage) images.push(media.bannerImage);
+            if (media.coverImage?.extraLarge) images.push(media.coverImage.extraLarge);
+        });
+
+        // Filter duplicates and return top 3
+        return [...new Set(images)].slice(0, 3);
+    } catch (e) {
+        console.error("Failed to fetch official images:", e);
+        return [];
+    }
+}

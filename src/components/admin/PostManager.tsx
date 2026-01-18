@@ -31,6 +31,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [customImagePreview, setCustomImagePreview] = useState<string>('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
 
+    // New Image Search & Processing State
+    const [searchedImages, setSearchedImages] = useState<string[]>([]);
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+    const [processedImage, setProcessedImage] = useState<string | null>(null);
+    const [isSearchingImages, setIsSearchingImages] = useState(false);
+    const [isProcessingImage, setIsProcessingImage] = useState(false);
+
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isPublishing, setIsPublishing] = useState(false);
@@ -49,30 +56,127 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setOverlayTag('');
         setCustomImage(null);
         setCustomImagePreview('');
+        setCustomImagePreview('');
         setPreviewPost(null);
+        // Reset new state
+        setSearchedImages([]);
+        setSelectedImageIndex(null);
+        setProcessedImage(null);
         setShowModal(true);
     };
 
+
+    // New Handlers
+    const handleSearchImages = async () => {
+        if (!topic) return alert('Please enter a topic first.');
+        setIsSearchingImages(true);
+        try {
+            const res = await fetch('/api/admin/search-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setSearchedImages(data.images);
+                setSelectedImageIndex(0); // Default to first
+            } else {
+                alert('Image search failed: ' + data.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error searching images');
+        } finally {
+            setIsSearchingImages(false);
+        }
+    };
+
+    const handleApplyText = async () => {
+        const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+            ? searchedImages[selectedImageIndex]
+            : customImagePreview; // Fallback to upload if needed
+
+        if (!imageUrl) return alert('No image selected to apply text to.');
+
+        // Use either custom title or topic
+        const displayTitle = title || topic;
+        if (!displayTitle) return alert('Title is required for text overlay.');
+
+        setIsProcessingImage(true);
+        try {
+            const res = await fetch('/api/admin/process-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageUrl,
+                    title: displayTitle,
+                    headline: overlayTag || (genType === 'TRENDING' ? 'TRENDING' : 'NEWS')
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setProcessedImage(data.processedImage);
+            } else {
+                alert('Text application failed: ' + data.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error applying text');
+        } finally {
+            setIsProcessingImage(false);
+        }
+    };
+
+    // Modified Generate Preview to use the manually processed image if available
     const handleGeneratePreview = async () => {
-        if (!genType) return;
         setIsGenerating(true);
         setPreviewPost(null);
 
         try {
-            if (genType === 'CUSTOM') {
-                // Handle custom post creation
-                if (!title || !customImage) {
-                    alert('Title and image are required for custom posts');
+            if (genType === 'CUSTOM' || processedImage) {
+                // If we have a processed image, use Custom Post flow to save it
+                // Or if it's a manual custom post
+                if (!title) {
+                    // If title missing but we have topic (from manual flow), use topic
+                    if (genType !== 'CUSTOM' && !topic) {
+                        alert('Title or Topic is required');
+                        setIsGenerating(false);
+                        return;
+                    }
+                }
+
+                const finalTitle = title || topic;
+                const finalContent = content || `Check out the latest on ${finalTitle}.`;
+
+                // If we have a processed Base64 image, we need to send it.
+                // The /api/admin/custom-post expects formData with 'image' file.
+                // We might need to convert base64 to blob or update the API.
+                // For now, let's assume we can Convert Base64 -> File
+
+                let imagePayload: File | string | null = customImage;
+
+                if (processedImage) {
+                    // Convert Base64 to Blob
+                    const res = await fetch(processedImage);
+                    const blob = await res.blob();
+                    imagePayload = new File([blob], "processed-image.png", { type: "image/png" });
+                }
+
+                if (!imagePayload && !customImage) {
+                    alert('Image required');
                     setIsGenerating(false);
                     return;
                 }
 
                 const formData = new FormData();
-                formData.append('title', title);
-                formData.append('content', content || `Check out: ${title}`);
-                formData.append('type', 'COMMUNITY');
+                formData.append('title', finalTitle);
+                formData.append('content', finalContent);
+                formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : 'COMMUNITY');
                 formData.append('headline', overlayTag || 'FEATURED');
-                formData.append('image', customImage);
+                formData.append('image', imagePayload as Blob);
+                if (processedImage) {
+                    formData.append('skipProcessing', 'true');
+                }
 
                 const response = await fetch('/api/admin/custom-post', {
                     method: 'POST',
@@ -84,10 +188,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     setPreviewPost(data.post);
                     setPosts([data.post, ...posts]);
                 } else {
-                    alert('Generation failed: ' + (data.error || 'Unknown error'));
+                    alert('Save failed: ' + (data.error || 'Unknown error'));
                 }
             } else {
-                // Handle Intel/Trending generation
+                // ... Original Auto-Gen Logic (Fallback if no manual image intervention) ...
                 const response = await fetch('/api/admin/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -458,6 +562,86 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             <p className="text-[10px] text-neutral-500 mt-1">
                                                 If left empty, the engine will search for the latest live {genType === 'INTEL' ? 'news' : 'trends'} automatically.
                                             </p>
+                                        </div>
+
+                                        {/* IMAGE SEARCH & SELECTION */}
+                                        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                                                    Official Image Selector
+                                                </label>
+                                                <button
+                                                    onClick={handleSearchImages}
+                                                    disabled={isSearchingImages || !topic}
+                                                    className="text-[10px] bg-blue-900/50 text-blue-400 px-2 py-1 rounded border border-blue-800 hover:bg-blue-900 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isSearchingImages ? 'Searching...' : 'Search Official Images'}
+                                                </button>
+                                            </div>
+
+                                            {searchedImages.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {/* Carousel / Grid */}
+                                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                                        {searchedImages.map((img, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                onClick={() => setSelectedImageIndex(idx)}
+                                                                className={`relative flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${selectedImageIndex === idx ? 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                                            >
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+
+                                                                {/* Selection Circle */}
+                                                                <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-white flex items-center justify-center ${selectedImageIndex === idx ? 'bg-green-500' : 'bg-black/50'}`}>
+                                                                    {selectedImageIndex === idx && <div className="w-2 h-2 bg-white rounded-full" />}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* TEXT OVERLAY ACTION */}
+                                                    {selectedImageIndex !== null && (
+                                                        <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Overlay Text (e.g. BREAKING NEWS)"
+                                                                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded p-2 text-white text-xs"
+                                                                    value={overlayTag}
+                                                                    onChange={(e) => setOverlayTag(e.target.value)}
+                                                                />
+                                                                <button
+                                                                    onClick={handleApplyText}
+                                                                    disabled={isProcessingImage}
+                                                                    className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-2 rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+                                                                >
+                                                                    {isProcessingImage ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                                                    Apply Text
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-4 text-xs text-neutral-600 italic">
+                                                    Click 'Search' to find official images for this topic.
+                                                </div>
+                                            )}
+
+                                            {/* Processed Preview */}
+                                            {processedImage && (
+                                                <div className="mt-4 p-3 bg-neutral-950 rounded border border-purple-500/30">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-xs font-bold text-purple-400">Final Image Preview</span>
+                                                        <span className="text-[10px] text-neutral-500">Ready to Save</span>
+                                                    </div>
+                                                    <div className="aspect-[4/5] w-32 bg-neutral-900 rounded overflow-hidden mx-auto border border-neutral-800">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img src={processedImage} alt="Processed" className="w-full h-full object-cover" />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div>
