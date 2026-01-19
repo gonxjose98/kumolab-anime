@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BlogPost } from '@/types';
 
 interface PostManagerProps {
@@ -582,22 +582,61 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             {searchedImages.length > 0 ? (
                                                 <div className="space-y-3">
                                                     {/* Carousel / Grid */}
-                                                    <div className="flex gap-2 overflow-x-auto pb-2">
-                                                        {searchedImages.map((img, idx) => (
-                                                            <div
-                                                                key={idx}
-                                                                onClick={() => setSelectedImageIndex(idx)}
-                                                                className={`relative flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${selectedImageIndex === idx ? 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                                    <div className="relative flex items-center justify-center gap-4 bg-black/40 rounded-xl p-4 border border-white/5 min-h-[300px]">
+                                                        {/* LEFT ARROW */}
+                                                        {searchedImages.length > 1 && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const newIndex = (selectedImageIndex ?? 0) - 1;
+                                                                    setSelectedImageIndex(newIndex < 0 ? searchedImages.length - 1 : newIndex);
+                                                                }}
+                                                                className="absolute left-2 p-2 bg-black/60 hover:bg-black/90 text-white rounded-full border border-white/20 transition-all z-10"
                                                             >
-                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+                                                                <ChevronLeft size={24} />
+                                                            </button>
+                                                        )}
 
-                                                                {/* Selection Circle */}
-                                                                <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-white flex items-center justify-center ${selectedImageIndex === idx ? 'bg-green-500' : 'bg-black/50'}`}>
-                                                                    {selectedImageIndex === idx && <div className="w-2 h-2 bg-white rounded-full" />}
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                        {/* MAIN IMAGE DISPLAY */}
+                                                        <div className="relative group w-[200px] aspect-[4/5] perspective-1000">
+                                                            {searchedImages.map((img, idx) => {
+                                                                // Simple logic to show current one, maybe slide later. For now, just show active.
+                                                                if (idx !== (selectedImageIndex ?? 0)) return null;
+                                                                return (
+                                                                    <div
+                                                                        key={idx}
+                                                                        className="relative w-full h-full rounded-xl overflow-hidden shadow-2xl border-2 border-green-500/50"
+                                                                    >
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+
+                                                                        {/* SELECTION INDICATOR (Always Selected in this view) */}
+                                                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                                                                            {searchedImages.map((_, dotIdx) => (
+                                                                                <div
+                                                                                    key={dotIdx}
+                                                                                    className={`w-3 h-3 rounded-full border border-white/80 transition-all ${dotIdx === selectedImageIndex ? 'bg-green-500 scale-110' : 'bg-transparent'}`}
+                                                                                />
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* RIGHT ARROW */}
+                                                        {searchedImages.length > 1 && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const newIndex = (selectedImageIndex ?? 0) + 1;
+                                                                    setSelectedImageIndex(newIndex >= searchedImages.length ? 0 : newIndex);
+                                                                }}
+                                                                className="absolute right-2 p-2 bg-black/60 hover:bg-black/90 text-white rounded-full border border-white/20 transition-all z-10"
+                                                            >
+                                                                <ChevronRight size={24} />
+                                                            </button>
+                                                        )}
                                                     </div>
 
                                                     {/* TEXT OVERLAY ACTION */}
