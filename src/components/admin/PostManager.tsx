@@ -568,14 +568,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-3">
                                             <div className="flex justify-between items-center mb-2">
                                                 <label className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                                                    Official Image Selector
+                                                    Official Image Selector (v2)
                                                 </label>
                                                 <button
-                                                    onClick={handleSearchImages}
+                                                    onClick={() => {
+                                                        console.log("Search button clicked for:", topic);
+                                                        handleSearchImages();
+                                                    }}
                                                     disabled={isSearchingImages || !topic}
-                                                    className="text-[10px] bg-blue-900/50 text-blue-400 px-2 py-1 rounded border border-blue-800 hover:bg-blue-900 transition-colors disabled:opacity-50"
+                                                    className="text-xs bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shadow-lg border border-green-400"
                                                 >
-                                                    {isSearchingImages ? 'Searching...' : 'Search Official Images'}
+                                                    {isSearchingImages ? 'Searching...' : 'SEARCH OFFICIAL IMAGES'}
                                                 </button>
                                             </div>
 
