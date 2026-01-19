@@ -98,8 +98,17 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '16:00' 
         }
     } else if (slot === '12:00') {
         // --- 12:00 UTC: ANIME INTEL ---
+        // Fetch candidates (guaranteed ~3 items for redundancy)
         const intelItems = await fetchAnimeIntel();
-        newPost = await generateIntelPost(intelItems, now);
+
+        // Select the first VALID candidate (avoid duplicates)
+        for (const item of intelItems) {
+            const candidate = await generateIntelPost([item], now);
+            if (candidate && validatePost(candidate, existingPosts, force)) {
+                newPost = candidate;
+                break; // We only want ONE post per day for this slot
+            }
+        }
     } else if (slot === '16:00') {
         // --- 16:00 EST: TRENDING NOW ---
         const signals = await fetchTrendingSignals();

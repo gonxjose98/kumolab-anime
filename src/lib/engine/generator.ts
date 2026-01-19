@@ -179,11 +179,14 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         officialSourceImage = '/hero-bg-final.png';
     }
 
+    const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
+    const validContent = cleanBody(topItem.content, validTitle);
+
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: topItem.title,
+            animeTitle: validTitle, // Use Cleaned Title for Image Text
             headline: overlayTag, // Status/Label in White
             slug: topItem.slug || 'intel'
         });
@@ -198,12 +201,12 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     return {
         id: `intel-${todayStr}-${Date.now()}`,
-        title: topItem.fullTitle || topItem.title,
+        title: validTitle,
         slug: `${topItem.slug || 'intel'}-${todayStr}`,
         type: 'INTEL',
         claimType,
         premiereDate: premiereDateStr,
-        content: topItem.content,
+        content: validContent,
         image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
         timestamp: date.toISOString(),
         isPublished: true
@@ -285,6 +288,9 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         officialSourceImage = '/hero-bg-final.png';
     }
 
+    const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
+    const validContent = cleanBody(trendingItem.content, validTitle);
+
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Enforce KumoLab branding for Trending posts as requested by User
@@ -292,7 +298,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: trendingItem.title,
+            animeTitle: validTitle, // Use Cleaned Title
             headline: overlayTag,
             slug: trendingItem.slug || 'trending'
         });
@@ -307,10 +313,10 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     return {
         id: `trending-${dateString}-${Date.now()}`,
-        title: trendingItem.fullTitle || trendingItem.title,
+        title: validTitle,
         slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
         type: 'TRENDING',
-        content: trendingItem.content,
+        content: validContent,
         image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
         timestamp: date.toISOString(),
         isPublished: true
@@ -344,4 +350,106 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
     }
 
     return true;
+}
+
+/**
+ * STRICT TITLE RULES:
+ * - Concise, Image-Safe (No brackets, parens).
+ * - Anime Name + Action/Status.
+ * - No questions, no multi-clause.
+ * - Soft ban "Community".
+ */
+function cleanTitle(title: string): string {
+    if (!title) return "Anime Update";
+
+    let clean = title;
+
+    // 1. Remove Brackets and Parentheses and their content
+    clean = clean.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '');
+
+    // 2. Remove "TV Anime", "The Anime", "The Series" filler
+    clean = clean.replace(/TV Anime/gi, 'Anime')
+        .replace(/The Anime/gi, 'Anime')
+        .replace(/The Series/gi, '');
+
+    // 3. Remove "Community" / "Fans" unless essential
+    if (clean.includes('Community')) {
+        // Soft ban: replace with specific if possible or generic "Buzz"
+        clean = clean.replace(/Community/gi, 'Fans');
+    }
+
+    // 4. Remove common RSS junk
+    clean = clean.replace(/News:/gi, '')
+        .replace(/Create/gi, '') // "Create a..."
+        .replace(/Vote/gi, '')
+        .replace(/Poll/gi, '');
+
+    // 5. Remove questions
+    clean = clean.replace(/\?/g, '');
+
+    // 6. Formatting: Remove extra spaces, em dashes
+    clean = clean.replace(/\s+/g, ' ').trim();
+    // Remove leading/trailing non-alphanumeric (like - or :)
+    clean = clean.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+
+    // 7. Enforce Action/Status framing if missing (Simple Heuristic)
+    // If it's just a name "One Piece", maybe add nothing (could be unsafe to guess).
+    // But user wants "Anime Name + Action".
+    // We assume the input title usually has it.
+
+    // 8. Hard Length Cap for Image Safety (approx 50 chars preferred)
+    if (clean.length > 65) {
+        // Try to truncate at last space
+        const truncated = clean.substring(0, 65);
+        clean = truncated.substring(0, truncated.lastIndexOf(' ')) + '...';
+    }
+
+    return clean;
+}
+
+/**
+ * STRICT BODY RULES:
+ * - Expand on title.
+ * - No filler.
+ * - Explanation of relevance.
+ */
+function cleanBody(content: string, title: string): string {
+    if (!content) return `Details regarding ${title} have been revealed. Check official sources for more information.`;
+
+    let clean = content;
+
+    // 1. Strip HTML
+    clean = clean.replace(/<[^>]*>?/gm, '');
+
+    // 2. Remove "Read more" or URLs
+    clean = clean.replace(/Read more.*/gi, '')
+        .replace(/http\S+/g, '');
+
+    // 3. Remove Title Repetition
+    if (clean.toLowerCase().startsWith(title.toLowerCase())) {
+        clean = clean.substring(title.length).trim();
+    }
+    // Remove "News" prefix if common
+    clean = clean.replace(/^News\s*[:|-]?\s*/i, '');
+
+    // 4. Truncate / concise
+    // Keep it to ~2 sentences or 180 chars.
+    const sentences = clean.split('. ');
+    if (sentences.length > 2) {
+        clean = sentences.slice(0, 2).join('. ') + '.';
+    }
+
+    if (clean.length > 200) {
+        clean = clean.substring(0, 197) + '...';
+    }
+
+    // 5. Ensure it's not empty
+    if (clean.length < 10) {
+        return `Latest updates on ${title}. Significant developments have been announced.`;
+    }
+
+    // 6. Formatting
+    clean = clean.trim();
+
+    return clean;
 }

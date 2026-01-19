@@ -127,7 +127,7 @@ export async function generateIntelImage({
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
-        const fontName = '"Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", sans-serif';
+        const fontName = 'Arial, sans-serif'; // Simplified for compatibility
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
@@ -159,6 +159,10 @@ export async function generateIntelImage({
             lineSpacing = globalFontSize * 0.95;
             gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
+            // Debug Measure
+            const testMeasure = ctx.measureText("TEST");
+            if (globalFontSize === 130) console.log(`[Image Engine] Font Test (${globalFontSize}px): Width=${testMeasure.width}`);
+
             titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
             headlineLines = cleanedHeadline.length > 0
                 ? wrapText(ctx, cleanedHeadline, availableWidth, 2)
@@ -170,6 +174,8 @@ export async function generateIntelImage({
             if (totalBlockHeight <= TARGET_ZONE_HEIGHT) break;
             globalFontSize -= 5;
         }
+
+        if (titleLines.length === 0) console.warn("[Image Engine] Warning: No title lines generated.");
 
         // 6. Localized High-Contrast Gradient
         // "I just want to make the text a little easier to see"

@@ -83,19 +83,20 @@ export default async function DashboardPage() {
         <div className="max-w-7xl mx-auto space-y-8">
             {/* 1. HEADER & OVERVIEW */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-xl bg-neutral-900/50 border border-neutral-800 backdrop-blur-sm relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-neutral-800 rounded-lg text-purple-400">
-                            <Eye size={18} />
+                <div className="p-6 rounded-2xl bg-black/20 border border-white/5 backdrop-blur-xl relative overflow-hidden group hover:border-white/10 transition-colors">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-3 mb-4 relative z-10">
+                        <div className="p-2.5 bg-white/5 rounded-xl text-purple-400 border border-white/5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                            <Eye size={20} />
                         </div>
-                        <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Total Views</h3>
+                        <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Total Traffic</h3>
                     </div>
-                    <div className="text-4xl font-bold text-white mt-2">
+                    <div className="text-5xl font-black text-white tracking-tighter relative z-10 drop-shadow-sm">
                         {stats.totalViews.toLocaleString()}
                     </div>
-                    <p className="text-xs text-neutral-500 mt-2 flex items-center gap-1">
-                        <Calendar size={12} />
-                        Last 30 Days
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-600 mt-4 flex items-center gap-2 font-mono relative z-10">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        Live Signal • Last 30 Days
                     </p>
                 </div>
 

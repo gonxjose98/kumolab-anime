@@ -44,3 +44,27 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
 }
+
+export async function PUT(req: NextRequest) {
+    try {
+        const body = await req.json();
+        const { id, ...updates } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('posts')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (e) {
+        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    }
+}

@@ -49,22 +49,26 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
     if (!isMounted) return <div className="h-[300px] w-full flex items-center justify-center text-neutral-800">Loading Analytics...</div>;
 
     return (
-        <div className="col-span-1 md:col-span-2 p-6 rounded-xl bg-neutral-900/50 border border-neutral-800 backdrop-blur-sm h-[350px] flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-semibold text-neutral-300 flex items-center gap-2">
-                    <TrendingUp size={16} className="text-purple-400" />
-                    Traffic Overview
-                </h3>
+        <div className="col-span-1 md:col-span-2 p-6 rounded-2xl bg-black/20 border border-white/5 backdrop-blur-xl h-[350px] flex flex-col group hover:border-white/10 transition-colors relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-bl from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-6 relative z-10">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white/5 rounded-xl text-purple-400 border border-white/5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                        <TrendingUp size={20} />
+                    </div>
+                    <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Traffic Overview</h3>
+                </div>
 
                 {/* Timeframe Toggles */}
-                <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
+                <div className="flex bg-black/40 p-1 rounded-lg border border-white/5">
                     {(['24h', '7d', '30d', 'all'] as const).map((t) => (
                         <button
                             key={t}
                             onClick={() => setTimeframe(t)}
                             className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${timeframe === t
-                                ? 'bg-neutral-800 text-white shadow-sm'
-                                : 'text-neutral-500 hover:text-neutral-300'
+                                ? 'bg-white/10 text-white shadow-sm border border-white/5'
+                                : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
                                 }`}
                         >
                             {t}
@@ -73,7 +77,7 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
                 </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0">
+            <div className="flex-1 w-full min-h-0 relative z-10">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
@@ -82,31 +86,34 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
                                 <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#262626" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                         <XAxis
                             dataKey="date"
                             stroke="#525252"
-                            tick={{ fill: '#525252', fontSize: 10 }}
+                            tick={{ fill: '#525252', fontSize: 10, fontFamily: 'monospace' }}
                             tickLine={false}
                             axisLine={false}
                             minTickGap={30}
                         />
                         <YAxis
                             stroke="#525252"
-                            tick={{ fill: '#525252', fontSize: 10 }}
+                            tick={{ fill: '#525252', fontSize: 10, fontFamily: 'monospace' }}
                             tickLine={false}
                             axisLine={false}
                             allowDecimals={false}
                         />
                         <Tooltip
                             contentStyle={{
-                                backgroundColor: '#171717',
-                                border: '1px solid #404040',
-                                borderRadius: '6px',
+                                backgroundColor: '#0a0a0a',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '8px',
                                 color: '#fff',
-                                fontSize: '12px'
+                                fontSize: '10px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
                             }}
-                            cursor={{ stroke: '#404040' }}
+                            cursor={{ stroke: '#7c3aed', strokeDasharray: '4 4' }}
                         />
                         <Area
                             type="monotone"
@@ -115,7 +122,7 @@ export default function AnalyticsDashboard({ initialData }: AnalyticsDashboardPr
                             strokeWidth={2}
                             fillOpacity={1}
                             fill="url(#colorViews)"
-                            animationDuration={1000}
+                            animationDuration={1500}
                         />
                     </AreaChart>
                 </ResponsiveContainer>

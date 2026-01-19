@@ -264,23 +264,28 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                 const title = titleMatch[1].replace('<![CDATA[', '').replace(']]>', '');
                 const description = descMatch ? descMatch[1].replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '') : ''; // Strip HTML
 
-                // INTEL KEYWORDS (User Requested Expansion)
-                // Topics: Season confirmations, delays, announcements, movies, studio changes, major industry news
+                // INTEL KEYWORDS (Refined for Series Focus)
+                // Topics: Season confirmations, visual reveals, trailers, delays.
                 const strictKeywords = [
-                    'Season', 'Announced', 'Confirmed', 'Release Date',
-                    'Trailer', 'Visual', 'PV',
-                    'Delay', 'Postponed', 'Hiatus',
-                    'Movie', 'Film',
-                    'Studio', 'Staff', 'Production',
-                    'Anime', 'Adaptation'
+                    'Season', 'Cour', // Specific anime terminology
+                    'Trailer', 'Visual', 'PV', // Visuals
+                    'Release Date', // Dates
+                    'Movie', // Films (but checked against negatives)
                 ];
 
-                // NEGATIVE KEYWORDS (Strict Exclusion)
-                // We strictly want ANIME. No Games, No Manga, No Live Action, No Stage Plays.
+                // NEGATIVE KEYWORDS (Brutal Exclusion of Meta/Industry News)
+                // We strictly want ANIME SERIES UPDATES.
                 const negativeKeywords = [
                     'Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', // Gaming
                     'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', // Print
-                    'Live-Action', 'Stage Play', 'Musical', 'Live Action', 'Play' // Theatrical/Live
+                    'Live-Action', 'Stage Play', 'Musical', 'Live Action', 'Play', // Theatrical/Live
+                    'Award', 'Prize', 'Nomination', 'Winner', // Awards
+                    'Comic-Con', 'Convention', 'Event', 'Expo', // Events
+                    'Interview', 'Report', 'Review', 'Editorial', // Meta content
+                    'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Ranking', 'Poll', // Merch/Stats
+                    'Earnings', 'Financial', 'Stock', // Business
+                    'Actor', 'Voice Actor', 'Seiyuu', 'Director', // Staff news (unless new project)
+                    'Dub', 'English Dub' // Dub news usually secondary
                 ];
 
                 const hasPositive = strictKeywords.some(k => title.includes(k));
@@ -386,18 +391,47 @@ export async function fetchAnimeIntel(): Promise<any[]> {
         // Let's sort to prioritize those capable of being 'confirmed' (keyword matches) if we modified strictness.
         // For now, just return items.
 
+        // Ensure we have at least 3 items by supplementing with Trending Data
+        // If RSS was too strict or empty, this fills the gap with real anime.
+        if (items.length < 3) {
+            console.log(`Only found ${items.length} valid RSS items. Supplementing with AniList Trending...`);
+            try {
+                const trendingData = await fetchAniListTrendingRaw();
+
+                for (const trend of trendingData) {
+                    if (items.length >= 3) break;
+
+                    const title = trend.title.english || trend.title.romaji;
+                    // Dedupe
+                    if (items.some(i => i.title === title)) continue;
+
+                    items.push({
+                        title: title,
+                        fullTitle: title,
+                        claimType: 'now_streaming',
+                        premiereDate: new Date().toISOString().split('T')[0],
+                        slug: 'intel-trending-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
+                        content: (trend.description || "The anime community is buzzing about this top-trending series.").replace(/<[^>]*>?/gm, '').substring(0, 280),
+                        imageSearchTerm: title,
+                        source: 'AniList Trending'
+                    });
+                }
+            } catch (e) {
+                console.warn("Trending supplement failed:", e);
+            }
+        }
+
         if (items.length === 0) {
-            console.warn("No RSS items matched. Falling back to synthetic mock for robustness.");
-            // Synthesis for "NEVER FAIL" requirement
+            // Absolute Fail Safe
             return [{
-                title: "Latest Anime Trends",
-                fullTitle: "Community Buzz: Top Anime of the Week",
+                title: "Anime Season Highlights",
+                fullTitle: "Community Highlights",
                 claimType: 'now_streaming',
                 premiereDate: new Date().toISOString().split('T')[0],
-                slug: 'trending-fallback-' + Date.now(),
-                content: "The community is buzzing about the latest episodes. Check out what's trending.",
-                imageSearchTerm: "Anime", // Generic search
-                source: "Fallback System"
+                slug: 'fallback-' + Date.now(),
+                content: "Check out the latest discussions.",
+                imageSearchTerm: "Anime",
+                source: "System Fallback"
             }];
         }
 
