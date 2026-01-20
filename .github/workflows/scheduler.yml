@@ -1,16 +1,22 @@
-name: KumoLab Automation Heartbeat
+name: KumoLab Scheduler
 
 on:
   schedule:
-    - cron: '0 * * * *' # Runs every hour on the hour
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+    # Run at 08:00, 12:00, 16:00, and 20:00 EST
+    # UTC Equivalents: 13:00, 17:00, 21:00, 01:00
+    - cron: '0 13 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 21 * * *'
+    - cron: '0 1 * * *'
+  # Allow manual trigger for testing
+  workflow_dispatch:
 
 jobs:
-  trigger_engine:
+  trigger-cron:
     runs-on: ubuntu-latest
     steps:
-      - name: PING KumoLab Engine
+      - name: Trigger Vercel Cron
         run: |
-          # Pings the blog engine endpoint.
-          # The endpoint itself handles EST time validation and scheduling.
-          curl -L -X GET "https://kumolab-anime.vercel.app/api/cron/run-blog-engine"
+          curl -X GET ${{ secrets.VERCEL_APP_URL }}/api/cron/run-blog-engine \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"

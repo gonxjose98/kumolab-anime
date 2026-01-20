@@ -11,6 +11,16 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
     try {
+        // 0. Security Check
+        // Allow if triggered by Vercel Cron OR if a valid CRON_SECRET is provided (e.g. from GitHub Actions)
+        const authHeader = request.headers.get('authorization');
+        const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+        const isValidSecret = process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+        if (!isVercelCron && !isValidSecret) {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+        }
+
         // 1. Get current time in EST (America/New_York)
         // Vercel Cron runs on UTC, but we want to respect EST schedules.
         const now = new Date();
