@@ -20,18 +20,22 @@ export const viewport = {
   maximumScale: 1,
 };
 
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
-        <AnalyticsTracker />
-        <Navigation />
-        <main>{children}</main>
-        <Footer />
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <AnalyticsTracker />
+          <Navigation />
+          <main>{children}</main>
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );

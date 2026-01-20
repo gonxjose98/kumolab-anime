@@ -3,29 +3,27 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Sun, Moon, Cloud, Menu, X, ShoppingCart } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useCartStore } from '@/store/useCartStore';
 import styles from './Navigation.module.css';
 
 const Navigation = () => {
-    const [theme, setTheme] = useState('dark');
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const cartItems = useCartStore((state) => state.items);
     const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-    // Initialize theme from localStorage or system preference
+    // Prevent hydration mismatch
     useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        // eslint-disable-next-line
-        setTheme(savedTheme);
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        setMounted(true);
     }, []);
 
     const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+        setTheme(theme === 'dark' ? 'light' : 'dark');
     };
+
+    if (!mounted) return null; // Or return a skeleton/placeholder to match server render if critical
 
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
     const closeMenu = () => setIsMenuOpen(false);

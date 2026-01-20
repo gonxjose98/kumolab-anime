@@ -20,7 +20,7 @@
   --header-height: 80px;
 }
 
-[data-theme='light'] {
+.light {
   --bg-color: #f8fafc;
   --surface-color: #ffffff;
   --surface-hover: #f1f5f9;
