@@ -1,4 +1,4 @@
-export {};
+export { };
 
 const fs = require('fs');
 const path = require('path');
@@ -21,8 +21,8 @@ async function main() {
 
     const slot = process.argv[2];
 
-    if (!slot || !['08:00', '12:00', '15:00', '20:00'].includes(slot)) {
-        console.error('Usage: npx tsx scripts/run-engine.ts <08:00|12:00|15:00|20:00>');
+    if (!slot || !['08:00', '12:00', '16:00', '20:00'].includes(slot)) {
+        console.error('Usage: npx tsx scripts/run-engine.ts <08:00|12:00|16:00|20:00>');
         process.exit(1);
     }
 
