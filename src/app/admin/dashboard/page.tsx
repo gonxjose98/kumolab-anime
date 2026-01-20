@@ -83,18 +83,18 @@ export default async function DashboardPage() {
         <div className="max-w-7xl mx-auto space-y-8">
             {/* 1. HEADER & OVERVIEW */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-2xl bg-black/20 border border-white/5 backdrop-blur-xl relative overflow-hidden group hover:border-white/10 transition-colors">
+                <div className="p-6 rounded-2xl bg-white/60 dark:bg-black/20 border border-gray-200 dark:border-white/5 backdrop-blur-xl relative overflow-hidden group hover:border-purple-500/20 dark:hover:border-white/10 transition-all shadow-xl shadow-purple-900/5 dark:shadow-none">
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="flex items-center gap-3 mb-4 relative z-10">
-                        <div className="p-2.5 bg-white/5 rounded-xl text-purple-400 border border-white/5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                        <div className="p-2.5 bg-purple-50 dark:bg-white/5 rounded-xl text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-white/5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
                             <Eye size={20} />
                         </div>
-                        <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Total Traffic</h3>
+                        <h3 className="text-[10px] font-black text-slate-500 dark:text-neutral-500 uppercase tracking-[0.2em]">Total Traffic</h3>
                     </div>
-                    <div className="text-5xl font-black text-white tracking-tighter relative z-10 drop-shadow-sm">
+                    <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter relative z-10 drop-shadow-sm">
                         {stats.totalViews.toLocaleString()}
                     </div>
-                    <p className="text-[10px] uppercase tracking-widest text-neutral-600 mt-4 flex items-center gap-2 font-mono relative z-10">
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-neutral-600 mt-4 flex items-center gap-2 font-mono relative z-10">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                         Live Signal • Last 30 Days
                     </p>

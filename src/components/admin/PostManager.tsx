@@ -355,14 +355,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/5 backdrop-blur-md">
+                <div className="flex bg-white/60 dark:bg-black/40 p-1.5 rounded-xl border border-gray-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-none">
                     {(['ALL', 'LIVE', 'HIDDEN'] as const).map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`relative px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest rounded-lg transition-all duration-300 ${filter === f
-                                ? 'text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]'
-                                : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
+                                ? 'text-white shadow-[0_4px_10px_rgba(168,85,247,0.3)]'
+                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/5'
                                 }`}
                         >
                             {filter === f && (
@@ -375,36 +375,40 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             </div>
 
             {/* Action Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Action Bar - Modern Glass Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button
                     onClick={() => handleGenerateClick('INTEL')}
-                    className="group relative overflow-hidden p-4 rounded-xl border border-blue-500/20 bg-blue-950/10 hover:bg-union-blue/20 transition-all active:scale-95"
+                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300"
                 >
-                    <div className="absolute inset-0 bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors" />
-                    <div className="relative flex flex-col items-center gap-2 text-blue-400 group-hover:text-blue-300">
-                        <Newspaper size={20} className="drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                    <div className="relative flex flex-col items-center gap-3 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                        <div className="p-3 rounded-full bg-blue-100/50 dark:bg-blue-500/10">
+                            <Newspaper size={20} />
+                        </div>
                         <span className="text-xs font-black uppercase tracking-widest">Gen Intel</span>
                     </div>
                 </button>
 
                 <button
                     onClick={() => handleGenerateClick('TRENDING')}
-                    className="group relative overflow-hidden p-4 rounded-xl border border-purple-500/20 bg-purple-950/10 hover:bg-purple-900/20 transition-all active:scale-95"
+                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300"
                 >
-                    <div className="absolute inset-0 bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors" />
-                    <div className="relative flex flex-col items-center gap-2 text-purple-400 group-hover:text-purple-300">
-                        <Zap size={20} className="drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+                    <div className="relative flex flex-col items-center gap-3 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
+                        <div className="p-3 rounded-full bg-purple-100/50 dark:bg-purple-500/10">
+                            <Zap size={20} />
+                        </div>
                         <span className="text-xs font-black uppercase tracking-widest">Gen Trending</span>
                     </div>
                 </button>
 
                 <button
                     onClick={() => handleGenerateClick('CUSTOM' as any)}
-                    className="group relative overflow-hidden p-4 rounded-xl border border-green-500/20 bg-green-950/10 hover:bg-green-900/20 transition-all active:scale-95"
+                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300"
                 >
-                    <div className="absolute inset-0 bg-green-500/10 group-hover:bg-green-500/20 transition-colors" />
-                    <div className="relative flex flex-col items-center gap-2 text-green-400 group-hover:text-green-300">
-                        <Plus size={20} className="drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                    <div className="relative flex flex-col items-center gap-3 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
+                        <div className="p-3 rounded-full bg-green-100/50 dark:bg-green-500/10">
+                            <Plus size={20} />
+                        </div>
                         <span className="text-xs font-black uppercase tracking-widest">Create Post</span>
                     </div>
                 </button>
@@ -414,11 +418,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <button
                             onClick={handleBulkDelete}
                             disabled={isPublishing}
-                            className="group relative overflow-hidden p-4 rounded-xl border border-red-500/20 bg-red-950/10 hover:bg-red-900/20 transition-all active:scale-95"
+                            className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="absolute inset-0 bg-red-500/10 group-hover:bg-red-500/20 transition-colors" />
-                            <div className="relative flex flex-col items-center gap-2 text-red-400 group-hover:text-red-300">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                            <div className="relative flex flex-col items-center gap-3 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
+                                    <div className="p-3 rounded-full bg-red-100/50 dark:bg-red-500/10">
+                                        <Trash2 size={20} />
+                                    </div>
+                                )}
                                 <span className="text-xs font-black uppercase tracking-widest">Delete ({selectedIds.length})</span>
                             </div>
                         </button>
@@ -426,11 +433,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <button
                             onClick={handleBulkHide}
                             disabled={isPublishing}
-                            className="group relative overflow-hidden p-4 rounded-xl border border-neutral-500/20 bg-neutral-900/40 hover:bg-neutral-800 transition-all active:scale-95"
+                            className="hidden md:block group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-neutral-900/40 hover:bg-gray-50 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="absolute inset-0 bg-white/5 group-hover:bg-white/10 transition-colors" />
-                            <div className="relative flex flex-col items-center gap-2 text-neutral-400 group-hover:text-neutral-300">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : <EyeOff size={20} />}
+                            <div className="relative flex flex-col items-center gap-3 text-slate-600 dark:text-neutral-400 group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
+                                    <div className="p-3 rounded-full bg-slate-100 dark:bg-white/5">
+                                        <EyeOff size={20} />
+                                    </div>
+                                )}
                                 <span className="text-xs font-black uppercase tracking-widest">Hide ({selectedIds.length})</span>
                             </div>
                         </button>
@@ -438,11 +448,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <button
                             onClick={handlePublishToSocials}
                             disabled={isPublishing}
-                            className="group relative overflow-hidden p-4 rounded-xl border border-pink-500/20 bg-pink-950/10 hover:bg-pink-900/20 transition-all active:scale-95"
+                            className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="absolute inset-0 bg-pink-500/10 group-hover:bg-pink-500/20 transition-colors" />
-                            <div className="relative flex flex-col items-center gap-2 text-pink-400 group-hover:text-pink-300 animate-pulse">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
+                            <div className="relative flex flex-col items-center gap-3 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
+                                    <div className="p-3 rounded-full bg-pink-100/50 dark:bg-pink-500/10">
+                                        <Zap size={20} />
+                                    </div>
+                                )}
                                 <span className="text-xs font-black uppercase tracking-widest">Publish ({selectedIds.length})</span>
                             </div>
                         </button>
@@ -451,76 +464,76 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             </div>
 
             {/* Content Display - Hybrid Table (Desktop) / Cards (Mobile) */}
-            <div className="bg-black/20 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-white/60 dark:bg-black/20 backdrop-blur-xl border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl">
                 {/* Desktop Table View */}
                 <div className="hidden md:block">
                     <table className="w-full text-left">
-                        <thead className="bg-white/5 text-neutral-400 border-b border-white/5">
+                        <thead className="bg-slate-50/50 dark:bg-white/5 text-slate-500 dark:text-neutral-400 border-b border-gray-200 dark:border-white/5">
                             <tr>
                                 <th className="p-4 pl-6 w-[40px]">
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.length === filteredPosts.length && filteredPosts.length > 0}
                                         onChange={toggleSelectAll}
-                                        className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                        className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-neutral-500">Signal Status</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-neutral-500">Visual</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-neutral-500 w-full">Intel</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-neutral-500 text-right pr-6">Controls</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-wider">Signal Status</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-wider">Visual</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-wider w-full">Intel</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-right pr-6">Controls</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                             {filteredPosts.map((post) => (
-                                <tr key={post.id} className={`group hover:bg-white/5 transition-colors ${selectedIds.includes(post.id) ? 'bg-purple-900/10' : ''}`}>
+                                <tr key={post.id} className={`group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
                                     <td className="p-4 pl-6 align-top">
                                         <input
                                             type="checkbox"
                                             checked={selectedIds.includes(post.id)}
                                             onChange={() => toggleSelect(post.id)}
-                                            className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                            className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
                                     <td className="p-4 align-top w-[120px]">
                                         <div className="flex flex-col gap-2">
-                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-[0_0_10px_inset] ${post.isPublished
-                                                ? 'bg-green-950/30 text-green-400 border-green-500/20 shadow-green-500/10'
-                                                : 'bg-red-950/30 text-red-500 border-red-500/20 shadow-red-500/10'
+                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.isPublished
+                                                ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                                : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
                                                 }`}>
                                                 {post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
                                             </span>
-                                            <span className="text-[10px] text-center font-mono text-neutral-600 uppercase">
+                                            <span className="text-[10px] text-center font-mono text-slate-500 dark:text-neutral-600 uppercase">
                                                 {post.type}
                                             </span>
                                         </div>
                                     </td>
                                     <td className="p-4 align-top w-[100px]">
-                                        <div className="w-16 h-20 rounded-lg bg-black/50 border border-white/10 overflow-hidden relative group-hover:border-white/30 transition-colors">
+                                        <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden relative group-hover:border-purple-300 dark:group-hover:border-white/30 transition-colors">
                                             {post.image ? (
                                                 /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img src={post.image} alt="" className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-neutral-800">
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-neutral-800">
                                                     <ImageIcon size={16} />
                                                 </div>
                                             )}
                                         </div>
                                     </td>
                                     <td className="p-4 align-top">
-                                        <h3 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors mb-1">
+                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors mb-1">
                                             {post.title}
                                         </h3>
-                                        <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono tracking-wide">
+                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide">
                                             <span>{new Date(post.timestamp).toLocaleDateString()}</span>
-                                            <span className="w-1 h-1 rounded-full bg-neutral-700" />
+                                            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
                                             <span className="truncate max-w-[200px]">{post.slug}</span>
                                         </div>
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
                                         <Link
                                             href={`/admin/post/${post.id}`}
-                                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-all"
+                                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-white/10 text-slate-400 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-white transition-all scale-90 hover:scale-100"
                                         >
                                             <Edit2 size={14} />
                                         </Link>
@@ -532,9 +545,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
 
                 {/* Mobile Card View */}
-                <div className="block md:hidden divide-y divide-white/5">
+                <div className="block md:hidden divide-y divide-gray-100 dark:divide-white/5">
                     {filteredPosts.map((post) => (
-                        <div key={post.id} className={`p-4 ${selectedIds.includes(post.id) ? 'bg-purple-900/10' : ''}`}>
+                        <div key={post.id} className={`p-4 ${selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
                             <div className="flex gap-4">
                                 {/* Checkbox & Image */}
                                 <div className="flex flex-col gap-3">
@@ -542,9 +555,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         type="checkbox"
                                         checked={selectedIds.includes(post.id)}
                                         onChange={() => toggleSelect(post.id)}
-                                        className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                        className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
-                                    <div className="w-16 h-20 rounded-lg bg-black/50 border border-white/10 overflow-hidden">
+                                    <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden">
                                         {post.image && (
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img src={post.image} alt="" className="w-full h-full object-cover" />
@@ -556,22 +569,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between mb-2">
                                         <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.isPublished
-                                            ? 'bg-green-950/30 text-green-400 border-green-500/20'
-                                            : 'bg-red-950/30 text-red-500 border-red-500/20'
+                                            ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                            : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
                                             }`}>
                                             {post.isPublished ? 'LIVE' : 'HIDDEN'}
                                         </span>
                                         <Link
                                             href={`/admin/post/${post.id}`}
-                                            className="text-neutral-500 hover:text-white"
+                                            className="text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white"
                                         >
                                             <Edit2 size={16} />
                                         </Link>
                                     </div>
-                                    <h3 className="text-sm font-bold text-white leading-tight mb-2 line-clamp-2">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
                                         {post.title}
                                     </h3>
-                                    <p className="text-[10px] text-neutral-500 font-mono">
+                                    <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
                                         {new Date(post.timestamp).toLocaleDateString()}
                                     </p>
                                 </div>
@@ -582,7 +595,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 {filteredPosts.length === 0 && (
                     <div className="p-12 text-center">
-                        <div className="inline-flex p-4 rounded-full bg-neutral-900/50 text-neutral-700 mb-4">
+                        <div className="inline-flex p-4 rounded-full bg-slate-100 dark:bg-neutral-900/50 text-slate-400 dark:text-neutral-700 mb-4">
                             <Newspaper size={24} />
                         </div>
                         <p className="text-neutral-500 text-sm font-medium">No transmissions found in this sector.</p>
@@ -593,29 +606,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             {/* GENERATION MODAL OVERHAUL */}
             {showModal && (
                 <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 sm:p-6">
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
-                    <div className="relative bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
+                    <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
+                    <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
 
                         {/* Modal Header */}
-                        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                        <div className="p-5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${genType === 'INTEL' ? 'bg-blue-500/10 text-blue-400' : genType === 'TRENDING' ? 'bg-purple-500/10 text-purple-400' : 'bg-green-500/10 text-green-400'}`}>
+                                <div className={`p-2 rounded-lg ${genType === 'INTEL' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : genType === 'TRENDING' ? 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400'}`}>
                                     {genType === 'INTEL' ? <Newspaper size={18} /> : genType === 'TRENDING' ? <Zap size={18} /> : <Plus size={18} />}
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-1">
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none mb-1">
                                         {genType === 'INTEL' ? 'Initiate Intel Drop' :
                                             genType === 'TRENDING' ? 'Broadcast Trending' :
                                                 'Custom Transmission'}
                                     </h3>
-                                    <p className="text-[10px] text-neutral-500 font-mono uppercase">
+                                    <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono uppercase">
                                         Protocol: {genType}
                                     </p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors"
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                             >
                                 <span className="sr-only">Close</span>
                                 <Plus size={20} className="rotate-45" />
@@ -631,13 +644,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         {/* Custom Post Inputs */}
                                         <div className="space-y-4">
                                             <div className="group">
-                                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-green-500 transition-colors">
+                                                <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-green-600 dark:group-focus-within:text-green-500 transition-colors">
                                                     Frequency Title
                                                 </label>
                                                 <input
                                                     type="text"
                                                     placeholder="Enter main headline..."
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all"
+                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={title}
                                                     onChange={(e) => setTitle(e.target.value)}
                                                 />
@@ -660,7 +673,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 reader.readAsDataURL(file);
                                                             }
                                                         }}
-                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-neutral-400 text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-wide file:bg-green-500/10 file:text-green-400 hover:file:bg-green-500/20 cursor-pointer"
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-400 dark:text-neutral-400 text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-wide file:bg-green-100 dark:file:bg-green-500/10 file:text-green-600 dark:file:text-green-400 hover:file:bg-green-200 dark:hover:file:bg-green-500/20 cursor-pointer"
                                                     />
                                                 </div>
                                                 {customImagePreview && (
@@ -681,7 +694,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 <input
                                                     type="text"
                                                     placeholder="e.g. BREAKING • OFFICIAL • REVEAL"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-neutral-700"
+                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                     value={overlayTag}
                                                     onChange={(e) => setOverlayTag(e.target.value)}
                                                 />
@@ -693,7 +706,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </label>
                                                 <textarea
                                                     placeholder="Enter transmission content..."
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-white/30 focus:ring-1 focus:ring-white/20 outline-none h-32 resize-none transition-all"
+                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-white/30 focus:ring-1 focus:ring-white/20 outline-none h-32 resize-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={content}
                                                     onChange={(e) => setContent(e.target.value)}
                                                 />
@@ -711,18 +724,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 <input
                                                     type="text"
                                                     placeholder="e.g. One Piece, Jujutsu Kaisen (Leave empty for auto-scout)"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={topic}
                                                     onChange={(e) => setTopic(e.target.value)}
                                                 />
                                             </div>
 
                                             {/* IMAGE SELECTOR V2 */}
-                                            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 md:p-5">
+                                            <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
                                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                                                     <div className="flex items-center gap-2">
                                                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                        <label className="text-xs font-black text-white uppercase tracking-widest">
+                                                        <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
                                                             Visual Feed Selector (v2)
                                                         </label>
                                                     </div>
@@ -742,9 +755,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 {searchedImages.length > 0 ? (
                                                     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
                                                         {/* Carousel */}
-                                                        <div className="relative group/carousel bg-black/40 rounded-xl p-6 border border-white/5 min-h-[320px] flex items-center justify-center overflow-hidden">
+                                                        <div className="relative group/carousel bg-slate-100 dark:bg-black/40 rounded-xl p-6 border border-gray-200 dark:border-white/5 min-h-[320px] flex items-center justify-center overflow-hidden">
                                                             {/* Grid Background Effect */}
-                                                            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)] pointer-events-none" />
+                                                            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)] pointer-events-none" />
 
                                                             {/* Arrow Controls */}
                                                             {searchedImages.length > 1 && (

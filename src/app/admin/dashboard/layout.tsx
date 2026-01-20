@@ -32,15 +32,15 @@ export default async function AdminLayout({
     }
 
     return (
-        <div className="min-h-screen bg-black text-white">
+        <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white transition-colors duration-300">
             {/* Simple Admin Header - Not Visible via Main Nav */}
 
 
-            <header className="border-b border-neutral-800 p-4 flex justify-between items-center bg-black/50 backdrop-blur sticky top-0 z-50">
+            <header className="border-b border-gray-200 dark:border-neutral-800 p-4 flex justify-between items-center bg-white/70 dark:bg-black/50 backdrop-blur-xl sticky top-0 z-50 transition-colors duration-300">
                 <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.png" alt="" className="h-8 w-auto invert brightness-200" />
-                    <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500">
+                    <img src="/logo.png" alt="" className="h-8 w-auto dark:invert dark:brightness-200 transition-all duration-300" />
+                    <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-500">
                         KumoLab Admin
                     </span>
                 </Link>
