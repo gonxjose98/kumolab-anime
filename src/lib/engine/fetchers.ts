@@ -555,6 +555,8 @@ async function fetchAniListTrendingRaw(): Promise<any[]> {
     }
 }
 
+import { checkSocialSignals } from '../social/signals';
+
 /**
  * The Master Aggregator Function
  */
@@ -652,19 +654,36 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     // Pick Winner
     const winner = ranked[0];
 
+    // --- CROSS REFERENCE WITH SOCIALS (X/IG) ---
+    // User Verification Request: "Check if trending on more than 1 social media"
+    try {
+        const socialSignals = await checkSocialSignals(winner.title);
+        if (socialSignals.length > 0) {
+            socialSignals.forEach(s => {
+                if (!winner.sources.includes(s.source)) {
+                    winner.sources.push(s.source);
+                    winner.score += s.score;
+                }
+            });
+            console.log(`[SmartSync] Social Cross-Ref Confirmed: ${winner.title} on ${socialSignals.map(s => s.source).join(', ')}`);
+        }
+    } catch (e) {
+        console.warn("[SmartSync] Social Cross-Ref Check Skipped/Failed:", e);
+    }
+
     // Clean Description Logic: Ensure it's not empty, otherwise generic.
     const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
 
     // Construct final Signal Item
     return {
         title: winner.title,
-        fullTitle: `${winner.title}`, // REMOVED "Trending Everywhere" suffix per user request
+        fullTitle: `${winner.title}`,
         slug: `trending-${winner.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-        content: finalContent, // Now uses real description/news/synopsis
-        image: winner.image, // May need fetching if undefined
-        imageSearchTerm: winner.title, // Critical for fallback image fetching
+        content: finalContent,
+        image: winner.image,
+        imageSearchTerm: winner.title,
         trendReason: `Trending on: ${winner.sources.join(', ')}`,
-        momentum: 1.0,
+        momentum: 1.0 + (winner.score * 0.1),
         source: 'KumoLab SmartSync'
     };
 }
