@@ -324,7 +324,61 @@ export async function generateIntelImage({
         }
     } catch (error) {
         console.error('Image Generation Error:', error);
-        return null;
+
+        // --- CARD OF LAST RESORT ---
+        // If everything fails, we MUST generate an image with text.
+        // We use a safe, pure-canvas approach with no external dependencies.
+        try {
+            const { createCanvas } = await import('@napi-rs/canvas');
+            const safeCanvas = createCanvas(1080, 1350);
+            const sCtx = safeCanvas.getContext('2d');
+
+            // 1. Background (Kumo Purple Gradient)
+            const grd = sCtx.createLinearGradient(0, 0, 0, 1350);
+            grd.addColorStop(0, '#1a1a2e');
+            grd.addColorStop(1, '#16213e');
+            sCtx.fillStyle = grd;
+            sCtx.fillRect(0, 0, 1080, 1350);
+
+            // 2. Text (Simplified)
+            sCtx.fillStyle = '#FFFFFF';
+            sCtx.textAlign = 'center';
+            sCtx.textBaseline = 'middle';
+            sCtx.font = 'bold 80px Arial, sans-serif';
+
+            // Draw Title
+            const safeTitle = animeTitle || 'ANIME UPDATE';
+            const words = safeTitle.toUpperCase().split(' ');
+            let line = '';
+            let y = 600;
+
+            for (let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                if (sCtx.measureText(testLine).width > 900 && n > 0) {
+                    sCtx.fillText(line, 540, y);
+                    line = words[n] + ' ';
+                    y += 100;
+                } else {
+                    line = testLine;
+                }
+            }
+            sCtx.fillText(line, 540, y);
+
+            // Draw Headline (Status)
+            y += 120;
+            sCtx.fillStyle = '#9D7BFF';
+            sCtx.font = 'bold 60px Arial, sans-serif';
+            sCtx.fillText(headline.toUpperCase(), 540, y);
+
+            // Return Base64
+            const finalBuffer = await safeCanvas.toBuffer('image/png');
+            console.log('[Image Engine] Recovered from error using Card of Last Resort.');
+            return `data:image/png;base64,${finalBuffer.toString('base64')}`;
+
+        } catch (fatalError) {
+            console.error('FATAL: Even the fallback card failed.', fatalError);
+            return null;
+        }
     }
 }
 
