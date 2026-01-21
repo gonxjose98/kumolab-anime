@@ -12,6 +12,13 @@ import path from 'path';
 const KUMOLAB_PURPLE = '#9D7BFF'; // Vibrant Lavender/Purple from reference
 const HANDLE_TEXT = '@KumoLabAnime';
 
+// Ensure font availability
+import { GlobalFonts } from '@napi-rs/canvas';
+// We might not have a custom font file, so we rely on system fonts. 
+// Adding a console log to debug what families are available if needed, 
+// but for now, we'll use a very safe stack.
+const FONT_STACK = 'Arial, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+
 interface IntelImageOptions {
     sourceUrl: string;
     animeTitle: string;
@@ -127,7 +134,7 @@ export async function generateIntelImage({
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
-        const fontName = 'Arial, sans-serif'; // Simplified for compatibility
+        const fontName = FONT_STACK;
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';

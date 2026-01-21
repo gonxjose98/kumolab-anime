@@ -3,7 +3,7 @@
  * Orchestrator for the KumoLab Daily Blog Automation
  */
 
-import { fetchAniListAiring, verifyOnCrunchyroll, fetchAnimeIntel, fetchTrendingSignals } from './fetchers';
+import { fetchAniListAiring, verifyOnCrunchyroll, fetchAnimeIntel, fetchTrendingSignals, fetchSmartTrendingCandidates } from './fetchers';
 import { generateDailyDropsPost, generateIntelPost, generateTrendingPost, validatePost } from './generator';
 import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
@@ -111,9 +111,13 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '16:00' 
         }
     } else if (slot === '16:00') {
         // --- 16:00 EST: TRENDING NOW ---
-        const signals = await fetchTrendingSignals();
-        const topTrend = signals[0];
-        newPost = await generateTrendsPost(topTrend, now);
+        // Use SmartSync to pull from Reddit + AniList + News to guarantee a hit
+        const topTrend = await fetchSmartTrendingCandidates();
+        if (topTrend) {
+            newPost = await generateTrendsPost(topTrend, now);
+        } else {
+            console.log("SmartSync failed to find ANY trending candidates. Skipping slot.");
+        }
     } else if (slot === '20:00') {
         // --- 20:00 EST: COMMUNITY NIGHT ---
         newPost = await generateCommunityNightPost(now);
