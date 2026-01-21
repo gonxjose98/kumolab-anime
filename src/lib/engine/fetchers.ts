@@ -636,18 +636,24 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     });
 
     // 3. Ranking & Selection
-    const ranked = Object.values(candidates).sort((a, b) => {
-        // Priority 1: More Sources (3 > 2 > 1)
-        if (b.score !== a.score) return b.score - a.score;
+    const ranked = Object.values(candidates).map(c => {
+        // SCORING ALGORITHM V2
+        // Base Score: Number of Sources
+        let finalScore = c.score;
 
-        // Priority 2: News Source takes precedence for "Breaking" feel if scores are tied
-        const aHasNews = a.sources.includes('Crunchyroll/News');
-        const bHasNews = b.sources.includes('Crunchyroll/News');
-        if (bHasNews && !aHasNews) return 1;
-        if (aHasNews && !bHasNews) return -1;
+        // Boost: AniList Trending (Proven Popularity)
+        if (c.sources.includes('AniList')) finalScore += 5;
 
-        return 0; // Equal
-    });
+        // Boost: Reddit Discussion (Community Engagement)
+        if (c.sources.includes('Reddit')) finalScore += 3;
+
+        // Penalize: Niche News Keywords (Cast, Song, Visual, Film)
+        // We want SERIES discussions for Trending, not just press releases.
+        const lowQualityKeywords = ['Cast', 'Theme Song', 'Performing', 'Preview', 'Visual', 'Film', 'Movie', 'Screening', 'Stage', 'Actor', 'Director'];
+        if (lowQualityKeywords.some(k => c.title.includes(k))) finalScore -= 3;
+
+        return { ...c, finalScore };
+    }).sort((a, b) => b.finalScore - a.finalScore); // Sort by calculated score
 
     if (ranked.length === 0) return null;
 

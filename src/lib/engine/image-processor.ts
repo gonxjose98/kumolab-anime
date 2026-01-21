@@ -59,16 +59,27 @@ export async function generateIntelImage({
         let buffer: Buffer;
 
         if (sourceUrl.startsWith('http')) {
-            const response = await fetch(sourceUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            try {
+                const response = await fetch(sourceUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
                 }
-            });
-            if (!response.ok) {
-                console.error(`[Image Engine] Fetch failed: ${response.status} ${response.statusText} for ${sourceUrl}`);
-                throw new Error('Failed to fetch image');
+                buffer = Buffer.from(await response.arrayBuffer());
+            } catch (fetchErr) {
+                console.warn(`[Image Engine] Failed to fetch source: ${sourceUrl}. Using Fallback Background to ensure text overlay.`);
+                // Fallback to local hero background
+                const fallbackPath = path.join(process.cwd(), 'public/hero-bg-final.png');
+                if (fs.existsSync(fallbackPath)) {
+                    buffer = fs.readFileSync(fallbackPath);
+                } else {
+                    // Ultimate fallback: 1x1 pixel black
+                    buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+                }
             }
-            buffer = Buffer.from(await response.arrayBuffer());
         } else {
             // Support both absolute paths and relative public paths
             const localPath = path.isAbsolute(sourceUrl)
