@@ -1,4 +1,3 @@
-export {};
 
 import { generateDailyDropsPost, generateIntelPost, generateTrendingPost } from '../src/lib/engine/generator';
 import { fetchAniListAiring, fetchOfficialAnimeImage } from '../src/lib/engine/fetchers';
@@ -9,18 +8,17 @@ import fs from 'fs';
 
 // Supabase Setup
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pytehpdxophkhuxnnqzj.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dGVocGR4b3Boa2h1eG5ucXpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNzI3NTksImV4cCI6MjA4Mzc0ODc1OX0.MgJiNAevZRFsidBEbUlHTXbKZUZCk3dIlWPypu2LHMI';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dGVocGR4b3Boa2h1eG5ucXpqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODE3Mjc1OSwiZXhwIjoyMDgzNzQ4NzU5fQ.oXPumZ99rcY4hfiaQ4qEMLBd5-34bd6N9_oA7n1pCH0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function publishPost(post: any) {
-    // Delete existing to allow overwrite (cleaner than upsert with complex constraints)
-    await supabase.from('posts').delete().eq('slug', post.slug);
-
+    const finalSlug = `${post.slug}-verified`;
+    // Upsert to handle existing records gracefully
     const { error } = await supabase
         .from('posts')
-        .insert([{
+        .upsert({
             title: post.title,
-            slug: `${post.slug}-verified`,
+            slug: finalSlug,
             type: post.type,
             content: post.content,
             image: post.image,
@@ -31,12 +29,12 @@ async function publishPost(post: any) {
             verification_tier: post.verification_tier,
             verification_reason: post.verification_reason,
             verification_sources: post.verification_sources
-        }]);
+        }, { onConflict: 'slug' });
 
     if (error) {
         console.error(`Error publishing ${post.title}:`, error.message);
     } else {
-        console.log(`✅ Published: ${post.title}`);
+        console.log(`✅ Published (Upsert): ${post.title}`);
     }
 }
 
@@ -175,4 +173,3 @@ async function runBackfill() {
 }
 
 runBackfill();
-

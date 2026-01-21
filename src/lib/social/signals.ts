@@ -7,7 +7,7 @@
 
 // Placeholder for now. Needs keys.
 const TWITTER_BEARER_TOKEN = process.env.TWITTER_BEARER_TOKEN;
-const IG_ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN; // IG uses Graph API token
+const IG_ACCESS_TOKEN = process.env.IG_ACCESS_TOKEN; // IG User Access Token
 
 interface SocialSignal {
     source: 'X' | 'Instagram';
