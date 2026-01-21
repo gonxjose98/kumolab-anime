@@ -166,7 +166,14 @@ async function publishToThreads(post: any, imageUrl: string) {
 
 export async function POST(req: NextRequest) {
     try {
-        const { postId } = await req.json();
+        // 0. Parse Options
+        const { postId, platforms } = await req.json();
+        // platforms: string[] e.g. ['x', 'instagram', 'facebook'] 
+        // If undefined/empty, default to ALL for backward compatibility (or user intent)
+        const targetPlatforms = (platforms && platforms.length > 0)
+            ? platforms.map((p: string) => p.toLowerCase())
+            : ['x', 'instagram', 'facebook'];
+
         if (!postId) return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
 
         const { data: post, error: fetchError } = await supabaseAdmin
@@ -179,45 +186,53 @@ export async function POST(req: NextRequest) {
 
         const results: any = { x: null, facebook: null, instagram: null, threads: null };
 
-        // 1. Prepare Media for X
+        // 1. Prepare Media for X (Only if X is targeted)
         let xMediaId: string | undefined;
         let imageBuffer: Buffer | undefined;
 
-        if (post.image) {
-            const imageRes = await fetch(post.image);
-            if (imageRes.ok) {
-                imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-            }
-        }
-
-        // 2. Publish to X
-        try {
-            const xClient = new TwitterApi({
-                appKey: process.env.X_API_KEY || '',
-                appSecret: process.env.X_API_SECRET || '',
-                accessToken: process.env.X_ACCESS_TOKEN || '',
-                accessSecret: process.env.X_ACCESS_SECRET || '',
-            });
-
-            if (imageBuffer) {
-                xMediaId = await xClient.v1.uploadMedia(imageBuffer, { type: 'png' });
+        if (targetPlatforms.includes('x')) {
+            if (post.image) {
+                const imageRes = await fetch(post.image);
+                if (imageRes.ok) {
+                    imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                }
             }
 
-            const xTweet = await publishToX(post, xClient, xMediaId);
-            results.x = { success: true, id: xTweet.data.id };
-        } catch (e: any) {
-            console.error("X Social Error:", e);
-            results.x = { success: false, error: e.message };
+            // 2. Publish to X
+            try {
+                const xClient = new TwitterApi({
+                    appKey: process.env.X_API_KEY || '',
+                    appSecret: process.env.X_API_SECRET || '',
+                    accessToken: process.env.X_ACCESS_TOKEN || '',
+                    accessSecret: process.env.X_ACCESS_SECRET || '',
+                });
+
+                if (imageBuffer) {
+                    xMediaId = await xClient.v1.uploadMedia(imageBuffer, { type: 'png' });
+                }
+
+                const xTweet = await publishToX(post, xClient, xMediaId);
+                results.x = { success: true, id: xTweet.data.id };
+            } catch (e: any) {
+                console.error("X Social Error:", e);
+                results.x = { success: false, error: e.message };
+            }
         }
 
         // 3. Publish to Facebook
-        results.facebook = await publishToFacebook(post, post.image);
+        if (targetPlatforms.includes('facebook')) {
+            results.facebook = await publishToFacebook(post, post.image);
+        }
 
         // 4. Publish to Instagram
-        results.instagram = await publishToInstagram(post, post.image);
+        if (targetPlatforms.includes('instagram')) {
+            results.instagram = await publishToInstagram(post, post.image);
+        }
 
-        // 5. Publish to Threads (Paused)
-        // results.threads = await publishToThreads(post, post.image);
+        // 5. Publish to Threads (Paused - but respecting logic if enabled later)
+        if (targetPlatforms.includes('threads')) {
+            // results.threads = await publishToThreads(post, post.image);
+        }
 
         // If at least one platform succeeded, we consider the overall operation a success
         const platformSuccesses = Object.values(results).filter((r: any) => r && r.success).length;

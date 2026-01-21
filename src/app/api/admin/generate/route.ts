@@ -41,8 +41,37 @@ export async function POST(req: NextRequest) {
         } else {
             // Auto Mode: Fetch real data
             if (type === 'INTEL') {
+                // Fetch blocked titles just like Trending to ensure we don't repeat Intel
+                const { data: existingPosts } = await supabaseAdmin
+                    .from('posts')
+                    .select('title, slug')
+                    .order('timestamp', { ascending: false })
+                    .limit(50);
+
+                const blockedTitles = existingPosts ? existingPosts.map((p: any) => p.title.toLowerCase()) : [];
+
                 const items = await fetchAnimeIntel();
-                if (items.length > 0) signalItem = items[0];
+
+                // Find first item that isn't blocked (fuzzy match)
+                if (items.length > 0) {
+                    // Try to find one not in blocked list
+                    signalItem = items.find(item => {
+                        const t = item.title.toLowerCase();
+                        // Check if this title is largely contained in any existing title or vice versa
+                        return !blockedTitles.some(blocked => blocked.includes(t) || t.includes(blocked));
+                    });
+
+                    // If all blocked, fallback to at least the second one if available, or just the first if we must
+                    if (!signalItem && items.length > 1) {
+                        // Relaxed check: Just exact blocking
+                        const justSlugs = existingPosts ? existingPosts.map((p: any) => p.slug) : [];
+                        signalItem = items.find(i => !justSlugs.includes(i.slug || ''));
+                    }
+
+                    // Final fallback
+                    if (!signalItem) signalItem = items[0];
+                }
+
             } else if (type === 'TRENDING') {
                 // Fetch existing posts for duplicate checking
                 const { data: existingPosts } = await supabaseAdmin

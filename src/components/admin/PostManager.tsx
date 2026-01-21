@@ -255,49 +255,108 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
+
+    // Social Publish Modal State
+    const [showSocialModal, setShowSocialModal] = useState(false);
+    const [socialPlatforms, setSocialPlatforms] = useState({
+        x: true,
+        instagram: true,
+        facebook: true
+    });
+    const [publishStatus, setPublishStatus] = useState<Record<string, Record<string, 'idle' | 'loading' | 'success' | 'error'>>>({});
+    const [publishLogs, setPublishLogs] = useState<Record<string, string[]>>({}); // Detailed text logs per post
+
     const toggleSelect = (id: string) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
     };
 
-    const handlePublishToSocials = async () => {
+    const runSocialPublish = async () => {
         if (selectedIds.length === 0) return;
 
-        // Respecting user rule: DO NOT PUBLISH ANYTHING UNLESS I APPROVE
-        if (!confirm(`Are you sure you want to publish ${selectedIds.length} selected post(s) to ALL Social Media (X, Facebook, Instagram, Threads)?`)) {
-            return;
-        }
-
         setIsPublishing(true);
-        let successCount = 0;
+        // Initialize status map for selected posts
+        const initStatus: any = {};
+        const initLogs: any = {};
+
+        selectedIds.forEach(id => {
+            initStatus[id] = {};
+            if (socialPlatforms.x) initStatus[id]['x'] = 'idle';
+            if (socialPlatforms.instagram) initStatus[id]['instagram'] = 'idle';
+            if (socialPlatforms.facebook) initStatus[id]['facebook'] = 'idle';
+            initLogs[id] = ["Initializing sequence..."];
+        });
+
+        setPublishStatus(initStatus);
+        setPublishLogs(initLogs);
+
+        const platformsList = Object.keys(socialPlatforms).filter(k => (socialPlatforms as any)[k]);
+
         try {
             for (const id of selectedIds) {
                 const post = posts.find(p => p.id === id);
                 if (!post) continue;
 
+                // Update Status to Loading for all active plaforms
+                setPublishStatus(prev => {
+                    const next = { ...prev };
+                    platformsList.forEach(p => next[id][p] = 'loading');
+                    return next;
+                });
+
+                // Call API
                 const res = await fetch('/api/admin/social/publish-all', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ postId: id })
+                    body: JSON.stringify({
+                        postId: id,
+                        platforms: platformsList
+                    })
                 });
 
                 const data = await res.json();
-                if (data.success) {
-                    successCount++;
-                } else {
-                    alert(`Failed to publish "${post.title}": ${data.error}`);
-                    break;
-                }
+
+                // Parse Results
+                setPublishStatus(prev => {
+                    const next = { ...prev };
+                    const results = data.results || {};
+
+                    platformsList.forEach(p => {
+                        if (results[p] && results[p].success) {
+                            next[id][p] = 'success';
+                        } else {
+                            next[id][p] = 'error';
+                        }
+                    });
+
+                    // Mark global post as published locally if at least one succeeded
+                    const anySuccess = Object.values(results).some((r: any) => r && r.success);
+                    if (anySuccess) {
+                        // Update local post state
+                        setPosts(current => current.map(curr => curr.id === id ? { ...curr, isPublished: true, is_published: true } : curr));
+                    }
+
+                    return next;
+                });
             }
-            alert(`Process complete. Successfully published ${successCount} out of ${selectedIds.length} posts to all platforms.`);
-            setSelectedIds([]);
         } catch (e: any) {
-            alert('Error during social publishing: ' + e.message);
+            alert('Critical Failure during broadcast: ' + e.message);
         } finally {
             setIsPublishing(false);
         }
     };
+
+
+    const handlePublishToSocials = () => {
+        if (selectedIds.length === 0) return;
+        setShowSocialModal(true);
+        // Reset statuses
+        setPublishStatus({});
+        setPublishLogs({});
+        setIsPublishing(false);
+    };
+
 
     const handleBulkDelete = async () => {
         if (!confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedIds.length} posts? This cannot be undone.`)) return;
