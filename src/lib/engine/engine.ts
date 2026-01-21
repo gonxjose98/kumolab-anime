@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { supabaseAdmin } from '../supabase/admin';
+import { publishToSocials } from '../social/publisher';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -158,6 +159,11 @@ async function publishPost(post: BlogPost) {
         if (error) {
             console.error('Supabase publish error:', error);
             throw error;
+        } else {
+            // Success! Trigger Social Publish in background
+            // (We don't await this to keep the API response fast, or we do await to ensure logs?)
+            // Since this is cron, awaiting is safer to prevent Vercel from killing the lambda too early.
+            await publishToSocials(post);
         }
     } else {
         const fileContents = fs.readFileSync(POSTS_PATH, 'utf8');

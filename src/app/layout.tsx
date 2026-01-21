@@ -10,6 +10,7 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakart
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com'),
   title: 'KumoLab | Anime Intelligence',
   description: 'Daily anime updates, drops, and intel - without the noise.',
 };

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Helper for X (existing logic)
 async function publishToX(post: any, client: TwitterApi, mediaId?: string) {
-    const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://kumolab-anime.vercel.app';
+    const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
 
     let tweetText = `${post.title}\n\n`;
@@ -25,7 +25,7 @@ async function publishToFacebook(post: any, imageUrl: string) {
         return { success: false, error: 'Facebook configuration missing' };
     }
 
-    const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://kumolab-anime.vercel.app';
+    const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
     const message = `${post.title}\n\nRead more: ${postUrl}\n\n#Anime #KumoLab`;
 
@@ -56,7 +56,7 @@ async function publishToInstagram(post: any, imageUrl: string) {
         return { success: false, error: 'Instagram configuration missing' };
     }
 
-    const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://kumolab-anime.vercel.app';
+    const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
     const caption = `${post.title}\n\nRead more at link in bio: ${postUrl}\n\n#Anime #KumoLab`;
 
@@ -95,8 +95,73 @@ async function publishToInstagram(post: any, imageUrl: string) {
 
 // Helper for Threads - Placeholder
 async function publishToThreads(post: any, imageUrl: string) {
-    console.log("Threads publishing triggered (Placeholder)");
-    return { success: true, platform: 'Threads' };
+    // 1. Get Credentials
+    const accessToken = process.env.THREADS_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
+    const userId = process.env.THREADS_USER_ID || 'me';
+
+    if (!accessToken) {
+        return { success: false, error: 'Threads Access Token missing (THREADS_ACCESS_TOKEN or META_ACCESS_TOKEN)' };
+    }
+
+    const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
+    const postUrl = `${domain}/blog/${post.slug}`;
+    const text = `${post.title}\n\nRead more: ${postUrl}\n\n#Anime #KumoLab`;
+
+    try {
+        // 2. Create Media Container
+        const containerUrl = `https://graph.threads.net/v1.0/${userId}/threads`;
+        console.log('[Threads] Creating container at:', containerUrl);
+
+        const containerRes = await fetch(containerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                media_type: 'IMAGE',
+                image_url: imageUrl,
+                text: text,
+                access_token: accessToken
+            })
+        });
+
+        const containerData = await containerRes.json();
+
+        if (containerData.error || !containerData.id) {
+            console.error('[Threads] Container Error:', containerData);
+            return { success: false, error: containerData.error?.message || 'Failed to create container' };
+        }
+
+        const containerId = containerData.id;
+        console.log('[Threads] Container Created:', containerId);
+
+        // 3. Wait for processing (Threads requires this sometimes)
+        // We'll verify status or just wait a bit.
+        // For simplicity, we'll try to publish immediately, but usually a small delay is safe.
+        await new Promise(r => setTimeout(r, 5000));
+
+        // 4. Publish Media
+        const publishUrl = `https://graph.threads.net/v1.0/${userId}/threads_publish`;
+        const publishRes = await fetch(publishUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                creation_id: containerId,
+                access_token: accessToken
+            })
+        });
+
+        const publishData = await publishRes.json();
+
+        if (publishData.error || !publishData.id) {
+            console.error('[Threads] Publish Error:', publishData);
+            return { success: false, error: publishData.error?.message || 'Failed to publish container' };
+        }
+
+        return { success: true, id: publishData.id };
+
+    } catch (e: any) {
+        console.error("Threads Network Error:", e);
+        return { success: false, error: e.message };
+    }
 }
 
 export async function POST(req: NextRequest) {
@@ -151,8 +216,8 @@ export async function POST(req: NextRequest) {
         // 4. Publish to Instagram
         results.instagram = await publishToInstagram(post, post.image);
 
-        // 5. Publish to Threads
-        results.threads = await publishToThreads(post, post.image);
+        // 5. Publish to Threads (Paused)
+        // results.threads = await publishToThreads(post, post.image);
 
         // If at least one platform succeeded, we consider the overall operation a success
         const platformSuccesses = Object.values(results).filter((r: any) => r && r.success).length;

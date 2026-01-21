@@ -45,7 +45,7 @@ export async function sendShippingEmail({
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            from: 'KumoLab <shop@kumolab.anime>',
+            from: 'KumoLab <shop@kumolabanime.com>',
             to,
             subject: 'Artifact Shipped: Your KumoLab order is on the way!',
             html: `<h1>Good news!</h1><p>Order #${orderId} has been shipped via ${carrier}.</p><p>Track it here: <a href="${trackingUrl}">${trackingNumber}</a></p>`

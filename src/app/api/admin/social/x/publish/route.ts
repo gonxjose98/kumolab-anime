@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
         // 4. Construct Tweet Text
         // Aesthetic: Title + Link + Handles
-        const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://kumolab-anime.vercel.app';
+        const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
         const postUrl = `${domain}/blog/${post.slug}`;
 
         let tweetText = `${post.title}\n\n`;
