@@ -34,15 +34,15 @@
 }
 
 .logoImg {
-    height: 58px;
-    /* Balanced height - increased by 20% */
+    height: 70px;
+    /* Balanced height - increased by ~20% */
     width: auto;
     object-fit: contain;
     transition: filter 0.3s ease;
 }
 
-[data-theme='dark'] .logoImg {
-    filter: invert(1) brightness(2);
+:global(.dark) .logoImg {
+    filter: invert(1) brightness(100);
     /* Invert black logo for dark theme */
 }
 
