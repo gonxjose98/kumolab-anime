@@ -397,10 +397,10 @@ function cleanTitle(title: string): string {
     // But user wants "Anime Name + Action".
     // We assume the input title usually has it.
 
-    // 8. Hard Length Cap for Image Safety (approx 50 chars preferred)
-    if (clean.length > 65) {
+    // 8. Hard Length Cap for Image Safety (User Limit: 100 chars)
+    if (clean.length > 100) {
         // Try to truncate at last space
-        const truncated = clean.substring(0, 65);
+        const truncated = clean.substring(0, 100);
         clean = truncated.substring(0, truncated.lastIndexOf(' ')) + '...';
     }
 

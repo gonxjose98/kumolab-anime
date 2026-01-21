@@ -165,33 +165,41 @@ export async function generateIntelImage({
 
         // --- DYNAMIC FONT SCALING ENGINE ---
         // Goal: Fill ~35% of the screen height without overflowing
-        let globalFontSize = 130; // Start big
+        let globalFontSize = 130; // Start big (Maximizes fill)
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
         let totalBlockHeight = 0;
         let gap = 0;
 
-        while (globalFontSize >= 60) {
+        // Expanded Range: Allow shrinking down to 45px for very long LN titles (100 chars)
+        while (globalFontSize >= 45) {
             ctx.font = `900 ${globalFontSize}px ${fontName}`;
-            lineSpacing = globalFontSize * 0.95;
+
+            // Tighter vertical rhythm for smaller fonts to look cohesive
+            const spacingMultiplier = globalFontSize < 80 ? 0.9 : 0.95;
+            lineSpacing = globalFontSize * spacingMultiplier;
+
             gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
             // Debug Measure
-            const testMeasure = ctx.measureText("TEST");
-            if (globalFontSize === 130) console.log(`[Image Engine] Font Test (${globalFontSize}px): Width=${testMeasure.width}`);
+            // ...
 
-            titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3);
+            // Allow up to 5 lines for Title (was 3)
+            titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 5);
             headlineLines = cleanedHeadline.length > 0
                 ? wrapText(ctx, cleanedHeadline, availableWidth, 2)
                 : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
 
-            // If we fit in the zone or if it's already quite small, stop
+            // If we fit in the zone, stop immediately (as we started from MAX size)
             if (totalBlockHeight <= TARGET_ZONE_HEIGHT) break;
+
             globalFontSize -= 5;
         }
+
+
 
         if (titleLines.length === 0) console.warn("[Image Engine] Warning: No title lines generated.");
 
