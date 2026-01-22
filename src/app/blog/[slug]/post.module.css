@@ -60,11 +60,13 @@
     font-size: 3rem;
     font-weight: 800;
     line-height: 1.1;
-    background: linear-gradient(to right, #fff, #a1a1a1);
+    color: var(--text-primary);
+    background: linear-gradient(to right, var(--text-primary), var(--text-tertiary));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
 }
+
 
 .content {
     font-size: 1.15rem;
@@ -100,11 +102,12 @@
 .dropTitle {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #FFFFFF;
+    color: var(--text-primary);
     margin-bottom: 0.25rem;
     /* TIGHT SPACING */
     line-height: 1.2;
 }
+
 
 .dropSubline {
     font-size: 0.9rem;
