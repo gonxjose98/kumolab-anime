@@ -6,17 +6,26 @@
 
 .heroImage {
     width: 100vw;
-    height: 60vh;
+    height: 75vh;
     margin-left: calc(50% - 50vw);
     margin-bottom: 3rem;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
 }
 
 .heroImage img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
+
+
+
 
 .header {
     text-align: center;
