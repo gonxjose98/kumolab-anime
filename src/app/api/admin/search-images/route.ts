@@ -6,14 +6,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
-        const { topic } = await request.json();
+        const { topic, page } = await request.json();
 
         if (!topic) {
             return NextResponse.json({ success: false, error: 'Topic is required' }, { status: 400 });
         }
 
-        console.log(`[Admin] Searching images for: ${topic}`);
-        const images = await fetchOfficialAnimeImages(topic);
+        const pageNum = page || 1;
+        console.log(`[Admin] Searching images for: ${topic} (Page ${pageNum})`);
+        const images = await fetchOfficialAnimeImages(topic, pageNum);
 
         return NextResponse.json({
             success: true,

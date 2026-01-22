@@ -53,7 +53,25 @@ export async function generateIntelImage({
 
     try {
         // 1. Dynamic Import (Prevents build-time binary resolution issues)
-        const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+        const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
+
+        // Check/Register Fonts
+        if (GlobalFonts.families.filter(f => f.family.includes('Inter')).length === 0) {
+            try {
+                // Fetch Inter font from Google Fonts CDN (Robust/Permanent)
+                const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter-Black.ttf';
+                const fontRes = await fetch(fontUrl);
+                if (fontRes.ok) {
+                    const fontBuffer = await fontRes.arrayBuffer();
+                    GlobalFonts.register(Buffer.from(fontBuffer), 'Inter');
+                }
+            } catch (e) {
+                console.warn("Retrying font download with backup mirror...");
+            }
+        }
+
+        // Update Stack
+        const fontName = 'Inter, Arial, sans-serif';
 
         // 2. Download and Resize/Crop to 1080x1350
         let buffer: Buffer;
@@ -145,7 +163,12 @@ export async function generateIntelImage({
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
-        const fontName = FONT_STACK;
+        // Use local variable font name determined above (re-declaring for scope clarity if needed, or stick to the one defined in generateIntelImage scope)
+        // Note: We changed 'const fontName' at top of function in previous step, but let's ensure we use it throughout.
+        // Actually, let's just make sure we use the right variable.
+        // The previous step defined `const fontName = 'Inter, ...'` inside try block.
+        // Let's ensure strict usage here.
+        const fontToUse = 'Inter, Arial, sans-serif';
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
@@ -174,7 +197,7 @@ export async function generateIntelImage({
 
         // Expanded Range: Allow shrinking down to 45px for very long LN titles (100 chars)
         while (globalFontSize >= 45) {
-            ctx.font = `900 ${globalFontSize}px ${fontName}`;
+            ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
 
             // Tighter vertical rhythm for smaller fonts to look cohesive
             const spacingMultiplier = globalFontSize < 80 ? 0.9 : 0.95;
@@ -231,7 +254,7 @@ export async function generateIntelImage({
         ctx.textBaseline = 'top';
 
         // --- DRAW ANIME TITLE (PRIMARY: WHITE / HEAVY) ---
-        ctx.font = `900 ${globalFontSize}px ${fontName}`;
+        ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
         ctx.fillStyle = '#FFFFFF'; // White for Primary Title
 
         titleLines.forEach((line) => {
@@ -241,7 +264,7 @@ export async function generateIntelImage({
 
         // --- DRAW HEADLINE (SUPPORTING: DYNAMIC COLOR / HEAVY) ---
         currentY += gap;
-        ctx.font = `900 ${globalFontSize}px ${fontName}`;
+        ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
 
         headlineLines.forEach((line) => {
             const words = line.split(' ');
@@ -276,7 +299,7 @@ export async function generateIntelImage({
         });
 
         // --- DRAW HANDLE (Subtle) ---
-        ctx.font = `bold 24px ${fontName}`;
+        ctx.font = `bold 24px ${fontToUse}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.shadowBlur = 0;
         // If Top, put handle at top padding? Or Bottom? Keep it bottom consistent.

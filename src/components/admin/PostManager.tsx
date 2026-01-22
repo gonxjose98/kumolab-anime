@@ -37,6 +37,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [processedImage, setProcessedImage] = useState<string | null>(null);
     const [isSearchingImages, setIsSearchingImages] = useState(false);
     const [isProcessingImage, setIsProcessingImage] = useState(false);
+    const [searchPage, setSearchPage] = useState(1); // Pagination state
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,30 +57,38 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setOverlayTag('');
         setCustomImage(null);
         setCustomImagePreview('');
-        setCustomImagePreview('');
         setPreviewPost(null);
         // Reset new state
         setSearchedImages([]);
         setSelectedImageIndex(null);
         setProcessedImage(null);
+        setSearchPage(1); // Reset page
         setShowModal(true);
     };
 
 
     // New Handlers
-    const handleSearchImages = async () => {
+    const handleSearchImages = async (reset: boolean = true) => {
         if (!topic) return alert('Please enter a topic first.');
         setIsSearchingImages(true);
+        const nextPage = reset ? 1 : searchPage + 1;
+
         try {
             const res = await fetch('/api/admin/search-images', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic })
+                body: JSON.stringify({ topic, page: nextPage })
             });
             const data = await res.json();
             if (data.success) {
-                setSearchedImages(data.images);
-                setSelectedImageIndex(0); // Default to first
+                if (reset) {
+                    setSearchedImages(data.images);
+                    setSelectedImageIndex(0);
+                } else {
+                    // Append new unique images
+                    setSearchedImages(prev => [...new Set([...prev, ...data.images])]);
+                }
+                setSearchPage(nextPage);
             } else {
                 alert('Image search failed: ' + data.error);
             }
@@ -435,90 +444,73 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             {/* Action Bar */}
             {/* Action Bar - Modern Glass Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Action Bar - Modern Aesthetic Compact */}
+            <div className="flex flex-wrap gap-3 items-center">
                 <button
                     onClick={() => handleGenerateClick('INTEL')}
-                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300"
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
-                    <div className="relative flex flex-col items-center gap-3 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
-                        <div className="p-3 rounded-full bg-blue-100/50 dark:bg-blue-500/10">
-                            <Newspaper size={20} />
-                        </div>
-                        <span className="text-xs font-black uppercase tracking-widest">Gen Intel</span>
+                    <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                        <Newspaper size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Intel</span>
                     </div>
                 </button>
 
                 <button
                     onClick={() => handleGenerateClick('TRENDING')}
-                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300"
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
-                    <div className="relative flex flex-col items-center gap-3 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
-                        <div className="p-3 rounded-full bg-purple-100/50 dark:bg-purple-500/10">
-                            <Zap size={20} />
-                        </div>
-                        <span className="text-xs font-black uppercase tracking-widest">Gen Trending</span>
+                    <div className="flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
+                        <Zap size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Trending</span>
                     </div>
                 </button>
 
                 <button
                     onClick={() => handleGenerateClick('CUSTOM' as any)}
-                    className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300"
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
-                    <div className="relative flex flex-col items-center gap-3 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
-                        <div className="p-3 rounded-full bg-green-100/50 dark:bg-green-500/10">
-                            <Plus size={20} />
-                        </div>
-                        <span className="text-xs font-black uppercase tracking-widest">Create Post</span>
+                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
+                        <Plus size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Create</span>
                     </div>
                 </button>
 
                 {selectedIds.length > 0 && (
-                    <>
+                    <div className="flex gap-2 ml-auto w-full md:w-auto">
                         <button
                             onClick={handleBulkDelete}
                             disabled={isPublishing}
-                            className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300"
+                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="relative flex flex-col items-center gap-3 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
-                                    <div className="p-3 rounded-full bg-red-100/50 dark:bg-red-500/10">
-                                        <Trash2 size={20} />
-                                    </div>
-                                )}
-                                <span className="text-xs font-black uppercase tracking-widest">Delete ({selectedIds.length})</span>
+                            <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Delete</span>
                             </div>
                         </button>
 
                         <button
                             onClick={handleBulkHide}
                             disabled={isPublishing}
-                            className="hidden md:block group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-neutral-900/40 hover:bg-gray-50 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-neutral-900/40 hover:bg-gray-50 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="relative flex flex-col items-center gap-3 text-slate-600 dark:text-neutral-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
-                                    <div className="p-3 rounded-full bg-slate-100 dark:bg-white/5">
-                                        <EyeOff size={20} />
-                                    </div>
-                                )}
-                                <span className="text-xs font-black uppercase tracking-widest">Hide ({selectedIds.length})</span>
+                            <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-neutral-400 group-hover:scale-105 transition-transform">
+                                <EyeOff size={16} />
+                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Hide</span>
                             </div>
                         </button>
 
                         <button
                             onClick={handlePublishToSocials}
                             disabled={isPublishing}
-                            className="group relative overflow-hidden p-5 rounded-2xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
+                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="relative flex flex-col items-center gap-3 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={20} className="animate-spin" /> : (
-                                    <div className="p-3 rounded-full bg-pink-100/50 dark:bg-pink-500/10">
-                                        <Zap size={20} />
-                                    </div>
-                                )}
-                                <span className="text-xs font-black uppercase tracking-widest">Publish ({selectedIds.length})</span>
+                            <div className="flex items-center justify-center gap-2 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                                <span className="text-[10px] font-black uppercase tracking-widest">Publish ({selectedIds.length})</span>
                             </div>
                         </button>
-                    </>
+                    </div>
                 )}
             </div>
 
@@ -798,17 +790,30 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             Visual Feed Selector (v2)
                                                         </label>
                                                     </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            console.log("Search button clicked for:", topic);
-                                                            handleSearchImages();
-                                                        }}
-                                                        disabled={isSearchingImages || !topic}
-                                                        className="w-full sm:w-auto text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
-                                                    >
-                                                        {isSearchingImages ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
-                                                        {isSearchingImages ? 'SCANNING...' : 'ACQUIRE IMAGES'}
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={async () => {
+                                                                await handleSearchImages(true);
+                                                            }}
+                                                            disabled={isSearchingImages || !topic}
+                                                            className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
+                                                        >
+                                                            {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                                                            {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
+                                                        </button>
+                                                        {searchedImages.length > 0 && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    await handleSearchImages(false);
+                                                                }}
+                                                                disabled={isSearchingImages}
+                                                                className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                                            >
+                                                                {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                                                More
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 {searchedImages.length > 0 ? (

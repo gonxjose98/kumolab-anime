@@ -698,10 +698,10 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
  * Searches AniList for multiple official media images by title.
  * Returns up to 3 high-quality images (Cover or Banner).
  */
-export async function fetchOfficialAnimeImages(title: string): Promise<string[]> {
+export async function fetchOfficialAnimeImages(title: string, page: number = 1): Promise<string[]> {
     const query = `
-        query ($search: String) {
-            Page(page: 1, perPage: 3) {
+        query ($search: String, $page: Int) {
+            Page(page: $page, perPage: 6) { 
                 media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
                     id
                     coverImage {
@@ -709,6 +709,9 @@ export async function fetchOfficialAnimeImages(title: string): Promise<string[]>
                         large
                     }
                     bannerImage
+                    streamingEpisodes {
+                        thumbnail
+                    }
                 }
             }
         }
@@ -718,7 +721,7 @@ export async function fetchOfficialAnimeImages(title: string): Promise<string[]>
         const response = await fetch(ANILIST_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ query, variables: { search: title } })
+            body: JSON.stringify({ query, variables: { search: title, page: page } })
         });
         const json = await response.json();
         const mediaList = json.data?.Page?.media || [];
@@ -728,10 +731,14 @@ export async function fetchOfficialAnimeImages(title: string): Promise<string[]>
         mediaList.forEach((media: any) => {
             if (media.bannerImage) images.push(media.bannerImage);
             if (media.coverImage?.extraLarge) images.push(media.coverImage.extraLarge);
+            if (media.streamingEpisodes && media.streamingEpisodes.length > 0) {
+                // Get a random thumbnail from episodes
+                images.push(media.streamingEpisodes[media.streamingEpisodes.length - 1].thumbnail);
+            }
         });
 
-        // Filter duplicates and return top 3
-        return [...new Set(images)].slice(0, 3);
+        // Filter duplicates and return top 6 (expanded from 3)
+        return [...new Set(images)];
     } catch (e) {
         console.error("Failed to fetch official images:", e);
         return [];
