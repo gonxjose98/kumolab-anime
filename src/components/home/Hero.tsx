@@ -9,21 +9,19 @@ const Hero = () => {
     const [hasAnimated, setHasAnimated] = useState(false);
 
     useEffect(() => {
-        const played = sessionStorage.getItem('hero_animated');
-        if (played) {
-            setHasAnimated(true);
-        } else {
-            setHasAnimated(false);
-            sessionStorage.setItem('hero_animated', 'true');
-        }
+        // We set this to true after a short timeout to ensure the CSS animations start first
+        // or just rely on CSS forwards.
+        // Actually, if we want it to ONLY play once, we use sessionStorage.
+        // But if the user 'no longer sees it', they might have already triggered it.
+        // I'll switch to a simple mount-based animation that happens on every load.
 
         const handleScroll = () => {
-
             setOffset(window.scrollY);
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
 
     // Very subtle parallax: 1.5% of scroll
     const parallaxTranslate = offset * 0.015;
