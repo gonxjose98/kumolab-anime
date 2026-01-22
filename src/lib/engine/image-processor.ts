@@ -193,8 +193,6 @@ export async function generateIntelImage({
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
-        const availableWidth = WIDTH * 0.90;
-        // Use local variable font name determined above (re-declaring for scope clarity if needed, or stick to the one defined in generateIntelImage scope)
         // See top of function for fontToUse definition ('Inter')
 
         ctx.textAlign = 'center';
