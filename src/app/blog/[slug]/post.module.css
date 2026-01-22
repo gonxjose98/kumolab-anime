@@ -109,12 +109,12 @@
 .dropSubline {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--accent-primary);
-    /* Use Kumo Purple */
+    color: #9D7BFF;
+    /* Exact KumoLab Signature Purple */
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    opacity: 0.8;
 }
+
 
 .dropContent .paragraph {
     font-family: var(--font-display);
