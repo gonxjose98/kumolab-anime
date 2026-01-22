@@ -230,9 +230,6 @@ export async function generateIntelImage({
 
             gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
-            // Debug Measure
-            // ...
-
             // Allow up to 5 lines for Title (was 3)
             titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 5);
             headlineLines = cleanedHeadline.length > 0
@@ -241,8 +238,14 @@ export async function generateIntelImage({
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
 
-            // If we fit in the zone, stop immediately (as we started from MAX size)
-            if (totalBlockHeight <= TARGET_ZONE_HEIGHT) break;
+            // Check Max Width of any single line
+            const maxLineWidth = Math.max(
+                ...titleLines.map(l => ctx.measureText(l).width),
+                ...headlineLines.map(l => ctx.measureText(l).width)
+            );
+
+            // If we fit in the zone AND width, stop immediately
+            if (totalBlockHeight <= TARGET_ZONE_HEIGHT && maxLineWidth <= availableWidth) break;
 
             globalFontSize -= 5;
         }
