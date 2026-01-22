@@ -517,8 +517,15 @@ export interface TrendingCandidate {
 }
 
 // Helper to normalize titles for comparison
+// Helper to normalize titles for comparison
 function normalizeTitle(t: string): string {
-    return t.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    return t.toLowerCase()
+        .replace(/【|】|\[|\]|\(|\)/g, '') // Remove brackets
+        .replace(/season \d+|part \d+|cour \d+/gi, '') // Remove season info for matching
+        .replace(/tv anime|anime/gi, '') // Remove filler
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 /**
@@ -651,12 +658,13 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
 
         if (c.sources.includes('AniList')) finalScore += 5;
         if (c.sources.includes('Reddit')) finalScore += 3;
+        if (c.sources.includes('Crunchyroll/News')) finalScore += 10; // News items are very valuable for tags
 
         const lowQualityKeywords = ['Cast', 'Theme Song', 'Performing', 'Preview', 'Visual', 'Film', 'Movie', 'Screening', 'Stage', 'Actor', 'Director'];
         if (lowQualityKeywords.some(k => c.title.includes(k))) finalScore -= 3;
 
         return { ...c, finalScore };
-    }).sort((a, b) => b.finalScore - a.finalScore); // Sort by calculated score
+    }).sort((a, b) => b.finalScore - a.finalScore);
 
     if (ranked.length === 0) return [];
 
@@ -667,27 +675,37 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         // Clean Description Logic
         const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
 
-        // --- CONTEXTUAL TAG LOGIC ---
-        let contextTag = "ANIME DISCOURSE";
+        // --- CONTEXTUAL TAG LOGIC (PRIORITIZED) ---
+        let possibleTags: string[] = [];
 
-        if (winner.sources.includes('Crunchyroll/News')) {
-            const t = winner.title.toLowerCase();
-            const c = finalContent.toLowerCase();
-            if (t.includes('season') || c.includes('season')) contextTag = "SEASON ANNOUNCEMENT";
-            else if (t.includes('trailer') || t.includes('pv')) contextTag = "TRAILER REVEAL";
-            else if (t.includes('visual')) contextTag = "VISUAL REVEAL";
-            else contextTag = "PRODUCTION UPDATE";
+        const t = winner.title.toLowerCase();
+        const c = finalContent.toLowerCase();
+
+        // 1. Production / News Tags (High Priority)
+        if (t.includes('season') || c.includes('season')) possibleTags.push("SEASON ANNOUNCEMENT");
+        if (t.includes('trailer') || t.includes('pv')) possibleTags.push("TRAILER REVEAL");
+        if (t.includes('visual')) possibleTags.push("VISUAL REVEAL");
+        if (t.includes('delay') || t.includes('hiatus')) possibleTags.push("PRODUCTION DELAY");
+
+        // 2. Engagement Tags
+        if (t.includes('episode') && t.includes('discussion')) possibleTags.push("EPISODE REACTION");
+
+        // 3. Source-based Fallbacks
+        if (winner.sources.includes('Reddit')) possibleTags.push("COMMUNITY BUZZ");
+
+        if (winner.status === 'RELEASING' || winner.sources.includes('AniList')) {
+            if (winner.status === 'RELEASING') possibleTags.push("CURRENTLY AIRING");
+            else possibleTags.push("TRENDING NOW");
         }
-        else if (winner.sources.includes('Reddit')) {
-            const t = winner.title.toLowerCase();
-            if (t.includes('episode') && t.includes('discussion')) contextTag = "EPISODE REACTION";
-            else if (t.includes('visual') || t.includes('trailer')) contextTag = "VISUAL REVEAL";
-            else contextTag = "COMMUNITY BUZZ";
-        }
-        else if (winner.sources.includes('AniList')) {
-            if (winner.status === 'RELEASING') contextTag = "CURRENTLY AIRING";
-            else contextTag = "COMMUNITY FAVORITE";
-        }
+
+        // --- SELECTION (Pick the most specific tag) ---
+        const priorityOrder = [
+            "SEASON ANNOUNCEMENT", "TRAILER REVEAL", "PRODUCTION DELAY",
+            "VISUAL REVEAL", "EPISODE REACTION", "COMMUNITY BUZZ",
+            "CURRENTLY AIRING", "TRENDING NOW", "ANIME DISCOURSE"
+        ];
+
+        let contextTag = priorityOrder.find(tag => possibleTags.includes(tag)) || "ANIME DISCOURSE";
 
         results.push({
             title: winner.title,

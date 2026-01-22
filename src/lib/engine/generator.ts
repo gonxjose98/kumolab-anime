@@ -366,11 +366,14 @@ export function cleanTitle(title: string): string {
     let clean = title;
 
     // 1. Remove Brackets and Parentheses and their content
-    clean = clean.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '');
+    // Handles [ ], ( ), and Japanese 【 】
+    clean = clean.replace(/\[.*?\]/g, '')
+        .replace(/\(.*?\)/g, '')
+        .replace(/【.*?】/g, '');
 
     // 2. Remove "TV Anime", "The Anime", "The Series" filler
-    clean = clean.replace(/TV Anime/gi, 'Anime')
-        .replace(/The Anime/gi, 'Anime')
+    clean = clean.replace(/TV Anime/gi, '')
+        .replace(/The Anime/gi, '')
         .replace(/The Series/gi, '');
 
     // 3. Remove "Community" / "Fans" unless essential
