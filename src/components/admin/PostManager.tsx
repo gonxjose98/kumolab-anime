@@ -30,7 +30,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
-    const [overlayTag, setOverlayTag] = useState('');
+    const [overlayTag, setOverlayTag] = useState('NEWS');
     const [customImage, setCustomImage] = useState<File | null>(null);
     const [customImagePreview, setCustomImagePreview] = useState<string>('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
@@ -42,6 +42,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isSearchingImages, setIsSearchingImages] = useState(false);
     const [isProcessingImage, setIsProcessingImage] = useState(false);
     const [searchPage, setSearchPage] = useState(1); // Pagination state
+
+    // Advanced Image Manipulation State
+    const [imageScale, setImageScale] = useState(1);
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isApplyGradient, setIsApplyGradient] = useState(true);
+    const [isApplyText, setIsApplyText] = useState(true);
+
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -58,7 +65,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic('');
         setTitle('');
         setContent('');
-        setOverlayTag('');
+        setOverlayTag(type === 'TRENDING' ? 'TRENDING' : 'NEWS');
         setCustomImage(null);
         setCustomImagePreview('');
         setPreviewPost(null);
@@ -67,7 +74,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setSelectedImageIndex(null);
         setProcessedImage(null);
         setSearchPage(1); // Reset page
+        setImageScale(1);
+        setImagePosition({ x: 0, y: 0 });
+        setIsApplyGradient(true);
+        setIsApplyText(true);
         setShowModal(true);
+
     };
 
 
@@ -104,16 +116,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async () => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean) => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview; // Fallback to upload if needed
 
-        if (!imageUrl) return alert('No image selected to apply text to.');
+        if (!imageUrl) return; // Silent return if no image
 
         // Use either custom title or topic
         const displayTitle = title || topic;
-        if (!displayTitle) return alert('Title is required for text overlay.');
+        // If it's a manual custom post with only image, it might not have title yet
+        // However, the backend expects a title for text rendering.
+        // We'll use a placeholder if needed or just skip if no title and applyText is true
+        if (isApplyText && !displayTitle) return;
 
         setIsProcessingImage(true);
         try {
@@ -123,22 +138,75 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({
                     imageUrl,
                     title: displayTitle,
-                    headline: overlayTag || (genType === 'TRENDING' ? 'TRENDING' : 'NEWS')
+                    headline: overlayTag || (genType === 'TRENDING' ? 'TRENDING' : 'NEWS'),
+                    scale: manualScale ?? imageScale,
+                    position: manualPos ?? imagePosition,
+                    applyText: forcedApplyText ?? isApplyText,
+                    applyGradient: forcedApplyGradient ?? isApplyGradient
                 })
             });
             const data = await res.json();
             if (data.success) {
                 setProcessedImage(data.processedImage);
             } else {
-                alert('Text application failed: ' + data.error);
+                alert('FX configuration failed: ' + data.error);
             }
         } catch (e) {
             console.error(e);
-            alert('Error applying text');
+            alert('Error applying FX');
         } finally {
             setIsProcessingImage(false);
         }
     };
+
+    // Advanced Image Interactions
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+    const handleImagePointerDown = (e: React.PointerEvent) => {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        setIsDragging(true);
+        setDragStart({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImagePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        const sensitivity = 0.8;
+        const deltaX = (e.clientX - dragStart.x) / 500 * sensitivity;
+        const deltaY = (e.clientY - dragStart.y) / 500 * sensitivity;
+
+        setImagePosition(prev => ({
+            x: prev.x + deltaX,
+            y: prev.y + deltaY
+        }));
+        setDragStart({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImagePointerUp = (e: React.PointerEvent) => {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        setIsDragging(false);
+        handleApplyText();
+    };
+
+    const handleZoom = (delta: number) => {
+        const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
+        setImageScale(newScale);
+        handleApplyText(newScale);
+    };
+
+    const toggleFX = (type: 'text' | 'gradient') => {
+        if (type === 'text') {
+            const newVal = !isApplyText;
+            setIsApplyText(newVal);
+            handleApplyText(undefined, undefined, newVal, undefined);
+        } else {
+            const newVal = !isApplyGradient;
+            setIsApplyGradient(newVal);
+            handleApplyText(undefined, undefined, undefined, newVal);
+        }
+    };
+
+
 
     // Modified Generate Preview to use the manually processed image if available
     const handleGeneratePreview = async () => {
@@ -185,7 +253,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 formData.append('title', finalTitle);
                 formData.append('content', finalContent);
                 formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : 'COMMUNITY');
-                formData.append('headline', overlayTag || 'FEATURED');
+                formData.append('headline', overlayTag);
                 formData.append('image', imagePayload as Blob);
                 if (processedImage) {
                     formData.append('skipProcessing', 'true');
@@ -235,7 +303,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // Post is already saved as draft by the API.
         // User just closes modal and sees it in list.
         setShowModal(false);
-        setFilter('HIDDEN'); // Switch to Hidden tab to see it
+        setFilter('HIDDEN');
     };
 
     const handleCancel = async () => {
@@ -423,7 +491,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 });
             }
 
-            setPosts(posts.map(p => selectedIds.includes(p.id) ? { ...p, isPublished: false, is_published: false } : p));
+            setPosts(posts.map(p => (p.id && selectedIds.includes(p.id)) ? { ...p, isPublished: false, is_published: false } : p));
             setSelectedIds([]);
         } catch (e) {
             alert('Hide failed');
@@ -563,12 +631,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                             {filteredPosts.map((post) => (
-                                <tr key={post.id} className={`group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                <tr key={post.id} className={`group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${post.id && selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
                                     <td className="p-4 pl-6 align-top">
                                         <input
                                             type="checkbox"
-                                            checked={selectedIds.includes(post.id)}
-                                            onChange={() => toggleSelect(post.id)}
+                                            checked={!!post.id && selectedIds.includes(post.id)}
+                                            onChange={() => post.id && toggleSelect(post.id)}
                                             className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
@@ -616,7 +684,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
                                         <Link
-                                            href={`/admin/post/${post.id}`}
+                                            href={`/admin/post/${post.id || ''}`}
                                             className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-white/10 text-slate-400 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-white transition-all scale-90 hover:scale-100"
                                         >
                                             <Edit2 size={14} />
@@ -631,14 +699,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 {/* Mobile Card View */}
                 <div className="block md:hidden divide-y divide-gray-100 dark:divide-white/5">
                     {filteredPosts.map((post) => (
-                        <div key={post.id} className={`p-4 ${selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                        <div key={post.id} className={`p-4 ${post.id && selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
                             <div className="flex gap-4">
                                 {/* Checkbox & Image */}
                                 <div className="flex flex-col gap-3">
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.includes(post.id)}
-                                        onChange={() => toggleSelect(post.id)}
+                                        checked={!!post.id && selectedIds.includes(post.id)}
+                                        onChange={() => post.id && toggleSelect(post.id)}
                                         className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                     <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden">
@@ -856,14 +924,86 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     />
                                                 </div>
                                                 {customImagePreview && (
-                                                    <div className="mt-4 relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 group">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={customImagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                                                            <span className="text-white text-xs font-bold">Image loaded</span>
+                                                    <div className="mt-4 space-y-4">
+                                                        {/* Advanced Editor for Custom Uploads */}
+                                                        <div className="relative group/carousel bg-slate-100 dark:bg-black/40 rounded-xl p-6 border border-gray-200 dark:border-white/5 min-h-[320px] flex items-center justify-center overflow-hidden">
+                                                            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent:80%)] pointer-events-none" />
+
+                                                            <div
+                                                                className="relative z-10 w-[240px] aspect-[4/5] perspective-1000 cursor-grab active:cursor-grabbing touch-none select-none"
+                                                                onPointerDown={handleImagePointerDown}
+                                                                onPointerMove={handleImagePointerMove}
+                                                                onPointerUp={handleImagePointerUp}
+                                                            >
+                                                                <div className="relative w-full h-full rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-neutral-900 transition-transform duration-500">
+                                                                    <div
+                                                                        className="w-full h-full will-change-transform"
+                                                                        style={{
+                                                                            transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                                            transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                                                                        }}
+                                                                    >
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img src={customImagePreview} alt="" className="w-full h-full object-cover pointer-events-none" />
+                                                                    </div>
+                                                                    {isProcessingImage && (
+                                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-30">
+                                                                            <Loader2 size={32} className="text-purple-500 animate-spin" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* FX Control protocol for Custom Upload */}
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/5 rounded-xl gap-4">
+                                                                <div className="flex items-center gap-1">
+                                                                    <button onClick={() => handleZoom(-0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} className="rotate-45" /></button>
+                                                                    <div className="text-[10px] font-mono text-neutral-500 w-12 text-center">SCAL: {(imageScale * 100).toFixed(0)}%</div>
+                                                                    <button onClick={() => handleZoom(0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} /></button>
+                                                                </div>
+                                                                <div className="h-4 w-[1px] bg-white/10" />
+                                                                <div className="flex-1 flex justify-center text-[9px] font-mono text-neutral-600 uppercase tracking-widest text-center">
+                                                                    PAN VISUAL ASSET
+                                                                </div>
+                                                                <div className="h-4 w-[1px] bg-white/10" />
+                                                                <button
+                                                                    onClick={() => { setImageScale(1); setImagePosition({ x: 0, y: 0 }); handleApplyText(1, { x: 0, y: 0 }); }}
+                                                                    className="text-[9px] font-bold text-neutral-500 hover:text-white uppercase tracking-tighter px-2"
+                                                                >
+                                                                    Reset
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => toggleFX('text')}
+                                                                    disabled={isProcessingImage}
+                                                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isApplyText ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-900 text-neutral-600 border border-white/5'}`}
+                                                                >
+                                                                    Overlay Text: {isApplyText ? 'ON' : 'OFF'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => toggleFX('gradient')}
+                                                                    disabled={isProcessingImage}
+                                                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isApplyGradient ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-neutral-900 text-neutral-600 border border-white/5'}`}
+                                                                >
+                                                                    Gradient: {isApplyGradient ? 'ON' : 'OFF'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleApplyText()}
+                                                                    disabled={isProcessingImage}
+                                                                    className="bg-green-600 hover:bg-green-500 text-white text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-xl transition-all flex items-center gap-2"
+                                                                >
+                                                                    {isProcessingImage ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                                                    Commit
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
+
                                             </div>
 
                                             <div className="group">
@@ -978,15 +1118,40 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             )}
 
                                                             {/* Image Stage */}
-                                                            <div className="relative z-10 w-[220px] aspect-[4/5] perspective-1000">
+                                                            <div
+                                                                className="relative z-10 w-[240px] aspect-[4/5] perspective-1000 cursor-grab active:cursor-grabbing touch-none select-none"
+                                                                onPointerDown={handleImagePointerDown}
+                                                                onPointerMove={handleImagePointerMove}
+                                                                onPointerUp={handleImagePointerUp}
+                                                            >
                                                                 {searchedImages.map((img, idx) => {
                                                                     if (idx !== (selectedImageIndex ?? 0)) return null;
                                                                     return (
-                                                                        <div key={idx} className="relative w-full h-full rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-neutral-900 group-hover/carousel:scale-[1.02] transition-transform duration-500">
-                                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                            <img src={img} alt="" className="w-full h-full object-cover" />
+                                                                        <div
+                                                                            key={idx}
+                                                                            className="relative w-full h-full rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-neutral-900 group-hover/carousel:scale-[1.01] transition-transform duration-500"
+                                                                        >
+                                                                            {/* Real-time Interaction Preview (Pre-processing) */}
+                                                                            <div
+                                                                                className="w-full h-full will-change-transform"
+                                                                                style={{
+                                                                                    transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                                                    transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                                                                                }}
+                                                                            >
+                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
+                                                                            </div>
+
+                                                                            {/* Loading Overlay */}
+                                                                            {isProcessingImage && (
+                                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-30">
+                                                                                    <Loader2 size={32} className="text-purple-500 animate-spin" />
+                                                                                </div>
+                                                                            )}
+
                                                                             {/* Selection Dots */}
-                                                                            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
+                                                                            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
                                                                                 {searchedImages.map((_, dotIdx) => (
                                                                                     <div
                                                                                         key={dotIdx}
@@ -998,28 +1163,70 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     );
                                                                 })}
                                                             </div>
+
                                                         </div>
 
-                                                        {/* Text Application Control */}
+                                                        {/* Advanced FX Control Protocol */}
                                                         {selectedImageIndex !== null && (
-                                                            <div className="flex gap-2 p-3 bg-black/30 rounded-xl border border-white/5">
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="OVERLAY TEXT (e.g. S2 ANNOUNCED)"
-                                                                    className="flex-1 bg-transparent text-white text-xs font-bold tracking-wide placeholder:text-neutral-600 outline-none uppercase"
-                                                                    value={overlayTag}
-                                                                    onChange={(e) => setOverlayTag(e.target.value)}
-                                                                />
-                                                                <button
-                                                                    onClick={handleApplyText}
-                                                                    disabled={isProcessingImage}
-                                                                    className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-                                                                >
-                                                                    {isProcessingImage ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                                                                    Apply FX
-                                                                </button>
+                                                            <div className="space-y-3">
+                                                                {/* Image Manipulation Bar */}
+                                                                <div className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/5 rounded-xl gap-4">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <button onClick={() => handleZoom(-0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} className="rotate-45" /></button>
+                                                                        <div className="text-[10px] font-mono text-neutral-500 w-12 text-center">SCAL: {(imageScale * 100).toFixed(0)}%</div>
+                                                                        <button onClick={() => handleZoom(0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} /></button>
+                                                                    </div>
+                                                                    <div className="h-4 w-[1px] bg-white/10" />
+                                                                    <div className="flex-1 flex justify-center text-[9px] font-mono text-neutral-600 uppercase tracking-widest">
+                                                                        Drag Visual to Offset Axis
+                                                                    </div>
+                                                                    <div className="h-4 w-[1px] bg-white/10" />
+                                                                    <button
+                                                                        onClick={() => { setImageScale(1); setImagePosition({ x: 0, y: 0 }); handleApplyText(1, { x: 0, y: 0 }); }}
+                                                                        className="text-[9px] font-bold text-neutral-500 hover:text-white uppercase tracking-tighter px-2"
+                                                                    >
+                                                                        Reset
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* FX Toggles & Title Bar */}
+                                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                                    <div className="flex-1 flex gap-2 p-2 bg-black/30 rounded-xl border border-white/5">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="OVERLAY CALLOUT"
+                                                                            className="flex-1 bg-transparent text-white text-[10px] font-black tracking-widest placeholder:text-neutral-700 outline-none uppercase px-2"
+                                                                            value={overlayTag}
+                                                                            onChange={(e) => setOverlayTag(e.target.value)}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => toggleFX('text')}
+                                                                            disabled={isProcessingImage}
+                                                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isApplyText ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}
+                                                                        >
+                                                                            Render Text
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => toggleFX('gradient')}
+                                                                            disabled={isProcessingImage}
+                                                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isApplyGradient ? 'bg-indigo-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}
+                                                                        >
+                                                                            Gradient
+                                                                        </button>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => handleApplyText()}
+                                                                        disabled={isProcessingImage}
+
+                                                                        className="bg-green-600 hover:bg-green-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-lg hover:shadow-green-500/20 disabled:opacity-50 flex items-center justify-center gap-2 sm:w-auto w-full"
+                                                                    >
+                                                                        {isProcessingImage ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                                                        Commit FX
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         )}
+
                                                     </div>
                                                 ) : (
                                                     <div className="py-12 flex flex-col items-center justify-center text-neutral-600 border border-dashed border-neutral-800 rounded-xl">

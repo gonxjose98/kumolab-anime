@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
-        const { imageUrl, title, headline } = await request.json();
+        const { imageUrl, title, headline, scale, position, applyText, applyGradient } = await request.json();
 
         if (!imageUrl || !title) {
             return NextResponse.json({ success: false, error: 'Image URL and Title are required' }, { status: 400 });
@@ -22,8 +22,13 @@ export async function POST(request: NextRequest) {
             animeTitle: title,
             headline: headline || '',
             slug: mockSlug,
-            skipUpload: true // Force Base64 return
+            skipUpload: true, // Force Base64 return
+            scale,
+            position,
+            applyText,
+            applyGradient
         });
+
 
         if (!processedImage) {
             throw new Error('Image generation returned null');
