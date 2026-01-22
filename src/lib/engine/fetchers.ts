@@ -513,6 +513,7 @@ export interface TrendingCandidate {
     sources: string[];
     image?: string;
     description?: string;
+    status?: string;
 }
 
 // Helper to normalize titles for comparison
@@ -523,6 +524,13 @@ function normalizeTitle(t: string): string {
 /**
  * Fetches proper Trending Anime from AniList (Metric: Trending)
  */
+/**
+ * Fetches proper Trending Anime from AniList (Metric: Trending)
+ */
+export async function fetchAniListTrending(): Promise<any[]> {
+    return fetchAniListTrendingRaw();
+}
+
 async function fetchAniListTrendingRaw(): Promise<any[]> {
     const query = `
         query {
@@ -532,6 +540,7 @@ async function fetchAniListTrendingRaw(): Promise<any[]> {
                         romaji
                         english
                     }
+                    status
                     description
                     coverImage {
                         extraLarge
@@ -572,7 +581,7 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     const normalizedExcludes = excludeTitles.map(normalizeTitle);
 
     // Helper to Add/Update Candidate
-    const addVote = (title: string, source: string, image?: string, desc?: string) => {
+    const addVote = (title: string, source: string, image?: string, desc?: string, status?: string) => {
         if (!title) return;
         const norm = normalizeTitle(title);
 
@@ -589,7 +598,8 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
                 score: 0,
                 sources: [],
                 image: image,
-                description: desc
+                description: desc,
+                status: status
             };
         }
 
@@ -599,10 +609,8 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
             candidates[key].score += 1;
         }
         // Upgrade image/desc if missing and this source has it
-        // We prefer News/AniList descriptions over Reddit self-text often, unless Reddit is the ONLY source.
-        // Actually, AniList description is usually the synopsis. News description is the news itself. 
-        // We prioritize News Description > AniList Synopsis (stripped) > Reddit Content > Placeholder.
         if (!candidates[key].image && image) candidates[key].image = image;
+        if (!candidates[key].status && status) candidates[key].status = status;
 
         const isSynopsis = desc && desc.length > 50;
         if (source === 'Crunchyroll/News' && desc) {
@@ -622,7 +630,7 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         const img = item.bannerImage || item.coverImage?.extraLarge;
         // Strip HTML from AniList description
         const cleanDesc = item.description ? item.description.replace(/<[^>]*>?/gm, '') : '';
-        addVote(t, 'AniList', img, cleanDesc);
+        addVote(t, 'AniList', img, cleanDesc, item.status);
     });
 
     // Reddit (Discussion & Buzz)
@@ -641,57 +649,60 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         // Base Score: Number of Sources
         let finalScore = c.score;
 
-        // Boost: AniList Trending (Proven Popularity)
         if (c.sources.includes('AniList')) finalScore += 5;
-
-        // Boost: Reddit Discussion (Community Engagement)
         if (c.sources.includes('Reddit')) finalScore += 3;
 
-        // Penalize: Niche News Keywords (Cast, Song, Visual, Film)
-        // We want SERIES discussions for Trending, not just press releases.
         const lowQualityKeywords = ['Cast', 'Theme Song', 'Performing', 'Preview', 'Visual', 'Film', 'Movie', 'Screening', 'Stage', 'Actor', 'Director'];
         if (lowQualityKeywords.some(k => c.title.includes(k))) finalScore -= 3;
 
         return { ...c, finalScore };
     }).sort((a, b) => b.finalScore - a.finalScore); // Sort by calculated score
 
-    if (ranked.length === 0) return null;
+    if (ranked.length === 0) return [];
 
-    // Pick Winner
-    const winner = ranked[0];
+    // --- PROCESS TOP CANDIDATES (Limit 10) ---
+    const results = [];
 
-    // --- CROSS REFERENCE WITH SOCIALS (X/IG) ---
-    // User Verification Request: "Check if trending on more than 1 social media"
-    try {
-        const socialSignals = await checkSocialSignals(winner.title);
-        if (socialSignals.length > 0) {
-            socialSignals.forEach(s => {
-                if (!winner.sources.includes(s.source)) {
-                    winner.sources.push(s.source);
-                    winner.score += s.score;
-                }
-            });
-            console.log(`[SmartSync] Social Cross-Ref Confirmed: ${winner.title} on ${socialSignals.map(s => s.source).join(', ')}`);
+    for (const winner of ranked.slice(0, 10)) {
+        // Clean Description Logic
+        const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
+
+        // --- CONTEXTUAL TAG LOGIC ---
+        let contextTag = "ANIME DISCOURSE";
+
+        if (winner.sources.includes('Crunchyroll/News')) {
+            const t = winner.title.toLowerCase();
+            const c = finalContent.toLowerCase();
+            if (t.includes('season') || c.includes('season')) contextTag = "SEASON ANNOUNCEMENT";
+            else if (t.includes('trailer') || t.includes('pv')) contextTag = "TRAILER REVEAL";
+            else if (t.includes('visual')) contextTag = "VISUAL REVEAL";
+            else contextTag = "PRODUCTION UPDATE";
         }
-    } catch (e) {
-        console.warn("[SmartSync] Social Cross-Ref Check Skipped/Failed:", e);
+        else if (winner.sources.includes('Reddit')) {
+            const t = winner.title.toLowerCase();
+            if (t.includes('episode') && t.includes('discussion')) contextTag = "EPISODE REACTION";
+            else if (t.includes('visual') || t.includes('trailer')) contextTag = "VISUAL REVEAL";
+            else contextTag = "COMMUNITY BUZZ";
+        }
+        else if (winner.sources.includes('AniList')) {
+            if (winner.status === 'RELEASING') contextTag = "CURRENTLY AIRING";
+            else contextTag = "COMMUNITY FAVORITE";
+        }
+
+        results.push({
+            title: winner.title,
+            fullTitle: `${winner.title}`,
+            slug: `trending-${winner.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+            content: finalContent,
+            image: winner.image,
+            imageSearchTerm: winner.title,
+            trendReason: contextTag,
+            momentum: 1.0 + (winner.score * 0.1),
+            source: 'KumoLab SmartSync'
+        });
     }
 
-    // Clean Description Logic: Ensure it's not empty, otherwise generic.
-    const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
-
-    // Construct final Signal Item
-    return {
-        title: winner.title,
-        fullTitle: `${winner.title}`,
-        slug: `trending-${winner.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-        content: finalContent,
-        image: winner.image,
-        imageSearchTerm: winner.title,
-        trendReason: `Trending on: ${winner.sources.join(', ')}`,
-        momentum: 1.0 + (winner.score * 0.1),
-        source: 'KumoLab SmartSync'
-    };
+    return results;
 }
 
 /**

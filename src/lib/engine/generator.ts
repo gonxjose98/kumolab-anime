@@ -359,7 +359,7 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
  * - No questions, no multi-clause.
  * - Soft ban "Community".
  */
-function cleanTitle(title: string): string {
+export function cleanTitle(title: string): string {
     if (!title) return "Anime Update";
 
     let clean = title;
@@ -452,4 +452,44 @@ function cleanBody(content: string, title: string): string {
     clean = clean.trim();
 
     return clean;
+}
+/**
+ * Generates Trending Posts (plural) - Wrapper for engine usage
+ * Fetches data from external source (e.g. AniList trending) and generates posts.
+ * Note: This function was missing in previous view but implied by usage in generate-fresh.ts.
+ * We need to implement it by combining fetchers + generateTrendingPost.
+ */
+import { fetchSmartTrendingCandidates } from './fetchers';
+
+export async function generateTrendingPosts(): Promise<BlogPost[]> {
+    const trendingItems = await fetchSmartTrendingCandidates();
+    // fetchAniListTrending returns AniListMedia format, needs adaptation to what generateTrendingPost expects.
+    // Actually, looking at generateTrendingPost usage, it expects an object with imageSearchTerm, trendReason etc.
+    // Let's check fetchers.ts again if needed, but for now we implement the bridge.
+
+    // We need to map AniListMedia to the "trendingItem" shape expected by generateTrendingPost
+    // The "trendingItem" shape seems loose (any), effectively an extended media object.
+
+    const posts: BlogPost[] = [];
+    const date = new Date();
+
+    for (const item of trendingItems) {
+        // Map Smart Item
+        const genItem = {
+            title: item.title,
+            fullTitle: item.fullTitle,
+            slug: item.slug,
+            image: item.image,
+            imageSearchTerm: item.imageSearchTerm,
+            content: item.content,
+            trendReason: item.trendReason
+        };
+
+        const post = await generateTrendingPost(genItem, date);
+        if (post) {
+            posts.push(post);
+        }
+    }
+
+    return posts;
 }
