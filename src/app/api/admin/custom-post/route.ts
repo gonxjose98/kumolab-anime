@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateIntelImage } from '@/lib/engine/image-processor';
+import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
     try {
@@ -49,9 +50,6 @@ export async function POST(req: NextRequest) {
 
         if (skipProcessing) {
             // If skipping processing, the uploaded image is ALREADY the final processed image.
-            // We just need to ensure it persists. The temp upload is fine, but let's be cleaner and rename it or just use it.
-            // Since we plan to delete 'tempFileName', we should probably copy it or just use a final filename initially?
-            // Let's just use the Public URL of the uploaded file and NOT delete it.
             processedImageUrl = publicUrl;
         } else {
             processedImageUrl = await generateIntelImage({
@@ -65,6 +63,7 @@ export async function POST(req: NextRequest) {
 
         // Create post in database
         const post = {
+            id: randomUUID(),
             title,
             slug,
             type,

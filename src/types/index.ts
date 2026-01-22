@@ -2,7 +2,7 @@ export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY';
 export type ClaimType = 'confirmed' | 'premiered' | 'now_streaming' | 'delayed' | 'trailer' | 'finale_aired';
 
 export interface BlogPost {
-    id: string;
+    id?: string;
     title: string;
     slug: string;
     type: PostType;

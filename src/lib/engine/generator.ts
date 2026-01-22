@@ -7,6 +7,7 @@ import { AiringEpisode } from './fetchers';
 import { BlogPost, PostType, ClaimType } from '@/types';
 import { generateIntelImage } from './image-processor';
 import { fetchOfficialAnimeImage } from './fetchers';
+import { randomUUID } from 'crypto';
 
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
@@ -39,7 +40,7 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): B
     });
 
     return {
-        id: `drop-${dateString}`,
+        id: randomUUID(),
         title: `Daily Drops - ${dateString}`,
         slug: `daily-drops-${dateString}`,
         type: 'DROP',
@@ -200,7 +201,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     }
 
     return {
-        id: `intel-${todayStr}-${Date.now()}`,
+        id: randomUUID(),
         title: validTitle,
         slug: `${topItem.slug || 'intel'}-${todayStr}`,
         type: 'INTEL',
@@ -312,7 +313,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     }
 
     return {
-        id: `trending-${dateString}-${Date.now()}`,
+        id: randomUUID(),
         title: validTitle,
         slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
         type: 'TRENDING',
