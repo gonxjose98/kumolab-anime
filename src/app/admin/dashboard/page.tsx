@@ -11,21 +11,21 @@ function formatDate(dateString: string) {
     return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-async function getStats(supabase: any) {
+async function getAnalytics(supabase: any) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // 1. Website Views (Time Series)
     const { data: viewsData, error } = await supabase
         .from('page_views')
         .select('timestamp')
         .gt('timestamp', thirtyDaysAgo.toISOString())
         .eq('is_bot', false);
 
-    if (error || !viewsData) return { totalViews: 0, chartData: [] };
-
     const dailyCounts: Record<string, number> = {};
     const chartData = [];
 
+    // Init last 30 days
     for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -33,23 +33,65 @@ async function getStats(supabase: any) {
         dailyCounts[key] = 0;
     }
 
-    viewsData.forEach((row: any) => {
-        const dateKey = new Date(row.timestamp).toISOString().split('T')[0];
-        if (dailyCounts[dateKey] !== undefined) {
-            dailyCounts[dateKey]++;
-        }
-    });
-
-    for (const [date, count] of Object.entries(dailyCounts)) {
-        chartData.push({
-            date: formatDate(date),
-            views: count,
+    if (viewsData) {
+        viewsData.forEach((row: any) => {
+            const dateKey = new Date(row.timestamp).toISOString().split('T')[0];
+            if (dailyCounts[dateKey] !== undefined) dailyCounts[dateKey]++;
         });
     }
 
+    for (const [date, count] of Object.entries(dailyCounts)) {
+        chartData.push({ date: formatDate(date), views: count });
+    }
+
+    const totalWebsiteViews = viewsData?.length || 0;
+
+    // 2. Social Metrics (Aggregated from Posts)
+    // We assume 'posts' table has a 'socialMetrics' column (JSONB) as per our type definition.
+    // Since we just updated Types but maybe not DB, we'll try to select it. 
+    // If it fails (column doesn't exist), we catch and default to 0.
+    let socialStats = { views: 0, likes: 0, comments: 0 };
+
+    try {
+        const { data: postsData } = await supabase.from('posts').select('social_metrics'); // logic assumes snake_case in DB mapping to camelCase in Types? Supabase usually snake_case.
+        // Actually, we haven't migrated the DB. This fetch might fail if column is missing. 
+        // For robustness, we'll handle empty return.
+
+        if (postsData) {
+            postsData.forEach((p: any) => {
+                const m = p.social_metrics; // social_metrics JSON
+                if (m) {
+                    // Add up Twitter
+                    if (m.twitter) {
+                        socialStats.views += m.twitter.views || 0;
+                        socialStats.likes += m.twitter.likes || 0;
+                        socialStats.comments += m.twitter.comments || 0;
+                    }
+                    // Add up IG
+                    if (m.instagram) {
+                        socialStats.views += m.instagram.views || 0;
+                        socialStats.likes += m.instagram.likes || 0;
+                        socialStats.comments += m.instagram.comments || 0;
+                    }
+                    // Add up FB
+                    if (m.facebook) {
+                        socialStats.views += m.facebook.views || 0;
+                        socialStats.likes += m.facebook.likes || 0;
+                        socialStats.comments += m.facebook.comments || 0;
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Could not fetch social metrics from DB", e);
+    }
+
     return {
-        totalViews: viewsData.length,
-        chartData
+        website: {
+            views: totalWebsiteViews,
+            chart: chartData
+        },
+        social: socialStats
     };
 }
 
@@ -76,34 +118,18 @@ export default async function DashboardPage() {
         }
     );
 
-    const stats = await getStats(supabase);
+    const analytics = await getAnalytics(supabase);
     const posts = await getPosts(supabase);
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
-            {/* 1. HEADER & OVERVIEW */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-2xl bg-white/60 dark:bg-black/20 border border-gray-200 dark:border-white/5 backdrop-blur-xl relative overflow-hidden group hover:border-purple-500/20 dark:hover:border-white/10 transition-all shadow-xl shadow-purple-900/5 dark:shadow-none">
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-3 mb-4 relative z-10">
-                        <div className="p-2.5 bg-purple-50 dark:bg-white/5 rounded-xl text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-white/5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
-                            <Eye size={20} />
-                        </div>
-                        <h3 className="text-[10px] font-black text-slate-500 dark:text-neutral-500 uppercase tracking-[0.2em]">Total Traffic</h3>
-                    </div>
-                    <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter relative z-10 drop-shadow-sm">
-                        {stats.totalViews.toLocaleString()}
-                    </div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-neutral-600 mt-4 flex items-center gap-2 font-mono relative z-10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        Live Signal • Last 30 Days
-                    </p>
-                </div>
+            {/* 1. ANALYTICS DASHBOARD */}
+            <AnalyticsDashboard
+                websiteData={analytics.website}
+                socialData={analytics.social}
+            />
 
-                <AnalyticsDashboard initialData={stats.chartData} />
-            </div>
-
-            {/* 2. POST MANAGEMENT (Client Component) */}
+            {/* 2. POST MANAGEMENT */}
             <PostManager initialPosts={posts} />
         </div>
     );

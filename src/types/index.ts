@@ -16,6 +16,19 @@ export interface BlogPost {
     verification_tier?: 'streamer' | 'popularity' | 'format_exception';
     verification_reason?: string;
     verification_sources?: any;
+    // Social IDs & Cache
+    socialIds?: {
+        twitter?: string;
+        instagram?: string;
+        facebook?: string;
+        threads?: string;
+    };
+    socialMetrics?: {
+        twitter?: { views: number; likes: number; comments: number; retweets: number };
+        instagram?: { views: number; likes: number; comments: number };
+        facebook?: { views: number; likes: number; comments: number };
+        updatedAt: string;
+    };
 }
 
 export interface Product {

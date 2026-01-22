@@ -4,6 +4,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import PostAnalytics from '@/components/admin/PostAnalytics';
+
 export default function PostEditor() {
     const params = useParams();
     const id = params?.id as string;
@@ -104,11 +106,14 @@ export default function PostEditor() {
                 >
                     ← Back to Dashboard
                 </button>
-                <div className="text-right">
-                    <span className="block text-xs text-neutral-500 uppercase tracking-widest">Views</span>
-                    <span className="text-xl font-bold text-white">{views.toLocaleString()}</span>
-                </div>
             </div>
+
+            {/* ANALYTICS PANEL */}
+            <PostAnalytics
+                postId={id}
+                websiteViews={views}
+                initialSocialMetrics={post.social_metrics}
+            />
 
             <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 space-y-6">
 
