@@ -28,10 +28,12 @@ const Footer = () => {
                     <div>
                         <h4>Socials</h4>
                         <ul>
-                            <li><a href="#">Twitter</a></li>
-                            <li><a href="#">Instagram</a></li>
+                            <li><a href="https://x.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">X (Twitter)</a></li>
+                            <li><a href="https://instagram.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+                            <li><a href="https://facebook.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">Facebook</a></li>
                         </ul>
                     </div>
+
                 </div>
             </div>
             <div className={styles.copyright}>
