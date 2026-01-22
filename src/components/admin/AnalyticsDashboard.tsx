@@ -13,6 +13,11 @@ interface AnalyticsDashboardProps {
         views: number;
         likes: number;
         comments: number;
+        breakdown?: {
+            twitter: { views: number; likes: number; comments: number };
+            instagram: { views: number; likes: number; comments: number };
+            facebook: { views: number; likes: number; comments: number };
+        };
     };
 }
 
@@ -60,8 +65,8 @@ export default function AnalyticsDashboard({ websiteData, socialData }: Analytic
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 z-10">
                     <div className="flex items-center gap-3">
                         <div className={`p-2.5 rounded-xl border shadow-[0_0_15px_rgba(168,85,247,0.15)] transition-colors ${mode === 'WEBSITE' ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20' :
-                                mode === 'SOCIAL' ? 'bg-pink-50 dark:bg-pink-900/10 text-pink-600 dark:text-pink-400 border-pink-100 dark:border-pink-500/20' :
-                                    'bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-500/20'
+                            mode === 'SOCIAL' ? 'bg-pink-50 dark:bg-pink-900/10 text-pink-600 dark:text-pink-400 border-pink-100 dark:border-pink-500/20' :
+                                'bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-500/20'
                             }`}>
                             {mode === 'WEBSITE' && <Globe size={20} />}
                             {mode === 'SOCIAL' && <Share2 size={20} />}
@@ -113,9 +118,36 @@ export default function AnalyticsDashboard({ websiteData, socialData }: Analytic
                 {/* Chart Area */}
                 <div className="flex-1 w-full min-h-0 relative z-10">
                     {mode === 'SOCIAL' ? (
-                        <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 dark:text-neutral-600 gap-2 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
-                            <TrendingUp size={24} className="opacity-50" />
-                            <span className="text-xs font-mono uppercase tracking-widest">Timeline Data Not Available for Socials</span>
+                        <div className="h-full w-full flex flex-col items-center justify-center">
+                            {/* SOCIAL BREAKDOWN */}
+                            <div className="w-full h-full grid grid-cols-3 gap-4 p-4 text-center items-center">
+                                {/* Twitter / X */}
+                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">X (Twitter)</div>
+                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
+                                        {(socialData.breakdown?.twitter?.views || 0).toLocaleString()}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400">VIEWS</div>
+                                </div>
+
+                                {/* Instagram */}
+                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-pink-500">Instagram</div>
+                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
+                                        {(socialData.breakdown?.instagram?.views || 0).toLocaleString()}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400">VIEWS</div>
+                                </div>
+
+                                {/* Facebook */}
+                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Facebook</div>
+                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
+                                        {(socialData.breakdown?.facebook?.views || 0).toLocaleString()}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400">VIEWS</div>
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">

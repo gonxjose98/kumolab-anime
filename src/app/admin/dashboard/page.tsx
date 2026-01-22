@@ -16,11 +16,19 @@ async function getAnalytics(supabase: any) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // 1. Website Views (Time Series)
-    const { data: viewsData, error } = await supabase
+    // We fetch just timestamps for the chart (limit 1000 is acceptable for trend, or we'd need RPC)
+    // BUT for the Total Count, we use a separate count queries to break limits.
+    const { count: totalWebsiteViews } = await supabase
+        .from('page_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_bot', false);
+
+    const { data: viewsData } = await supabase
         .from('page_views')
         .select('timestamp')
         .gt('timestamp', thirtyDaysAgo.toISOString())
-        .eq('is_bot', false);
+        .eq('is_bot', false)
+        .limit(2000); // Bump limit slightly for chart accuracy
 
     const dailyCounts: Record<string, number> = {};
     const chartData = [];
@@ -44,40 +52,61 @@ async function getAnalytics(supabase: any) {
         chartData.push({ date: formatDate(date), views: count });
     }
 
-    const totalWebsiteViews = viewsData?.length || 0;
-
     // 2. Social Metrics (Aggregated from Posts)
-    // We assume 'posts' table has a 'socialMetrics' column (JSONB) as per our type definition.
-    // Since we just updated Types but maybe not DB, we'll try to select it. 
-    // If it fails (column doesn't exist), we catch and default to 0.
-    let socialStats = { views: 0, likes: 0, comments: 0 };
+    // Fetch social_metrics if available.
+    let socialStats = {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        breakdown: {
+            twitter: { views: 0, likes: 0, comments: 0 },
+            instagram: { views: 0, likes: 0, comments: 0 },
+            facebook: { views: 0, likes: 0, comments: 0 }
+        }
+    };
 
     try {
-        const { data: postsData } = await supabase.from('posts').select('social_metrics'); // logic assumes snake_case in DB mapping to camelCase in Types? Supabase usually snake_case.
-        // Actually, we haven't migrated the DB. This fetch might fail if column is missing. 
-        // For robustness, we'll handle empty return.
+        const { data: postsData } = await supabase.from('posts').select('social_metrics');
 
         if (postsData) {
             postsData.forEach((p: any) => {
-                const m = p.social_metrics; // social_metrics JSON
+                const m = p.social_metrics;
                 if (m) {
-                    // Add up Twitter
+                    // Twitter
                     if (m.twitter) {
-                        socialStats.views += m.twitter.views || 0;
-                        socialStats.likes += m.twitter.likes || 0;
-                        socialStats.comments += m.twitter.comments || 0;
+                        const v = m.twitter.views || 0;
+                        const l = m.twitter.likes || 0;
+                        const c = m.twitter.comments || 0;
+                        socialStats.views += v;
+                        socialStats.likes += l;
+                        socialStats.comments += c;
+                        socialStats.breakdown.twitter.views += v;
+                        socialStats.breakdown.twitter.likes += l;
+                        socialStats.breakdown.twitter.comments += c;
                     }
-                    // Add up IG
+                    // Instagram
                     if (m.instagram) {
-                        socialStats.views += m.instagram.views || 0;
-                        socialStats.likes += m.instagram.likes || 0;
-                        socialStats.comments += m.instagram.comments || 0;
+                        const v = m.instagram.views || 0;
+                        const l = m.instagram.likes || 0;
+                        const c = m.instagram.comments || 0;
+                        socialStats.views += v;
+                        socialStats.likes += l;
+                        socialStats.comments += c;
+                        socialStats.breakdown.instagram.views += v;
+                        socialStats.breakdown.instagram.likes += l;
+                        socialStats.breakdown.instagram.comments += c;
                     }
-                    // Add up FB
+                    // Facebook
                     if (m.facebook) {
-                        socialStats.views += m.facebook.views || 0;
-                        socialStats.likes += m.facebook.likes || 0;
-                        socialStats.comments += m.facebook.comments || 0;
+                        const v = m.facebook.views || 0;
+                        const l = m.facebook.likes || 0;
+                        const c = m.facebook.comments || 0;
+                        socialStats.views += v;
+                        socialStats.likes += l;
+                        socialStats.comments += c;
+                        socialStats.breakdown.facebook.views += v;
+                        socialStats.breakdown.facebook.likes += l;
+                        socialStats.breakdown.facebook.comments += c;
                     }
                 }
             });
@@ -88,7 +117,7 @@ async function getAnalytics(supabase: any) {
 
     return {
         website: {
-            views: totalWebsiteViews,
+            views: totalWebsiteViews || 0,
             chart: chartData
         },
         social: socialStats
