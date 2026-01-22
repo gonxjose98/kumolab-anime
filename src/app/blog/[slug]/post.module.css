@@ -84,7 +84,7 @@
 
 /* --- Daily Drops Editorial Styling --- */
 .dropContent {
-    text-align: center;
+    text-align: left;
     max-width: 700px;
     margin: 0 auto;
 }
@@ -94,7 +94,7 @@
     /* Space between different anime drops */
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
 }
 
 .dropTitle {
