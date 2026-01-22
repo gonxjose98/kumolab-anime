@@ -1,7 +1,7 @@
-@keyframes floatUp {
+@keyframes heroEntrance {
     0% {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(10px);
     }
 
     100% {
@@ -9,6 +9,17 @@
         transform: translateY(0);
     }
 }
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
 
 @keyframes gradientDrift {
     0% {
@@ -24,36 +35,50 @@
     }
 }
 
-@keyframes gentlePulse {
+@keyframes singlePulse {
     0% {
         transform: scale(1);
-        box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
     }
 
     50% {
-        transform: scale(1.03);
-        box-shadow: 0 0 35px rgba(124, 58, 237, 0.35);
+        transform: scale(1.02);
+        box-shadow: 0 0 30px rgba(124, 58, 237, 0.25);
     }
 
     100% {
         transform: scale(1);
-        box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
     }
 }
+
 
 .hero {
     position: relative;
     height: calc(100vh - var(--header-height));
-    /* Subtract header height for perfect fit */
     width: 100%;
-    background-image: url("/hero-bg-final.png");
-    background-size: cover;
-    background-position: center 25%;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    background: #000;
+    /* Fallback */
 }
+
+.parallaxBg {
+    position: absolute;
+    top: -5%;
+    left: 0;
+    width: 100%;
+    height: 110%;
+    /* Extra height for parallax */
+    background-image: url("/hero-bg-final.png");
+    background-size: cover;
+    background-position: center 25%;
+    z-index: 0;
+    will-change: transform;
+}
+
 
 .heroOverlay {
     position: absolute;
@@ -69,23 +94,37 @@
     text-align: center;
     max-width: 1200px;
     padding: 0 20px;
-    animation: floatUp 0.8s ease-out forwards;
 }
+
+.heroContent.hasAnimated .headline,
+.heroContent.hasAnimated .subheadline,
+.heroContent.hasAnimated .primaryBtn {
+    opacity: 1;
+    animation: gradientDrift 8s linear infinite !important;
+    /* Keep gradient drift but no entrance/pulse */
+    transform: none;
+}
+
+
 
 .headline {
     font-family: var(--font-outfit), sans-serif;
-    /* Mobile: 4rem/64px */
     font-size: 4rem;
     font-weight: 900;
     color: #FFFFFF;
     line-height: 1.1;
     letter-spacing: -0.02em;
     margin-bottom: 24px;
-    /* Extra deep shadows for maximum pop */
     text-shadow:
         0 8px 16px rgba(0, 0, 0, 0.9),
         0 0 50px rgba(0, 0, 0, 0.4);
+
+    /* Entrance Animation */
+    opacity: 0;
+    animation: heroEntrance 0.5s ease-out forwards;
+    animation-delay: 0.1s;
 }
+
 
 /* Tablet: text-6xl (6rem/96px) */
 @media (min-width: 640px) {
@@ -121,20 +160,23 @@
 .subheadline {
     font-family: var(--font-display);
     font-size: 1.25rem;
-    /* Larger for readability */
     color: #FFFFFF;
     font-weight: 600;
     line-height: 1.6;
     max-width: 800px;
     margin: 0 auto 48px;
-    /* Strong shadow for readability against bright backgrounds */
     text-shadow:
         0 4px 8px rgba(0, 0, 0, 1),
         0 0 20px rgba(0, 0, 0, 0.8);
     font-style: normal;
-    opacity: 1;
     letter-spacing: 0.03em;
+
+    /* Entrance Animation - 200ms delay after title */
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out forwards;
+    animation-delay: 0.3s;
 }
+
 
 .buttons {
     display: flex;
@@ -144,20 +186,17 @@
 }
 
 .primaryBtn {
-    /* Glassmorphism — REQUIRED */
     background: linear-gradient(90deg,
             rgba(124, 58, 237, 0.35),
             rgba(124, 58, 237, 0.2),
             rgba(124, 58, 237, 0.35));
     background-size: 200% auto;
-    /* Translucent purple */
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     color: #FFFFFF;
     border: 1px solid rgba(255, 255, 255, 0.25);
     padding: 16px 42px;
     border-radius: 99px;
-    /* Pill */
     font-family: var(--font-display);
     font-size: 1.1rem;
     font-weight: 600;
@@ -166,26 +205,29 @@
     gap: 12px;
     cursor: pointer;
     transition:
-        transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+        transform 0.3s ease-out,
         box-shadow 0.3s ease,
         background-color 0.3s ease;
-    /* Initial float + Idle Gradient + Initial Pulse (delayed) */
+
+    /* Animation sequence: Fade In -> Delayed Single Pulse */
+    opacity: 0;
     animation:
-        floatUp 0.8s ease-out forwards,
+        fadeIn 0.5s ease-out forwards,
         gradientDrift 8s linear infinite,
-        gentlePulse 1.5s ease-out 1.5s 1;
-    /* Soft glow around edges */
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+        singlePulse 1s ease-out forwards;
+    animation-delay: 0.5s, 0s, 1.2s;
+
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
     outline: none;
     -webkit-tap-highlight-color: transparent;
 }
 
 .primaryBtn:hover {
-    /* Slight brightness increase & glow intensification (20-30% purple glow requested) */
     background-color: rgba(124, 58, 237, 0.45);
-    transform: translateY(-2px);
-    box-shadow: 0 0 25px rgba(124, 58, 237, 0.3);
+    transform: scale(1.02);
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.2);
 }
+
 
 .primaryBtn:active {
     /* Tactile feedback scale down requested (~0.97-0.98) */
