@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
 
         // Create post in database
         const post = {
-            id: `custom-${Date.now()}`,
             title,
             slug,
             type,
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
         const { data, error } = await supabaseAdmin
             .from('posts')
             .insert({
-                id: post.id,
                 title: post.title,
                 slug: post.slug,
                 type: post.type,

@@ -56,51 +56,29 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // Check/Register Fonts - ROBUST LOADING
-        // We force 'Inter' usage. System fonts on serverless are unreliable.
-        const fontToUse = 'Inter';
-        const fontUrlPrimary = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter-Black.ttf';
-        const fontUrlBackup = 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Black.ttf';
+        // We switch to 'Oswald' (Impact-like) from reliable Google Fonts Raw CDN
+        let fontToUse = 'Sans'; // System default fallback
+        const fontName = 'Oswald';
+        const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald-Bold.ttf';
 
-        // Always attempt to verify font presence
-        if (!GlobalFonts.has(fontToUse)) {
-            console.log(`[Image Engine] Font '${fontToUse}' not registered. Initiating download sequence...`);
-            let fontBuffer: Buffer | null = null;
-
+        if (GlobalFonts.has(fontName)) {
+            fontToUse = fontName;
+            console.log(`[Image Engine] Font '${fontName}' already available.`);
+        } else {
+            console.log(`[Image Engine] Font '${fontName}' not registered. Initiating download...`);
             try {
-                // Try Primary
-                console.log(`[Image Engine] Attempting Primary: ${fontUrlPrimary}`);
-                const res1 = await fetch(fontUrlPrimary);
-                if (res1.ok) {
-                    fontBuffer = Buffer.from(await res1.arrayBuffer());
-                    console.log(`[Image Engine] Primary download successful.`);
+                const res = await fetch(fontUrl);
+                if (res.ok) {
+                    const fontBuffer = Buffer.from(await res.arrayBuffer());
+                    GlobalFonts.register(fontBuffer, fontName);
+                    fontToUse = fontName;
+                    console.log(`[Image Engine] '${fontName}' registered successfully.`);
                 } else {
-                    console.warn(`[Image Engine] Primary download failed: ${res1.status} ${res1.statusText}`);
-                    throw new Error('Primary source failed');
+                    console.warn(`[Image Engine] Font download failed: ${res.status} ${res.statusText}`);
                 }
             } catch (e) {
-                // Try Backup
-                console.warn(`[Image Engine] Primary failed. Attempting Backup: ${fontUrlBackup}`);
-                try {
-                    const res2 = await fetch(fontUrlBackup);
-                    if (res2.ok) {
-                        fontBuffer = Buffer.from(await res2.arrayBuffer());
-                        console.log(`[Image Engine] Backup download successful.`);
-                    } else {
-                        console.error(`[Image Engine] Backup download failed: ${res2.status} ${res2.statusText}`);
-                    }
-                } catch (e2) {
-                    console.error(`[Image Engine] CRITICAL: All font sources failed. Text rendering will likely fail.`);
-                }
+                console.error(`[Image Engine] Font load error:`, e);
             }
-
-            if (fontBuffer) {
-                GlobalFonts.register(fontBuffer, fontToUse);
-                console.log(`[Image Engine] Font '${fontToUse}' registered to Canvas.`);
-            } else {
-                console.error(`[Image Engine] Failed to acquire font buffer.`);
-            }
-        } else {
-            console.log(`[Image Engine] Font '${fontToUse}' already available.`);
         }
 
         // 2. Download and Resize/Crop to 1080x1350
