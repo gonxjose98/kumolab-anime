@@ -55,23 +55,53 @@ export async function generateIntelImage({
         // 1. Dynamic Import (Prevents build-time binary resolution issues)
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
-        // Check/Register Fonts
-        if (GlobalFonts.families.filter(f => f.family.includes('Inter')).length === 0) {
+        // Check/Register Fonts - ROBUST LOADING
+        // We force 'Inter' usage. System fonts on serverless are unreliable.
+        const fontToUse = 'Inter';
+        const fontUrlPrimary = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter-Black.ttf';
+        const fontUrlBackup = 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Black.ttf';
+
+        // Always attempt to verify font presence
+        if (!GlobalFonts.has(fontToUse)) {
+            console.log(`[Image Engine] Font '${fontToUse}' not registered. Initiating download sequence...`);
+            let fontBuffer: Buffer | null = null;
+
             try {
-                // Fetch Inter font from Google Fonts CDN (Robust/Permanent)
-                const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter-Black.ttf';
-                const fontRes = await fetch(fontUrl);
-                if (fontRes.ok) {
-                    const fontBuffer = await fontRes.arrayBuffer();
-                    GlobalFonts.register(Buffer.from(fontBuffer), 'Inter');
+                // Try Primary
+                console.log(`[Image Engine] Attempting Primary: ${fontUrlPrimary}`);
+                const res1 = await fetch(fontUrlPrimary);
+                if (res1.ok) {
+                    fontBuffer = Buffer.from(await res1.arrayBuffer());
+                    console.log(`[Image Engine] Primary download successful.`);
+                } else {
+                    console.warn(`[Image Engine] Primary download failed: ${res1.status} ${res1.statusText}`);
+                    throw new Error('Primary source failed');
                 }
             } catch (e) {
-                console.warn("Retrying font download with backup mirror...");
+                // Try Backup
+                console.warn(`[Image Engine] Primary failed. Attempting Backup: ${fontUrlBackup}`);
+                try {
+                    const res2 = await fetch(fontUrlBackup);
+                    if (res2.ok) {
+                        fontBuffer = Buffer.from(await res2.arrayBuffer());
+                        console.log(`[Image Engine] Backup download successful.`);
+                    } else {
+                        console.error(`[Image Engine] Backup download failed: ${res2.status} ${res2.statusText}`);
+                    }
+                } catch (e2) {
+                    console.error(`[Image Engine] CRITICAL: All font sources failed. Text rendering will likely fail.`);
+                }
             }
-        }
 
-        // Update Stack
-        const fontName = 'Inter, Arial, sans-serif';
+            if (fontBuffer) {
+                GlobalFonts.register(fontBuffer, fontToUse);
+                console.log(`[Image Engine] Font '${fontToUse}' registered to Canvas.`);
+            } else {
+                console.error(`[Image Engine] Failed to acquire font buffer.`);
+            }
+        } else {
+            console.log(`[Image Engine] Font '${fontToUse}' already available.`);
+        }
 
         // 2. Download and Resize/Crop to 1080x1350
         let buffer: Buffer;
@@ -163,12 +193,9 @@ export async function generateIntelImage({
         // 5. Typography Settings (IMPACTFUL & DYNAMIC)
         const centerX = WIDTH / 2;
         const availableWidth = WIDTH * 0.90;
+        const availableWidth = WIDTH * 0.90;
         // Use local variable font name determined above (re-declaring for scope clarity if needed, or stick to the one defined in generateIntelImage scope)
-        // Note: We changed 'const fontName' at top of function in previous step, but let's ensure we use it throughout.
-        // Actually, let's just make sure we use the right variable.
-        // The previous step defined `const fontName = 'Inter, ...'` inside try block.
-        // Let's ensure strict usage here.
-        const fontToUse = 'Inter, Arial, sans-serif';
+        // See top of function for fontToUse definition ('Inter')
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
