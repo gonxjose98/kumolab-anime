@@ -11,7 +11,13 @@ export async function publishToSocials(post: BlogPost) {
         return;
     }
 
+    if (process.env.AUTO_PUBLISH_SOCIALS !== 'true') {
+        console.warn(`⚠️ [Social] Auto-publish is currently DISABLED. Skipping broadcast for: ${post.title}`);
+        return;
+    }
+
     console.log(`[Social] Starting broadcast for: ${post.title}`);
+
 
     // 1. Facebook Page Publish
     if (PAGE_ID) {

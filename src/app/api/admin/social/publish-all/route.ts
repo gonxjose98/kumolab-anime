@@ -237,6 +237,21 @@ export async function POST(req: NextRequest) {
         // If at least one platform succeeded, we consider the overall operation a success
         const platformSuccesses = Object.values(results).filter((r: any) => r && r.success).length;
 
+        // Update post with social IDs
+        const socialIds: any = post.social_ids || {};
+        if (results.x?.success) socialIds.twitter = results.x.id;
+        if (results.facebook?.success) socialIds.facebook = results.facebook.id;
+        if (results.instagram?.success) socialIds.instagram = results.instagram.id;
+        if (results.threads?.success) socialIds.threads = results.threads.id;
+
+        await supabaseAdmin
+            .from('posts')
+            .update({
+                social_ids: socialIds,
+                is_published: true // Mark as published if we pushed to socials
+            })
+            .eq('id', postId);
+
         if (platformSuccesses > 0) {
             return NextResponse.json({
                 success: true,
@@ -250,6 +265,7 @@ export async function POST(req: NextRequest) {
                 error: "All platforms failed to publish"
             }, { status: 500 });
         }
+
 
     } catch (error: any) {
         console.error('Social Orchestrator Error:', error);

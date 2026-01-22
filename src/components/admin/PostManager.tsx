@@ -3,7 +3,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle } from 'lucide-react';
+
 import { BlogPost } from '@/types';
 
 interface PostManagerProps {
@@ -11,11 +12,14 @@ interface PostManagerProps {
 }
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
-    // Normalize posts to ensure isPublished is present (Supabase returns is_published)
+    // Normalize posts to ensure isPublished and social stats are present
     const normalizedPosts = initialPosts.map(p => ({
         ...p,
-        isPublished: (p as any).is_published ?? p.isPublished
+        isPublished: (p as any).is_published ?? p.isPublished,
+        socialIds: (p as any).social_ids ?? (p.socialIds || {})
     }));
+
+
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN'>('ALL');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -242,8 +246,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             // Delete from DB (Cleanup)
             try {
-                const res = await fetch(`/api/posts?id=${encodeURIComponent(previewPost.id)}`, { method: 'DELETE' });
+                const res = await fetch(`/api/posts?id=${encodeURIComponent(previewPost.id as string)}`, { method: 'DELETE' });
                 if (!res.ok) {
+
                     console.error("Delete draft failed:", await res.text());
                 } else {
                     console.log("Draft deleted successfully");
@@ -260,9 +265,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (selectedIds.length === filteredPosts.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(filteredPosts.map(p => p.id));
+            setSelectedIds(filteredPosts.map(p => p.id as string));
         }
     };
+
 
 
     // Social Publish Modal State
@@ -301,6 +307,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPublishLogs(initLogs);
 
         const platformsList = Object.keys(socialPlatforms).filter(k => (socialPlatforms as any)[k]);
+        if (platformsList.length === 0) return alert('Select at least one platform');
+
 
         try {
             for (const id of selectedIds) {
@@ -332,6 +340,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     const results = data.results || {};
 
                     platformsList.forEach(p => {
+                        const platformKey = p === 'x' ? 'twitter' : p;
                         if (results[p] && results[p].success) {
                             next[id][p] = 'success';
                         } else {
@@ -339,22 +348,37 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         }
                     });
 
-                    // Mark global post as published locally if at least one succeeded
+                    // Update local post state with social IDs if success
                     const anySuccess = Object.values(results).some((r: any) => r && r.success);
                     if (anySuccess) {
-                        // Update local post state
-                        setPosts(current => current.map(curr => curr.id === id ? { ...curr, isPublished: true, is_published: true } : curr));
+                        setPosts(current => current.map(curr => {
+                            if (curr.id === id) {
+                                const newSocialIds = { ...curr.socialIds };
+                                if (results.x?.success) newSocialIds.twitter = results.x.id;
+                                if (results.facebook?.success) newSocialIds.facebook = results.facebook.id;
+                                if (results.instagram?.success) newSocialIds.instagram = results.instagram.id;
+
+                                return {
+                                    ...curr,
+                                    isPublished: true,
+                                    is_published: true,
+                                    socialIds: newSocialIds
+                                };
+                            }
+                            return curr;
+                        }));
                     }
 
                     return next;
                 });
             }
         } catch (e: any) {
-            alert('Critical Failure during broadcast: ' + e.message);
+            console.error('Broadcast protocol failure:', e);
         } finally {
             setIsPublishing(false);
         }
     };
+
 
 
     const handlePublishToSocials = () => {
@@ -373,11 +397,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsPublishing(true);
         try {
             for (const id of selectedIds) {
-                await fetch(`/api/posts?id=${id}`, { method: 'DELETE' });
+                await fetch(`/api/posts?id=${id as string}`, { method: 'DELETE' });
             }
-            setPosts(posts.filter(p => !selectedIds.includes(p.id)));
+            setPosts(posts.filter(p => !selectedIds.includes(p.id as string)));
             setSelectedIds([]);
         } catch (e) {
+
             alert('Delete failed');
             console.error(e);
         } finally {
@@ -394,9 +419,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 await fetch('/api/posts', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, is_published: false })
+                    body: JSON.stringify({ id: id as string, is_published: false })
                 });
             }
+
             setPosts(posts.map(p => selectedIds.includes(p.id) ? { ...p, isPublished: false, is_published: false } : p));
             setSelectedIds([]);
         } catch (e) {
@@ -554,11 +580,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 }`}>
                                                 {post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
                                             </span>
+                                            <div className="flex items-center justify-center gap-1.5 pt-1">
+                                                <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
+                                                <Instagram size={10} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
+                                                <Facebook size={10} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
+                                                <Share2 size={10} className={post.socialIds?.threads ? 'text-white' : 'text-neutral-700 opacity-20'} />
+                                            </div>
                                             <span className="text-[10px] text-center font-mono text-slate-500 dark:text-neutral-600 uppercase">
                                                 {post.type}
                                             </span>
                                         </div>
                                     </td>
+
                                     <td className="p-4 align-top w-[100px]">
                                         <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden relative group-hover:border-purple-300 dark:group-hover:border-white/30 transition-colors">
                                             {post.image ? (
@@ -619,12 +652,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between mb-2">
-                                        <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.isPublished
-                                            ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
-                                            : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
-                                            }`}>
-                                            {post.isPublished ? 'LIVE' : 'HIDDEN'}
-                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.isPublished
+                                                ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                                : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
+                                                }`}>
+                                                {post.isPublished ? 'LIVE' : 'HIDDEN'}
+                                            </span>
+                                            <div className="flex gap-1">
+                                                <Twitter size={8} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
+                                                <Instagram size={8} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
+                                                <Facebook size={8} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
+                                            </div>
+                                        </div>
                                         <Link
                                             href={`/admin/post/${post.id}`}
                                             className="text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white"
@@ -632,6 +672,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             <Edit2 size={16} />
                                         </Link>
                                     </div>
+
                                     <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
                                         {post.title}
                                     </h3>
@@ -654,7 +695,94 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
             </div>
 
-            {/* GENERATION MODAL OVERHAUL */}
+            {/* SOCIAL PUBLISH MODAL OVERHAUL */}
+            {showSocialModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isPublishing && setShowSocialModal(false)} />
+                    <div className="relative bg-[#0a0a0a]/90 border border-white/10 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
+
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 uppercase tracking-tighter">Broadcast Protocol</h3>
+                            <p className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase mt-1">Deploying {selectedIds.length} transmission(s)</p>
+                        </div>
+
+                        {/* Platform Selectors */}
+                        <div className="p-6 space-y-4">
+                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Select Target Networks</label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {(['x', 'instagram', 'facebook', 'threads'] as const).map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setSocialPlatforms(prev => ({ ...prev, [p]: !(prev as any)[p] }))}
+                                        disabled={isPublishing}
+                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${(socialPlatforms as any)[p]
+                                            ? 'bg-white/10 border-white/20 text-white'
+                                            : 'bg-black border-white/5 text-neutral-600 opacity-40 hover:opacity-100'
+                                            }`}
+                                    >
+                                        {p === 'x' && <Twitter size={20} />}
+                                        {p === 'instagram' && <Instagram size={20} />}
+                                        {p === 'facebook' && <Facebook size={20} />}
+                                        {p === 'threads' && <Share2 size={20} />}
+                                        <span className="text-[10px] font-bold uppercase mt-2">{p === 'x' ? 'X / Twitter' : p}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Active Progress List */}
+                        <div className="px-6 pb-6 flex-1 overflow-y-auto max-h-60 custom-scrollbar space-y-3">
+                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-2">Transmission Queue</label>
+                            {selectedIds.map(id => {
+                                const post = posts.find(p => p.id === id);
+                                const status = publishStatus[id] || {};
+                                return (
+                                    <div key={id} className="p-3 bg-white/[0.03] border border-white/5 rounded-xl flex items-center gap-4">
+                                        <div className="w-10 h-12 bg-neutral-900 rounded border border-white/5 overflow-hidden flex-shrink-0">
+                                            {post?.image && <img src={post.image} className="w-full h-full object-cover" alt="" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-xs font-bold text-white truncate">{post?.title}</h4>
+                                            <div className="flex gap-2 mt-1">
+                                                {Object.keys(socialPlatforms).filter(k => (socialPlatforms as any)[k]).map(plat => (
+                                                    <div key={plat} className="flex items-center gap-1">
+                                                        <span className="text-[9px] text-neutral-500 uppercase font-mono">{plat}:</span>
+                                                        {status[plat] === 'loading' ? <Loader2 size={10} className="animate-spin text-purple-400" /> :
+                                                            status[plat] === 'success' ? <CheckCircle2 size={10} className="text-green-500" /> :
+                                                                status[plat] === 'error' ? <XCircle size={10} className="text-red-500" /> :
+                                                                    <div className="w-2.5 h-2.5 rounded-full border border-white/10" />}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer / Action */}
+                        <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-4">
+                            <button
+                                onClick={() => setShowSocialModal(false)}
+                                disabled={isPublishing}
+                                className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={runSocialPublish}
+                                disabled={isPublishing}
+                                className="px-8 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                                {isPublishing ? 'Broadcasting...' : 'Execute Protocol'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showModal && (
                 <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
@@ -960,7 +1088,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         <h4 className="text-xs font-black text-green-400 uppercase tracking-widest">
                                             Simulation Result
                                         </h4>
-                                        <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id.split('-')[1]}</span>
+                                        <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
+
                                     </div>
 
                                     <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">

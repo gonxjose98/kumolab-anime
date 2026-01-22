@@ -21,8 +21,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Get current time in EST (America/New_York)
-        // Vercel Cron runs on UTC, but we want to respect EST schedules.
+        // 1. Get slot from query param (Override) or current time
+        const { searchParams } = new URL(request.url);
+        const querySlot = searchParams.get('slot');
+
         const now = new Date();
         const estTimeFormatter = new Intl.DateTimeFormat('en-US', {
             timeZone: 'America/New_York',
@@ -31,32 +33,29 @@ export async function GET(request: NextRequest) {
         });
 
         const hourEST = parseInt(estTimeFormatter.format(now));
+        console.log(`[CRON] Woke up at ${now.toISOString()} (UTC). EST Hour: ${hourEST}. Query Slot: ${querySlot}`);
 
-        console.log(`[CRON] Woke up at ${now.toISOString()} (UTC). EST Hour: ${hourEST}`);
-
-        // 2. Map EST Hour to Slot
+        // 2. Map Hour/Param to Slot
         let slot: '08:00' | '12:00' | '16:00' | '20:00' | null = null;
 
-        switch (hourEST) {
-            case 8:
-                slot = '08:00';
-                break;
-            case 12:
-                slot = '12:00';
-                break;
-            case 16: // Changed from 15 to 16
-                slot = '16:00'; // Changed from '15:00' to '16:00'
-                break;
-            case 20:
-                slot = '20:00';
-                break;
-            default:
-                // No slot scheduled for this hour
-                return NextResponse.json({
-                    success: true,
-                    message: `No scheduled task for ${hourEST}:00 EST. System standing by.`
-                });
+        if (querySlot && ['08:00', '12:00', '16:00', '15:00', '20:00'].includes(querySlot)) {
+            slot = querySlot as any;
+        } else {
+            // ROBUST WINDOW MAPPING (Ensures drops even if cron is slightly late)
+            if (hourEST >= 8 && hourEST < 10) slot = '08:00';
+            else if (hourEST >= 12 && hourEST < 14) slot = '12:00';
+            else if (hourEST >= 16 && hourEST < 18) slot = '16:00';
+            else if (hourEST >= 20 && hourEST < 22) slot = '20:00';
         }
+
+        if (!slot) {
+            // No slot scheduled for this hour
+            return NextResponse.json({
+                success: true,
+                message: `No active window for ${hourEST}:00 EST. System standing by.`
+            });
+        }
+
 
         console.log(`[CRON] Dispatching engine for slot: ${slot}`);
 

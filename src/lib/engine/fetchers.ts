@@ -270,8 +270,10 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                     'Season', 'Cour', // Specific anime terminology
                     'Trailer', 'Visual', 'PV', // Visuals
                     'Release Date', // Dates
-                    'Movie', // Films (but checked against negatives)
+                    'Movie', // Films
+                    'Cast', 'Reveals', 'Unveils', 'Casts' // News/Intel
                 ];
+
 
                 // NEGATIVE KEYWORDS (Brutal Exclusion of Meta/Industry News)
                 // We strictly want ANIME SERIES UPDATES.
@@ -298,23 +300,30 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                     if (Date.now() - pubDate.getTime() < 72 * 60 * 60 * 1000) {
 
                         // Smart Claim Type Detection
-                        let claimType = 'confirmed';
+                        let claimType: any = 'confirmed';
                         if (title.includes('Delay') || title.includes('Postponed') || title.includes('Hiatus')) {
                             claimType = 'delayed';
                         } else if (title.includes('Trailer') || title.includes('PV')) {
                             claimType = 'trailer';
-                        } else if (title.includes('Visual')) {
-                            claimType = 'confirmed'; // Visuals usually confirm a look/season
+                        } else if (title.includes('Visual') || title.includes('Reveals') || title.includes('Unveils')) {
+                            claimType = 'confirmed';
+                        } else if (title.includes('Cast') || title.includes('Casts')) {
+                            claimType = 'confirmed'; // Casting news is a confirmation of production progress
                         }
 
+
                         // CLEAN TITLE LOGIC
-                        // User banned "Original TV", "TV Anime", and now "Anime" global
+                        // User banned "Original TV", "TV Anime", and now "Anime" global from post titles
                         let cleanTitle = title
                             .replace(/Original TV Anime/gi, '')
                             .replace(/TV Anime/gi, '')
                             .replace(/Original Anime/gi, '')
-                            .replace(/Anime/gi, '') // BANNED WORD: Anime
+                            .replace(/Anime/gi, '')
                             .replace(/\s+/g, ' ').trim();
+
+                        // Ensure we didn't strip the title to nothing
+                        if (cleanTitle.length < 5) cleanTitle = title;
+
 
                         // OPTIMIZED SEARCH TERM EXTRACTION
                         // Goal: Get JUST the anime name. "Inherit the Winds Original TV Anime..." -> "Inherit the Winds"

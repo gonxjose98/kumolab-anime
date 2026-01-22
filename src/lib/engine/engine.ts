@@ -20,7 +20,8 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Main engine function to run for a specific slot.
  * Now triggered by a single hourly cron (see vercel.json)
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '16:00' | '20:00', force: boolean = false) {
+export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' | '15:00', force: boolean = false) {
+
     const now = new Date();
     const existingPosts = await getPosts();
     let newPost: BlogPost | null = null;
@@ -110,15 +111,48 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '15:00' | '16:00' 
                 break; // We only want ONE post per day for this slot
             }
         }
-    } else if (slot === '16:00') {
+        if (!newPost) {
+            console.log(`[Engine] No valid Anime Intel found for slot 12:00. Items checked: ${intelItems.length}. Trying Trending fallback...`);
+            const trendingItems = await fetchSmartTrendingCandidates();
+            if (trendingItems && trendingItems.length > 0) {
+                for (const item of trendingItems) {
+                    const candidate = await generateTrendsPost(item, now);
+                    if (candidate && validatePost(candidate, existingPosts, force)) {
+                        newPost = candidate;
+                        break;
+                    }
+                }
+            }
+        }
+    } else if (slot === '16:00' || slot === '15:00') {
+
+
         // --- 16:00 EST: TRENDING NOW ---
         // Use SmartSync to pull from Reddit + AniList + News to guarantee a hit
         const topTrend = await fetchSmartTrendingCandidates();
-        if (topTrend) {
-            newPost = await generateTrendsPost(topTrend, now);
-        } else {
-            console.log("SmartSync failed to find ANY trending candidates. Skipping slot.");
+        if (topTrend && Array.isArray(topTrend) && topTrend.length > 0) {
+            for (const item of topTrend) {
+                const candidate = await generateTrendsPost(item, now);
+                if (candidate && validatePost(candidate, existingPosts, force)) {
+                    newPost = candidate;
+                    break;
+                }
+            }
         }
+
+        if (!newPost) {
+            console.log("No valid Trending candidates found for slot 16:00. Trying Intel fallback...");
+            const intelItems = await fetchAnimeIntel();
+            for (const item of intelItems) {
+                const candidate = await generateIntelPost([item], now);
+                if (candidate && validatePost(candidate, existingPosts, force)) {
+                    newPost = candidate;
+                    break;
+                }
+            }
+        }
+
+
     } else if (slot === '20:00') {
         // --- 20:00 EST: COMMUNITY NIGHT ---
         newPost = await generateCommunityNightPost(now);
@@ -160,10 +194,10 @@ async function publishPost(post: BlogPost) {
             console.error('Supabase publish error:', error);
             throw error;
         } else {
-            // Success! Trigger Social Publish in background
-            // (We don't await this to keep the API response fast, or we do await to ensure logs?)
-            // Since this is cron, awaiting is safer to prevent Vercel from killing the lambda too early.
-            await publishToSocials(post);
+            // [DISABLED] Automation refined. User requested NO auto-social push without approval.
+            // await publishToSocials(post);
+            console.log(`[Engine] Post saved to DB, but Social Publish skipped (Awaiting Manual Approval).`);
+
         }
     } else {
         const fileContents = fs.readFileSync(POSTS_PATH, 'utf8');
