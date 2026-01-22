@@ -45,11 +45,31 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 </h1>
             </div>
 
-            <div className={styles.content}>
-                {post.content.split('\n').map((paragraph, index) => (
-                    <p key={index} className={styles.paragraph}>{paragraph}</p>
-                ))}
+            <div className={`${styles.content} ${post.type === 'DROP' ? styles.dropContent : ''}`}>
+                {post.type === 'DROP' ? (
+                    // Specialized Editorial Rendering for Daily Drops
+                    post.content.split('\n\n').map((block, index) => {
+                        const lines = block.split('\n');
+                        // If it's a Title + Subline pair (2 lines)
+                        if (lines.length === 2 && index > 1) {
+                            return (
+                                <div key={index} className={styles.dropItem}>
+                                    <h3 className={styles.dropTitle}>{lines[0]}</h3>
+                                    <p className={styles.dropSubline}>{lines[1]}</p>
+                                </div>
+                            );
+                        }
+                        // Intro text or single lines
+                        return <p key={index} className={styles.paragraph}>{block}</p>;
+                    })
+                ) : (
+                    // Standard Blog Rendering
+                    post.content.split('\n').map((paragraph, index) => (
+                        <p key={index} className={styles.paragraph}>{paragraph}</p>
+                    ))
+                )}
             </div>
+
         </article>
     );
 }

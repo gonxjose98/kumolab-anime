@@ -81,3 +81,45 @@
         font-size: 2rem;
     }
 }
+
+/* --- Daily Drops Editorial Styling --- */
+.dropContent {
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.dropItem {
+    margin-bottom: 2.5rem;
+    /* Space between different anime drops */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.dropTitle {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 0.25rem;
+    /* TIGHT SPACING */
+    line-height: 1.2;
+}
+
+.dropSubline {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    /* Use Kumo Purple */
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+}
+
+.dropContent .paragraph {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-bottom: 3rem;
+    font-size: 1.25rem;
+}
