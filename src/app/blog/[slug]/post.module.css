@@ -5,24 +5,23 @@
 }
 
 .heroImage {
-    width: 100vw;
-    height: 75vh;
-    margin-left: calc(50% - 50vw);
-    margin-bottom: 3rem;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    margin-bottom: 3.5rem;
+    border-radius: 12px;
     overflow: hidden;
+    background: transparent;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 .heroImage img {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
+    width: 100%;
     height: auto;
+    display: block;
+    max-height: 85vh;
+    /* Safe upper bound for very tall images */
     object-fit: contain;
 }
+
 
 
 
