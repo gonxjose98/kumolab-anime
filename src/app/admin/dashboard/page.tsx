@@ -23,34 +23,36 @@ async function getAnalytics(supabase: any) {
         .select('*', { count: 'exact', head: true })
         .eq('is_bot', false);
 
-    const { data: viewsData } = await supabase
-        .from('page_views')
-        .select('timestamp')
-        .gt('timestamp', thirtyDaysAgo.toISOString())
-        .eq('is_bot', false)
-        .limit(2000); // Bump limit slightly for chart accuracy
-
-    const dailyCounts: Record<string, number> = {};
-    const chartData = [];
-
-    // Init last 30 days
+    // 2. Chart Data (30 Parallel COUNT queries to scale infinitely)
+    // We avoid fetching rows to prevent 1000/2000 limit cap.
+    const dates = [];
     for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
-        dailyCounts[key] = 0;
+        dates.push(d);
     }
 
-    if (viewsData) {
-        viewsData.forEach((row: any) => {
-            const dateKey = new Date(row.timestamp).toISOString().split('T')[0];
-            if (dailyCounts[dateKey] !== undefined) dailyCounts[dateKey]++;
-        });
-    }
+    const dailyCounts = await Promise.all(dates.map(async (date) => {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(date);
+        end.setHours(23, 59, 59, 999);
 
-    for (const [date, count] of Object.entries(dailyCounts)) {
-        chartData.push({ date: formatDate(date), views: count });
-    }
+        // Supabase COUNT is fast and unlimited
+        const { count } = await supabase
+            .from('page_views')
+            .select('*', { count: 'exact', head: true })
+            .gte('timestamp', start.toISOString())
+            .lte('timestamp', end.toISOString())
+            .eq('is_bot', false);
+
+        return {
+            date: formatDate(date.toISOString()),
+            views: count || 0
+        };
+    }));
+
+    const chartData = dailyCounts;
 
     // 2. Social Metrics (Aggregated from Posts)
     // Fetch social_metrics if available.
