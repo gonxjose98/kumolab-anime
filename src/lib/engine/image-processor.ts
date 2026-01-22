@@ -56,28 +56,38 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // Check/Register Fonts - ROBUST LOADING
-        // We switch to 'Oswald' (Impact-like) from reliable Google Fonts Raw CDN
+        // We use locally bundled 'SourceSans3' to ensure Vercel availability.
         let fontToUse = 'Sans'; // System default fallback
-        const fontName = 'Oswald';
-        const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald-Bold.ttf';
+        const fontName = 'SourceSans3';
+        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'SourceSans3-Bold.otf');
 
         if (GlobalFonts.has(fontName)) {
             fontToUse = fontName;
-            console.log(`[Image Engine] Font '${fontName}' already available.`);
+            // console.log(`[Image Engine] Font '${fontName}' already available.`);
         } else {
-            console.log(`[Image Engine] Font '${fontName}' not registered. Initiating download...`);
+            console.log(`[Image Engine] Registering font from: ${fontPath}`);
             try {
-                const res = await fetch(fontUrl);
-                if (res.ok) {
-                    const fontBuffer = Buffer.from(await res.arrayBuffer());
-                    GlobalFonts.register(fontBuffer, fontName);
+                if (fs.existsSync(fontPath)) {
+                    GlobalFonts.registerFromPath(fontPath, fontName);
                     fontToUse = fontName;
                     console.log(`[Image Engine] '${fontName}' registered successfully.`);
                 } else {
-                    console.warn(`[Image Engine] Font download failed: ${res.status} ${res.statusText}`);
+                    console.warn(`[Image Engine] Font file missing at ${fontPath}. Attempting backup download...`);
+                    // Fallback Download if local file missing (e.g. wrong build dir)
+                    const backupUrl = 'https://raw.githubusercontent.com/adobe-fonts/source-sans/release/OTF/SourceSans3-Bold.otf';
+                    const res = await fetch(backupUrl);
+                    if (res.ok) {
+                        const buf = Buffer.from(await res.arrayBuffer());
+                        GlobalFonts.register(buf, fontName);
+                        fontToUse = fontName;
+                        console.log(`[Image Engine] Backup download registered.`);
+                    } else {
+                        throw new Error(`Backup download failed: ${res.status}`);
+                    }
                 }
             } catch (e) {
                 console.error(`[Image Engine] Font load error:`, e);
+                console.warn("[Image Engine] Text rendering will fallback to system sans-serif.");
             }
         }
 
