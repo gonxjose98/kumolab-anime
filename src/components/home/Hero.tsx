@@ -6,14 +6,15 @@ import styles from './Hero.module.css';
 
 const Hero = () => {
     const [offset, setOffset] = useState(0);
-    const [hasAnimated, setHasAnimated] = useState(false);
+    const [hasAnimated, setHasAnimated] = useState(true); // Default to stable (skip anim)
 
     useEffect(() => {
-        // We set this to true after a short timeout to ensure the CSS animations start first
-        // or just rely on CSS forwards.
-        // Actually, if we want it to ONLY play once, we use sessionStorage.
-        // But if the user 'no longer sees it', they might have already triggered it.
-        // I'll switch to a simple mount-based animation that happens on every load.
+        // Initial Page Load Check: Only play once per session
+        const played = sessionStorage.getItem('hero_animated');
+        if (!played) {
+            setHasAnimated(false); // Trigger the one-time entrance sequence
+            sessionStorage.setItem('hero_animated', 'true');
+        }
 
         const handleScroll = () => {
             setOffset(window.scrollY);
@@ -21,6 +22,7 @@ const Hero = () => {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
 
 
     // Very subtle parallax: 1.5% of scroll
