@@ -140,7 +140,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[]) => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom') => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -150,7 +150,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // User says overlayTag is the text in the picture. 
         // We pass empty title to avoid deduplication with topic.
         const signalText = overlayTag || '';
-        if (isApplyText && !signalText) return;
+        // Allow processing even if text is empty, as long as image exists
+        // if (isApplyText && !signalText) return; 
 
         setIsProcessingImage(true);
         try {
@@ -167,7 +168,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     applyGradient: forcedApplyGradient ?? isApplyGradient,
                     textPos: textPosition,
                     textScale,
-                    gradientPos: gradientPosition,
+                    gradientPos: manualGradientPos ?? gradientPosition,
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices
                 })
             });
@@ -1244,7 +1245,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 }}
                                                                             >
                                                                                 <div className="text-center drop-shadow-2xl">
-                                                                                    <div className="text-white text-lg font-black uppercase leading-tight max-w-sm flex flex-wrap justify-center gap-x-1.5">
+                                                                                    <div
+                                                                                        className="text-white text-lg font-black uppercase leading-[0.9] max-w-sm flex flex-wrap justify-center gap-x-1.5"
+                                                                                        style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
+                                                                                    >
                                                                                         {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                             <span
                                                                                                 key={idx}
@@ -1322,13 +1326,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
                                                                     <div className="grid grid-cols-2 gap-2">
                                                                         <button
-                                                                            onClick={() => { setGradientPosition('top'); handleApplyText(); }}
+                                                                            onClick={() => {
+                                                                                setGradientPosition('top');
+                                                                                handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
+                                                                            }}
                                                                             className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
                                                                         >
                                                                             HEADER
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => { setGradientPosition('bottom'); handleApplyText(); }}
+                                                                            onClick={() => {
+                                                                                setGradientPosition('bottom');
+                                                                                handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
+                                                                            }}
                                                                             className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
                                                                         >
                                                                             FOOTER
@@ -1372,7 +1382,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <div className="flex items-center justify-between">
                                                                         <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
                                                                         <button
-                                                                            onClick={() => { setIsApplyGradient(!isApplyGradient); handleApplyText(); }}
+                                                                            onClick={() => {
+                                                                                const nextVal = !isApplyGradient;
+                                                                                setIsApplyGradient(nextVal);
+                                                                                handleApplyText(undefined, undefined, undefined, nextVal);
+                                                                            }}
                                                                             className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${isApplyGradient ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-500 border border-white/5'}`}
                                                                         >
                                                                             {isApplyGradient ? <Eye size={10} /> : <EyeOff size={10} />} Gradient

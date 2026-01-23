@@ -53,6 +53,8 @@ export async function generateIntelImage({
     purpleWordIndices
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
+    console.log(`[Image Engine] Starting generation. Text: "${headline}", Gradient: ${applyGradient}, Position: ${gradientPosition}`);
+
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -72,36 +74,34 @@ export async function generateIntelImage({
         const fontName = 'Outfit';
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
 
-        if (GlobalFonts.has(fontName)) {
-            fontToUse = fontName;
-        } else {
-            console.log(`[Image Engine] Registering font from: ${fontPath}`);
-            try {
-                if (fs.existsSync(fontPath)) {
+        console.log(`[Image Engine] Font registration check. Path: ${fontPath}`);
+        try {
+            if (fs.existsSync(fontPath)) {
+                // Always attempt registration to be sure, napi-rs handles duplicates gracefully or we check .has()
+                if (!GlobalFonts.has(fontName)) {
                     GlobalFonts.registerFromPath(fontPath, fontName);
-                    fontToUse = fontName;
-                    console.log(`[Image Engine] '${fontName}' registered successfully.`);
-                } else {
-                    console.warn(`[Image Engine] Font file missing at ${fontPath}. Attempting backup download...`);
-                    // Use Outfit-Black for the high-impact brand look (Weight 900)
-                    const backupUrl = 'https://github.com/google/fonts/raw/main/ofl/outfit/static/Outfit-Black.ttf';
-                    const res = await fetch(backupUrl);
-                    if (res.ok) {
-                        const buf = Buffer.from(await res.arrayBuffer());
-                        GlobalFonts.register(buf, fontName);
-                        fontToUse = fontName;
-                        console.log(`[Image Engine] Backup download for '${fontName}' registered.`);
-                        // Save to public/fonts for next time
-                        if (!fs.existsSync(path.dirname(fontPath))) fs.mkdirSync(path.dirname(fontPath), { recursive: true });
-                        fs.writeFileSync(fontPath, buf);
-                    } else {
-                        throw new Error(`Backup download failed: ${res.status}`);
-                    }
+                    console.log(`[Image Engine] '${fontName}' registered from path.`);
                 }
-            } catch (e) {
-                console.error(`[Image Engine] Font load error:`, e);
-                console.warn("[Image Engine] Text rendering will fallback to system sans-serif.");
+                fontToUse = fontName;
+            } else {
+                console.warn(`[Image Engine] Font file missing at ${fontPath}. Attempting backup download...`);
+                const backupUrl = 'https://github.com/google/fonts/raw/main/ofl/outfit/static/Outfit-Black.ttf';
+                const res = await fetch(backupUrl);
+                if (res.ok) {
+                    const buf = Buffer.from(await res.arrayBuffer());
+                    GlobalFonts.register(buf, fontName);
+                    fontToUse = fontName;
+                    console.log(`[Image Engine] Backup download for '${fontName}' registered.`);
+                    if (!fs.existsSync(path.dirname(fontPath))) fs.mkdirSync(path.dirname(fontPath), { recursive: true });
+                    fs.writeFileSync(fontPath, buf);
+                } else {
+                    console.error(`[Image Engine] Backup download failed: ${res.status}`);
+                    fontToUse = 'Impact, Arial, sans-serif'; // Better bold fallback
+                }
             }
+        } catch (e) {
+            console.error(`[Image Engine] Font load error:`, e);
+            fontToUse = 'Impact, Arial, sans-serif';
         }
 
         // 2. Download source
