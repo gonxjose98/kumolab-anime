@@ -238,19 +238,28 @@ export async function POST(req: NextRequest) {
         const platformSuccesses = Object.values(results).filter((r: any) => r && r.success).length;
 
         // Update post with social IDs
-        const socialIds: any = post.social_ids || {};
-        if (results.x?.success) socialIds.twitter = results.x.id;
-        if (results.facebook?.success) socialIds.facebook = results.facebook.id;
-        if (results.instagram?.success) socialIds.instagram = results.instagram.id;
-        if (results.threads?.success) socialIds.threads = results.threads.id;
+        // Wrap in try-catch so we don't fail the whole request if DB update fails (e.g. missing column)
+        try {
+            const socialIds: any = post.social_ids || {};
+            if (results.x?.success) socialIds.twitter = results.x.id;
+            if (results.facebook?.success) socialIds.facebook = results.facebook.id;
+            if (results.instagram?.success) socialIds.instagram = results.instagram.id;
+            if (results.threads?.success) socialIds.threads = results.threads.id;
 
-        await supabaseAdmin
-            .from('posts')
-            .update({
-                social_ids: socialIds,
-                is_published: true // Mark as published if we pushed to socials
-            })
-            .eq('id', postId);
+            const { error: updateError } = await supabaseAdmin
+                .from('posts')
+                .update({
+                    social_ids: socialIds,
+                    is_published: true // Mark as published if we pushed to socials
+                })
+                .eq('id', postId);
+
+            if (updateError) {
+                console.error("DB Update Failed (Non-fatal for publishing):", updateError);
+            }
+        } catch (dbError) {
+            console.error("DB Update Exception (Non-fatal, social posts likely live):", dbError);
+        }
 
         if (platformSuccesses > 0) {
             return NextResponse.json({
