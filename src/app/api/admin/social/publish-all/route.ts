@@ -8,7 +8,7 @@ async function publishToX(post: any, client: TwitterApi, mediaId?: string) {
     const postUrl = `${domain}/blog/${post.slug}`;
 
     let tweetText = `${post.title}\n\n`;
-    tweetText += `Read more: ${postUrl}\n\n#Anime #KumoLab`;
+    tweetText += `Read more at KumoLabAnime.com\n${postUrl}\n\n#Anime #KumoLab`;
 
     return await client.v2.tweet({
         text: tweetText,
@@ -27,7 +27,7 @@ async function publishToFacebook(post: any, imageUrl: string) {
 
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
-    const message = `${post.title}\n\nRead more: ${postUrl}\n\n#Anime #KumoLab`;
+    const message = `${post.title}\n\nRead more at KumoLabAnime.com\n${postUrl}\n\n#Anime #KumoLab`;
 
     try {
         const res = await fetch(`https://graph.facebook.com/v21.0/${pageId}/photos`, {
@@ -58,7 +58,7 @@ async function publishToInstagram(post: any, imageUrl: string) {
 
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
-    const caption = `${post.title}\n\nRead more at link in bio: ${postUrl}\n\n#Anime #KumoLab`;
+    const caption = `${post.title}\n\nRead more at KumoLabAnime.com\nLink in bio: ${postUrl}\n\n#Anime #KumoLab`;
 
     try {
         // 1. Create Media Container
@@ -105,7 +105,7 @@ async function publishToThreads(post: any, imageUrl: string) {
 
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
-    const text = `${post.title}\n\nRead more: ${postUrl}\n\n#Anime #KumoLab`;
+    const text = `${post.title}\n\nRead more at KumoLabAnime.com\n${postUrl}\n\n#Anime #KumoLab`;
 
     try {
         // 2. Create Media Container

@@ -138,8 +138,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
         setShowExpandedPreview(false);
-        setIsApplyGradient(true);
-        setIsApplyText(true);
+        setIsApplyGradient(false);
+        setIsApplyText(false);
         setShowModal(true);
     };
 
