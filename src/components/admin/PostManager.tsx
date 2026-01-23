@@ -147,8 +147,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         if (!imageUrl) return;
 
-        const displayTitle = title || topic;
-        if (isApplyText && !displayTitle) return;
+        // User says overlayTag is the text in the picture. 
+        // We pass empty title to avoid deduplication with topic.
+        const signalText = overlayTag || '';
+        if (isApplyText && !signalText) return;
 
         setIsProcessingImage(true);
         try {
@@ -157,8 +159,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: displayTitle,
-                    headline: overlayTag || (genType === 'TRENDING' ? 'TRENDING' : 'NEWS'),
+                    title: '', // Empty to avoid deduplication and extra text
+                    headline: signalText,
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
                     applyText: forcedApplyText ?? isApplyText,
@@ -1343,7 +1345,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
                                                                     <Type size={14} className="text-purple-400" />
-                                                                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Signal Messaging & Branding</span>
+                                                                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title</span>
                                                                 </div>
                                                             </div>
 
@@ -1351,7 +1353,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 <div className="relative group">
                                                                     <input
                                                                         type="text"
-                                                                        placeholder="SIGNATURE HEADLINE (e.g. JUST CONFIRMED)"
+                                                                        placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
                                                                         className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
                                                                         value={overlayTag}
                                                                         onChange={(e) => {
@@ -1361,48 +1363,61 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     />
                                                                 </div>
 
-                                                                {/* Tactical Selector */}
-                                                                <div className="flex flex-col sm:flex-row items-center gap-4 bg-black/20 p-4 rounded-xl border border-white/5">
-                                                                    <div className="flex-1 flex items-center gap-4">
-                                                                        <div className="flex gap-1">
-                                                                            <button
-                                                                                onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
-                                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                            >
-                                                                                <ChevronLeftCircle size={20} />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => setPurpleCursorIndex(prev => Math.min((overlayTag.split(' ').filter(x => x).length - 1), prev + 1))}
-                                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                            >
-                                                                                <ChevronRightCircle size={20} />
-                                                                            </button>
-                                                                        </div>
-                                                                        <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
-                                                                            {overlayTag.split(' ').filter(x => x).map((word, idx) => (
-                                                                                <span
-                                                                                    key={idx}
-                                                                                    className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
-                                                                                            idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
-                                                                                        }`}
+                                                                {/* Tactical Selector - Box inside box */}
+                                                                <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-4">
+                                                                    <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
+
+                                                                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                                                                        <div className="flex-1 flex items-center gap-4">
+                                                                            <div className="flex gap-1">
+                                                                                <button
+                                                                                    onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
+                                                                                    className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
                                                                                 >
-                                                                                    {word}
-                                                                                </span>
-                                                                            ))}
+                                                                                    <ChevronLeftCircle size={20} />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setPurpleCursorIndex(prev => {
+                                                                                        const wordsCount = overlayTag.split(/\s+/).filter(Boolean).length;
+                                                                                        return Math.min(Math.max(0, wordsCount - 1), prev + 1);
+                                                                                    })}
+                                                                                    className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                                                >
+                                                                                    <ChevronRightCircle size={20} />
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
+                                                                                {overlayTag.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                    <span
+                                                                                        key={idx}
+                                                                                        className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
+                                                                                            idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
+                                                                                            }`}
+                                                                                    >
+                                                                                        {word}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex gap-2 w-full sm:w-auto">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (!purpleWordIndices.includes(purpleCursorIndex)) {
+                                                                                        setPurpleWordIndices(prev => [...prev, purpleCursorIndex].sort((a, b) => a - b));
+                                                                                    }
+                                                                                }}
+                                                                                className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
+                                                                            >
+                                                                                APPLY PURPLE
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setPurpleWordIndices([])}
+                                                                                className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
+                                                                            >
+                                                                                REMOVE ALL
+                                                                            </button>
                                                                         </div>
                                                                     </div>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setPurpleWordIndices(prev =>
-                                                                                prev.includes(purpleCursorIndex)
-                                                                                    ? prev.filter(i => i !== purpleCursorIndex)
-                                                                                    : [...prev, purpleCursorIndex]
-                                                                            );
-                                                                        }}
-                                                                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${purpleWordIndices.includes(purpleCursorIndex) ? 'bg-red-500/20 text-red-400' : 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'}`}
-                                                                    >
-                                                                        {purpleWordIndices.includes(purpleCursorIndex) ? 'REMOVE PURPLE' : 'APPLY PURPLE'}
-                                                                    </button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1473,23 +1488,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </div>
 
                                             {/* Extra Fields for Manual Override */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Override Title</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Optional title override..."
-                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none"
-                                                        value={title}
-                                                        onChange={(e) => setTitle(e.target.value)}
-                                                    />
-
-                                                </div>
+                                            <div className="pt-4 border-t border-white/5">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Editor Notes</label>
                                                     <textarea
                                                         placeholder="Optional content body..."
-                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none h-[42px] resize-none overflow-hidden focus:h-24 transition-all"
+                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none h-[64px] resize-none overflow-hidden focus:h-24 transition-all"
                                                         value={content}
                                                         onChange={(e) => setContent(e.target.value)}
                                                     />

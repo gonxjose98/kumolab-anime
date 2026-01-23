@@ -301,17 +301,17 @@ export async function generateIntelImage({
                     let wordX = drawX - totalLineLength / 2;
 
                     ctx.textAlign = 'left';
-                    const wordsBeforeCount = headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(' ').filter(x => x).length;
+                    const wordsBeforeCount = headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(/\s+/).filter(Boolean).length;
 
-                    words.forEach((word, idx) => {
+                    words.filter(Boolean).forEach((word, idx) => {
                         const globalIndex = wordsBeforeCount + idx;
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
-                            : (isLastLine && idx === lastWordIdx);
+                            : (isLastLine && idx === (words.filter(Boolean).length - 1));
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.fillText(word + (idx < words.length - 1 ? ' ' : ''), wordX, currentY);
-                        wordX += lineMetrics[idx];
+                        ctx.fillText(word + (idx < words.filter(Boolean).length - 1 ? ' ' : ''), wordX, currentY);
+                        wordX += ctx.measureText(word + ' ').width; // Use direct measure for precision
                     });
                     ctx.textAlign = 'center';
                 }
