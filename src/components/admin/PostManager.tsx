@@ -489,6 +489,74 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
     };
 
+    const handleCommitToPreview = async () => {
+        try {
+            // Get the base image
+            const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+                ? searchedImages[selectedImageIndex]
+                : customImagePreview;
+
+            if (!imageUrl) {
+                alert('No image available to preview');
+                return;
+            }
+
+            // If there's text to apply, process the image first
+            let finalImage = processedImage || imageUrl;
+
+            if (overlayTag && (isApplyText || isApplyGradient)) {
+                setIsProcessingImage(true);
+                try {
+                    const res = await fetch('/api/admin/process-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            imageUrl,
+                            title: '',
+                            headline: overlayTag,
+                            scale: imageScale,
+                            position: imagePosition,
+                            applyText: isApplyText,
+                            applyGradient: isApplyGradient,
+                            textPos: textPosition,
+                            textScale,
+                            gradientPos: gradientPosition,
+                            purpleIndex: purpleWordIndices
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        finalImage = data.processedImage;
+                        setProcessedImage(data.processedImage);
+                    }
+                } catch (e) {
+                    console.error('Error processing image for preview:', e);
+                } finally {
+                    setIsProcessingImage(false);
+                }
+            }
+
+            // Create the preview with the processed image
+            const finalTitle = title || topic;
+            const finalContent = content || `Check out the latest on ${finalTitle}.`;
+
+            setPreviewPost({
+                id: editingPostId,
+                title: finalTitle,
+                content: finalContent,
+                type: genType || 'COMMUNITY',
+                image: finalImage,
+                headline: overlayTag,
+                slug: '',
+                timestamp: new Date().toISOString(),
+                isPublished: false
+            } as any);
+        } catch (e: any) {
+            alert('Error creating preview: ' + e.message);
+        }
+    };
+
+
     const handleCancel = async () => {
         if (previewPost) {
             // Remove from local state immediately so it 'disappears' for user
@@ -1642,28 +1710,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         {/* Preview Changes Button (for editing mode) */}
                         {editingPostId && (
                             <button
-                                onClick={() => {
-                                    // Create a preview without saving to database
-                                    const finalTitle = title || topic;
-                                    const finalContent = content || `Check out the latest on ${finalTitle}.`;
-                                    const finalImage = processedImage || customImagePreview || searchedImages[selectedImageIndex || 0];
-
-                                    setPreviewPost({
-                                        id: editingPostId,
-                                        title: finalTitle,
-                                        content: finalContent,
-                                        type: genType || 'COMMUNITY',
-                                        image: finalImage,
-                                        headline: overlayTag,
-                                        slug: '',
-                                        timestamp: new Date().toISOString(),
-                                        isPublished: false
-                                    } as any);
-                                }}
-                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] active:scale-[0.99] flex items-center justify-center gap-3"
+                                onClick={handleCommitToPreview}
+                                disabled={isProcessingImage}
+                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
                             >
-                                <Eye size={20} />
-                                Commit Changes to Preview
+                                {isProcessingImage ? <Loader2 className="animate-spin" size={20} /> : <Eye size={20} />}
+                                {isProcessingImage ? 'Processing...' : 'Commit Changes to Preview'}
                             </button>
                         )}
 
