@@ -32,7 +32,7 @@ export async function publishToSocials(post: BlogPost) {
 
             const fbUrl = `https://graph.facebook.com/v18.0/${PAGE_ID}/photos`;
             const fbParams = new URLSearchParams({
-                url: post.image,
+                url: post.image || '',
                 message: `${post.title}\n\n${post.content}\n\nRead more at KumoLab.`,
                 access_token: tokenToUse
             });
@@ -56,9 +56,9 @@ export async function publishToSocials(post: BlogPost) {
             // A. Container
             const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
             const containerParams = new URLSearchParams({
-                image_url: post.image,
+                image_url: post.image || '',
                 caption: `${post.title}\n\n${post.content.substring(0, 2100)}\n\n#anime #kumolab #animenews`,
-                access_token: META_ACCESS_TOKEN
+                access_token: META_ACCESS_TOKEN || ''
             });
 
             const containerRes = await fetch(`${containerUrl}?${containerParams}`, { method: 'POST' });
@@ -69,7 +69,7 @@ export async function publishToSocials(post: BlogPost) {
                 const publishUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media_publish`;
                 const publishParams = new URLSearchParams({
                     creation_id: containerData.id,
-                    access_token: META_ACCESS_TOKEN
+                    access_token: META_ACCESS_TOKEN || ''
                 });
 
                 // Wait 4s for processing
