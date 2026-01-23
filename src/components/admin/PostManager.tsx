@@ -1185,64 +1185,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 />
                                             </div>
                                         </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* AUTO / INTEL Form */}
-                                        <div className="space-y-6">
-                                            <div className="group">
-                                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
-                                                    Target Topic / Anime
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. One Piece, Jujutsu Kaisen (Leave empty for auto-scout)"
-                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
-                                                    value={topic}
-                                                    onChange={(e) => setTopic(e.target.value)}
-                                                />
-                                            </div>
-
-                                            {/* IMAGE SELECTOR V2 */}
-                                            <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
-                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                        <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                                            Visual Feed Selector (v2)
-                                                        </label>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={async () => {
-                                                                await handleSearchImages(true);
-                                                            }}
-                                                            disabled={isSearchingImages || !topic}
-                                                            className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
-                                                        >
-                                                            {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
-                                                            {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
-                                                        </button>
-                                                        {searchedImages.length > 0 && (
-                                                            <button
-                                                                onClick={async () => {
-                                                                    await handleSearchImages(false);
-                                                                }}
-                                                                disabled={isSearchingImages}
-                                                                className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                                            >
-                                                                {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                                                                More
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                /* AUTO / INTEL Form */
+                                    </div>
+                            </>
+                            ) : (
+                            <>
+                                {/* AUTO / INTEL Form */}
                                 <div className="space-y-6">
                                     <div className="group">
                                         <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
@@ -1291,549 +1238,606 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 )}
                                             </div>
                                         </div>
+
                                     </div>
+                                </div>
+                            </>
+                            ) : (
+                            /* AUTO / INTEL Form */
+                            <div className="space-y-6">
+                                <div className="group">
+                                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
+                                        Target Topic / Anime
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. One Piece, Jujutsu Kaisen (Leave empty for auto-scout)"
+                                        className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
+                                        value={topic}
+                                        onChange={(e) => setTopic(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* IMAGE SELECTOR V2 */}
+                                <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                            <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                                Visual Feed Selector (v2)
+                                            </label>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={async () => {
+                                                    await handleSearchImages(true);
+                                                }}
+                                                disabled={isSearchingImages || !topic}
+                                                className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
+                                            >
+                                                {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                                                {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
+                                            </button>
+                                            {searchedImages.length > 0 && (
+                                                <button
+                                                    onClick={async () => {
+                                                        await handleSearchImages(false);
+                                                    }}
+                                                    disabled={isSearchingImages}
+                                                    className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                                >
+                                                    {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                                    More
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                                 )}
 
-                                    {searchedImages.length > 0 ? (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                                            {/* --- THE PRO EDITOR STAGE --- */}
-                                            <div className="flex flex-col lg:flex-row gap-6">
-                                                <div className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center">
-                                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
+                            {searchedImages.length > 0 ? (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                    {/* --- THE PRO EDITOR STAGE --- */}
+                                    <div className="flex flex-col lg:flex-row gap-6">
+                                        <div className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center">
+                                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
-                                                    {/* Arrow Controls (Floating) */}
-                                                    {searchedImages.length > 1 && !isDragging && (
-                                                        <>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length); }}
-                                                                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 -translate-x-12 opacity-0 group-hover/editor:opacity-100"
-                                                            >
-                                                                <ChevronLeft size={20} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length); }}
-                                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 translate-x-12 opacity-0 group-hover/editor:opacity-100"
-                                                            >
-                                                                <ChevronRight size={20} />
-                                                            </button>
-                                                        </>
-                                                    )}
+                                            {/* Arrow Controls (Floating) */}
+                                            {searchedImages.length > 1 && !isDragging && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length); }}
+                                                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 -translate-x-12 opacity-0 group-hover/editor:opacity-100"
+                                                    >
+                                                        <ChevronLeft size={20} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length); }}
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 translate-x-12 opacity-0 group-hover/editor:opacity-100"
+                                                    >
+                                                        <ChevronRight size={20} />
+                                                    </button>
+                                                </>
+                                            )}
 
-                                                    {/* Stage Content */}
-                                                    <div className="relative w-full h-full">
-                                                        {/* 1. Background Image Layer */}
+                                            {/* Stage Content */}
+                                            <div className="relative w-full h-full">
+                                                {/* 1. Background Image Layer */}
+                                                <div
+                                                    className="absolute inset-0 cursor-move will-change-transform"
+                                                    onPointerDown={(e) => handleImagePointerDown(e, 'image')}
+                                                    onPointerMove={handleImagePointerMove}
+                                                    onPointerUp={handleImagePointerUp}
+                                                    style={{
+                                                        transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                        transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
+                                                    }}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={searchedImages[selectedImageIndex ?? 0]} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                                                </div>
+
+                                                {/* 2. Gradient Layer (Visual Only) */}
+                                                {isApplyGradient && (
+                                                    <div
+                                                        className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
+                                                    />
+                                                )}
+
+                                                {/* 3. Text Manipulation Proxy Layer */}
+                                                {isApplyText && (
+                                                    <div
+                                                        className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}
+                                                    >
                                                         <div
-                                                            className="absolute inset-0 cursor-move will-change-transform"
-                                                            onPointerDown={(e) => handleImagePointerDown(e, 'image')}
-                                                            onPointerMove={handleImagePointerMove}
-                                                            onPointerUp={handleImagePointerUp}
+                                                            className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
+                                                            onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                             style={{
-                                                                transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
-                                                                transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
+                                                                transform: textPosition
+                                                                    ? `translate(${textPosition.x - (WIDTH / 2)}px, ${textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))}px) scale(${textScale})`
+                                                                    : `scale(${textScale})`,
+                                                                transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                             }}
                                                         >
-                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                            <img src={searchedImages[selectedImageIndex ?? 0]} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
-                                                        </div>
-
-                                                        {/* 2. Gradient Layer (Visual Only) */}
-                                                        {isApplyGradient && (
-                                                            <div
-                                                                className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
-                                                            />
-                                                        )}
-
-                                                        {/* 3. Text Manipulation Proxy Layer */}
-                                                        {isApplyText && (
-                                                            <div
-                                                                className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}
-                                                            >
+                                                            <div className="text-center drop-shadow-2xl">
                                                                 <div
-                                                                    className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
-                                                                    onPointerDown={(e) => handleImagePointerDown(e, 'text')}
-                                                                    style={{
-                                                                        transform: textPosition
-                                                                            ? `translate(${textPosition.x - (WIDTH / 2)}px, ${textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))}px) scale(${textScale})`
-                                                                            : `scale(${textScale})`,
-                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
-                                                                    }}
+                                                                    className="text-white text-lg font-black uppercase leading-[0.9] max-w-sm flex flex-wrap justify-center gap-x-1.5"
+                                                                    style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
                                                                 >
-                                                                    <div className="text-center drop-shadow-2xl">
-                                                                        <div
-                                                                            className="text-white text-lg font-black uppercase leading-[0.9] max-w-sm flex flex-wrap justify-center gap-x-1.5"
-                                                                            style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
-                                                                        >
-                                                                            {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                <span
-                                                                                    key={idx}
-                                                                                    onPointerDown={(e) => {
-                                                                                        if (isTextLocked) e.stopPropagation();
-                                                                                    }}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        e.preventDefault();
-                                                                                        const newIndices = purpleWordIndices.includes(idx)
-                                                                                            ? purpleWordIndices.filter(i => i !== idx)
-                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                        setPurpleWordIndices(newIndices);
-                                                                                    }}
-                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
-                                                                                >
-                                                                                    {word}
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                    {!isTextLocked && !isDragging && (
-                                                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
-                                                                            Drag to Place
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Processing Loader */}
-                                                        {isProcessingImage && (
-                                                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                                                                <div className="flex flex-col items-center gap-3">
-                                                                    <Loader2 size={32} className="text-purple-500 animate-spin" />
-                                                                    <span className="text-[10px] text-purple-400 font-black uppercase tracking-[0.2em]">Processing FX...</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Side Control Panel */}
-                                                <div className="w-full lg:w-48 flex flex-col gap-4">
-                                                    {/* Global Tools */}
-                                                    <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl flex flex-wrap lg:flex-col gap-2">
-                                                        <button onClick={handleResetAll} className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                                                            <RotateCcw size={14} /> REVERT
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setIsAutoSnap(!isAutoSnap)}
-                                                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold rounded-lg transition-all ${isAutoSnap ? 'text-blue-400 bg-blue-400/10' : 'text-neutral-500 bg-white/5'}`}
-                                                        >
-                                                            <Anchor size={14} /> {isAutoSnap ? 'SNAP: ON' : 'SNAP: OFF'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Image Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
-                                                            <span>Asset Zoom</span>
-                                                            <span className="font-mono text-white/50">{Math.round(imageScale * 100)}%</span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleZoom(-0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
-                                                            <button onClick={() => handleZoom(0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setIsImageLocked(!isImageLocked)}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isImageLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isImageLocked ? <Lock size={12} /> : <Unlock size={12} />} {isImageLocked ? 'LOCKED' : 'UNLOCK'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Text Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
-                                                            <span>Text Scale</span>
-                                                            <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
-                                                            <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
-                                                        </div>
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setGradientPosition('top');
-                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
-                                                                }}
-                                                                className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
-                                                            >
-                                                                HEADER
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setGradientPosition('bottom');
-                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
-                                                                }}
-                                                                className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
-                                                            >
-                                                                FOOTER
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setIsTextLocked(!isTextLocked)}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isTextLocked ? <Lock size={12} /> : <Unlock size={12} />} {isTextLocked ? 'FIXED' : 'FREE'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* --- PURPLE WORD SELECTOR INTEGRATED --- */}
-                                            <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden mt-6">
-                                                <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <Type size={14} className="text-purple-400" />
-                                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-5 space-y-4">
-                                                    <div className="relative group">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
-                                                            className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
-                                                            value={overlayTag}
-                                                            onChange={(e) => {
-                                                                setOverlayTag(e.target.value);
-                                                                setPurpleWordIndices([]); // Reset when text changes
-                                                                setIsApplyText(true); // Auto-enable visibility
-                                                            }}
-                                                        />
-                                                    </div>
-
-                                                    {/* Tactical Selector - Box inside box */}
-                                                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const nextVal = !isApplyGradient;
-                                                                    setIsApplyGradient(nextVal);
-                                                                    handleApplyText(undefined, undefined, undefined, nextVal);
-                                                                }}
-                                                                className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${isApplyGradient ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-500 border border-white/5'}`}
-                                                            >
-                                                                {isApplyGradient ? <Eye size={10} /> : <EyeOff size={10} />} Gradient
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                                                            <div className="flex-1 flex items-center gap-4">
-                                                                <div className="flex gap-1">
-                                                                    <button
-                                                                        onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
-                                                                        className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                    >
-                                                                        <ChevronLeftCircle size={20} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setPurpleCursorIndex(prev => {
-                                                                            const wordsCount = overlayTag.split(/\s+/).filter(Boolean).length;
-                                                                            return Math.min(Math.max(0, wordsCount - 1), prev + 1);
-                                                                        })}
-                                                                        className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                    >
-                                                                        <ChevronRightCircle size={20} />
-                                                                    </button>
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
-                                                                    {overlayTag.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                    {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                         <span
                                                                             key={idx}
-                                                                            className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
-                                                                                idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
-                                                                                }`}
+                                                                            onPointerDown={(e) => {
+                                                                                if (isTextLocked) e.stopPropagation();
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                e.preventDefault();
+                                                                                const newIndices = purpleWordIndices.includes(idx)
+                                                                                    ? purpleWordIndices.filter(i => i !== idx)
+                                                                                    : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                setPurpleWordIndices(newIndices);
+                                                                            }}
+                                                                            className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
                                                                         >
                                                                             {word}
                                                                         </span>
                                                                     ))}
                                                                 </div>
                                                             </div>
-                                                            <div className="flex gap-2 w-full sm:w-auto">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (!purpleWordIndices.includes(purpleCursorIndex)) {
-                                                                            const newIndices = [...purpleWordIndices, purpleCursorIndex].sort((a, b) => a - b);
-                                                                            setPurpleWordIndices(newIndices);
-                                                                            handleApplyText(undefined, undefined, undefined, undefined, newIndices);
-                                                                        }
-                                                                    }}
-                                                                    className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
-                                                                >
-                                                                    APPLY PURPLE
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPurpleWordIndices([]);
-                                                                        handleApplyText(undefined, undefined, undefined, undefined, []);
-                                                                    }}
-                                                                    className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
-                                                                >
-                                                                    REMOVE ALL
-                                                                </button>
-                                                            </div>
+                                                            {!isTextLocked && !isDragging && (
+                                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
+                                                                    Drag to Place
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
+                                                )}
 
-                                            {/* Action Bar */}
-                                            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                                                <button
-                                                    onClick={() => handleApplyText()}
-                                                    disabled={isProcessingImage}
-                                                    className="flex-1 py-4 bg-white dark:bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
-                                                >
-                                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                                                    COMMIT CHANGES TO PREVIEW
-                                                </button>
-
-                                                {processedImage && (
-                                                    <button
-                                                        onClick={() => setShowExpandedPreview(true)}
-                                                        className="py-4 px-8 bg-neutral-900 text-white border border-white/10 font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        <Maximize2 size={18} />
-                                                        EXPAND
-                                                    </button>
+                                                {/* Processing Loader */}
+                                                {isProcessingImage && (
+                                                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <Loader2 size={32} className="text-purple-500 animate-spin" />
+                                                            <span className="text-[10px] text-purple-400 font-black uppercase tracking-[0.2em]">Processing FX...</span>
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </div>
+                                        </div>
 
-                                            {/* Fullscreen Preview Modal */}
-                                            {showExpandedPreview && processedImage && (
-                                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
-                                                    <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setShowExpandedPreview(false)} />
-                                                    <div className="relative w-full max-w-4xl aspect-[4/5] bg-neutral-900 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(157,123,255,0.2)] border border-white/10">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
-                                                        <button
-                                                            onClick={() => setShowExpandedPreview(false)}
-                                                            className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/10 transition-all shadow-2xl z-[201]"
-                                                        >
-                                                            <XCircle size={28} />
-                                                        </button>
-                                                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
-                                                            MASTER VISUAL INSPECTION
+                                        {/* Side Control Panel */}
+                                        <div className="w-full lg:w-48 flex flex-col gap-4">
+                                            {/* Global Tools */}
+                                            <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl flex flex-wrap lg:flex-col gap-2">
+                                                <button onClick={handleResetAll} className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                                                    <RotateCcw size={14} /> REVERT
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsAutoSnap(!isAutoSnap)}
+                                                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold rounded-lg transition-all ${isAutoSnap ? 'text-blue-400 bg-blue-400/10' : 'text-neutral-500 bg-white/5'}`}
+                                                >
+                                                    <Anchor size={14} /> {isAutoSnap ? 'SNAP: ON' : 'SNAP: OFF'}
+                                                </button>
+                                            </div>
+
+                                            {/* Image Tools */}
+                                            <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
+                                                    <span>Asset Zoom</span>
+                                                    <span className="font-mono text-white/50">{Math.round(imageScale * 100)}%</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleZoom(-0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
+                                                    <button onClick={() => handleZoom(0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
+                                                </div>
+                                                <button
+                                                    onClick={() => setIsImageLocked(!isImageLocked)}
+                                                    className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isImageLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                >
+                                                    {isImageLocked ? <Lock size={12} /> : <Unlock size={12} />} {isImageLocked ? 'LOCKED' : 'UNLOCK'}
+                                                </button>
+                                            </div>
+
+                                            {/* Text Tools */}
+                                            <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
+                                                    <span>Text Scale</span>
+                                                    <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
+                                                    <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
+                                                </div>
+                                                <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setGradientPosition('top');
+                                                            handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
+                                                        }}
+                                                        className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                    >
+                                                        HEADER
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setGradientPosition('bottom');
+                                                            handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
+                                                        }}
+                                                        className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                    >
+                                                        FOOTER
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    onClick={() => setIsTextLocked(!isTextLocked)}
+                                                    className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                >
+                                                    {isTextLocked ? <Lock size={12} /> : <Unlock size={12} />} {isTextLocked ? 'FIXED' : 'FREE'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* --- PURPLE WORD SELECTOR INTEGRATED --- */}
+                                    <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden mt-6">
+                                        <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Type size={14} className="text-purple-400" />
+                                                <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-5 space-y-4">
+                                            <div className="relative group">
+                                                <input
+                                                    type="text"
+                                                    placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
+                                                    className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
+                                                    value={overlayTag}
+                                                    onChange={(e) => {
+                                                        setOverlayTag(e.target.value);
+                                                        setPurpleWordIndices([]); // Reset when text changes
+                                                        setIsApplyText(true); // Auto-enable visibility
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {/* Tactical Selector - Box inside box */}
+                                            <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const nextVal = !isApplyGradient;
+                                                            setIsApplyGradient(nextVal);
+                                                            handleApplyText(undefined, undefined, undefined, nextVal);
+                                                        }}
+                                                        className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${isApplyGradient ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-500 border border-white/5'}`}
+                                                    >
+                                                        {isApplyGradient ? <Eye size={10} /> : <EyeOff size={10} />} Gradient
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex flex-col sm:flex-row items-center gap-4">
+                                                    <div className="flex-1 flex items-center gap-4">
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
+                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                            >
+                                                                <ChevronLeftCircle size={20} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setPurpleCursorIndex(prev => {
+                                                                    const wordsCount = overlayTag.split(/\s+/).filter(Boolean).length;
+                                                                    return Math.min(Math.max(0, wordsCount - 1), prev + 1);
+                                                                })}
+                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                            >
+                                                                <ChevronRightCircle size={20} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
+                                                            {overlayTag.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                <span
+                                                                    key={idx}
+                                                                    className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
+                                                                        idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
+                                                                        }`}
+                                                                >
+                                                                    {word}
+                                                                </span>
+                                                            ))}
                                                         </div>
                                                     </div>
+                                                    <div className="flex gap-2 w-full sm:w-auto">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!purpleWordIndices.includes(purpleCursorIndex)) {
+                                                                    const newIndices = [...purpleWordIndices, purpleCursorIndex].sort((a, b) => a - b);
+                                                                    setPurpleWordIndices(newIndices);
+                                                                    handleApplyText(undefined, undefined, undefined, undefined, newIndices);
+                                                                }
+                                                            }}
+                                                            className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
+                                                        >
+                                                            APPLY PURPLE
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setPurpleWordIndices([]);
+                                                                handleApplyText(undefined, undefined, undefined, undefined, []);
+                                                            }}
+                                                            className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
+                                                        >
+                                                            REMOVE ALL
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <div className="py-12 flex flex-col items-center justify-center text-neutral-600 border border-dashed border-neutral-800 rounded-xl">
-                                            <ImageIcon size={32} className="mb-2 opacity-20" />
-                                            <span className="text-xs uppercase tracking-widest font-medium">Awaiting Signal Acquisition</span>
-                                        </div>
-                                    )}
+                                    </div>
 
-                                    {/* Final Preview Output */}
-                                    {processedImage && (
-                                        <div className="mt-4 p-4 bg-purple-900/10 border border-purple-500/20 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-2">
-                                            <div className="w-16 h-20 rounded-lg overflow-hidden border border-white/10 bg-black flex-shrink-0">
+                                    {/* Action Bar */}
+                                    <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                                        <button
+                                            onClick={() => handleApplyText()}
+                                            disabled={isProcessingImage}
+                                            className="flex-1 py-4 bg-white dark:bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                                        >
+                                            {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
+                                            COMMIT CHANGES TO PREVIEW
+                                        </button>
+
+                                        {processedImage && (
+                                            <button
+                                                onClick={() => setShowExpandedPreview(true)}
+                                                className="py-4 px-8 bg-neutral-900 text-white border border-white/10 font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Maximize2 size={18} />
+                                                EXPAND
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Fullscreen Preview Modal */}
+                                    {showExpandedPreview && processedImage && (
+                                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+                                            <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setShowExpandedPreview(false)} />
+                                            <div className="relative w-full max-w-4xl aspect-[4/5] bg-neutral-900 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(157,123,255,0.2)] border border-white/10">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={processedImage} alt="Final" className="w-full h-full object-cover" />
+                                                <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
+                                                <button
+                                                    onClick={() => setShowExpandedPreview(false)}
+                                                    className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/10 transition-all shadow-2xl z-[201]"
+                                                >
+                                                    <XCircle size={28} />
+                                                </button>
+                                                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
+                                                    MASTER VISUAL INSPECTION
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="text-purple-400 text-[10px] font-black uppercase tracking-widest mb-1">Status: Processed</div>
-                                                <div className="text-white text-xs">Visual asset ready for deployment.</div>
-                                            </div>
-                                            <div className="ml-auto w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]" />
                                         </div>
                                     )}
                                 </div>
-
-                                {/* Extra Fields for Manual Override */}
-                                <div className="pt-4 border-t border-white/5">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Editor Notes</label>
-                                        <textarea
-                                            placeholder="Optional content body..."
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none h-[64px] resize-none overflow-hidden focus:h-24 transition-all"
-                                            value={content}
-                                            onChange={(e) => setContent(e.target.value)}
-                                        />
-                                    </div>
+                            ) : (
+                                <div className="py-12 flex flex-col items-center justify-center text-neutral-600 border border-dashed border-neutral-800 rounded-xl">
+                                    <ImageIcon size={32} className="mb-2 opacity-20" />
+                                    <span className="text-xs uppercase tracking-widest font-medium">Awaiting Signal Acquisition</span>
                                 </div>
-                            </div>
-                                )}
+                            )}
 
-                            {/* Main Generation Action */}
-                            <button
-                                onClick={handleGeneratePreview}
-                                disabled={isGenerating}
-                                className="w-full py-4 mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
-                            >
-                                {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                                {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
-                            </button>
-
-                            {/* PREVIEW POST CARD (Result) */}
-                            {previewPost && (
-                                <div className="mt-8 border-t-2 border-dashed border-white/10 pt-8 animate-in fade-in slide-in-from-bottom-8">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-xs font-black text-green-400 uppercase tracking-widest">
-                                            {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
-                                        </h4>
-                                        <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
-
+                            {/* Final Preview Output */}
+                            {processedImage && (
+                                <div className="mt-4 p-4 bg-purple-900/10 border border-purple-500/20 rounded-xl flex items-center gap-4 animate-in slide-in-from-top-2">
+                                    <div className="w-16 h-20 rounded-lg overflow-hidden border border-white/10 bg-black flex-shrink-0">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={processedImage} alt="Final" className="w-full h-full object-cover" />
                                     </div>
-
-                                    <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
-                                        <div className="md:w-[40%] aspect-[4/5] bg-neutral-900 relative border-b md:border-b-0 md:border-r border-white/10">
-                                            {previewPost.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={previewPost.image} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-neutral-700">NO VISUAL</div>
-                                            )}
-                                        </div>
-                                        <div className="p-6 md:w-[60%] flex flex-col">
-                                            <div className="mb-auto">
-                                                <h3 className="text-xl font-bold text-white mb-3 leading-tight">{previewPost.title}</h3>
-                                                <p className="text-sm text-neutral-400 leading-relaxed">{previewPost.content}</p>
-                                            </div>
-                                            <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 text-[10px] font-mono text-neutral-500 uppercase">
-                                                <div>
-                                                    <span className="block text-neutral-700">Type</span>
-                                                    {previewPost.type}
-                                                </div>
-                                                <div>
-                                                    <span className="block text-neutral-700">Timestamp</span>
-                                                    {new Date(previewPost.timestamp).toLocaleTimeString()}
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div>
+                                        <div className="text-purple-400 text-[10px] font-black uppercase tracking-widest mb-1">Status: Processed</div>
+                                        <div className="text-white text-xs">Visual asset ready for deployment.</div>
                                     </div>
+                                    <div className="ml-auto w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]" />
                                 </div>
                             )}
                         </div>
 
-                        {/* Modal Footer */}
-                        {
-                            previewPost && (
-                                <div className="p-5 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3 backdrop-blur-md">
-                                    <button
-                                        onClick={handleCancel}
-                                        className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
-                                    >
-                                        Discard
-                                    </button>
-                                    <button
-                                        onClick={handleConfirm}
-                                        className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
-                                    >
-                                        {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
-                                    </button>
-                                </div>
-                            )
-                        }
-                    </div >
-                </div >
-            )
-            }
-
-            {/* SCHEDULER LOGS MODAL */}
-            {
-                showLogsModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                            {/* Header */}
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                        <Terminal size={20} className="text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                    <XCircle size={24} />
-                                </button>
-                            </div>
-
-                            {/* Logs Content */}
-                            <div className="flex-1 overflow-auto p-0 md:p-6">
-                                {isLoadingLogs ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Loader2 size={32} className="animate-spin text-blue-500" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                    </div>
-                                ) : schedulerLogs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Terminal size={32} className="opacity-20" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
-                                    </div>
-                                ) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                            <tr>
-                                                <th className="p-4 border-b border-white/5">Time</th>
-                                                <th className="p-4 border-b border-white/5">Slot</th>
-                                                <th className="p-4 border-b border-white/5">Status</th>
-                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                            {schedulerLogs.map((log) => (
-                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                    </td>
-                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                    <td className="p-4">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                            }`}>
-                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                            {log.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-neutral-300">
-                                                        {log.message}
-                                                        {log.details && (
-                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                {log.details}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {log.status !== 'success' && (
-                                                            <button
-                                                                onClick={() => handleRegenerateSlot(log.slot)}
-                                                                disabled={isRegenerating === log.slot}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                Regenerate
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                <span>Logs persist for 7 days</span>
-                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                    <RotateCcw size={12} /> Refresh
-                                </button>
+                        {/* Extra Fields for Manual Override */}
+                        <div className="pt-4 border-t border-white/5">
+                            <div>
+                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Editor Notes</label>
+                                <textarea
+                                    placeholder="Optional content body..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none h-[64px] resize-none overflow-hidden focus:h-24 transition-all"
+                                    value={content}
+                                    onChange={(e) => setContent(e.target.value)}
+                                />
                             </div>
                         </div>
                     </div>
-                )
-            }
-            <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
-                <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
-                <span>System Status: ONLINE</span>
+                                )}
+                </div>
+
+                    {/* Main Generation Action */}
+            <button
+                onClick={handleGeneratePreview}
+                disabled={isGenerating}
+                className="w-full py-4 mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+            >
+                {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+                {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
+            </button>
+
+            {/* PREVIEW POST CARD (Result) */}
+            {previewPost && (
+                <div className="mt-8 border-t-2 border-dashed border-white/10 pt-8 animate-in fade-in slide-in-from-bottom-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-xs font-black text-green-400 uppercase tracking-widest">
+                            {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
+                        </h4>
+                        <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
+
+                    </div>
+
+                    <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
+                        <div className="md:w-[40%] aspect-[4/5] bg-neutral-900 relative border-b md:border-b-0 md:border-r border-white/10">
+                            {previewPost.image ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={previewPost.image} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-neutral-700">NO VISUAL</div>
+                            )}
+                        </div>
+                        <div className="p-6 md:w-[60%] flex flex-col">
+                            <div className="mb-auto">
+                                <h3 className="text-xl font-bold text-white mb-3 leading-tight">{previewPost.title}</h3>
+                                <p className="text-sm text-neutral-400 leading-relaxed">{previewPost.content}</p>
+                            </div>
+                            <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 text-[10px] font-mono text-neutral-500 uppercase">
+                                <div>
+                                    <span className="block text-neutral-700">Type</span>
+                                    {previewPost.type}
+                                </div>
+                                <div>
+                                    <span className="block text-neutral-700">Timestamp</span>
+                                    {new Date(previewPost.timestamp).toLocaleTimeString()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+
+        {/* Modal Footer */ }
+    {
+        previewPost && (
+            <div className="p-5 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3 backdrop-blur-md">
+                <button
+                    onClick={handleCancel}
+                    className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
+                >
+                    Discard
+                </button>
+                <button
+                    onClick={handleConfirm}
+                    className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
+                >
+                    {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
+                </button>
             </div>
+        )
+    }
+                    </div >
+                </div >
+            )
+}
+
+{/* SCHEDULER LOGS MODAL */ }
+{
+    showLogsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                {/* Header */}
+                <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                            <Terminal size={20} className="text-blue-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
+                            <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
+                        <XCircle size={24} />
+                    </button>
+                </div>
+
+                {/* Logs Content */}
+                <div className="flex-1 overflow-auto p-0 md:p-6">
+                    {isLoadingLogs ? (
+                        <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                            <Loader2 size={32} className="animate-spin text-blue-500" />
+                            <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
+                        </div>
+                    ) : schedulerLogs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                            <Terminal size={32} className="opacity-20" />
+                            <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
+                                <tr>
+                                    <th className="p-4 border-b border-white/5">Time</th>
+                                    <th className="p-4 border-b border-white/5">Slot</th>
+                                    <th className="p-4 border-b border-white/5">Status</th>
+                                    <th className="p-4 border-b border-white/5 w-full">Message</th>
+                                    <th className="p-4 border-b border-white/5 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 text-xs font-mono">
+                                {schedulerLogs.map((log) => (
+                                    <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <td className="p-4 text-neutral-400 whitespace-nowrap">
+                                            {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                        </td>
+                                        <td className="p-4 text-white font-bold">{log.slot}</td>
+                                        <td className="p-4">
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                }`}>
+                                                {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-neutral-300">
+                                            {log.message}
+                                            {log.details && (
+                                                <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
+                                                    {log.details}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            {log.status !== 'success' && (
+                                                <button
+                                                    onClick={() => handleRegenerateSlot(log.slot)}
+                                                    disabled={isRegenerating === log.slot}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
+                                                >
+                                                    {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                                                    Regenerate
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                    <span>Logs persist for 7 days</span>
+                    <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
+                        <RotateCcw size={12} /> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+<div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
+    <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
+    <span>System Status: ONLINE</span>
+</div>
         </div >
     );
 }
