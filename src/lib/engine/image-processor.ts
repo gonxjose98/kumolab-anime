@@ -235,8 +235,8 @@ export async function generateIntelImage({
             // Since we usually only have headline now, we'll simplify.
             gap = (titleLines.length > 0 && cleanedHeadline.length > 0) ? globalFontSize * 0.25 : 0;
 
-            titleLines = animeTitle.trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3) : [];
-            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 3) : [];
+            titleLines = animeTitle.trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 6) : [];
+            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
             const maxLineWidth = Math.max(
@@ -404,5 +404,5 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number): s
         }
     }
     lines.push(currentLine);
-    return lines.slice(0, maxLines);
+    return lines.slice(0, maxLines || 10);
 }
