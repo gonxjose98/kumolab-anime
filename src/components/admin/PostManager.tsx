@@ -1235,7 +1235,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     placeholder="e.g. BREAKING • OFFICIAL • REVEAL"
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                     value={overlayTag}
-                                                    onChange={(e) => setOverlayTag(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setOverlayTag(e.target.value);
+                                                        setIsApplyText(true);
+                                                    }}
                                                 />
                                             </div>
 
@@ -1508,6 +1511,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         onChange={(e) => {
                                                                             setOverlayTag(e.target.value);
                                                                             setPurpleWordIndices([]); // Reset when text changes
+                                                                            setIsApplyText(true); // Auto-enable visibility
                                                                         }}
                                                                     />
                                                                 </div>
@@ -1794,8 +1798,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 <td className="p-4 text-white font-bold">{log.slot}</td>
                                                 <td className="p-4">
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                        log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                                                         }`}>
                                                         {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
                                                         {log.status}
