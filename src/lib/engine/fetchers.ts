@@ -253,146 +253,78 @@ export async function fetchAnimeIntel(): Promise<any[]> {
 
         let match;
         while ((match = itemRegex.exec(text)) !== null) {
-            const itemBlock = match[0];
-            const titleMatch = titleRegex.exec(itemBlock);
-            const linkMatch = linkRegex.exec(itemBlock);
-            const descMatch = descRegex.exec(itemBlock);
-            const dateMatch = pubDateRegex.exec(itemBlock);
+            try {
+                const itemBlock = match[0];
+                const titleMatch = titleRegex.exec(itemBlock);
+                const linkMatch = linkRegex.exec(itemBlock);
+                const descMatch = descRegex.exec(itemBlock);
+                const dateMatch = pubDateRegex.exec(itemBlock);
 
-            if (titleMatch && linkMatch) {
-                // Filter for "Season" or "Announced" or "Movie" to match 'Intel' criteria
-                const title = titleMatch[1].replace('<![CDATA[', '').replace(']]>', '');
-                const description = descMatch ? descMatch[1].replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '') : ''; // Strip HTML
+                if (!titleMatch || !linkMatch) continue;
 
-                // INTEL KEYWORDS (Refined for Series Focus)
-                // Topics: Season confirmations, visual reveals, trailers, delays.
-                const strictKeywords = [
-                    'Season', 'Cour', // Specific anime terminology
-                    'Trailer', 'Visual', 'PV', // Visuals
-                    'Release Date', // Dates
-                    'Movie', // Films
-                    'Cast', 'Reveals', 'Unveils', 'Casts' // News/Intel
-                ];
+                const rawTitle = (titleMatch[1] || '').replace('<![CDATA[', '').replace(']]>', '').trim();
+                const rawDescription = (descMatch ? descMatch[1] : '').replace('<![CDATA[', '').replace(']]>', '').replace(/<[^>]*>?/gm, '').trim();
+                const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
 
+                if (!rawTitle) continue;
 
-                // NEGATIVE KEYWORDS (Brutal Exclusion of Meta/Industry News)
-                // We strictly want ANIME SERIES UPDATES.
-                const negativeKeywords = [
-                    'Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', // Gaming
-                    'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', // Print
-                    'Live-Action', 'Stage Play', 'Musical', 'Live Action', 'Play', // Theatrical/Live
-                    'Award', 'Prize', 'Nomination', 'Winner', // Awards
-                    'Comic-Con', 'Convention', 'Event', 'Expo', // Events
-                    'Interview', 'Report', 'Review', 'Editorial', // Meta content
-                    'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Ranking', 'Poll', // Merch/Stats
-                    'Earnings', 'Financial', 'Stock', // Business
-                    'Actor', 'Voice Actor', 'Seiyuu', 'Director', // Staff news (unless new project)
-                    'Dub', 'English Dub' // Dub news usually secondary
-                ];
+                // INTEL KEYWORDS
+                const strictKeywords = ['Season', 'Cour', 'Trailer', 'Visual', 'PV', 'Release Date', 'Movie', 'Cast', 'Reveals', 'Unveils', 'Casts'];
+                const negativeKeywords = ['Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', 'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', 'Live-Action', 'Stage Play', 'Musical', 'Award', 'Prize', 'Convention', 'Event', 'Interview', 'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Earnings', 'Financial', 'Stock', 'Actor', 'Voice Actor', 'Seiyuu', 'Director', 'Dub', 'English Dub'];
 
-                const hasPositive = strictKeywords.some(k => title.includes(k));
-                const hasNegative = negativeKeywords.some(k => title.includes(k) || description.includes(k));
+                const hasPositive = strictKeywords.some(k => rawTitle.includes(k));
+                const hasNegative = negativeKeywords.some(k => rawTitle.includes(k) || rawDescription.includes(k));
 
                 if (hasPositive && !hasNegative) {
-                    const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
-
                     // Recent news (last 72h)
                     if (Date.now() - pubDate.getTime() < 72 * 60 * 60 * 1000) {
-
-                        // Smart Claim Type Detection
                         let claimType: any = 'confirmed';
-                        if (title.includes('Delay') || title.includes('Postponed') || title.includes('Hiatus')) {
-                            claimType = 'delayed';
-                        } else if (title.includes('Trailer') || title.includes('PV')) {
-                            claimType = 'trailer';
-                        } else if (title.includes('Visual') || title.includes('Reveals') || title.includes('Unveils')) {
-                            claimType = 'confirmed';
-                        } else if (title.includes('Cast') || title.includes('Casts')) {
-                            claimType = 'confirmed'; // Casting news is a confirmation of production progress
-                        }
+                        if (rawTitle.includes('Delay') || rawTitle.includes('Postponed') || rawTitle.includes('Hiatus')) claimType = 'delayed';
+                        else if (rawTitle.includes('Trailer') || rawTitle.includes('PV')) claimType = 'trailer';
 
-
-                        // CLEAN TITLE LOGIC
-                        // User banned "Original TV", "TV Anime", and now "Anime" global from post titles
-                        let cleanTitle = title
+                        let cleanTitle = rawTitle
                             .replace(/Original TV Anime/gi, '')
                             .replace(/TV Anime/gi, '')
                             .replace(/Original Anime/gi, '')
                             .replace(/Anime/gi, '')
                             .replace(/\s+/g, ' ').trim();
 
-                        // Ensure we didn't strip the title to nothing
-                        if (cleanTitle.length < 5) cleanTitle = title;
+                        if (cleanTitle.length < 5) cleanTitle = rawTitle;
 
-
-                        // OPTIMIZED SEARCH TERM EXTRACTION
-                        // Goal: Get JUST the anime name. "Inherit the Winds Original TV Anime..." -> "Inherit the Winds"
-
-                        let searchName = "";
-
-                        // Strategy A: Pre-colon (Highest confidence)
-                        // "Frieren: Beyond Journey's End" -> "Frieren"
-                        if (title.includes(':')) {
-                            searchName = title.split(':')[0].trim();
-                        } else {
-                            // Strategy B: Clean the whole string
-                            searchName = title;
-                        }
-
-                        // Remove all noise words from search term
-                        const noiseWords = [
-                            'Original', 'TV', 'Anime', 'The Movie', 'Movie',
-                            'Season', 'Cour', 'Part',
-                            'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff',
-                            'Release Date', 'Delay', 'Postponed', 'Info',
-                            'Channel', 'Views', 'Million', 'Billion', 'Subscriber', 'Platform',
-                            'Surpasses', 'Attracts', 'Streaming', 'Service', 'English-Language'
-                        ];
-
+                        let searchName = rawTitle.includes(':') ? rawTitle.split(':')[0].trim() : rawTitle;
+                        const noiseWords = ['Original', 'TV', 'Anime', 'The Movie', 'Movie', 'Season', 'Cour', 'Part', 'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff', 'Release Date', 'Delay', 'Postponed', 'Info'];
                         noiseWords.forEach(word => {
-                            const regex = new RegExp(`\\b${word}\\b`, 'gi');
-                            searchName = searchName.replace(regex, '');
+                            searchName = searchName.replace(new RegExp(`\\b${word}\\b`, 'gi'), '');
                         });
-
-                        // Remove common news-style artifacts
-                        searchName = searchName.replace(/["'']/g, ''); // Fix quotes
-
-                        searchName = searchName.replace(/\s+/g, ' ').trim();
-
-                        // Fallback: If we stripped it to death, take the first 3 words of the ORIGINAL title (ignoring noise)
-                        if (searchName.length < 2) {
-                            searchName = title.split(' ').slice(0, 3).join(' ');
-                        }
+                        searchName = searchName.replace(/["'']/g, '').replace(/\s+/g, ' ').trim();
+                        if (searchName.length < 2) searchName = rawTitle.split(' ').slice(0, 3).join(' ');
 
                         items.push({
                             title: cleanTitle,
                             fullTitle: cleanTitle,
-                            claimType: claimType,
+                            claimType,
                             premiereDate: new Date().toISOString().split('T')[0],
                             slug: 'intel-' + cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                            content: description.substring(0, 280),
+                            content: rawDescription.substring(0, 280),
                             imageSearchTerm: searchName,
                             source: 'AnimeNewsNetwork'
                         });
                     }
-                } else {
-                    // Fallback Logic (Same strictness applied to Generic fallback to prevent Games slipping in)
-                    const pubDate = dateMatch ? new Date(dateMatch[1]) : new Date();
-
-                    // Also check negatives here
-                    if (!hasNegative && (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000)) {
-                        items.push({
-                            title: title,
-                            fullTitle: title,
-                            claimType: 'now_streaming', // Safe default
-                            premiereDate: new Date().toISOString().split('T')[0],
-                            slug: 'news-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                            content: description.substring(0, 280),
-                            imageSearchTerm: title.split(':')[0],
-                            source: 'ANN (Generic)'
-                        });
-                    }
+                } else if (!hasNegative && (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000)) {
+                    // Generic Fallback
+                    items.push({
+                        title: rawTitle,
+                        fullTitle: rawTitle,
+                        claimType: 'now_streaming',
+                        premiereDate: new Date().toISOString().split('T')[0],
+                        slug: 'news-' + rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
+                        content: rawDescription.substring(0, 280),
+                        imageSearchTerm: rawTitle.split(':')[0].trim(),
+                        source: 'ANN (Generic)'
+                    });
                 }
+            } catch (err) {
+                console.error("[Image Engine] Error processing RSS item:", err);
             }
         }
 
