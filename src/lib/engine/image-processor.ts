@@ -31,7 +31,7 @@ interface IntelImageOptions {
     textPosition?: { x: number; y: number };
     textScale?: number;
     gradientPosition?: 'top' | 'bottom';
-    purpleWordIndex?: number;
+    purpleWordIndices?: number[];
 }
 
 /**
@@ -50,7 +50,7 @@ export async function generateIntelImage({
     textPosition,
     textScale = 1,
     gradientPosition = 'bottom',
-    purpleWordIndex
+    purpleWordIndices
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
     if (!fs.existsSync(outputDir)) {
@@ -290,31 +290,9 @@ export async function generateIntelImage({
             headlineLines.forEach((line) => {
                 const words = line.split(' ');
 
-                // Logic: Priority to purpleWordIndex if provided, else last word of last line
-                const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
-
                 if (words.length > 0) {
-                    // Identify which word to highlight
-                    let highlightIndex = -1;
-                    if (purpleWordIndex !== undefined) {
-                        // Find if any word in this line matches the global index?
-                        // Actually, simpler: if purpleWordIndex is provided, we search for that word in the whole headline content.
-                        // But let's assume purpleWordIndex is the word index in the *current line* for simplicity if we can't map globally.
-                        // User said: "pick which word has the purple on it".
-                        // Let's assume purpleWordIndex is the index in the headline's words array.
-
-                        const headlineAllWords = cleanedHeadline.split(' ');
-                        const lineWordIndices = [];
-                        let headIdx = 0;
-                        headlineLines.forEach(l => {
-                            l.split(' ').forEach(w => {
-                                // Not perfect due to wrapText possibly changing words, but close enough
-                            });
-                        });
-                        // IMPROVED LOGIC: purpleWordIndex is index in headlineAllWords.
-                    }
-
-                    // Default behavior (Fallback)
+                    // Logic: Priority to purpleWordIndices if provided, else last word of last line
+                    const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
                     const lastWordIdx = words.length - 1;
 
                     // Calculation for alignment
@@ -323,9 +301,12 @@ export async function generateIntelImage({
                     let wordX = drawX - totalLineLength / 2;
 
                     ctx.textAlign = 'left';
+                    const wordsBeforeCount = headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(' ').filter(x => x).length;
+
                     words.forEach((word, idx) => {
-                        const isPurple = (purpleWordIndex !== undefined)
-                            ? (headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(' ').filter(x => x).length + idx === purpleWordIndex)
+                        const globalIndex = wordsBeforeCount + idx;
+                        const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
+                            ? (purpleWordIndices.includes(globalIndex))
                             : (isLastLine && idx === lastWordIdx);
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';

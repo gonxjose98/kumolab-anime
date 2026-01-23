@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
@@ -56,7 +56,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [textPosition, setTextPosition] = useState<{ x: number, y: number } | null>(null);
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
-    const [purpleWordIndex, setPurpleWordIndex] = useState<number | undefined>(undefined);
+    const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
+    const [purpleCursorIndex, setPurpleCursorIndex] = useState(0);
+    const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(true);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
@@ -95,7 +97,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTextPosition(null);
         setIsTextLocked(false);
         setGradientPosition('bottom');
-        setPurpleWordIndex(undefined);
+        setPurpleWordIndices([]);
+        setPurpleCursorIndex(0);
+        setShowExpandedPreview(false);
         setIsApplyGradient(true);
         setIsApplyText(true);
         setShowModal(true);
@@ -162,7 +166,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     textPos: textPosition,
                     textScale,
                     gradientPos: gradientPosition,
-                    purpleIndex: purpleWordIndex
+                    purpleIndex: purpleWordIndices
                 })
             });
             const data = await res.json();
@@ -249,7 +253,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTextScale(1);
         setTextPosition(null);
         setIsTextLocked(false);
-        setPurpleWordIndex(undefined);
+        setPurpleWordIndices([]);
+        setPurpleCursorIndex(0);
         handleApplyText(1, { x: 0, y: 0 });
     };
 
@@ -1333,38 +1338,116 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             </div>
                                                         </div>
 
-                                                        {/* --- PURPLE WORD SELECTOR --- */}
-                                                        <div className="p-5 bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/20 rounded-2xl">
-                                                            <div className="flex items-center gap-3 mb-4">
-                                                                <Type size={16} className="text-purple-400" />
-                                                                <div className="text-xs font-black text-white uppercase tracking-widest">Purple Signal Targeting</div>
+                                                        {/* --- PURPLE WORD SELECTOR INTEGRATED --- */}
+                                                        <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden mt-6">
+                                                            <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Type size={14} className="text-purple-400" />
+                                                                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Signal Messaging & Branding</span>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {(overlayTag || '').split(' ').filter(w => w).map((word, idx) => (
+
+                                                            <div className="p-5 space-y-4">
+                                                                <div className="relative group">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="SIGNATURE HEADLINE (e.g. JUST CONFIRMED)"
+                                                                        className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
+                                                                        value={overlayTag}
+                                                                        onChange={(e) => {
+                                                                            setOverlayTag(e.target.value);
+                                                                            setPurpleWordIndices([]); // Reset when text changes
+                                                                        }}
+                                                                    />
+                                                                </div>
+
+                                                                {/* Tactical Selector */}
+                                                                <div className="flex flex-col sm:flex-row items-center gap-4 bg-black/20 p-4 rounded-xl border border-white/5">
+                                                                    <div className="flex-1 flex items-center gap-4">
+                                                                        <div className="flex gap-1">
+                                                                            <button
+                                                                                onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
+                                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                                            >
+                                                                                <ChevronLeftCircle size={20} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setPurpleCursorIndex(prev => Math.min((overlayTag.split(' ').filter(x => x).length - 1), prev + 1))}
+                                                                                className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                                            >
+                                                                                <ChevronRightCircle size={20} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
+                                                                            {overlayTag.split(' ').filter(x => x).map((word, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
+                                                                                            idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
+                                                                                        }`}
+                                                                                >
+                                                                                    {word}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
                                                                     <button
-                                                                        key={idx}
-                                                                        onClick={() => { setPurpleWordIndex(idx); handleApplyText(); }}
-                                                                        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(purpleWordIndex === undefined ? (idx === (overlayTag.split(' ').length - 1)) : (purpleWordIndex === idx))
-                                                                            ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
-                                                                            : 'bg-black/40 text-neutral-500 border-white/5 hover:border-white/20'
-                                                                            }`}
+                                                                        onClick={() => {
+                                                                            setPurpleWordIndices(prev =>
+                                                                                prev.includes(purpleCursorIndex)
+                                                                                    ? prev.filter(i => i !== purpleCursorIndex)
+                                                                                    : [...prev, purpleCursorIndex]
+                                                                            );
+                                                                        }}
+                                                                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${purpleWordIndices.includes(purpleCursorIndex) ? 'bg-red-500/20 text-red-400' : 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'}`}
                                                                     >
-                                                                        {word}
+                                                                        {purpleWordIndices.includes(purpleCursorIndex) ? 'REMOVE PURPLE' : 'APPLY PURPLE'}
                                                                     </button>
-                                                                ))}
+                                                                </div>
                                                             </div>
-                                                            <p className="mt-3 text-[9px] text-neutral-500 font-mono uppercase tracking-widest">Click to assign KumoLab branding to a specific word</p>
                                                         </div>
 
-                                                        {/* Commit Button */}
-                                                        <button
-                                                            onClick={() => handleApplyText()}
-                                                            disabled={isProcessingImage}
-                                                            className="w-full py-3 bg-green-600 hover:bg-green-500 text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-[0_10px_25px_rgba(22,163,74,0.3)] hover:shadow-[0_15px_35px_rgba(22,163,74,0.5)] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
-                                                        >
-                                                            {isProcessingImage ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
-                                                            {isProcessingImage ? 'COMMITTING CHANGES...' : 'COMMIT IMAGE TRANSFORMATION'}
-                                                        </button>
+                                                        {/* Action Bar */}
+                                                        <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                                                            <button
+                                                                onClick={() => handleApplyText()}
+                                                                disabled={isProcessingImage}
+                                                                className="flex-1 py-4 bg-white dark:bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                                                            >
+                                                                {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
+                                                                COMMIT CHANGES TO PREVIEW
+                                                            </button>
+
+                                                            {processedImage && (
+                                                                <button
+                                                                    onClick={() => setShowExpandedPreview(true)}
+                                                                    className="py-4 px-8 bg-neutral-900 text-white border border-white/10 font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
+                                                                >
+                                                                    <Maximize2 size={18} />
+                                                                    EXPAND
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Fullscreen Preview Modal */}
+                                                        {showExpandedPreview && processedImage && (
+                                                            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+                                                                <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setShowExpandedPreview(false)} />
+                                                                <div className="relative w-full max-w-4xl aspect-[4/5] bg-neutral-900 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(157,123,255,0.2)] border border-white/10">
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
+                                                                    <button
+                                                                        onClick={() => setShowExpandedPreview(false)}
+                                                                        className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all"
+                                                                    >
+                                                                        <Plus size={24} className="rotate-45" />
+                                                                    </button>
+                                                                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
+                                                                        MASTER VISUAL INSPECTION
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="py-12 flex flex-col items-center justify-center text-neutral-600 border border-dashed border-neutral-800 rounded-xl">

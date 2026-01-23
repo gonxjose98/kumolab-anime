@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
             textPosition: textPos,
             textScale,
             gradientPosition: gradientPos,
-            purpleWordIndex: purpleIndex
+            purpleWordIndices: purpleIndex // Accepts array from client
         });
 
 
