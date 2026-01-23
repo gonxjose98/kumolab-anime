@@ -187,25 +187,28 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         officialSourceImage = '/hero-bg-final.png';
     }
 
-    // 3. CARD OVERLAY TAG (Branding)
-    // We use a fixed branding tag to avoid conflicting with the title
-    const BRANDING_TAG = "KUMOLAB SIGNAL";
-
     const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
     const validContent = cleanBody(topItem.content, validTitle);
 
-    // 4. AUTOMATIC PURPLE HIGHLIGHT
-    // Highlight first word of title to ensure "Kumolab Purple" is always present.
-    // Index 0: KUMOLAB, Index 1: SIGNAL, Index 2: First word of Title
-    const purpleWordIndices = [2];
+    // 3. DYNAMIC PURPLE HIGHLIGHT
+    // Highlight specific impact words: "Debut", "July", "Confirmed", etc.
+    const titleWords = validTitle.split(/\s+/).filter(Boolean);
+    const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
+    const purpleWordIndices: number[] = [];
+
+    titleWords.forEach((word, idx) => {
+        if (targetWords.some(tw => word.toLowerCase().includes(tw))) {
+            purpleWordIndices.push(idx);
+        }
+    });
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: validTitle, // Main Title (matches post title)
-            headline: BRANDING_TAG, // Consistent Branding
-            purpleWordIndices,      // Force Purple on first title word
+            headline: '',           // Removed Branding Tag
+            purpleWordIndices,      // Dynamic Highlight
             slug: topItem.slug || 'intel'
         });
 
@@ -312,13 +315,20 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Enforce KumoLab branding for Trending posts as requested by User
-        const BRANDING_TAG = "KUMOLAB SIGNAL";
-        const purpleWordIndices = [2]; // Highlight first word of title
+        const titleWords = validTitle.split(/\s+/).filter(Boolean);
+        const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
+        const purpleWordIndices: number[] = [];
+
+        titleWords.forEach((word, idx) => {
+            if (targetWords.some(tw => word.toLowerCase().includes(tw))) {
+                purpleWordIndices.push(idx);
+            }
+        });
 
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: validTitle,
-            headline: BRANDING_TAG,
+            headline: '', // Removed Branding Tag
             purpleWordIndices,
             slug: trendingItem.slug || 'trending'
         });
