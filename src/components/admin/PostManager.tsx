@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
@@ -1319,6 +1319,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
                                                                         <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
                                                                     </div>
+                                                                    <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Visibility</div>
+                                                                    <button
+                                                                        onClick={() => { setIsApplyGradient(!isApplyGradient); handleApplyText(); }}
+                                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyGradient ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                                    >
+                                                                        {isApplyGradient ? <Eye size={12} /> : <EyeOff size={12} />} {isApplyGradient ? 'GRADIENT: ON' : 'GRADIENT: OFF'}
+                                                                    </button>
+
                                                                     <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
                                                                     <div className="grid grid-cols-2 gap-2">
                                                                         <button

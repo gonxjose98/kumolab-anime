@@ -214,11 +214,9 @@ export async function generateIntelImage({
         ctx.shadowOffsetY = 8;
 
         // Deduplication
-        const titleWords = animeTitle.toUpperCase().split(/\s+/);
-        let cleanedHeadline = (headline || '').toUpperCase();
-        const headlineWords = cleanedHeadline.split(/\s+/);
-        const uniqueHeadlineWords = headlineWords.filter(word => !titleWords.includes(word));
-        cleanedHeadline = uniqueHeadlineWords.join(' ');
+        // Deduplication - REMOVED for manual mission control. 
+        // User wants EXACT control over overlayTag.
+        let cleanedHeadline = (headline || '').toUpperCase().trim();
 
         // Font Scaling
         let globalFontSize = 130;
@@ -247,7 +245,7 @@ export async function generateIntelImage({
             globalFontSize -= 5;
         }
 
-        if (titleLines.length === 0) console.warn("[Image Engine] Warning: No title lines generated.");
+        if (headlineLines.length === 0 && cleanedHeadline.length > 0) console.warn("[Image Engine] Warning: No headline lines generated.");
 
         // 6. High-Contrast Gradient
         if (applyGradient) {
@@ -282,16 +280,6 @@ export async function generateIntelImage({
             ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
             ctx.fillStyle = '#FFFFFF';
 
-            // USER FIX: Stop drawing the anime title (topic). 
-            // Text in picture now ONLY comes from cleanedHeadline (overlayTag).
-            /* 
-            titleLines.forEach((line) => {
-                ctx.fillText(line.toUpperCase(), drawX, currentY);
-                currentY += lineSpacing;
-            });
-            currentY += gap; 
-            */
-
             // Draw Headline Lines with Highlight
             headlineLines.forEach((line) => {
                 const words = line.split(/\s+/).filter(Boolean);
@@ -301,8 +289,9 @@ export async function generateIntelImage({
                     const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
 
                     // Calculation for alignment
-                    const lineMetrics = words.map(w => ctx.measureText(w + ' ').width);
-                    const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0);
+                    const lineMetrics = words.map(w => ctx.measureText(w).width); // Measure without space for accuracy
+                    const spacing = ctx.measureText(' ').width;
+                    const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0) + (words.length - 1) * spacing;
                     let wordX = drawX - totalLineLength / 2;
 
                     ctx.textAlign = 'left';
@@ -312,11 +301,13 @@ export async function generateIntelImage({
                         const globalIndex = wordsBeforeCount + idx;
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
-                            : false; // USER FIX: No more automatic purple on last word
+                            : false;
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.fillText(word + (idx < words.length - 1 ? ' ' : ''), wordX, currentY);
-                        wordX += ctx.measureText(word + ' ').width; // Precision measure
+                        // VERY BOLD: Reset font weight before each fill for safety
+                        ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
+                        ctx.fillText(word, wordX, currentY);
+                        wordX += lineMetrics[idx] + spacing;
                     });
                     ctx.textAlign = 'center';
                 }
@@ -386,8 +377,11 @@ export async function generateIntelImage({
 }
 
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number): string[] {
-    const words = text.split(' ');
+    if (!text || !text.trim()) return [];
+    const words = text.split(/\s+/).filter(Boolean);
     const lines = [];
+    if (words.length === 0) return [];
+
     let currentLine = words[0];
     for (let i = 1; i < words.length; i++) {
         const word = words[i];
