@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
             content: content || `Check out: ${title}`,
             image: processedImageUrl || publicUrl,
             timestamp: new Date().toISOString(),
-            isPublished: type === 'CONFIRMATION_ALERT' // Auto-publish alerts, others start as draft
+            isPublished: type === 'CONFIRMATION_ALERT' // Only Alerts go live automatically
         };
 
         const { data, error } = await supabaseAdmin

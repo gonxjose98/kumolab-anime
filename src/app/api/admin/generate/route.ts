@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Generator rejected the data (Validation Failed). Check logs.' }, { status: 500 });
         }
 
-        // SAVE AS DRAFT (isPublished = false) unless it's a CONFIRMATION_ALERT
+        // Admin-triggered generation saves as DRAFT (isPublished = false) unless it's a high-priority ALERT
         post.isPublished = type === 'CONFIRMATION_ALERT';
 
         // Persist to Supabase
