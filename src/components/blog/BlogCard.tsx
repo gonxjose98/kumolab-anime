@@ -9,24 +9,30 @@ interface BlogCardProps {
 const BlogCard = ({ post }: BlogCardProps) => {
     // Rule 4: Card overlay text mapping
     const getOverlayText = () => {
-        if (post.type !== 'INTEL' || !post.claimType) return post.type;
+        // Priority 1: User-defined headline (from Mission Control)
+        if (post.headline) return post.headline;
 
-        const dateStr = post.premiereDate;
-        const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-        }) : '';
+        // Priority 2: Intel-specific date mapping
+        if (post.type === 'INTEL' && post.claimType) {
+            const dateStr = post.premiereDate;
+            const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            }) : '';
 
-        switch (post.claimType) {
-            case 'confirmed': return `PREMIERES ${formattedDate}`;
-            case 'premiered': return `PREMIERED ${formattedDate}`;
-            case 'now_streaming': return "NOW STREAMING";
-            case 'delayed': return "DELAYED";
-            case 'trailer': return "NEW TRAILER";
-            case 'finale_aired': return "FINALE AIRED";
-            default: return post.type;
+            switch (post.claimType) {
+                case 'confirmed': return `PREMIERES ${formattedDate}`;
+                case 'premiered': return `PREMIERED ${formattedDate}`;
+                case 'now_streaming': return "NOW STREAMING";
+                case 'delayed': return "DELAYED";
+                case 'trailer': return "NEW TRAILER";
+                case 'finale_aired': return "FINALE AIRED";
+            }
         }
+
+        // Priority 3: Fallback to Post Type
+        return post.type;
     };
 
     return (

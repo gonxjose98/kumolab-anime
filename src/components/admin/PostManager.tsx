@@ -50,6 +50,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [imageScale, setImageScale] = useState(1);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [isImageLocked, setIsImageLocked] = useState(false);
+    const [isApplyingEffect, setIsApplyingEffect] = useState(false); // New state to track processing
 
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
@@ -185,8 +186,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
         setShowExpandedPreview(false);
-        setIsApplyGradient(false);
-        setIsApplyText(false);
+        setIsApplyGradient(!!post.headline);
+        setIsApplyText(!!post.headline);
         setShowModal(true);
     };
 
@@ -224,27 +225,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom') => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom'): Promise<string | null> => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
 
-        if (!imageUrl) return;
+        if (!imageUrl) return null;
 
-        // User says overlayTag is the text in the picture. 
-        // We pass empty title to avoid deduplication with topic.
         const signalText = overlayTag || '';
-        // Allow processing even if text is empty, as long as image exists
-        // if (isApplyText && !signalText) return; 
-
         setIsProcessingImage(true);
+        setIsApplyingEffect(true);
         try {
             const res = await fetch('/api/admin/process-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: '', // Empty to avoid deduplication and extra text
+                    title: '',
                     headline: signalText,
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
@@ -259,14 +256,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const data = await res.json();
             if (data.success) {
                 setProcessedImage(data.processedImage);
+                return data.processedImage;
             } else {
-                alert('FX configuration failed: ' + data.error);
+                console.error('FX configuration failed: ' + data.error);
+                return null;
             }
         } catch (e) {
             console.error(e);
-            alert('Error applying FX');
+            return null;
         } finally {
             setIsProcessingImage(false);
+            setIsApplyingEffect(false);
         }
     };
 
@@ -364,6 +364,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsGenerating(true);
         setPreviewPost(null);
 
+        // Ensure we have a processed image if we have FX configuration active
+        let finalImageToSave = processedImage;
+        if (!finalImageToSave && (isApplyText || isApplyGradient)) {
+            const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+                ? searchedImages[selectedImageIndex]
+                : customImagePreview;
+            if (imageUrl) {
+                finalImageToSave = await handleApplyText();
+            }
+        }
+
         // Enforce title requirements for Confirmation Alerts
         if (genType === 'CONFIRMATION_ALERT') {
             const validPrefixes = ['JUST CONFIRMED', 'OFFICIAL', 'CONFIRMED'];
@@ -437,7 +448,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     // This ensures the user sees their text overlay changes immediately
                     const previewData = {
                         ...data.post,
-                        image: processedImage || data.post.image,
+                        image: finalImageToSave || data.post.image,
                         headline: overlayTag || data.post.headline
                     };
                     setPreviewPost(previewData);
@@ -1242,9 +1253,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                     value={overlayTag}
                                                     onChange={(e) => {
-                                                        setOverlayTag(e.target.value);
+                                                        const newVal = e.target.value;
+                                                        setOverlayTag(newVal);
                                                         setIsApplyText(true);
                                                     }}
+                                                    onBlur={() => handleApplyText()}
                                                 />
                                             </div>
 
@@ -1545,6 +1558,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             setPurpleWordIndices([]); // Reset when text changes
                                                             setIsApplyText(true); // Auto-enable visibility
                                                         }}
+                                                        onBlur={() => handleApplyText()}
                                                     />
                                                 </div>
 
@@ -1627,11 +1641,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         {/* Action Bar */}
                                         <div className="mt-8 flex flex-col sm:flex-row gap-4">
                                             <button
-                                                onClick={() => handleApplyText()}
+                                                onClick={() => handleCommitToPreview()}
                                                 disabled={isProcessingImage}
                                                 className="flex-1 py-4 bg-white dark:bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
                                             >
-                                                {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
+                                                {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
                                                 COMMIT CHANGES TO PREVIEW
                                             </button>
 
@@ -1701,43 +1715,28 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     />
                                 </div>
                             </div>
-
-
-
-
                         </div>
 
-                        {/* Preview Changes Button (for editing mode) */}
-                        {editingPostId && (
-                            <button
-                                onClick={handleCommitToPreview}
-                                disabled={isProcessingImage}
-                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
-                            >
-                                {isProcessingImage ? <Loader2 className="animate-spin" size={20} /> : <Eye size={20} />}
-                                {isProcessingImage ? 'Processing...' : 'Commit Changes to Preview'}
-                            </button>
-                        )}
-
                         {/* Main Generation Action */}
-                        <button
-                            onClick={handleGeneratePreview}
-                            disabled={isGenerating}
-                            className="w-full py-4 mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
-                        >
-                            {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                            {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
-                        </button>
+                        <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                            <button
+                                onClick={handleGeneratePreview}
+                                disabled={isGenerating || isApplyingEffect}
+                                className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+                            >
+                                {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+                                {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
+                            </button>
+                        </div>
 
                         {/* PREVIEW POST CARD (Result) */}
                         {previewPost && (
-                            <div className="mt-8 border-t-2 border-dashed border-white/10 pt-8 animate-in fade-in slide-in-from-bottom-8">
+                            <div className="p-5 border-t border-white/10 bg-black/40 animate-in fade-in slide-in-from-bottom-4">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-xs font-black text-green-400 uppercase tracking-widest">
+                                    <h4 className="text-[10px] font-black text-green-400 uppercase tracking-widest">
                                         {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
                                     </h4>
                                     <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
-
                                 </div>
 
                                 <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
@@ -1752,7 +1751,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <div className="p-6 md:w-[60%] flex flex-col">
                                         <div className="mb-auto">
                                             <h3 className="text-xl font-bold text-white mb-3 leading-tight">{previewPost.title}</h3>
-                                            <p className="text-sm text-neutral-400 leading-relaxed">{previewPost.content}</p>
+                                            <p className="text-sm text-neutral-400 leading-relaxed line-clamp-4">{previewPost.content}</p>
                                         </div>
                                         <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 text-[10px] font-mono text-neutral-500 uppercase">
                                             <div>
@@ -1766,14 +1765,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
 
-
-                        {/* Modal Footer */}
-                        {
-                            previewPost && (
-                                <div className="p-5 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3 backdrop-blur-md">
+                                <div className="mt-6 flex justify-end gap-3">
                                     <button
                                         onClick={handleCancel}
                                         className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
@@ -1787,109 +1780,107 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
                                     </button>
                                 </div>
-                            )
-                        }
+                            </div>
+                        )}
                     </div>
                 </div>
-            )
-            }
+            )}
 
 
             {/* SCHEDULER LOGS MODAL */}
-            {
-                showLogsModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                            {/* Header */}
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                        <Terminal size={20} className="text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                    </div>
+            {showLogsModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                    <Terminal size={20} className="text-blue-400" />
                                 </div>
-                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                    <XCircle size={24} />
-                                </button>
+                                <div>
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
+                                    <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
+                                </div>
                             </div>
+                            <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
 
-                            {/* Logs Content */}
-                            <div className="flex-1 overflow-auto p-0 md:p-6">
-                                {isLoadingLogs ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Loader2 size={32} className="animate-spin text-blue-500" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                    </div>
-                                ) : schedulerLogs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Terminal size={32} className="opacity-20" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
-                                    </div>
-                                ) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                            <tr>
-                                                <th className="p-4 border-b border-white/5">Time</th>
-                                                <th className="p-4 border-b border-white/5">Slot</th>
-                                                <th className="p-4 border-b border-white/5">Status</th>
-                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
+                        {/* Logs Content */}
+                        <div className="flex-1 overflow-auto p-0 md:p-6">
+                            {isLoadingLogs ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                    <Loader2 size={32} className="animate-spin text-blue-500" />
+                                    <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
+                                </div>
+                            ) : schedulerLogs.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                    <Terminal size={32} className="opacity-20" />
+                                    <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
+                                        <tr>
+                                            <th className="p-4 border-b border-white/5">Time</th>
+                                            <th className="p-4 border-b border-white/5">Slot</th>
+                                            <th className="p-4 border-b border-white/5">Status</th>
+                                            <th className="p-4 border-b border-white/5 w-full">Message</th>
+                                            <th className="p-4 border-b border-white/5 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5 text-xs font-mono">
+                                        {schedulerLogs.map((log: any) => (
+                                            <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                <td className="p-4 text-neutral-400 whitespace-nowrap">
+                                                    {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                </td>
+                                                <td className="p-4 text-white font-bold">{log.slot}</td>
+                                                <td className="p-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                        log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                        }`}>
+                                                        {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-neutral-300">
+                                                    {log.message}
+                                                    {log.details && (
+                                                        <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
+                                                            {log.details}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {log.status !== 'success' && (
+                                                        <button
+                                                            onClick={() => handleRegenerateSlot(log.slot)}
+                                                            disabled={isRegenerating === log.slot}
+                                                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
+                                                        >
+                                                            {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                                                            Regenerate
+                                                        </button>
+                                                    )}
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                            {schedulerLogs.map((log) => (
-                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                    </td>
-                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                    <td className="p-4">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                            }`}>
-                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                            {log.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-neutral-300">
-                                                        {log.message}
-                                                        {log.details && (
-                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                {log.details}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {log.status !== 'success' && (
-                                                            <button
-                                                                onClick={() => handleRegenerateSlot(log.slot)}
-                                                                disabled={isRegenerating === log.slot}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                Regenerate
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                <span>Logs persist for 7 days</span>
-                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                    <RotateCcw size={12} /> Refresh
-                                </button>
-                            </div>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                            <span>Logs persist for 7 days</span>
+                            <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
+                                <RotateCcw size={12} /> Refresh
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
             <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
                 <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
