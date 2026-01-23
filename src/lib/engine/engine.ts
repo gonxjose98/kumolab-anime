@@ -4,6 +4,7 @@
  */
 
 import { fetchAniListAiring, verifyOnCrunchyroll, fetchAnimeIntel, fetchTrendingSignals, fetchSmartTrendingCandidates } from './fetchers';
+import { logSchedulerRun } from '../logging/scheduler';
 import { generateDailyDropsPost, generateIntelPost, generateTrendingPost, validatePost } from './generator';
 import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
@@ -160,9 +161,11 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
     if (newPost && validatePost(newPost, existingPosts, force)) {
         await publishPost(newPost);
+        await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug });
         return newPost;
     }
 
+    await logSchedulerRun(slot, 'skipped', 'No valid content generated', { reason: 'Fetchers empty or all duplicates' });
     return null;
 }
 

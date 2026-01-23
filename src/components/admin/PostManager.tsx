@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
@@ -70,6 +70,53 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isPublishing, setIsPublishing] = useState(false);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
+
+    // Scheduler Logs State
+    const [showLogsModal, setShowLogsModal] = useState(false);
+    const [schedulerLogs, setSchedulerLogs] = useState<any[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState<string | null>(null);
+
+    const handleFetchLogs = async () => {
+        setIsLoadingLogs(true);
+        try {
+            const res = await fetch('/api/admin/logs');
+            const data = await res.json();
+            if (data.success) {
+                setSchedulerLogs(data.logs);
+            } else {
+                console.error("Failed to fetch logs:", data.error);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoadingLogs(false);
+        }
+    };
+
+    const handleRegenerateSlot = async (slot: string) => {
+        if (!confirm(`Force regenerate post for slot ${slot}? This will bypass schedule checks.`)) return;
+        setIsRegenerating(slot);
+        try {
+            // Call the manual trigger (which is now cron/route.ts or similar)
+            // Actually manual trigger is usually /api/cron?slot=... (legacy) or /api/cron/run-blog-engine?slot=...
+            // Let's use the robust one: run-blog-engine
+            const res = await fetch(`/api/cron/run-blog-engine?slot=${slot}`);
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message || 'Regeneration successful');
+                handleFetchLogs(); // Refresh logs
+                // Refresh posts list?
+                // window.location.reload(); // Hard refresh to see new post
+            } else {
+                alert('Regeneration failed: ' + (data.message || data.error));
+            }
+        } catch (e: any) {
+            alert('Error: ' + e.message);
+        } finally {
+            setIsRegenerating(null);
+        }
+    };
 
     const filteredPosts = posts.filter(post => {
         if (filter === 'LIVE') return post.isPublished;
@@ -706,6 +753,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
                         <CheckCircle2 size={16} />
                         <span className="text-[10px] font-black uppercase tracking-widest">Alert</span>
+                    </div>
+                </button>
+
+                <button
+                    onClick={() => { setShowLogsModal(true); handleFetchLogs(); }}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-950/10 hover:bg-slate-50 dark:hover:bg-slate-900/20 border border-gray-200 dark:border-slate-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-slate-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform">
+                        <Terminal size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Logs</span>
                     </div>
                 </button>
 
@@ -1681,6 +1738,101 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 </button>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* SCHEDULER LOGS MODAL */}
+            {showLogsModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                    <Terminal size={20} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
+                                    <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+
+                        {/* Logs Content */}
+                        <div className="flex-1 overflow-auto p-0 md:p-6">
+                            {isLoadingLogs ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                    <Loader2 size={32} className="animate-spin text-blue-500" />
+                                    <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
+                                </div>
+                            ) : schedulerLogs.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                    <Terminal size={32} className="opacity-20" />
+                                    <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
+                                        <tr>
+                                            <th className="p-4 border-b border-white/5">Time</th>
+                                            <th className="p-4 border-b border-white/5">Slot</th>
+                                            <th className="p-4 border-b border-white/5">Status</th>
+                                            <th className="p-4 border-b border-white/5 w-full">Message</th>
+                                            <th className="p-4 border-b border-white/5 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5 text-xs font-mono">
+                                        {schedulerLogs.map((log) => (
+                                            <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                <td className="p-4 text-neutral-400 whitespace-nowrap">
+                                                    {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                </td>
+                                                <td className="p-4 text-white font-bold">{log.slot}</td>
+                                                <td className="p-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                        }`}>
+                                                        {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-neutral-300">
+                                                    {log.message}
+                                                    {log.details && (
+                                                        <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
+                                                            {log.details}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {log.status !== 'success' && (
+                                                        <button
+                                                            onClick={() => handleRegenerateSlot(log.slot)}
+                                                            disabled={isRegenerating === log.slot}
+                                                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
+                                                        >
+                                                            {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                                                            Regenerate
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                            <span>Logs persist for 7 days</span>
+                            <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
+                                <RotateCcw size={12} /> Refresh
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
