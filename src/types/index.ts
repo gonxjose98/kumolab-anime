@@ -11,6 +11,7 @@ export interface BlogPost {
     excerpt?: string; // For meta description or preview
     content: string; // Markdown or HTML
     image?: string;
+    headline?: string;
     timestamp: string; // ISO string
     isPublished: boolean;
     verification_tier?: 'streamer' | 'popularity' | 'format_exception';

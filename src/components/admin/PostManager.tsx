@@ -114,7 +114,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        setOverlayTag('NEWS'); // Default
+        setOverlayTag(post.headline || 'NEWS');
         setCustomImage(null);
         setCustomImagePreview(post.image || '');
         setPreviewPost(null);
@@ -1319,7 +1319,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                         {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                             <span
                                                                                                 key={idx}
-                                                                                                className={purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}
+                                                                                                onPointerDown={(e) => {
+                                                                                                    if (isTextLocked) e.stopPropagation();
+                                                                                                }}
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    e.preventDefault();
+                                                                                                    const newIndices = purpleWordIndices.includes(idx)
+                                                                                                        ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                        : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                                    setPurpleWordIndices(newIndices);
+                                                                                                }}
+                                                                                                className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
                                                                                             >
                                                                                                 {word}
                                                                                             </span>
