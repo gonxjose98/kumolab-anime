@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
             textPos, textScale, gradientPos, purpleIndex
         } = await request.json();
 
-        if (!imageUrl || !title) {
-            return NextResponse.json({ success: false, error: 'Image URL and Title are required' }, { status: 400 });
+        if (!imageUrl) {
+            return NextResponse.json({ success: false, error: 'Image URL is required' }, { status: 400 });
         }
 
         console.log(`[Admin] Generating preview for: ${title}`);
