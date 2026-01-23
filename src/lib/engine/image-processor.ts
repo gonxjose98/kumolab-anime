@@ -278,22 +278,23 @@ export async function generateIntelImage({
             ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
             ctx.fillStyle = '#FFFFFF';
 
-            // Draw Title Lines
+            // USER FIX: Stop drawing the anime title (topic). 
+            // Text in picture now ONLY comes from cleanedHeadline (overlayTag).
+            /* 
             titleLines.forEach((line) => {
                 ctx.fillText(line.toUpperCase(), drawX, currentY);
                 currentY += lineSpacing;
             });
-
-            currentY += gap;
+            currentY += gap; 
+            */
 
             // Draw Headline Lines with Highlight
             headlineLines.forEach((line) => {
-                const words = line.split(' ');
+                const words = line.split(/\s+/).filter(Boolean);
 
                 if (words.length > 0) {
-                    // Logic: Priority to purpleWordIndices if provided, else last word of last line
+                    // Logic: ONLY use purpleWordIndices if provided. NO fallback to last word.
                     const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
-                    const lastWordIdx = words.length - 1;
 
                     // Calculation for alignment
                     const lineMetrics = words.map(w => ctx.measureText(w + ' ').width);
@@ -303,15 +304,15 @@ export async function generateIntelImage({
                     ctx.textAlign = 'left';
                     const wordsBeforeCount = headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(/\s+/).filter(Boolean).length;
 
-                    words.filter(Boolean).forEach((word, idx) => {
+                    words.forEach((word, idx) => {
                         const globalIndex = wordsBeforeCount + idx;
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
-                            : (isLastLine && idx === (words.filter(Boolean).length - 1));
+                            : false; // USER FIX: No more automatic purple on last word
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.fillText(word + (idx < words.filter(Boolean).length - 1 ? ' ' : ''), wordX, currentY);
-                        wordX += ctx.measureText(word + ' ').width; // Use direct measure for precision
+                        ctx.fillText(word + (idx < words.length - 1 ? ' ' : ''), wordX, currentY);
+                        wordX += ctx.measureText(word + ' ').width; // Precision measure
                     });
                     ctx.textAlign = 'center';
                 }

@@ -140,7 +140,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean) => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[]) => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -168,7 +168,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     textPos: textPosition,
                     textScale,
                     gradientPos: gradientPosition,
-                    purpleIndex: purpleWordIndices
+                    purpleIndex: manualPurpleIndices ?? purpleWordIndices
                 })
             });
             const data = await res.json();
@@ -1244,11 +1244,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 }}
                                                                             >
                                                                                 <div className="text-center drop-shadow-2xl">
-                                                                                    <div className="text-white text-lg font-black uppercase leading-tight max-w-sm">
-                                                                                        {title || topic || 'PREVIEW TITLE'}
-                                                                                    </div>
-                                                                                    <div className="text-purple-400 text-sm font-black uppercase tracking-widest mt-1">
-                                                                                        {overlayTag || 'TRENDING'}
+                                                                                    <div className="text-white text-lg font-black uppercase leading-tight max-w-sm flex flex-wrap justify-center gap-x-1.5">
+                                                                                        {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                            <span
+                                                                                                key={idx}
+                                                                                                className={purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}
+                                                                                            >
+                                                                                                {word}
+                                                                                            </span>
+                                                                                        ))}
                                                                                     </div>
                                                                                 </div>
                                                                                 {!isTextLocked && !isDragging && (
@@ -1403,7 +1407,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             <button
                                                                                 onClick={() => {
                                                                                     if (!purpleWordIndices.includes(purpleCursorIndex)) {
-                                                                                        setPurpleWordIndices(prev => [...prev, purpleCursorIndex].sort((a, b) => a - b));
+                                                                                        const newIndices = [...purpleWordIndices, purpleCursorIndex].sort((a, b) => a - b);
+                                                                                        setPurpleWordIndices(newIndices);
+                                                                                        handleApplyText(undefined, undefined, undefined, undefined, newIndices);
                                                                                     }
                                                                                 }}
                                                                                 className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
@@ -1411,7 +1417,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 APPLY PURPLE
                                                                             </button>
                                                                             <button
-                                                                                onClick={() => setPurpleWordIndices([])}
+                                                                                onClick={() => {
+                                                                                    setPurpleWordIndices([]);
+                                                                                    handleApplyText(undefined, undefined, undefined, undefined, []);
+                                                                                }}
                                                                                 className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
                                                                             >
                                                                                 REMOVE ALL
