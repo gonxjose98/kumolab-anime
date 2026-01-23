@@ -1,4 +1,4 @@
-export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY';
+export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT';
 export type ClaimType = 'confirmed' | 'premiered' | 'now_streaming' | 'delayed' | 'trailer' | 'finale_aired';
 
 export interface BlogPost {

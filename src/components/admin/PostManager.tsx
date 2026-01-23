@@ -26,7 +26,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [showModal, setShowModal] = useState(false);
 
     // Modal State
-    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | null>(null);
+    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT' | null>(null);
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -60,12 +60,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         return true;
     });
 
-    const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM') => {
+    const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
         setGenType(type);
         setTopic('');
         setTitle('');
         setContent('');
-        setOverlayTag(type === 'TRENDING' ? 'TRENDING' : 'NEWS');
+        setOverlayTag(type === 'TRENDING' ? 'TRENDING' : type === 'CONFIRMATION_ALERT' ? 'OFFICIAL' : 'NEWS');
         setCustomImage(null);
         setCustomImagePreview('');
         setPreviewPost(null);
@@ -213,6 +213,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsGenerating(true);
         setPreviewPost(null);
 
+        // Enforce title requirements for Confirmation Alerts
+        if (genType === 'CONFIRMATION_ALERT') {
+            const validPrefixes = ['JUST CONFIRMED', 'OFFICIAL', 'CONFIRMED'];
+            const upperTitle = (title || topic).toUpperCase().trim();
+            const hasValidPrefix = validPrefixes.some(prefix => upperTitle.startsWith(prefix));
+
+            if (!hasValidPrefix) {
+                alert('CONFIRMATION ALERT titles must begin with JUST CONFIRMED, OFFICIAL, or CONFIRMED.');
+                setIsGenerating(false);
+                return;
+            }
+        }
+
         try {
             if (genType === 'CUSTOM' || processedImage) {
                 // If we have a processed image, use Custom Post flow to save it
@@ -252,7 +265,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 const formData = new FormData();
                 formData.append('title', finalTitle);
                 formData.append('content', finalContent);
-                formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : 'COMMUNITY');
+                formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
                 formData.append('headline', overlayTag);
                 formData.append('image', imagePayload as Blob);
                 if (processedImage) {
@@ -300,10 +313,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     };
 
     const handleConfirm = () => {
-        // Post is already saved as draft by the API.
+        // Post is already saved by the API.
         // User just closes modal and sees it in list.
         setShowModal(false);
-        setFilter('HIDDEN');
+        setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
     };
 
     const handleCancel = async () => {
@@ -570,6 +583,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </button>
 
+                <button
+                    onClick={() => handleGenerateClick('CONFIRMATION_ALERT')}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-orange-950/10 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-orange-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
+                        <CheckCircle2 size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Alert</span>
+                    </div>
+                </button>
+
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
                         <button
@@ -642,11 +665,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
                                     <td className="p-4 align-top w-[120px]">
                                         <div className="flex flex-col gap-2">
-                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.isPublished
+                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
                                                 ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
                                                 : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
                                                 }`}>
-                                                {post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
+                                                {post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
                                             </span>
                                             <div className="flex items-center justify-center gap-1.5 pt-1">
                                                 <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
@@ -866,7 +889,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none mb-1">
                                         {genType === 'INTEL' ? 'Initiate Intel Drop' :
                                             genType === 'TRENDING' ? 'Broadcast Trending' :
-                                                'Custom Transmission'}
+                                                genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION ALERT' :
+                                                    'Custom Transmission'}
                                     </h3>
                                     <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono uppercase">
                                         Protocol: {genType}
@@ -886,7 +910,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
                             {/* Input Fields Container */}
                             <div className="space-y-4">
-                                {genType === 'CUSTOM' ? (
+                                {genType === 'CUSTOM' || genType === 'CONFIRMATION_ALERT' ? (
                                     <>
                                         {/* Custom Post Inputs */}
                                         <div className="space-y-4">
@@ -896,11 +920,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    placeholder="Enter main headline..."
+                                                    placeholder={genType === 'CONFIRMATION_ALERT' ? "JUST CONFIRMED: One Piece Season 2..." : "Enter main headline..."}
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={title}
                                                     onChange={(e) => setTitle(e.target.value)}
                                                 />
+                                                {genType === 'CONFIRMATION_ALERT' && (
+                                                    <p className="mt-1 text-[9px] text-orange-500 font-bold uppercase tracking-tighter">
+                                                        Must start with: JUST CONFIRMED, OFFICIAL, or CONFIRMED
+                                                    </p>
+                                                )}
                                             </div>
 
                                             <div className="group">
@@ -1262,6 +1291,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         value={title}
                                                         onChange={(e) => setTitle(e.target.value)}
                                                     />
+
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Editor Notes</label>
@@ -1284,7 +1314,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     className="w-full py-4 mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                                    {isGenerating ? 'Saving...' : genType === 'CUSTOM' ? 'Save As Hidden' : 'Save As Hidden'}
+                                    {isGenerating ? 'Saving...' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
                                 </button>
                             </div>
 
@@ -1293,7 +1323,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 <div className="mt-8 border-t-2 border-dashed border-white/10 pt-8 animate-in fade-in slide-in-from-bottom-8">
                                     <div className="flex items-center justify-between mb-4">
                                         <h4 className="text-xs font-black text-green-400 uppercase tracking-widest">
-                                            Simulation Result
+                                            {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
                                         </h4>
                                         <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
 
@@ -1342,7 +1372,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     onClick={handleConfirm}
                                     className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
                                 >
-                                    Confirm Transmission
+                                    {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
                                 </button>
                             </div>
                         )}

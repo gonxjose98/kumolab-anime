@@ -1,0 +1,222 @@
+.alertContainer {
+    padding: 2rem 0;
+    margin-top: -2rem;
+    position: relative;
+    z-index: 50;
+    background: transparent;
+}
+
+.alertBar {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: rgba(10, 10, 10, 0.85);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5),
+        0 0 20px -5px rgba(255, 68, 68, 0.1);
+}
+
+.alertBar:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 68, 68, 0.5);
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.6),
+        0 0 30px -5px rgba(255, 68, 68, 0.2);
+}
+
+.alertGlow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #ff4444, #ff8844, #ff4444);
+    background-size: 200% 100%;
+    animation: flow 3s linear infinite;
+    z-index: 2;
+}
+
+@keyframes flow {
+    0% {
+        background-position: 100% 0;
+    }
+
+    100% {
+        background-position: -100% 0;
+    }
+}
+
+.alertContent {
+    padding: 2rem;
+    flex: 1;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.alertHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pulseContainer {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulseDot {
+    width: 6px;
+    height: 6px;
+    background: #ff4444;
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.pulseRing {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #ff4444;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-out infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+.alertLabel {
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 0.2rem;
+    color: #ff4444;
+    text-transform: uppercase;
+}
+
+.mainInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.title {
+    font-size: 1.75rem;
+    font-weight: 950;
+    color: white;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+}
+
+.excerpt {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.6;
+    max-width: 600px;
+}
+
+.footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sourceInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(34, 197, 94, 0.1);
+    padding: 0.4rem 0.75rem;
+    border-radius: 2rem;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.shieldIcon {
+    color: #22c55e;
+}
+
+.sourceText {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #22c55e;
+    letter-spacing: 0.05rem;
+}
+
+.action {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+}
+
+.actionText {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.1rem;
+    text-transform: uppercase;
+}
+
+.imageZone {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    overflow: hidden;
+}
+
+.alertImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 1s ease;
+}
+
+.alertBar:hover .alertImage {
+    transform: scale(1.05);
+}
+
+.imageOverlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(0deg, rgba(10, 10, 10, 0.9) 0%, transparent 100%);
+}
+
+@media (min-width: 768px) {
+    .alertBar {
+        flex-direction: row;
+        height: 360px;
+    }
+
+    .imageZone {
+        width: 45%;
+        height: 100%;
+    }
+
+    .title {
+        font-size: 2.5rem;
+    }
+
+    .imageOverlay {
+        background: linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, transparent 100%);
+    }
+}

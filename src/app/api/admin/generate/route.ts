@@ -146,8 +146,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Generator rejected the data (Validation Failed). Check logs.' }, { status: 500 });
         }
 
-        // SAVE AS DRAFT (isPublished = false)
-        post.isPublished = false;
+        // SAVE AS DRAFT (isPublished = false) unless it's a CONFIRMATION_ALERT
+        post.isPublished = type === 'CONFIRMATION_ALERT';
 
         // Persist to Supabase
         const { data, error } = await supabaseAdmin
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
                 content: post.content,
                 image: post.image,
                 timestamp: post.timestamp,
-                is_published: false, // HIDDEN
+                is_published: post.isPublished, // LIVE if ALERT, else HIDDEN
                 claim_type: post.claimType,
                 premiere_date: post.premiereDate,
                 verification_reason: 'Admin Generated'
