@@ -3,13 +3,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
 interface PostManagerProps {
     initialPosts: BlogPost[];
 }
+
+const WIDTH = 1080;
+const HEIGHT = 1350;
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
     // Normalize posts to ensure isPublished and social stats are present
@@ -46,8 +49,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Advanced Image Manipulation State
     const [imageScale, setImageScale] = useState(1);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isImageLocked, setIsImageLocked] = useState(false);
+
+    // Text Manipulation State
+    const [textScale, setTextScale] = useState(1);
+    const [textPosition, setTextPosition] = useState<{ x: number, y: number } | null>(null);
+    const [isTextLocked, setIsTextLocked] = useState(false);
+    const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
+    const [purpleWordIndex, setPurpleWordIndex] = useState<number | undefined>(undefined);
+    const [isAutoSnap, setIsAutoSnap] = useState(true);
+
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
+    const [dragTarget, setDragTarget] = useState<'image' | 'text' | null>(null);
 
 
     // Multi-select state
@@ -76,6 +90,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setSearchPage(1); // Reset page
         setImageScale(1);
         setImagePosition({ x: 0, y: 0 });
+        setIsImageLocked(false);
+        setTextScale(1);
+        setTextPosition(null);
+        setIsTextLocked(false);
+        setGradientPosition('bottom');
+        setPurpleWordIndex(undefined);
         setIsApplyGradient(true);
         setIsApplyText(true);
         setShowModal(true);
@@ -119,15 +139,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean) => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
-            : customImagePreview; // Fallback to upload if needed
+            : customImagePreview;
 
-        if (!imageUrl) return; // Silent return if no image
+        if (!imageUrl) return;
 
-        // Use either custom title or topic
         const displayTitle = title || topic;
-        // If it's a manual custom post with only image, it might not have title yet
-        // However, the backend expects a title for text rendering.
-        // We'll use a placeholder if needed or just skip if no title and applyText is true
         if (isApplyText && !displayTitle) return;
 
         setIsProcessingImage(true);
@@ -142,7 +158,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
                     applyText: forcedApplyText ?? isApplyText,
-                    applyGradient: forcedApplyGradient ?? isApplyGradient
+                    applyGradient: forcedApplyGradient ?? isApplyGradient,
+                    textPos: textPosition,
+                    textScale,
+                    gradientPos: gradientPosition,
+                    purpleIndex: purpleWordIndex
                 })
             });
             const data = await res.json();
@@ -163,35 +183,74 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-    const handleImagePointerDown = (e: React.PointerEvent) => {
+    const handleImagePointerDown = (e: React.PointerEvent, target: 'image' | 'text' = 'image') => {
+        if (target === 'image' && isImageLocked) return;
+        if (target === 'text' && isTextLocked) return;
+
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         setIsDragging(true);
+        setDragTarget(target);
         setDragStart({ x: e.clientX, y: e.clientY });
     };
 
     const handleImagePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging) return;
-        const sensitivity = 0.8;
-        const deltaX = (e.clientX - dragStart.x) / 500 * sensitivity;
-        const deltaY = (e.clientY - dragStart.y) / 500 * sensitivity;
+        if (!isDragging || !dragStart || !dragTarget) return;
 
-        setImagePosition(prev => ({
-            x: prev.x + deltaX,
-            y: prev.y + deltaY
-        }));
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const scaleX = WIDTH / rect.width;
+        const scaleY = HEIGHT / rect.height;
+
+        const deltaX = (e.clientX - dragStart.x) * scaleX;
+        const deltaY = (e.clientY - dragStart.y) * scaleY;
+
+        if (dragTarget === 'image') {
+            setImagePosition(prev => ({
+                x: prev.x + (deltaX / WIDTH),
+                y: prev.y + (deltaY / HEIGHT)
+            }));
+        } else if (dragTarget === 'text') {
+            setTextPosition(prev => {
+                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 100 : HEIGHT - 300 };
+                return {
+                    x: base.x + deltaX,
+                    y: base.y + deltaY
+                };
+            });
+        }
         setDragStart({ x: e.clientX, y: e.clientY });
     };
 
     const handleImagePointerUp = (e: React.PointerEvent) => {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
         setIsDragging(false);
+        if (dragTarget === 'text' && isAutoSnap) {
+            setTextPosition(null); // Snap back to default calculated position
+        }
+        setDragTarget(null);
         handleApplyText();
     };
 
-    const handleZoom = (delta: number) => {
-        const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
-        setImageScale(newScale);
-        handleApplyText(newScale);
+    const handleZoom = (delta: number, target: 'image' | 'text' = 'image') => {
+        if (target === 'image') {
+            const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
+            setImageScale(newScale);
+            handleApplyText(newScale);
+        } else {
+            const newScale = Math.max(0.1, Math.min(5, textScale + delta));
+            setTextScale(newScale);
+            handleApplyText(undefined, undefined, undefined, undefined); // Uses latest textScale state
+        }
+    };
+
+    const handleResetAll = () => {
+        setImageScale(1);
+        setImagePosition({ x: 0, y: 0 });
+        setIsImageLocked(false);
+        setTextScale(1);
+        setTextPosition(null);
+        setIsTextLocked(false);
+        setPurpleWordIndex(undefined);
+        handleApplyText(1, { x: 0, y: 0 });
     };
 
     const toggleFX = (type: 'text' | 'gradient') => {
@@ -1114,148 +1173,198 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </div>
 
                                                 {searchedImages.length > 0 ? (
-                                                    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
-                                                        {/* Carousel */}
-                                                        <div className="relative group/carousel bg-slate-100 dark:bg-black/40 rounded-xl p-6 border border-gray-200 dark:border-white/5 min-h-[320px] flex items-center justify-center overflow-hidden">
-                                                            {/* Grid Background Effect */}
-                                                            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)] pointer-events-none" />
+                                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                                        {/* --- THE PRO EDITOR STAGE --- */}
+                                                        <div className="flex flex-col lg:flex-row gap-6">
+                                                            <div className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center">
+                                                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
-                                                            {/* Arrow Controls */}
-                                                            {searchedImages.length > 1 && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const newIndex = (selectedImageIndex ?? 0) - 1;
-                                                                            setSelectedImageIndex(newIndex < 0 ? searchedImages.length - 1 : newIndex);
-                                                                        }}
-                                                                        className="absolute left-4 p-3 bg-black/50 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-sm border border-white/10 transition-all z-20"
-                                                                    >
-                                                                        <ChevronLeft size={20} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const newIndex = (selectedImageIndex ?? 0) + 1;
-                                                                            setSelectedImageIndex(newIndex >= searchedImages.length ? 0 : newIndex);
-                                                                        }}
-                                                                        className="absolute right-4 p-3 bg-black/50 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-sm border border-white/10 transition-all z-20"
-                                                                    >
-                                                                        <ChevronRight size={20} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-
-                                                            {/* Image Stage */}
-                                                            <div
-                                                                className="relative z-10 w-[240px] aspect-[4/5] perspective-1000 cursor-grab active:cursor-grabbing touch-none select-none"
-                                                                onPointerDown={handleImagePointerDown}
-                                                                onPointerMove={handleImagePointerMove}
-                                                                onPointerUp={handleImagePointerUp}
-                                                            >
-                                                                {searchedImages.map((img, idx) => {
-                                                                    if (idx !== (selectedImageIndex ?? 0)) return null;
-                                                                    return (
-                                                                        <div
-                                                                            key={idx}
-                                                                            className="relative w-full h-full rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-neutral-900 group-hover/carousel:scale-[1.01] transition-transform duration-500"
+                                                                {/* Arrow Controls (Floating) */}
+                                                                {searchedImages.length > 1 && !isDragging && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length); }}
+                                                                            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 -translate-x-12 opacity-0 group-hover/editor:opacity-100"
                                                                         >
-                                                                            {/* Real-time Interaction Preview (Pre-processing) */}
+                                                                            <ChevronLeft size={20} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length); }}
+                                                                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 translate-x-12 opacity-0 group-hover/editor:opacity-100"
+                                                                        >
+                                                                            <ChevronRight size={20} />
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
+                                                                {/* Stage Content */}
+                                                                <div className="relative w-full h-full">
+                                                                    {/* 1. Background Image Layer */}
+                                                                    <div
+                                                                        className="absolute inset-0 cursor-move will-change-transform"
+                                                                        onPointerDown={(e) => handleImagePointerDown(e, 'image')}
+                                                                        onPointerMove={handleImagePointerMove}
+                                                                        onPointerUp={handleImagePointerUp}
+                                                                        style={{
+                                                                            transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                                            transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
+                                                                        }}
+                                                                    >
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img src={searchedImages[selectedImageIndex ?? 0]} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                                                                    </div>
+
+                                                                    {/* 2. Gradient Layer (Visual Only) */}
+                                                                    {isApplyGradient && (
+                                                                        <div
+                                                                            className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
+                                                                        />
+                                                                    )}
+
+                                                                    {/* 3. Text Manipulation Proxy Layer */}
+                                                                    {isApplyText && (
+                                                                        <div
+                                                                            className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}
+                                                                        >
                                                                             <div
-                                                                                className="w-full h-full will-change-transform"
+                                                                                className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
+                                                                                onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                                 style={{
-                                                                                    transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
-                                                                                    transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                                                                                    transform: textPosition
+                                                                                        ? `translate(${textPosition.x - (WIDTH / 2)}px, ${textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))}px) scale(${textScale})`
+                                                                                        : `scale(${textScale})`,
+                                                                                    transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                                 }}
                                                                             >
-                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
-                                                                            </div>
-
-                                                                            {/* Loading Overlay */}
-                                                                            {isProcessingImage && (
-                                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-30">
-                                                                                    <Loader2 size={32} className="text-purple-500 animate-spin" />
+                                                                                <div className="text-center drop-shadow-2xl">
+                                                                                    <div className="text-white text-lg font-black uppercase leading-tight max-w-sm">
+                                                                                        {title || topic || 'PREVIEW TITLE'}
+                                                                                    </div>
+                                                                                    <div className="text-purple-400 text-sm font-black uppercase tracking-widest mt-1">
+                                                                                        {overlayTag || 'TRENDING'}
+                                                                                    </div>
                                                                                 </div>
-                                                                            )}
-
-                                                                            {/* Selection Dots */}
-                                                                            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
-                                                                                {searchedImages.map((_, dotIdx) => (
-                                                                                    <div
-                                                                                        key={dotIdx}
-                                                                                        className={`w-1.5 h-1.5 rounded-full transition-all ${dotIdx === selectedImageIndex ? 'bg-white w-4' : 'bg-white/30'}`}
-                                                                                    />
-                                                                                ))}
+                                                                                {!isTextLocked && !isDragging && (
+                                                                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
+                                                                                        Drag to Place
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
-                                                                    );
-                                                                })}
+                                                                    )}
+
+                                                                    {/* Processing Loader */}
+                                                                    {isProcessingImage && (
+                                                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                                                                            <div className="flex flex-col items-center gap-3">
+                                                                                <Loader2 size={32} className="text-purple-500 animate-spin" />
+                                                                                <span className="text-[10px] text-purple-400 font-black uppercase tracking-[0.2em]">Processing FX...</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
 
+                                                            {/* Side Control Panel */}
+                                                            <div className="w-full lg:w-48 flex flex-col gap-4">
+                                                                {/* Global Tools */}
+                                                                <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl flex flex-wrap lg:flex-col gap-2">
+                                                                    <button onClick={handleResetAll} className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                                                                        <RotateCcw size={14} /> REVERT
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setIsAutoSnap(!isAutoSnap)}
+                                                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold rounded-lg transition-all ${isAutoSnap ? 'text-blue-400 bg-blue-400/10' : 'text-neutral-500 bg-white/5'}`}
+                                                                    >
+                                                                        <Anchor size={14} /> {isAutoSnap ? 'SNAP: ON' : 'SNAP: OFF'}
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Image Tools */}
+                                                                <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                                    <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
+                                                                        <span>Asset Zoom</span>
+                                                                        <span className="font-mono text-white/50">{Math.round(imageScale * 100)}%</span>
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => handleZoom(-0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
+                                                                        <button onClick={() => handleZoom(0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => setIsImageLocked(!isImageLocked)}
+                                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isImageLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                                    >
+                                                                        {isImageLocked ? <Lock size={12} /> : <Unlock size={12} />} {isImageLocked ? 'LOCKED' : 'UNLOCK'}
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Text Tools */}
+                                                                <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                                    <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
+                                                                        <span>Text Scale</span>
+                                                                        <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
+                                                                        <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
+                                                                    </div>
+                                                                    <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <button
+                                                                            onClick={() => { setGradientPosition('top'); handleApplyText(); }}
+                                                                            className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                                        >
+                                                                            HEADER
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setGradientPosition('bottom'); handleApplyText(); }}
+                                                                            className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                                        >
+                                                                            FOOTER
+                                                                        </button>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => setIsTextLocked(!isTextLocked)}
+                                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                                    >
+                                                                        {isTextLocked ? <Lock size={12} /> : <Unlock size={12} />} {isTextLocked ? 'FIXED' : 'FREE'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         </div>
 
-                                                        {/* Advanced FX Control Protocol */}
-                                                        {selectedImageIndex !== null && (
-                                                            <div className="space-y-3">
-                                                                {/* Image Manipulation Bar */}
-                                                                <div className="flex items-center justify-between p-2 bg-white/[0.03] border border-white/5 rounded-xl gap-4">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <button onClick={() => handleZoom(-0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} className="rotate-45" /></button>
-                                                                        <div className="text-[10px] font-mono text-neutral-500 w-12 text-center">SCAL: {(imageScale * 100).toFixed(0)}%</div>
-                                                                        <button onClick={() => handleZoom(0.1)} className="p-2 hover:bg-white/10 text-white rounded-lg transition-colors"><Plus size={14} /></button>
-                                                                    </div>
-                                                                    <div className="h-4 w-[1px] bg-white/10" />
-                                                                    <div className="flex-1 flex justify-center text-[9px] font-mono text-neutral-600 uppercase tracking-widest">
-                                                                        Drag Visual to Offset Axis
-                                                                    </div>
-                                                                    <div className="h-4 w-[1px] bg-white/10" />
-                                                                    <button
-                                                                        onClick={() => { setImageScale(1); setImagePosition({ x: 0, y: 0 }); handleApplyText(1, { x: 0, y: 0 }); }}
-                                                                        className="text-[9px] font-bold text-neutral-500 hover:text-white uppercase tracking-tighter px-2"
-                                                                    >
-                                                                        Reset
-                                                                    </button>
-                                                                </div>
-
-                                                                {/* FX Toggles & Title Bar */}
-                                                                <div className="flex flex-col sm:flex-row gap-2">
-                                                                    <div className="flex-1 flex gap-2 p-2 bg-black/30 rounded-xl border border-white/5">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="OVERLAY CALLOUT"
-                                                                            className="flex-1 bg-transparent text-white text-[10px] font-black tracking-widest placeholder:text-neutral-700 outline-none uppercase px-2"
-                                                                            value={overlayTag}
-                                                                            onChange={(e) => setOverlayTag(e.target.value)}
-                                                                        />
-                                                                        <button
-                                                                            onClick={() => toggleFX('text')}
-                                                                            disabled={isProcessingImage}
-                                                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isApplyText ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}
-                                                                        >
-                                                                            Render Text
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => toggleFX('gradient')}
-                                                                            disabled={isProcessingImage}
-                                                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isApplyGradient ? 'bg-indigo-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}
-                                                                        >
-                                                                            Gradient
-                                                                        </button>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => handleApplyText()}
-                                                                        disabled={isProcessingImage}
-
-                                                                        className="bg-green-600 hover:bg-green-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-lg hover:shadow-green-500/20 disabled:opacity-50 flex items-center justify-center gap-2 sm:w-auto w-full"
-                                                                    >
-                                                                        {isProcessingImage ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                                                                        Commit FX
-                                                                    </button>
-                                                                </div>
+                                                        {/* --- PURPLE WORD SELECTOR --- */}
+                                                        <div className="p-5 bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/20 rounded-2xl">
+                                                            <div className="flex items-center gap-3 mb-4">
+                                                                <Type size={16} className="text-purple-400" />
+                                                                <div className="text-xs font-black text-white uppercase tracking-widest">Purple Signal Targeting</div>
                                                             </div>
-                                                        )}
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {(overlayTag || '').split(' ').filter(w => w).map((word, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        onClick={() => { setPurpleWordIndex(idx); handleApplyText(); }}
+                                                                        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(purpleWordIndex === undefined ? (idx === (overlayTag.split(' ').length - 1)) : (purpleWordIndex === idx))
+                                                                            ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+                                                                            : 'bg-black/40 text-neutral-500 border-white/5 hover:border-white/20'
+                                                                            }`}
+                                                                    >
+                                                                        {word}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <p className="mt-3 text-[9px] text-neutral-500 font-mono uppercase tracking-widest">Click to assign KumoLab branding to a specific word</p>
+                                                        </div>
 
+                                                        {/* Commit Button */}
+                                                        <button
+                                                            onClick={() => handleApplyText()}
+                                                            disabled={isProcessingImage}
+                                                            className="w-full py-3 bg-green-600 hover:bg-green-500 text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-[0_10px_25px_rgba(22,163,74,0.3)] hover:shadow-[0_15px_35px_rgba(22,163,74,0.5)] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                                        >
+                                                            {isProcessingImage ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+                                                            {isProcessingImage ? 'COMMITTING CHANGES...' : 'COMMIT IMAGE TRANSFORMATION'}
+                                                        </button>
                                                     </div>
                                                 ) : (
                                                     <div className="py-12 flex flex-col items-center justify-center text-neutral-600 border border-dashed border-neutral-800 rounded-xl">

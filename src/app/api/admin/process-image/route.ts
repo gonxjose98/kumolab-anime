@@ -6,7 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
-        const { imageUrl, title, headline, scale, position, applyText, applyGradient } = await request.json();
+        const {
+            imageUrl, title, headline, scale, position, applyText, applyGradient,
+            textPos, textScale, gradientPos, purpleIndex
+        } = await request.json();
 
         if (!imageUrl || !title) {
             return NextResponse.json({ success: false, error: 'Image URL and Title are required' }, { status: 400 });
@@ -26,7 +29,11 @@ export async function POST(request: NextRequest) {
             scale,
             position,
             applyText,
-            applyGradient
+            applyGradient,
+            textPosition: textPos,
+            textScale,
+            gradientPosition: gradientPos,
+            purpleWordIndex: purpleIndex
         });
 
 

@@ -28,6 +28,10 @@ interface IntelImageOptions {
     position?: { x: number; y: number };
     applyText?: boolean;
     applyGradient?: boolean;
+    textPosition?: { x: number; y: number };
+    textScale?: number;
+    gradientPosition?: 'top' | 'bottom';
+    purpleWordIndex?: number;
 }
 
 /**
@@ -38,13 +42,16 @@ export async function generateIntelImage({
     animeTitle,
     headline,
     slug,
-    textPosition = 'bottom',
     skipUpload = false,
     scale = 1,
     position = { x: 0, y: 0 },
     applyText = true,
-    applyGradient = true
-}: IntelImageOptions & { textPosition?: 'top' | 'bottom', skipUpload?: boolean }): Promise<string | null> {
+    applyGradient = true,
+    textPosition,
+    textScale = 1,
+    gradientPosition = 'bottom',
+    purpleWordIndex
+}: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
@@ -159,7 +166,7 @@ export async function generateIntelImage({
         ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
 
         // 4. Zone Logic (Top vs Bottom)
-        const isTop = textPosition === 'top';
+        const isTop = gradientPosition === 'top';
         let targetZonePercentage = 0.35;
 
         // --- AUTOMATIC OBSTRUCTION DETECTION (HEURISTIC) ---
@@ -204,7 +211,7 @@ export async function generateIntelImage({
 
         // Deduplication
         const titleWords = animeTitle.toUpperCase().split(/\s+/);
-        let cleanedHeadline = headline.toUpperCase();
+        let cleanedHeadline = (headline || '').toUpperCase();
         const headlineWords = cleanedHeadline.split(/\s+/);
         const uniqueHeadlineWords = headlineWords.filter(word => !titleWords.includes(word));
         cleanedHeadline = uniqueHeadlineWords.join(' ');
@@ -218,9 +225,9 @@ export async function generateIntelImage({
         let gap = 0;
 
         while (globalFontSize >= 45) {
-            ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
-            const spacingMultiplier = globalFontSize < 80 ? 0.9 : 0.95;
-            lineSpacing = globalFontSize * spacingMultiplier;
+            ctx.font = `900 ${globalFontSize * textScale}px ${fontToUse}`;
+            const spacingMultiplier = (globalFontSize * textScale) < 80 ? 0.9 : 0.95;
+            lineSpacing = (globalFontSize * textScale) * spacingMultiplier;
             gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
             titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 5);
@@ -257,45 +264,75 @@ export async function generateIntelImage({
             ctx.save();
             ctx.shadowBlur = 0;
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, gradientYStart, WIDTH, gradientHeight);
+            ctx.fillRect(0, isTop ? 0 : HEIGHT - gradientHeight, WIDTH, gradientHeight);
             ctx.restore();
         }
 
         // 7. Draw Text
         if (applyText) {
-            let currentY = isTop ? 80 : HEIGHT - totalBlockHeight - 80;
-            ctx.textBaseline = 'top';
+            const finalFontSize = globalFontSize * textScale;
+            let currentY = textPosition ? textPosition.y : (isTop ? 80 : HEIGHT - totalBlockHeight - 80);
+            const drawX = textPosition ? textPosition.x : centerX;
 
-            ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
+            ctx.textBaseline = 'top';
+            ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
             ctx.fillStyle = '#FFFFFF';
 
+            // Draw Title Lines
             titleLines.forEach((line) => {
-                ctx.fillText(line, centerX, currentY);
+                ctx.fillText(line.toUpperCase(), drawX, currentY);
                 currentY += lineSpacing;
             });
 
             currentY += gap;
-            ctx.font = `900 ${globalFontSize}px ${fontToUse}`;
 
+            // Draw Headline Lines with Highlight
             headlineLines.forEach((line) => {
                 const words = line.split(' ');
-                if (words.length > 1) {
-                    const lastWord = words.pop() || '';
-                    const prefix = words.join(' ') + ' ';
-                    const prefixWidth = ctx.measureText(prefix).width;
-                    const lastWordWidth = ctx.measureText(lastWord).width;
-                    const totalLineWidth = prefixWidth + lastWordWidth;
-                    const startX = centerX - totalLineWidth / 2;
+
+                // Logic: Priority to purpleWordIndex if provided, else last word of last line
+                const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
+
+                if (words.length > 0) {
+                    // Identify which word to highlight
+                    let highlightIndex = -1;
+                    if (purpleWordIndex !== undefined) {
+                        // Find if any word in this line matches the global index?
+                        // Actually, simpler: if purpleWordIndex is provided, we search for that word in the whole headline content.
+                        // But let's assume purpleWordIndex is the word index in the *current line* for simplicity if we can't map globally.
+                        // User said: "pick which word has the purple on it".
+                        // Let's assume purpleWordIndex is the index in the headline's words array.
+
+                        const headlineAllWords = cleanedHeadline.split(' ');
+                        const lineWordIndices = [];
+                        let headIdx = 0;
+                        headlineLines.forEach(l => {
+                            l.split(' ').forEach(w => {
+                                // Not perfect due to wrapText possibly changing words, but close enough
+                            });
+                        });
+                        // IMPROVED LOGIC: purpleWordIndex is index in headlineAllWords.
+                    }
+
+                    // Default behavior (Fallback)
+                    const lastWordIdx = words.length - 1;
+
+                    // Calculation for alignment
+                    const lineMetrics = words.map(w => ctx.measureText(w + ' ').width);
+                    const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0);
+                    let wordX = drawX - totalLineLength / 2;
 
                     ctx.textAlign = 'left';
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillText(prefix, startX, currentY);
-                    ctx.fillStyle = '#9D7BFF';
-                    ctx.fillText(lastWord, startX + prefixWidth, currentY);
+                    words.forEach((word, idx) => {
+                        const isPurple = (purpleWordIndex !== undefined)
+                            ? (headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(' ').filter(x => x).length + idx === purpleWordIndex)
+                            : (isLastLine && idx === lastWordIdx);
+
+                        ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                        ctx.fillText(word + (idx < words.length - 1 ? ' ' : ''), wordX, currentY);
+                        wordX += lineMetrics[idx];
+                    });
                     ctx.textAlign = 'center';
-                } else {
-                    ctx.fillStyle = '#9D7BFF';
-                    ctx.fillText(line, centerX, currentY);
                 }
                 currentY += lineSpacing;
             });
