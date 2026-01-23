@@ -118,8 +118,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setCustomImage(null);
         setCustomImagePreview(post.image || '');
         setPreviewPost(null);
-        setSearchedImages([]);
-        setSelectedImageIndex(null);
+        // Load existing image into the "Pro Editor" so it's visible immediately
+        if (post.image) {
+            setSearchedImages([post.image]);
+            setSelectedImageIndex(0);
+        } else {
+            setSearchedImages([]);
+            setSelectedImageIndex(null);
+        }
         setProcessedImage(null);
         setSearchPage(1);
         setImageScale(1);
@@ -325,9 +331,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
 
         try {
-            if (genType === 'CUSTOM' || processedImage) {
+            if (genType === 'CUSTOM' || processedImage || editingPostId) {
                 // If we have a processed image, use Custom Post flow to save it
-                // Or if it's a manual custom post
+                // Or if it's a manual custom post OR an edit
                 if (!title) {
                     // If title missing but we have topic (from manual flow), use topic
                     if (genType !== 'CUSTOM' && !topic) {
@@ -354,7 +360,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     imagePayload = new File([blob], "processed-image.png", { type: "image/png" });
                 }
 
-                if (!imagePayload && !customImage) {
+                if (!imagePayload && !customImage && !editingPostId) {
                     alert('Image required');
                     setIsGenerating(false);
                     return;
