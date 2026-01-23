@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
             title,
             type,
             content: content || `Check out: ${title}`,
+            headline: headline, // Save the overlay text/headline
         };
 
         if (finalImageUrl) {

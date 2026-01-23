@@ -433,7 +433,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 const data = await response.json();
                 if (data.success && data.post) {
-                    setPreviewPost(data.post);
+                    // If we have a processedImage, use it for the preview instead of the database image
+                    // This ensures the user sees their text overlay changes immediately
+                    const previewData = {
+                        ...data.post,
+                        image: processedImage || data.post.image,
+                        headline: overlayTag || data.post.headline
+                    };
+                    setPreviewPost(previewData);
                     if (editingPostId) {
                         setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
                     } else {
@@ -1631,6 +1638,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
                         </div>
+
+                        {/* Preview Changes Button (for editing mode) */}
+                        {editingPostId && (
+                            <button
+                                onClick={() => {
+                                    // Create a preview without saving to database
+                                    const finalTitle = title || topic;
+                                    const finalContent = content || `Check out the latest on ${finalTitle}.`;
+                                    const finalImage = processedImage || customImagePreview || searchedImages[selectedImageIndex || 0];
+
+                                    setPreviewPost({
+                                        id: editingPostId,
+                                        title: finalTitle,
+                                        content: finalContent,
+                                        type: genType || 'COMMUNITY',
+                                        image: finalImage,
+                                        headline: overlayTag,
+                                        slug: '',
+                                        timestamp: new Date().toISOString(),
+                                        isPublished: false
+                                    } as any);
+                                }}
+                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] active:scale-[0.99] flex items-center justify-center gap-3"
+                            >
+                                <Eye size={20} />
+                                Commit Changes to Preview
+                            </button>
+                        )}
+
                         {/* Main Generation Action */}
                         <button
                             onClick={handleGeneratePreview}
