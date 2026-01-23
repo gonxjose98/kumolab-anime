@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
@@ -1223,6 +1223,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
                                                         {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
                                                     </button>
+                                                    <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-1.5 cursor-pointer">
+                                                        <Upload size={12} />
+                                                        Upload
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) {
+                                                                    const reader = new FileReader();
+                                                                    reader.onloadend = () => {
+                                                                        const result = reader.result as string;
+                                                                        setSearchedImages([result]);
+                                                                        setSelectedImageIndex(0);
+                                                                        setImageScale(1);
+                                                                        setImagePosition({ x: 0, y: 0 });
+                                                                    };
+                                                                    reader.readAsDataURL(file);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </label>
                                                     {searchedImages.length > 0 && (
                                                         <button
                                                             onClick={async () => {
