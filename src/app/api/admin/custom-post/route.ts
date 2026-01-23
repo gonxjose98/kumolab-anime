@@ -12,88 +12,101 @@ export async function POST(req: NextRequest) {
         const headline = formData.get('headline') as string || 'FEATURED';
         const imageFile = formData.get('image') as File;
 
-        if (!title || !imageFile) {
+        const skipProcessing = formData.get('skipProcessing') === 'true';
+        const postId = formData.get('postId') as string;
+
+        if (!title || (!imageFile && !postId)) {
             return NextResponse.json({ error: 'Title and image are required' }, { status: 400 });
         }
 
-        // Convert image file to buffer
-        const arrayBuffer = await imageFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        let finalImageUrl: string | null = null;
+        let tempFileName: string | null = null;
 
-        // Upload original image to Supabase Storage temporarily
-        const tempFileName = `temp-${Date.now()}-${imageFile.name}`;
-        const { data: uploadData, error: uploadError } = await supabaseAdmin
-            .storage
-            .from('blog-images')
-            .upload(tempFileName, buffer, {
-                contentType: imageFile.type,
-                upsert: true
-            });
+        if (imageFile) {
+            // Convert image file to buffer
+            const arrayBuffer = await imageFile.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
 
-        if (uploadError) {
-            console.error('Upload error:', uploadError);
-            return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+            // Upload original image to Supabase Storage temporarily
+            tempFileName = `temp-${Date.now()}-${imageFile.name}`;
+            const { error: uploadError } = await supabaseAdmin
+                .storage
+                .from('blog-images')
+                .upload(tempFileName, buffer, {
+                    contentType: imageFile.type,
+                    upsert: true
+                });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+            }
+
+            // Get public URL of uploaded image
+            const { data: { publicUrl } } = supabaseAdmin
+                .storage
+                .from('blog-images')
+                .getPublicUrl(tempFileName);
+
+            const slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
+
+            if (skipProcessing) {
+                finalImageUrl = publicUrl;
+            } else {
+                finalImageUrl = await generateIntelImage({
+                    sourceUrl: publicUrl,
+                    animeTitle: title,
+                    headline: headline,
+                    slug: slug,
+                    gradientPosition: 'bottom'
+                });
+            }
         }
 
-        // Get public URL of uploaded image
-        const { data: { publicUrl } } = supabaseAdmin
-            .storage
-            .from('blog-images')
-            .getPublicUrl(tempFileName);
-
-        // Generate processed image with text overlay
-        const skipProcessing = formData.get('skipProcessing') === 'true';
-
-        // Generate processed image with text overlay
-        const slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
-        let processedImageUrl: string | null = null;
-
-        if (skipProcessing) {
-            // If skipping processing, the uploaded image is ALREADY the final processed image.
-            processedImageUrl = publicUrl;
-        } else {
-            processedImageUrl = await generateIntelImage({
-                sourceUrl: publicUrl,
-                animeTitle: title,
-                headline: headline,
-                slug: slug,
-                textPosition: 'bottom'
-            });
-        }
-
-        // Create post in database
-        const post = {
-            id: randomUUID(),
+        // Create or Update post in database
+        const postData: any = {
             title,
-            slug,
             type,
             content: content || `Check out: ${title}`,
-            image: processedImageUrl || publicUrl,
-            timestamp: new Date().toISOString(),
-            isPublished: type === 'CONFIRMATION_ALERT' // Only Alerts go live automatically
         };
 
-        const { data, error } = await supabaseAdmin
-            .from('posts')
-            .insert({
-                title: post.title,
-                slug: post.slug,
-                type: post.type,
-                content: post.content,
-                image: post.image,
-                timestamp: post.timestamp,
-                is_published: post.isPublished
-            })
-            .select()
-            .single();
+        if (finalImageUrl) {
+            postData.image = finalImageUrl;
+        }
+
+        // Only generate slug and timestamp for NEW posts
+        if (!postId) {
+            postData.id = randomUUID();
+            postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
+            postData.timestamp = new Date().toISOString();
+            postData.is_published = type === 'CONFIRMATION_ALERT';
+        }
+
+        let query;
+        if (postId) {
+            query = supabaseAdmin
+                .from('posts')
+                .update(postData)
+                .eq('id', postId)
+                .select()
+                .single();
+        } else {
+            query = supabaseAdmin
+                .from('posts')
+                .insert(postData)
+                .select()
+                .single();
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Database error:', error);
-            return NextResponse.json({ error: 'Failed to create post' }, { status: 500 });
+            return NextResponse.json({ error: 'Failed to save post' }, { status: 500 });
         }
 
         // Clean up temp file ONLY if we generated a new one via processing
-        if (!skipProcessing) {
+        if (tempFileName && !skipProcessing) {
             await supabaseAdmin.storage.from('blog-images').remove([tempFileName]);
         }
 

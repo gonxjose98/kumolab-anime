@@ -69,6 +69,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [editingPostId, setEditingPostId] = useState<string | null>(null);
 
     const filteredPosts = posts.filter(post => {
         if (filter === 'LIVE') return post.isPublished;
@@ -77,6 +78,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     });
 
     const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
+        setEditingPostId(null);
         setGenType(type);
         setTopic('');
         setTitle('');
@@ -104,6 +106,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyText(true);
         setShowModal(true);
 
+    };
+
+    const handleEditClick = (post: BlogPost) => {
+        setEditingPostId(post.id as string);
+        setGenType(post.type as any);
+        setTopic(post.title);
+        setTitle(post.title);
+        setContent(post.content);
+        setOverlayTag('NEWS'); // Default
+        setCustomImage(null);
+        setCustomImagePreview(post.image || '');
+        setPreviewPost(null);
+        setSearchedImages([]);
+        setSelectedImageIndex(null);
+        setProcessedImage(null);
+        setSearchPage(1);
+        setImageScale(1);
+        setImagePosition({ x: 0, y: 0 });
+        setIsImageLocked(false);
+        setTextScale(1);
+        setTextPosition(null);
+        setIsTextLocked(false);
+        setGradientPosition('bottom');
+        setPurpleWordIndices([]);
+        setPurpleCursorIndex(0);
+        setShowExpandedPreview(false);
+        setIsApplyGradient(true);
+        setIsApplyText(true);
+        setShowModal(true);
     };
 
 
@@ -334,9 +365,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 formData.append('content', finalContent);
                 formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
                 formData.append('headline', overlayTag);
-                formData.append('image', imagePayload as Blob);
-                if (processedImage) {
+                if (imagePayload) formData.append('image', imagePayload as Blob);
+                if (processedImage || (!imagePayload && customImagePreview)) {
                     formData.append('skipProcessing', 'true');
+                }
+                if (editingPostId) {
+                    formData.append('postId', editingPostId);
                 }
 
                 const response = await fetch('/api/admin/custom-post', {
@@ -347,12 +381,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 const data = await response.json();
                 if (data.success && data.post) {
                     setPreviewPost(data.post);
-                    setPosts([data.post, ...posts]);
+                    if (editingPostId) {
+                        setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
+                    } else {
+                        setPosts([data.post, ...posts]);
+                    }
                 } else {
                     alert('Save failed: ' + (data.error || 'Unknown error'));
                 }
             } else {
                 // ... Original Auto-Gen Logic (Fallback if no manual image intervention) ...
+                if (editingPostId) {
+                    alert('Direct auto-gen in edit mode not supported. Please use the visual editor tools above.');
+                    setIsGenerating(false);
+                    return;
+                }
                 const response = await fetch('/api/admin/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -773,12 +816,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         </div>
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
-                                        <Link
-                                            href={`/admin/post/${post.id || ''}`}
-                                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-white/10 text-slate-400 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-white transition-all scale-90 hover:scale-100"
-                                        >
-                                            <Edit2 size={14} />
-                                        </Link>
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => handleEditClick(post)}
+                                                title="Visual Mission Control"
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-purple-500/20 text-slate-400 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all scale-90 hover:scale-100"
+                                            >
+                                                <Zap size={14} />
+                                            </button>
+                                            <Link
+                                                href={`/admin/post/${post.id || ''}`}
+                                                title="Edit Details"
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-slate-400 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all scale-90 hover:scale-100"
+                                            >
+                                                <Edit2 size={14} />
+                                            </Link>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -823,12 +876,20 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 <Facebook size={8} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
                                             </div>
                                         </div>
-                                        <Link
-                                            href={`/admin/post/${post.id}`}
-                                            className="text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white"
-                                        >
-                                            <Edit2 size={16} />
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleEditClick(post)}
+                                                className="text-purple-600 dark:text-purple-400 hover:text-purple-700"
+                                            >
+                                                <Zap size={16} />
+                                            </button>
+                                            <Link
+                                                href={`/admin/post/${post.id}`}
+                                                className="text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white"
+                                            >
+                                                <Edit2 size={16} />
+                                            </Link>
+                                        </div>
                                     </div>
 
                                     <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
@@ -1541,7 +1602,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     className="w-full py-4 mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                                    {isGenerating ? 'Saving...' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
+                                    {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
                                 </button>
                             </div>
 
