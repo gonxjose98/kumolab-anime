@@ -1319,14 +1319,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
                                                                         <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
                                                                     </div>
-                                                                    <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Visibility</div>
-                                                                    <button
-                                                                        onClick={() => { setIsApplyGradient(!isApplyGradient); handleApplyText(); }}
-                                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyGradient ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                                    >
-                                                                        {isApplyGradient ? <Eye size={12} /> : <EyeOff size={12} />} {isApplyGradient ? 'GRADIENT: ON' : 'GRADIENT: OFF'}
-                                                                    </button>
-
                                                                     <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
                                                                     <div className="grid grid-cols-2 gap-2">
                                                                         <button
@@ -1377,7 +1369,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                                 {/* Tactical Selector - Box inside box */}
                                                                 <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-4">
-                                                                    <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
+                                                                        <button
+                                                                            onClick={() => { setIsApplyGradient(!isApplyGradient); handleApplyText(); }}
+                                                                            className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${isApplyGradient ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-500 border border-white/5'}`}
+                                                                        >
+                                                                            {isApplyGradient ? <Eye size={10} /> : <EyeOff size={10} />} Gradient
+                                                                        </button>
+                                                                    </div>
 
                                                                     <div className="flex flex-col sm:flex-row items-center gap-4">
                                                                         <div className="flex-1 flex items-center gap-4">
@@ -1470,9 +1470,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
                                                                     <button
                                                                         onClick={() => setShowExpandedPreview(false)}
-                                                                        className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all"
+                                                                        className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/10 transition-all shadow-2xl z-[201]"
                                                                     >
-                                                                        <Plus size={24} className="rotate-45" />
+                                                                        <XCircle size={28} />
                                                                     </button>
                                                                     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
                                                                         MASTER VISUAL INSPECTION

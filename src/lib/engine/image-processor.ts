@@ -230,13 +230,17 @@ export async function generateIntelImage({
             ctx.font = `900 ${globalFontSize * textScale}px ${fontToUse}`;
             const spacingMultiplier = (globalFontSize * textScale) < 80 ? 0.9 : 0.95;
             lineSpacing = (globalFontSize * textScale) * spacingMultiplier;
-            gap = cleanedHeadline.length > 0 ? globalFontSize * 0.25 : 0;
 
-            titleLines = wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 5);
-            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 2) : [];
+            // Gap should only exist if we have BOTH title and headline.
+            // Since we usually only have headline now, we'll simplify.
+            gap = (titleLines.length > 0 && cleanedHeadline.length > 0) ? globalFontSize * 0.25 : 0;
+
+            titleLines = animeTitle.trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 3) : [];
+            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 3) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
             const maxLineWidth = Math.max(
+                0,
                 ...titleLines.map(l => ctx.measureText(l).width),
                 ...headlineLines.map(l => (ctx.measureText(l).width))
             );
@@ -245,7 +249,10 @@ export async function generateIntelImage({
             globalFontSize -= 5;
         }
 
-        if (headlineLines.length === 0 && cleanedHeadline.length > 0) console.warn("[Image Engine] Warning: No headline lines generated.");
+        if (headlineLines.length === 0 && cleanedHeadline.length > 0) {
+            console.warn("[Image Engine] Warning: No headline lines generated. Forcing single line.");
+            headlineLines = [cleanedHeadline];
+        }
 
         // 6. High-Contrast Gradient
         if (applyGradient) {
@@ -285,11 +292,11 @@ export async function generateIntelImage({
                 const words = line.split(/\s+/).filter(Boolean);
 
                 if (words.length > 0) {
-                    // Logic: ONLY use purpleWordIndices if provided. NO fallback to last word.
-                    const isLastLine = headlineLines.indexOf(line) === headlineLines.length - 1;
-
                     // Calculation for alignment
-                    const lineMetrics = words.map(w => ctx.measureText(w).width); // Measure without space for accuracy
+                    const lineMetrics = words.map(w => {
+                        ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
+                        return ctx.measureText(w).width;
+                    });
                     const spacing = ctx.measureText(' ').width;
                     const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0) + (words.length - 1) * spacing;
                     let wordX = drawX - totalLineLength / 2;
@@ -304,12 +311,11 @@ export async function generateIntelImage({
                             : false;
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        // VERY BOLD: Reset font weight before each fill for safety
+                        // ENFORCE EXTREME BOLDNESS
                         ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
                         ctx.fillText(word, wordX, currentY);
                         wordX += lineMetrics[idx] + spacing;
                     });
-                    ctx.textAlign = 'center';
                 }
                 currentY += lineSpacing;
             });
