@@ -270,7 +270,7 @@ export async function fetchAnimeIntel(): Promise<any[]> {
 
                 // INTEL KEYWORDS
                 const strictKeywords = ['Season', 'Cour', 'Trailer', 'Visual', 'PV', 'Release Date', 'Movie', 'Cast', 'Reveals', 'Unveils', 'Casts'];
-                const negativeKeywords = ['Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', 'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', 'Live-Action', 'Stage Play', 'Musical', 'Award', 'Prize', 'Convention', 'Event', 'Interview', 'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Earnings', 'Financial', 'Stock', 'Actor', 'Voice Actor', 'Seiyuu', 'Director', 'Dub', 'English Dub'];
+                const negativeKeywords = ['Ranking', 'List', 'Top', 'Chart', 'Box Office', 'Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', 'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', 'Live-Action', 'Stage Play', 'Musical', 'Award', 'Prize', 'Convention', 'Event', 'Interview', 'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Earnings', 'Financial', 'Stock', 'Actor', 'Voice Actor', 'Seiyuu', 'Director', 'Dub', 'English Dub'];
 
                 const hasPositive = strictKeywords.some(k => rawTitle.includes(k));
                 const hasNegative = negativeKeywords.some(k => rawTitle.includes(k) || rawDescription.includes(k));

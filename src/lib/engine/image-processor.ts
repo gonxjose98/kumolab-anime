@@ -287,12 +287,14 @@ export async function generateIntelImage({
             ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
             ctx.fillStyle = '#FFFFFF';
 
-            // Draw Headline Lines with Highlight
-            headlineLines.forEach((line) => {
+            // Draw Combined Lines (Headline then Title)
+            const allLines = [...headlineLines, ...titleLines];
+            let globalWordOffset = 0;
+
+            allLines.forEach((line, lineIdx) => {
                 const words = line.split(/\s+/).filter(Boolean);
 
                 if (words.length > 0) {
-                    // Calculation for alignment
                     const lineMetrics = words.map(w => {
                         ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
                         return ctx.measureText(w).width;
@@ -302,22 +304,24 @@ export async function generateIntelImage({
                     let wordX = drawX - totalLineLength / 2;
 
                     ctx.textAlign = 'left';
-                    const wordsBeforeCount = headlineLines.slice(0, headlineLines.indexOf(line)).join(' ').split(/\s+/).filter(Boolean).length;
 
-                    words.forEach((word, idx) => {
-                        const globalIndex = wordsBeforeCount + idx;
+                    words.forEach((word, wordIdx) => {
+                        const globalIndex = globalWordOffset + wordIdx;
+                        // For automatic posts, we might not have purpleWordIndices.
+                        // But we want to allow it for manual.
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
                             : false;
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        // ENFORCE EXTREME BOLDNESS
                         ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
                         ctx.fillText(word, wordX, currentY);
-                        wordX += lineMetrics[idx] + spacing;
+                        wordX += lineMetrics[wordIdx] + spacing;
                     });
+
+                    globalWordOffset += words.length;
                 }
-                currentY += lineSpacing;
+                currentY += lineSpacing + (lineIdx === headlineLines.length - 1 ? gap : 0);
             });
 
             ctx.font = `bold 24px ${fontToUse}`;
