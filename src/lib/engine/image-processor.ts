@@ -69,8 +69,8 @@ export async function generateIntelImage({
 
         // Check/Register Fonts - ROBUST LOADING
         let fontToUse = 'Sans'; // System default fallback
-        const fontName = 'SourceSans3';
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'SourceSans3-Bold.otf');
+        const fontName = 'Outfit';
+        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
 
         if (GlobalFonts.has(fontName)) {
             fontToUse = fontName;
@@ -83,13 +83,17 @@ export async function generateIntelImage({
                     console.log(`[Image Engine] '${fontName}' registered successfully.`);
                 } else {
                     console.warn(`[Image Engine] Font file missing at ${fontPath}. Attempting backup download...`);
-                    const backupUrl = 'https://raw.githubusercontent.com/adobe-fonts/source-sans/release/OTF/SourceSans3-Bold.otf';
+                    // Use Outfit-Black for the high-impact brand look (Weight 900)
+                    const backupUrl = 'https://github.com/google/fonts/raw/main/ofl/outfit/static/Outfit-Black.ttf';
                     const res = await fetch(backupUrl);
                     if (res.ok) {
                         const buf = Buffer.from(await res.arrayBuffer());
                         GlobalFonts.register(buf, fontName);
                         fontToUse = fontName;
-                        console.log(`[Image Engine] Backup download registered.`);
+                        console.log(`[Image Engine] Backup download for '${fontName}' registered.`);
+                        // Save to public/fonts for next time
+                        if (!fs.existsSync(path.dirname(fontPath))) fs.mkdirSync(path.dirname(fontPath), { recursive: true });
+                        fs.writeFileSync(fontPath, buf);
                     } else {
                         throw new Error(`Backup download failed: ${res.status}`);
                     }
