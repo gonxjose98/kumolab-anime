@@ -458,59 +458,83 @@ export function cleanTitle(title: string): string {
 }
 
 /**
- * STRICT BODY RULES:
- * - Factual, Educational, Objective.
- * - No opinion or hype.
- * - Expands on the title with production or narrative context.
+ * STRICT BODY RULES (KumoLab Voice):
+ * - Minimalist, Factual, Future-Facing.
+ * - Structure: 1-2 sentences of context.
+ * - Standard Closing: "More information is expected..."
  */
 export function cleanBody(content: string, title: string, trendReason?: string): string {
     // 1. Base Cleanup
-    let base = (content || '').replace(/<[^>]*>?/gm, '')
-        .replace(/Read more.*/gi, '')
-        .replace(/http\S+/g, '')
+    let base = (content || '').replace(/<[^>]*>?/gm, '') // Strip HTML
+        .replace(/Read more.*/gi, '') // Strip links
+        .replace(/http\S+/g, '') // Strip URLs
+        .replace(/\b(Source|Via):.*/gi, '') // Strip credits
+        .replace(/\b(Images?|Video|Credit):.*/gi, '')
         .trim();
 
-    // 2. Intellectual Expansion Templates (Factual & Objective)
     const series = title.split(' Season')[0].split(':')[0].trim();
 
-    let expansion = "";
-    const reason = (trendReason || "").toUpperCase();
-
-    if (reason.includes("SEASON") || reason.includes("ANNOUNCEMENT")) {
-        expansion = `${series} is officially in production for its next installment. The continuation is expected to build directly on the events of the previous arc, focusing on narrative progression and character development. While specific premiere windows are often revealed via official production channels, the project marks a significant milestone for the series' ongoing adaptation.`;
-    } else if (reason.includes("TRAILER") || reason.includes("VISUAL")) {
-        expansion = `A new technical reveal for ${series} has been released, highlighting the production's updated visual direction and aesthetic standards. These reveals typically showcase the work of the returning animation staff and provide a glimpse into the production quality of the upcoming episodes.`;
-    } else if (reason.includes("EPISODE") || reason.includes("REACTION")) {
-        expansion = `The latest developments in ${series} have established new narrative stakes for the current arc. The story continues to explore the complexities of its established world, moving closer to key plot resolutions that have been anticipated by the audience.`;
-    } else {
-        expansion = `${series} remains a point of significant interest within the industry. The series' impact is driven by its consistent production quality and its ability to adapt complex narrative themes for a global audience.`;
-    }
-
-    // 3. Merge Source Data + Expansion
-    // Heuristic: If source is short or contains hype patterns, use educational expansion.
-    const hypePatterns = [/fans are/i, /internet/i, /buzz/i, /finally/i, /amazing/i, /incredible/i, /must/i];
-    const isHype = hypePatterns.some(p => p.test(base));
-
-    let finalBody = (base.length > 120 && !isHype) ? base : expansion;
-
-    // 4. Final Polish: Ensure no hype words OR opinion remains
-    const bannedHype = [
-        "amazing", "stunning", "incredible", "exciting", "finally",
-        "must-watch", "shocks fans", "breaks the internet", "internet is buzzing",
-        "fans are losing", "fans can't wait", "worth the wait", "masterpiece"
+    // 2. Intelligent Hype Stripping (In-place)
+    // Instead of discarding the text, we neutralize it.
+    const hypePhrases = [
+        "fans are excited", "fans are losing it", "breaks the internet",
+        "internet is buzzing", "can't wait", "worth the wait",
+        "masterpiece", "incredible", "amazing", "stunning",
+        "finally here", "just announced", "check out",
+        "what do you think?", "let us know"
     ];
 
-    // Clean up title repetition at the start
-    if (finalBody.toLowerCase().startsWith(title.toLowerCase())) {
-        finalBody = finalBody.substring(title.length).trim();
+    hypePhrases.forEach(phrase => {
+        const regex = new RegExp(phrase, 'gi');
+        base = base.replace(regex, '');
+    });
+
+    // 3. Fallback Generation (If source is essentially empty)
+    if (base.length < 20) {
+        const reason = (trendReason || "").toUpperCase();
+        if (reason.includes("SEASON") || reason.includes("ANNOUNCEMENT")) {
+            base = `${series} is in production for its next installment. The project continues the narrative progression of the series.`;
+        } else if (reason.includes("TRAILER") || reason.includes("VISUAL")) {
+            base = `New promotional material for ${series} has been released, providing an updated look at the production's visual direction.`;
+        } else {
+            base = `${series} continues to generate significant interest. The series remains a key topic of discussion within the industry.`;
+        }
     }
 
-    // Truncate to safe length
-    if (finalBody.length > 350) {
-        finalBody = finalBody.substring(0, 347) + '...';
+    // 4. Clean Start (Remove title redundancy)
+    if (base.toLowerCase().startsWith(title.toLowerCase())) {
+        base = base.substring(title.length).trim();
+        // Remove leading punctuation leftover
+        base = base.replace(/^[:\-\s]+/, '');
     }
 
-    return finalBody;
+    // Capitalize first letter
+    base = base.charAt(0).toUpperCase() + base.slice(1);
+
+    // 5. Truncate & Standardize
+    // Keep it punchy (max 250 chars)
+    if (base.length > 250) {
+        base = base.substring(0, 247).trim();
+        // Ensure we don't cut mid-sentence if possible, or simple ellipsis
+        const lastDot = base.lastIndexOf('.');
+        if (lastDot > 150) {
+            base = base.substring(0, lastDot + 1);
+        } else {
+            base += '...';
+        }
+    }
+
+    // 6. The KumoLab Closer
+    const closers = [
+        "\n\nMore information is expected closer to release.",
+        "\n\nMore information is expected ahead of the release.",
+        "\n\nFurther details have not yet been announced."
+    ];
+
+    // Pick one deterministically based on length to vary slightly but keep tone
+    const closer = closers[base.length % closers.length];
+
+    return base + closer;
 }
 /**
  * Generates Trending Posts (plural) - Wrapper for engine usage
