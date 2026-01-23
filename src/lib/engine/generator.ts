@@ -82,10 +82,10 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         return null;
     }
 
-    // premiere_date is required for confirmed, premiered, now_streaming logic
-    if (['confirmed', 'premiered', 'now_streaming'].includes(claimType) && !premiereDateStr) {
-        console.error(`Abort: claim_type "${claimType}" requires premiere_date.`);
-        return null;
+    // premiere_date is often missing for early confirmations
+    if (['premiered', 'now_streaming'].includes(claimType) && !premiereDateStr) {
+        // Fallback for missing date on already aired content
+        console.warn(`[Generator] Warning: claim_type "${claimType}" lacks premiere_date. Defaulting to safe labels.`);
     }
 
     // 2. DATE LOGIC & HARD RULES
@@ -114,8 +114,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     // 3. CARD OVERLAY TEXT (LOCKED)
     const overlayTextMap: Record<ClaimType, string> = {
-        confirmed: `PREMIERES ${formatPremiereDate(premiereDateStr)}`,
-        premiered: `PREMIERED ${formatPremiereDate(premiereDateStr)}`,
+        confirmed: premiereDateStr ? `PREMIERES ${formatPremiereDate(premiereDateStr)}` : "CONFIRMED",
+        premiered: premiereDateStr ? `PREMIERED ${formatPremiereDate(premiereDateStr)}` : "PREMIERED",
         now_streaming: "NOW STREAMING",
         delayed: "DELAYED",
         trailer: "NEW TRAILER",
@@ -187,15 +187,25 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         officialSourceImage = '/hero-bg-final.png';
     }
 
+    // 3. CARD OVERLAY TAG (Branding)
+    // We use a fixed branding tag to avoid conflicting with the title
+    const BRANDING_TAG = "KUMOLAB SIGNAL";
+
     const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
     const validContent = cleanBody(topItem.content, validTitle);
+
+    // 4. AUTOMATIC PURPLE HIGHLIGHT
+    // Highlight first word of title to ensure "Kumolab Purple" is always present.
+    // Index 0: KUMOLAB, Index 1: SIGNAL, Index 2: First word of Title
+    const purpleWordIndices = [2];
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: validTitle, // Use Cleaned Title for Image Text
-            headline: overlayTag, // Status/Label in White
+            animeTitle: validTitle, // Main Title (matches post title)
+            headline: BRANDING_TAG, // Consistent Branding
+            purpleWordIndices,      // Force Purple on first title word
             slug: topItem.slug || 'intel'
         });
 
@@ -302,12 +312,14 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Enforce KumoLab branding for Trending posts as requested by User
-        const overlayTag = (trendingItem.trendReason || "TRENDING").toUpperCase();
+        const BRANDING_TAG = "KUMOLAB SIGNAL";
+        const purpleWordIndices = [2]; // Highlight first word of title
 
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: validTitle, // Use Cleaned Title
-            headline: overlayTag,
+            animeTitle: validTitle,
+            headline: BRANDING_TAG,
+            purpleWordIndices,
             slug: trendingItem.slug || 'trending'
         });
 
