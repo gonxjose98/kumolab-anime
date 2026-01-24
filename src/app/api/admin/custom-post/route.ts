@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
             const buffer = Buffer.from(arrayBuffer);
 
             // Upload original image to Supabase Storage temporarily
-            tempFileName = `temp-${Date.now()}-${imageFile.name}`;
+            const sanitizedName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            tempFileName = `temp-${Date.now()}-${sanitizedName}`;
             const { error: uploadError } = await supabaseAdmin
                 .storage
                 .from('blog-images')

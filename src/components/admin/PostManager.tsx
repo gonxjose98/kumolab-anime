@@ -50,7 +50,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [imageScale, setImageScale] = useState(1);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [isImageLocked, setIsImageLocked] = useState(false);
-    const [isApplyingEffect, setIsApplyingEffect] = useState(false); // New state to track processing
+    const [isApplyingEffect, setIsApplyingEffect] = useState(false);
+    const [isStageDirty, setIsStageDirty] = useState(false); // Track if edits happened since last process
 
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
@@ -232,7 +233,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         if (!imageUrl) return null;
 
-        const signalText = overlayTag || '';
+        const signalText = (overlayTag || '').trim() || 'NEW SIGNAL'; // Fallback if empty but visibility requested
         setIsProcessingImage(true);
         setIsApplyingEffect(true);
         try {
@@ -242,7 +243,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({
                     imageUrl,
                     title: '',
-                    headline: signalText,
+                    headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
                     applyText: forcedApplyText ?? isApplyText,
@@ -256,6 +257,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const data = await res.json();
             if (data.success) {
                 setProcessedImage(data.processedImage);
+                setIsStageDirty(false); // We are now in sync
                 return data.processedImage;
             } else {
                 console.error('FX configuration failed: ' + data.error);
@@ -299,6 +301,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 x: prev.x + (deltaX / WIDTH),
                 y: prev.y + (deltaY / HEIGHT)
             }));
+            setIsStageDirty(true);
         } else if (dragTarget === 'text') {
             setTextPosition(prev => {
                 const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 100 : HEIGHT - 300 };
@@ -307,6 +310,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     y: base.y + deltaY
                 };
             });
+            setIsStageDirty(true);
         }
         setDragStart({ x: e.clientX, y: e.clientY });
     };
@@ -325,11 +329,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (target === 'image') {
             const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
             setImageScale(newScale);
+            setIsStageDirty(true);
             handleApplyText(newScale);
         } else {
             const newScale = Math.max(0.1, Math.min(5, textScale + delta));
             setTextScale(newScale);
-            handleApplyText(undefined, undefined, undefined, undefined); // Uses latest textScale state
+            setIsStageDirty(true);
+            handleApplyText(undefined, undefined, undefined, undefined);
         }
     };
 
@@ -346,6 +352,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     };
 
     const toggleFX = (type: 'text' | 'gradient') => {
+        setIsStageDirty(true);
         if (type === 'text') {
             const newVal = !isApplyText;
             setIsApplyText(newVal);
@@ -362,12 +369,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Modified Generate Preview to use the manually processed image if available
     const handleSavePost = async (autoClose: boolean = false) => {
         setIsGenerating(true);
-        // Do NOT reset previewPost here if we are just saving, 
-        // unless we want to hide it during the save.
 
-        // Ensure we have a processed image if we have FX configuration active
         let finalImageToSave = processedImage;
-        if (!finalImageToSave && (isApplyText || isApplyGradient)) {
+        // Always re-apply if dirty or missing to ensure latest edits are saved
+        if (!finalImageToSave || isStageDirty) {
             const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
                 ? searchedImages[selectedImageIndex]
                 : customImagePreview;
@@ -376,7 +381,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             }
         }
 
-        // Enforce title requirements for Confirmation Alerts
         if (genType === 'CONFIRMATION_ALERT') {
             const validPrefixes = ['JUST CONFIRMED', 'OFFICIAL', 'CONFIRMED'];
             const upperTitle = (title || topic || '').toUpperCase().trim();
@@ -390,30 +394,45 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
 
         try {
-            const finalTitle = title || topic;
+            const finalTitle = (title || topic || '').trim();
+            if (!finalTitle) {
+                alert('Title or Topic is required to save a transmission.');
+                setIsGenerating(false);
+                return;
+            }
 
-            // Convert Base64 processed image to File for upload
-            let imagePayload: File | null = null;
+            // Reliable Base64 to File conversion (replaces buggy fetch on data-uris)
+            let imageFileToUpload: File | null = null;
             if (finalImageToSave && finalImageToSave.startsWith('data:')) {
-                const res = await fetch(finalImageToSave);
-                const blob = await res.blob();
-                imagePayload = new File([blob], "processed-image.png", { type: "image/png" });
+                const parts = finalImageToSave.split(',');
+                const byteString = atob(parts[1]);
+                const mimeString = parts[0].split(':')[1].split(';')[0];
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                const blob = new Blob([ab], { type: mimeString });
+                imageFileToUpload = new File([blob], "processed-vision.png", { type: "image/png" });
             } else if (customImage) {
-                imagePayload = customImage;
+                imageFileToUpload = customImage;
             }
 
             const formData = new FormData();
             formData.append('title', finalTitle);
-            formData.append('content', content || `Check out the latest on ${finalTitle}.`);
+            formData.append('content', content || `Transmission for ${finalTitle}.`);
             formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
-            formData.append('headline', overlayTag);
+            formData.append('headline', overlayTag || 'FEATURED');
 
-            if (imagePayload) {
-                formData.append('image', imagePayload);
-                formData.append('skipProcessing', 'true'); // We already processed it or it's raw
-            } else if (editingPostId && !customImage) {
-                // If editing and no new image, we keep the old one but might update metadata
+            if (imageFileToUpload) {
+                formData.append('image', imageFileToUpload);
                 formData.append('skipProcessing', 'true');
+            } else if (editingPostId) {
+                formData.append('skipProcessing', 'true');
+            } else {
+                alert('Visual asset is required for new transmissions.');
+                setIsGenerating(false);
+                return;
             }
 
             if (editingPostId) {
@@ -427,7 +446,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             const data = await response.json();
             if (data.success && data.post) {
-                // Update local list
                 if (editingPostId) {
                     setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
                 } else {
@@ -438,25 +456,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     setShowModal(false);
                     setPreviewPost(null);
                     setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+                    alert(`Transmission ${editingPostId ? 'updated' : 'deployed'} successfully.`);
                 } else {
-                    // Update preview card to show it's saved
                     setPreviewPost({
                         ...data.post,
                         image: finalImageToSave || data.post.image,
-                        isSaved: true // flag to indicate DB sync is done
+                        isSaved: true
                     } as any);
                 }
             } else {
-                alert('Save failed: ' + (data.error || 'Unknown error'));
+                alert('FAILURE: ' + (data.error || 'Server rejected the transmission signal.'));
             }
         } catch (e: any) {
-            alert('Error saving post: ' + e.message);
+            console.error("[Admin] Persistence Error:", e);
+            alert('CRITICAL FAILURE: ' + e.message);
         } finally {
             setIsGenerating(false);
         }
     };
 
-    // Keep handleGeneratePreview for auto-gen compatibility but route to save
     const handleGeneratePreview = () => handleSavePost(false);
 
     const handleConfirm = async () => {
@@ -472,33 +490,33 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const handleCommitToPreview = async () => {
         try {
-            // Get the latest possible visuals
-            let finalImage = processedImage;
-            const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
-                ? searchedImages[selectedImageIndex]
-                : customImagePreview;
-
-            if (!finalImage && imageUrl) {
-                // If not processed yet, do it now
-                finalImage = await handleApplyText();
-            }
+            setIsProcessingImage(true);
+            // Force re-apply to ensure latest text/pos/scale
+            const finalImage = await handleApplyText();
 
             const finalTitle = title || topic || 'UNTITLED SIGNAL';
             const finalContent = content || `Simulation content for ${finalTitle}.`;
+
+            if (!finalImage) {
+                alert("Failed to generate visual asset. Please check network connectivity.");
+                return;
+            }
 
             setPreviewPost({
                 id: editingPostId || 'preview-' + Date.now(),
                 title: finalTitle,
                 content: finalContent,
                 type: genType || 'COMMUNITY',
-                image: finalImage || imageUrl,
+                image: finalImage,
                 headline: overlayTag,
                 timestamp: new Date().toISOString(),
                 isPublished: false,
-                isSaved: false // Crucial: mark as NOT saved so Confirm handles it
+                isSaved: false
             } as any);
         } catch (e: any) {
             alert('Error creating preview: ' + e.message);
+        } finally {
+            setIsProcessingImage(false);
         }
     };
 
@@ -1351,12 +1369,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                 }}
                                                             >
-                                                                <div className="text-center drop-shadow-2xl">
+                                                                <div className="text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
                                                                     <div
-                                                                        className="text-white text-lg font-black uppercase leading-[0.9] max-w-sm flex flex-wrap justify-center gap-x-1.5"
-                                                                        style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
+                                                                        className="text-white text-2xl font-[900] uppercase tracking-tighter leading-[0.8] max-w-sm flex flex-wrap justify-center gap-x-2"
+                                                                        style={{ fontFamily: 'Outfit, var(--font-outfit), sans-serif' }}
                                                                     >
-                                                                        {(overlayTag || 'AWAITING SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                        {(overlayTag || 'NEW SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                             <span
                                                                                 key={idx}
                                                                                 onPointerDown={(e) => {
@@ -1488,12 +1506,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
                                                         className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
                                                         value={overlayTag}
+                                                        onBlur={() => handleApplyText()}
                                                         onChange={(e) => {
                                                             setOverlayTag(e.target.value);
-                                                            setPurpleWordIndices([]); // Reset when text changes
-                                                            setIsApplyText(true); // Auto-enable visibility
+                                                            setPurpleWordIndices([]);
+                                                            setIsApplyText(true);
+                                                            setIsStageDirty(true);
                                                         }}
-                                                        onBlur={() => handleApplyText()}
                                                     />
                                                 </div>
 

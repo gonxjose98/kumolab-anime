@@ -70,39 +70,24 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // Check/Register Fonts - ROBUST LOADING
-        let fontToUse = 'Sans'; // System default fallback
+        let fontToUse = 'Sans-Serif';
         const fontName = 'Outfit';
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
 
-        console.log(`[Image Engine] Font registration check. Path: ${fontPath}`);
         try {
             if (fs.existsSync(fontPath)) {
-                // Always attempt registration to be sure, napi-rs handles duplicates gracefully or we check .has()
                 if (!GlobalFonts.has(fontName)) {
                     GlobalFonts.registerFromPath(fontPath, fontName);
-                    console.log(`[Image Engine] '${fontName}' registered from path.`);
                 }
-                fontToUse = fontName;
+                fontToUse = `"${fontName}", Impact, Arial, sans-serif`;
             } else {
-                console.warn(`[Image Engine] Font file missing at ${fontPath}. Attempting backup download...`);
-                const backupUrl = 'https://github.com/google/fonts/raw/main/ofl/outfit/static/Outfit-Black.ttf';
-                const res = await fetch(backupUrl);
-                if (res.ok) {
-                    const buf = Buffer.from(await res.arrayBuffer());
-                    GlobalFonts.register(buf, fontName);
-                    fontToUse = fontName;
-                    console.log(`[Image Engine] Backup download for '${fontName}' registered.`);
-                    if (!fs.existsSync(path.dirname(fontPath))) fs.mkdirSync(path.dirname(fontPath), { recursive: true });
-                    fs.writeFileSync(fontPath, buf);
-                } else {
-                    console.error(`[Image Engine] Backup download failed: ${res.status}`);
-                    fontToUse = 'Impact, Arial, sans-serif'; // Better bold fallback
-                }
+                fontToUse = 'Impact, Arial, sans-serif';
             }
         } catch (e) {
             console.error(`[Image Engine] Font load error:`, e);
             fontToUse = 'Impact, Arial, sans-serif';
         }
+        console.log(`[Image Engine] Using font stack: ${fontToUse}`);
 
         // 2. Download source
         let buffer: Buffer;
@@ -235,10 +220,11 @@ export async function generateIntelImage({
             // Since we usually only have headline now, we'll simplify.
             gap = (titleLines.length > 0 && cleanedHeadline.length > 0) ? globalFontSize * 0.25 : 0;
 
-            titleLines = animeTitle.trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 6) : [];
-            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6) : [];
+            titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 6) : [];
+            headlineLines = (cleanedHeadline || '').length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
+
             const maxLineWidth = Math.max(
                 0,
                 ...titleLines.map(l => ctx.measureText(l).width),
@@ -247,11 +233,19 @@ export async function generateIntelImage({
 
             if (totalBlockHeight <= TARGET_ZONE_HEIGHT && maxLineWidth <= availableWidth) break;
             globalFontSize -= 5;
+            if (globalFontSize < 40) break; // Hard floor
         }
 
+        console.log(`[Image Engine] Final Font Size: ${globalFontSize}. Lines: H(${headlineLines.length}) T(${titleLines.length})`);
+
         if (headlineLines.length === 0 && cleanedHeadline.length > 0) {
-            console.warn("[Image Engine] Warning: No headline lines generated. Forcing single line.");
-            headlineLines = [cleanedHeadline];
+            console.warn("[Image Engine] Warning: No headline lines wrapped. Forcing single line.");
+            headlineLines = [cleanedHeadline.substring(0, 40)];
+        }
+
+        // Final sanity check: If still empty but text requested, force a placeholder
+        if (applyText && headlineLines.length === 0 && titleLines.length === 0) {
+            headlineLines = ["KUMOLAB SIGNAL"];
         }
 
         // 6. High-Contrast Gradient
@@ -307,15 +301,18 @@ export async function generateIntelImage({
 
                     words.forEach((word, wordIdx) => {
                         const globalIndex = globalWordOffset + wordIdx;
-                        // For automatic posts, we might not have purpleWordIndices.
-                        // But we want to allow it for manual.
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
                             : false;
 
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
                         ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
-                        ctx.fillText(word, wordX, currentY);
+
+                        // Priority: Manual Text Position > Calculated currentY
+                        const baseDrawY = textPosition ? textPosition.y : currentY;
+                        const safeY = Math.max(50, Math.min(HEIGHT - 50, baseDrawY));
+
+                        ctx.fillText(word, wordX, safeY);
                         wordX += lineMetrics[wordIdx] + spacing;
                     });
 
@@ -324,10 +321,11 @@ export async function generateIntelImage({
                 currentY += lineSpacing + (lineIdx === headlineLines.length - 1 ? gap : 0);
             });
 
-            ctx.font = `bold 24px ${fontToUse}`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.shadowBlur = 0;
-            ctx.fillText(HANDLE_TEXT, centerX, HEIGHT - 30);
+            // Verification Watermark (Proves rendering is active)
+            ctx.font = `bold 32px Arial, sans-serif`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.textAlign = 'center';
+            ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 40);
         }
 
         // 8. Output
