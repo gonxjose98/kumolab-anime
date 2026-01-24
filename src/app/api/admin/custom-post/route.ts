@@ -76,12 +76,14 @@ export async function POST(req: NextRequest) {
             postData.image = finalImageUrl;
         }
 
-        // Only generate slug and timestamp for NEW posts
+        // Deployment Logic: Alerts are always published immediately
+        postData.is_published = type === 'CONFIRMATION_ALERT';
+
+        // Only generate id/slug/timestamp for NEW posts
         if (!postId) {
             postData.id = randomUUID();
             postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
             postData.timestamp = new Date().toISOString();
-            postData.is_published = type === 'CONFIRMATION_ALERT';
         }
 
         let query;

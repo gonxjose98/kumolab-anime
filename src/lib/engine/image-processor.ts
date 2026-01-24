@@ -85,8 +85,14 @@ export async function generateIntelImage({
             console.error(`[Image Engine] Font registration error:`, e);
         }
 
-        const fontToUse = `${fontNameForStack}, Impact, Arial, sans-serif`;
+        const fontToUse = `${fontNameForStack}, Arial, sans-serif`;
         console.log(`[Image Engine] Initialized font stack: ${fontToUse}`);
+
+        // Helper for reliable measurement
+        const safeMeasure = (t: string, currentFontSize: number) => {
+            const m = ctx.measureText(t);
+            return m.width > 0 ? m.width : (t.length * currentFontSize * 0.5);
+        };
 
         // 2. Download source
         let buffer: Buffer;
@@ -211,18 +217,18 @@ export async function generateIntelImage({
         let gap = 0;
 
         while (globalFontSize >= 45) {
-            ctx.font = `bold ${globalFontSize * textScale}px ${fontToUse}`;
-            const spacingMultiplier = (globalFontSize * textScale) < 80 ? 0.9 : 0.95;
-            lineSpacing = (globalFontSize * textScale) * spacingMultiplier;
+            const currentFS = globalFontSize * textScale;
+            ctx.font = `bold ${currentFS}px ${fontToUse}`;
+            const spacingMultiplier = currentFS < 80 ? 0.9 : 0.95;
+            lineSpacing = currentFS * spacingMultiplier;
 
             // Gap should only exist if we have BOTH title and headline.
-            // Since we usually only have headline now, we'll simplify.
             gap = (titleLines.length > 0 && cleanedHeadline.length > 0) ? globalFontSize * 0.25 : 0;
 
-            titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 6) : [];
+            titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6) : [];
             headlineLines = (cleanedHeadline || '').length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6) : [];
 
-            // SAFETY: If measureText is broken (returns 0), wrapText might return [].
+            // SAFETY: Force one line if wrapping returned nothing for content
             if (titleLines.length === 0 && (animeTitle || '').trim().length > 0) titleLines = [(animeTitle || '').toUpperCase()];
             if (headlineLines.length === 0 && (cleanedHeadline || '').length > 0) headlineLines = [cleanedHeadline];
 
@@ -230,8 +236,8 @@ export async function generateIntelImage({
 
             const maxLineWidth = Math.max(
                 0,
-                ...titleLines.map(l => ctx.measureText(l).width),
-                ...headlineLines.map(l => (ctx.measureText(l).width))
+                ...titleLines.map(l => safeMeasure(l, currentFS)),
+                ...headlineLines.map(l => safeMeasure(l, currentFS))
             );
 
             if (totalBlockHeight <= TARGET_ZONE_HEIGHT && maxLineWidth <= availableWidth) break;
@@ -276,22 +282,16 @@ export async function generateIntelImage({
         }
 
         // 7. Draw Text
-        // 7. Draw Text
         if (applyText) {
             const finalFontSize = Math.max(30, globalFontSize * textScale);
-            const calculatedDefaultY = (isTop ? 100 : HEIGHT - totalBlockHeight - 100);
-
-            // Absolute numbers check and normalization
-            let currentY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : calculatedDefaultY;
-            const drawX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : centerX;
-
             ctx.textBaseline = 'top';
             ctx.fillStyle = '#FFFFFF';
-            // Use specific bold fallback for drawing
-            const fontStack = `bold ${finalFontSize}px ${fontToUse}, Arial, sans-serif`;
-            ctx.font = fontStack;
+            const drawFont = `bold ${finalFontSize}px ${fontToUse}`;
+            ctx.font = drawFont;
 
-            console.log(`[Image Engine] Rendering text at ${drawX}, ${currentY} stack: ${fontStack}`);
+            const calculatedDefaultY = (isTop ? 100 : HEIGHT - totalBlockHeight - 100);
+            let currentY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : calculatedDefaultY;
+            const drawX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : centerX;
 
             // High intensity shadow for maximum visibility
             ctx.shadowColor = 'rgba(0, 0, 0, 1.0)';
@@ -302,21 +302,18 @@ export async function generateIntelImage({
             const allLines = [...headlineLines, ...titleLines];
             let globalWordOffset = 0;
 
-            if (allLines.length === 0 && applyText) {
-                // emergency draw
-                ctx.fillText("SIGNAL: ONLINE", centerX, HEIGHT / 2);
-            }
-
             allLines.forEach((line, lineIdx) => {
                 const words = line.split(/\s+/).filter(Boolean);
                 if (words.length > 0) {
                     // Force re-measure if needed with sanity fallback
-                    const lineMetrics = words.map(w => ctx.measureText(w).width || (w.length * finalFontSize * 0.45));
-                    const spaceWidth = ctx.measureText(' ').width || (finalFontSize * 0.2);
+                    const lineMetrics = words.map(w => safeMeasure(w, finalFontSize));
+                    const spaceWidth = safeMeasure(' ', finalFontSize);
                     const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0) + (words.length - 1) * spaceWidth;
 
                     let wordX = drawX - (totalLineLength / 2);
                     const yPos = currentY + (lineIdx * lineSpacing);
+
+                    ctx.textAlign = 'left'; // MANDATORY FIX
 
                     words.forEach((word, wordIdx) => {
                         const globalIndex = globalWordOffset + wordIdx;
@@ -330,9 +327,8 @@ export async function generateIntelImage({
                         wordX += lineMetrics[wordIdx] + spaceWidth;
                     });
                     globalWordOffset += words.length;
-                    console.log(`[Image Engine] Drew Line ${lineIdx}: "${line}" at Y: ${yPos}`);
+                    console.log(`[Image Engine] Rendered line: "${line}" at X:${wordX.toFixed(0)} Y:${yPos.toFixed(0)}`);
                 }
-                // Update currentY for automatic flows (if needed for later components)
             });
         }
 
@@ -340,9 +336,9 @@ export async function generateIntelImage({
         ctx.save();
         ctx.shadowBlur = 0;
         ctx.font = 'bold 36px Arial, sans-serif';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.textAlign = 'center';
-        ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 60);
+        ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 50);
         ctx.restore();
 
         // 8. Output
