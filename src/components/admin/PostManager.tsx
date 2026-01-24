@@ -402,7 +402,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             }
 
             // Reliable Base64 to File conversion (replaces buggy fetch on data-uris)
-            let imageFileToUpload: File | null = null;
+            let imageFileToUpload: Blob | null = null;
+            let imageFileName: string = "image.png";
+
             if (finalImageToSave && finalImageToSave.startsWith('data:')) {
                 const parts = finalImageToSave.split(',');
                 const byteString = atob(parts[1]);
@@ -413,19 +415,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     ia[i] = byteString.charCodeAt(i);
                 }
                 const blob = new Blob([ab], { type: mimeString });
-                imageFileToUpload = new File([blob], "processed-vision.png", { type: "image/png" });
+                imageFileToUpload = blob;
+                imageFileName = "processed-vision.png";
             } else if (customImage) {
                 imageFileToUpload = customImage;
+                imageFileName = customImage.name;
             }
 
             const formData = new FormData();
             formData.append('title', finalTitle);
             formData.append('content', content || `Transmission for ${finalTitle}.`);
             formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
-            formData.append('headline', overlayTag || 'FEATURED');
+            formData.append('headline', (overlayTag || 'FEATURED').toUpperCase());
 
             if (imageFileToUpload) {
-                formData.append('image', imageFileToUpload);
+                formData.append('image', imageFileToUpload, imageFileName);
                 formData.append('skipProcessing', 'true');
             } else if (editingPostId) {
                 formData.append('skipProcessing', 'true');

@@ -212,7 +212,7 @@ export async function generateIntelImage({
         let gap = 0;
 
         while (globalFontSize >= 45) {
-            ctx.font = `900 ${globalFontSize * textScale}px ${fontToUse}`;
+            ctx.font = `bold ${globalFontSize * textScale}px ${fontToUse}`;
             const spacingMultiplier = (globalFontSize * textScale) < 80 ? 0.9 : 0.95;
             lineSpacing = (globalFontSize * textScale) * spacingMultiplier;
 
@@ -290,7 +290,7 @@ export async function generateIntelImage({
 
                 if (words.length > 0) {
                     const lineMetrics = words.map(w => {
-                        ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
+                        ctx.font = `bold ${finalFontSize}px ${fontToUse}`;
                         return ctx.measureText(w).width;
                     });
                     const spacing = ctx.measureText(' ').width;
@@ -299,20 +299,34 @@ export async function generateIntelImage({
 
                     ctx.textAlign = 'left';
 
+                    // Fix: Multi-line stacking logic
+                    const yOffsetDelta = lineIdx * lineSpacing;
+                    const baseDrawY = textPosition ? textPosition.y + yOffsetDelta : currentY;
+                    const safeY = Math.max(50, Math.min(HEIGHT - 50, baseDrawY));
+
                     words.forEach((word, wordIdx) => {
                         const globalIndex = globalWordOffset + wordIdx;
                         const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
                             ? (purpleWordIndices.includes(globalIndex))
                             : false;
 
-                        ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
+                        const textColor = isPurple ? '#9D7BFF' : '#FFFFFF';
 
-                        // Priority: Manual Text Position > Calculated currentY
-                        const baseDrawY = textPosition ? textPosition.y : currentY;
-                        const safeY = Math.max(50, Math.min(HEIGHT - 50, baseDrawY));
+                        // Enhanced High-Contrast Drawing
+                        ctx.save();
+                        ctx.font = `bold ${finalFontSize}px ${fontToUse}`;
 
+                        // Thick Deep Shadow
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+                        ctx.shadowBlur = 12;
+                        ctx.shadowOffsetX = 3;
+                        ctx.shadowOffsetY = 3;
+
+                        // Main Fill
+                        ctx.fillStyle = textColor;
                         ctx.fillText(word, wordX, safeY);
+                        ctx.restore();
+
                         wordX += lineMetrics[wordIdx] + spacing;
                     });
 
