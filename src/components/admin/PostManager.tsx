@@ -242,7 +242,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: '',
+                    title: (title || topic || '').toUpperCase(),
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
@@ -1164,6 +1164,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={title}
                                                     onChange={(e) => setTitle(e.target.value)}
+                                                    onBlur={() => handleApplyText()}
                                                 />
                                                 {genType === 'CONFIRMATION_ALERT' && (
                                                     <p className="mt-1 text-[9px] text-orange-500 font-bold uppercase tracking-tighter">
@@ -1384,7 +1385,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         className="text-white text-2xl font-[900] uppercase tracking-tighter leading-[0.8] max-w-sm flex flex-wrap justify-center gap-x-2"
                                                                         style={{ fontFamily: 'Outfit, var(--font-outfit), sans-serif' }}
                                                                     >
-                                                                        {(overlayTag || 'NEW SIGNAL').split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                        {`${overlayTag || 'NEWS'} ${title || topic || ''}`.split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                             <span
                                                                                 key={idx}
                                                                                 onPointerDown={(e) => {
