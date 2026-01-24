@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
             title,
             type,
             content: content || `Check out: ${title}`,
-            headline: headline, // Save the overlay text/headline
+            excerpt: headline, // Map internal headline to DB excerpt for storage
         };
 
         if (finalImageUrl) {
@@ -103,8 +103,8 @@ export async function POST(req: NextRequest) {
         const { data, error } = await query;
 
         if (error) {
-            console.error('Database error:', error);
-            return NextResponse.json({ error: 'Failed to save post' }, { status: 500 });
+            console.error('[Admin DB] Detailed Error:', error);
+            return NextResponse.json({ error: `Database Error: ${error.message} (${error.code})` }, { status: 500 });
         }
 
         // Clean up temp file ONLY if we generated a new one via processing

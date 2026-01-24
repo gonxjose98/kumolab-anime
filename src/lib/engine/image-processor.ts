@@ -222,7 +222,11 @@ export async function generateIntelImage({
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, animeTitle.toUpperCase(), availableWidth, 6) : [];
             headlineLines = (cleanedHeadline || '').length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6) : [];
 
-            totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + gap;
+            // SAFETY: If measureText is broken (returns 0), wrapText might return [].
+            if (titleLines.length === 0 && (animeTitle || '').trim().length > 0) titleLines = [(animeTitle || '').toUpperCase()];
+            if (headlineLines.length === 0 && (cleanedHeadline || '').length > 0) headlineLines = [cleanedHeadline];
+
+            totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing + (titleLines.length > 0 && headlineLines.length > 0 ? gap : 0);
 
             const maxLineWidth = Math.max(
                 0,
@@ -232,10 +236,10 @@ export async function generateIntelImage({
 
             if (totalBlockHeight <= TARGET_ZONE_HEIGHT && maxLineWidth <= availableWidth) break;
             globalFontSize -= 5;
-            if (globalFontSize < 40) break; // Hard floor
+            if (globalFontSize < 40) break;
         }
 
-        console.log(`[Image Engine] Final Font Size: ${globalFontSize}. Lines: H(${headlineLines.length}) T(${titleLines.length})`);
+        console.log(`[Image Engine] Processing Complete. Lines: H(${headlineLines.length}) T(${titleLines.length}), FontSize: ${globalFontSize}, BlockH: ${totalBlockHeight}`);
 
         if (headlineLines.length === 0 && cleanedHeadline.length > 0) {
             console.warn("[Image Engine] Warning: No headline lines wrapped. Forcing single line.");
@@ -272,77 +276,74 @@ export async function generateIntelImage({
         }
 
         // 7. Draw Text
+        // 7. Draw Text
         if (applyText) {
-            const finalFontSize = Math.max(20, globalFontSize * textScale);
-            let currentY = textPosition ? textPosition.y : (isTop ? 80 : HEIGHT - totalBlockHeight - 80);
-            const drawX = textPosition ? textPosition.x : centerX;
+            const finalFontSize = Math.max(30, globalFontSize * textScale);
+            const calculatedDefaultY = (isTop ? 100 : HEIGHT - totalBlockHeight - 100);
+
+            // Absolute numbers check and normalization
+            let currentY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : calculatedDefaultY;
+            const drawX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : centerX;
 
             ctx.textBaseline = 'top';
             ctx.fillStyle = '#FFFFFF';
             // Use specific bold fallback for drawing
-            const drawFont = `bold ${finalFontSize}px "${fontToUse}", Impact, Arial, sans-serif`;
-            ctx.font = drawFont;
+            const fontStack = `bold ${finalFontSize}px ${fontToUse}, Arial, sans-serif`;
+            ctx.font = fontStack;
 
-            // Draw Combined Lines (Headline then Title)
+            console.log(`[Image Engine] Rendering text at ${drawX}, ${currentY} stack: ${fontStack}`);
+
+            // High intensity shadow for maximum visibility
+            ctx.shadowColor = 'rgba(0, 0, 0, 1.0)';
+            ctx.shadowBlur = 25;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 4;
+
             const allLines = [...headlineLines, ...titleLines];
             let globalWordOffset = 0;
 
+            if (allLines.length === 0 && applyText) {
+                // emergency draw
+                ctx.fillText("SIGNAL: ONLINE", centerX, HEIGHT / 2);
+            }
+
             allLines.forEach((line, lineIdx) => {
                 const words = line.split(/\s+/).filter(Boolean);
-
                 if (words.length > 0) {
-                    const lineMetrics = words.map(w => {
-                        ctx.font = `bold ${finalFontSize}px ${fontToUse}`;
-                        return ctx.measureText(w).width;
-                    });
-                    const spacing = ctx.measureText(' ').width;
-                    const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0) + (words.length - 1) * spacing;
-                    let wordX = drawX - totalLineLength / 2;
+                    // Force re-measure if needed with sanity fallback
+                    const lineMetrics = words.map(w => ctx.measureText(w).width || (w.length * finalFontSize * 0.45));
+                    const spaceWidth = ctx.measureText(' ').width || (finalFontSize * 0.2);
+                    const totalLineLength = lineMetrics.reduce((a, b) => a + b, 0) + (words.length - 1) * spaceWidth;
 
-                    ctx.textAlign = 'left';
-
-                    // Fix: Multi-line stacking logic
-                    const yOffsetDelta = lineIdx * lineSpacing;
-                    const baseDrawY = textPosition ? textPosition.y + yOffsetDelta : currentY;
-                    const safeY = Math.max(50, Math.min(HEIGHT - 50, baseDrawY));
+                    let wordX = drawX - (totalLineLength / 2);
+                    const yPos = currentY + (lineIdx * lineSpacing);
 
                     words.forEach((word, wordIdx) => {
                         const globalIndex = globalWordOffset + wordIdx;
-                        const isPurple = (purpleWordIndices && purpleWordIndices.length > 0)
-                            ? (purpleWordIndices.includes(globalIndex))
-                            : false;
+                        const isPurple = (purpleWordIndices && purpleWordIndices.includes(globalIndex));
 
-                        const textColor = isPurple ? '#9D7BFF' : '#FFFFFF';
-
-                        // Enhanced High-Contrast Drawing
                         ctx.save();
-                        ctx.font = `bold ${finalFontSize}px ${fontToUse}`;
-
-                        // Thick Deep Shadow
-                        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-                        ctx.shadowBlur = 12;
-                        ctx.shadowOffsetX = 3;
-                        ctx.shadowOffsetY = 3;
-
-                        // Main Fill
-                        ctx.fillStyle = textColor;
-                        ctx.fillText(word, wordX, safeY);
+                        ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                        ctx.fillText(word, wordX, yPos);
                         ctx.restore();
 
-                        wordX += lineMetrics[wordIdx] + spacing;
+                        wordX += lineMetrics[wordIdx] + spaceWidth;
                     });
-
                     globalWordOffset += words.length;
+                    console.log(`[Image Engine] Drew Line ${lineIdx}: "${line}" at Y: ${yPos}`);
                 }
-                currentY += lineSpacing + (lineIdx === headlineLines.length - 1 ? gap : 0);
+                // Update currentY for automatic flows (if needed for later components)
             });
-
-            // Verification Watermark (Proves rendering is active)
-            ctx.font = `bold 32px Arial, sans-serif`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.textAlign = 'center';
-            ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 50);
         }
+
+        // Final Heartbeat Watermark (Always draws to prove engine is alive)
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 36px Arial, sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.textAlign = 'center';
+        ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 60);
+        ctx.restore();
 
         // 8. Output
         const finalBuffer = await canvas.toBuffer('image/png');
@@ -403,13 +404,23 @@ export async function generateIntelImage({
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number): string[] {
     if (!text || !text.trim()) return [];
     const words = text.split(/\s+/).filter(Boolean);
-    const lines = [];
     if (words.length === 0) return [];
 
+    const lines: string[] = [];
     let currentLine = words[0];
+
     for (let i = 1; i < words.length; i++) {
         const word = words[i];
-        const width = ctx.measureText(currentLine + " " + word).width;
+        // SAFETY: If measureText returns 0 (broken font), assume a fixed char width of 0.5 * fontSize
+        const fontSizeMatch = ctx.font.match(/(\d+)px/);
+        const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 40;
+
+        let width = ctx.measureText(currentLine + " " + word).width;
+        if (width === 0) {
+            // Fallback: estimate width based on characters
+            width = (currentLine.length + word.length + 1) * (fontSize * 0.5);
+        }
+
         if (width < maxWidth) {
             currentLine += " " + word;
         } else {
