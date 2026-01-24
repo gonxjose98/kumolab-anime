@@ -11,6 +11,8 @@ export async function POST(request: NextRequest) {
             textPos, textScale, gradientPos, purpleIndex
         } = await request.json();
 
+        console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText, applyGradient });
+
         if (!imageUrl) {
             return NextResponse.json({ success: false, error: 'Image URL is required' }, { status: 400 });
         }

@@ -462,11 +462,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
                     alert(`Transmission ${editingPostId ? 'updated' : 'deployed'} successfully.`);
                 } else {
-                    setPreviewPost({
+                    // CRITICAL: Ensure we use the processed image for the preview if we saved one
+                    const previewData: any = {
                         ...data.post,
                         image: finalImageToSave || data.post.image,
                         isSaved: true
-                    } as any);
+                    };
+
+                    // Force the locally held visuals if they exist to avoid stale cloud versions
+                    if (processedImage) previewData.image = processedImage;
+
+                    setPreviewPost(previewData);
                 }
             } else {
                 alert('FAILURE: ' + (data.error || 'Server rejected the transmission signal.'));

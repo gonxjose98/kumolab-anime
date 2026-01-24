@@ -70,24 +70,23 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // Check/Register Fonts - ROBUST LOADING
-        let fontToUse = 'Sans-Serif';
-        const fontName = 'Outfit';
+        let fontNameForStack = 'Arial';
+        const customFontName = 'Outfit';
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
 
         try {
             if (fs.existsSync(fontPath)) {
-                if (!GlobalFonts.has(fontName)) {
-                    GlobalFonts.registerFromPath(fontPath, fontName);
+                if (!GlobalFonts.has(customFontName)) {
+                    GlobalFonts.registerFromPath(fontPath, customFontName);
                 }
-                fontToUse = `"${fontName}", Impact, Arial, sans-serif`;
-            } else {
-                fontToUse = 'Impact, Arial, sans-serif';
+                fontNameForStack = `"${customFontName}"`;
             }
         } catch (e) {
-            console.error(`[Image Engine] Font load error:`, e);
-            fontToUse = 'Impact, Arial, sans-serif';
+            console.error(`[Image Engine] Font registration error:`, e);
         }
-        console.log(`[Image Engine] Using font stack: ${fontToUse}`);
+
+        const fontToUse = `${fontNameForStack}, Impact, Arial, sans-serif`;
+        console.log(`[Image Engine] Initialized font stack: ${fontToUse}`);
 
         // 2. Download source
         let buffer: Buffer;
@@ -252,6 +251,7 @@ export async function generateIntelImage({
         if (applyGradient) {
             const gradientHeight = totalBlockHeight + 250;
             const gradientYStart = isTop ? 0 : HEIGHT - gradientHeight;
+            console.log(`[Image Engine] Drawing Gradient. H: ${gradientHeight}, Y: ${gradientYStart}, Top: ${isTop}`);
             const gradient = ctx.createLinearGradient(0, gradientYStart, 0, isTop ? gradientHeight : HEIGHT);
 
             if (isTop) {
@@ -273,13 +273,15 @@ export async function generateIntelImage({
 
         // 7. Draw Text
         if (applyText) {
-            const finalFontSize = globalFontSize * textScale;
+            const finalFontSize = Math.max(20, globalFontSize * textScale);
             let currentY = textPosition ? textPosition.y : (isTop ? 80 : HEIGHT - totalBlockHeight - 80);
             const drawX = textPosition ? textPosition.x : centerX;
 
             ctx.textBaseline = 'top';
-            ctx.font = `900 ${finalFontSize}px ${fontToUse}`;
             ctx.fillStyle = '#FFFFFF';
+            // Use specific bold fallback for drawing
+            const drawFont = `bold ${finalFontSize}px "${fontToUse}", Impact, Arial, sans-serif`;
+            ctx.font = drawFont;
 
             // Draw Combined Lines (Headline then Title)
             const allLines = [...headlineLines, ...titleLines];
@@ -339,7 +341,7 @@ export async function generateIntelImage({
             ctx.font = `bold 32px Arial, sans-serif`;
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.textAlign = 'center';
-            ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 40);
+            ctx.fillText(HANDLE_TEXT, WIDTH / 2, HEIGHT - 50);
         }
 
         // 8. Output
