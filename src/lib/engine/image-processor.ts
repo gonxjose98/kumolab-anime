@@ -163,30 +163,30 @@ export async function generateIntelImage({
         const isTop = gradientPosition === 'top';
         let targetZonePercentage = 0.35;
 
-        // --- AUTOMATIC OBSTRUCTION DETECTION (HEURISTIC) ---
-        try {
-            const detectionZoneY = isTop ? 0 : HEIGHT * 0.65;
-            const detectionZoneHeight = HEIGHT * 0.35;
-            const imageData = ctx.getImageData(0, detectionZoneY, WIDTH, detectionZoneHeight);
-            const pixels = imageData.data;
-            let skinTonePixels = 0;
+        // --- AUTOMATIC OBSTRUCTION DETECTION (DISABLED FOR USER CONTROL) ---
+        // try {
+        //     const detectionZoneY = isTop ? 0 : HEIGHT * 0.65;
+        //     const detectionZoneHeight = HEIGHT * 0.35;
+        //     const imageData = ctx.getImageData(0, detectionZoneY, WIDTH, detectionZoneHeight);
+        //     const pixels = imageData.data;
+        //     let skinTonePixels = 0;
 
-            for (let i = 0; i < pixels.length; i += 4) {
-                const r = pixels[i];
-                const g = pixels[i + 1];
-                const b = pixels[i + 2];
-                const isSkin = r > 200 && g > 160 && b > 130 && r > g && (r - b) < 100;
-                if (isSkin) skinTonePixels++;
-            }
+        //     for (let i = 0; i < pixels.length; i += 4) {
+        //         const r = pixels[i];
+        //         const g = pixels[i + 1];
+        //         const b = pixels[i + 2];
+        //         const isSkin = r > 200 && g > 160 && b > 130 && r > g && (r - b) < 100;
+        //         if (isSkin) skinTonePixels++;
+        //     }
 
-            const skinPercentage = (skinTonePixels / (WIDTH * detectionZoneHeight)) * 100;
-            if (skinPercentage > 2.5) {
-                console.log(`[Image Engine] Character face detected in ${textPosition} zone (${skinPercentage.toFixed(1)}%). Reducing text limit to 30%.`);
-                targetZonePercentage = 0.30;
-            }
-        } catch (e) {
-            console.warn('[Image Engine] Obstruction detection failed, falling back to 35%.', e);
-        }
+        //     const skinPercentage = (skinTonePixels / (WIDTH * detectionZoneHeight)) * 100;
+        //     if (skinPercentage > 2.5) {
+        //         console.log(`[Image Engine] Character face detected in ${textPosition} zone (${skinPercentage.toFixed(1)}%). Reducing text limit to 30%.`);
+        //         targetZonePercentage = 0.30;
+        //     }
+        // } catch (e) {
+        //     console.warn('[Image Engine] Obstruction detection failed, falling back to 35%.', e);
+        // }
 
         const TARGET_ZONE_HEIGHT = HEIGHT * targetZonePercentage;
 

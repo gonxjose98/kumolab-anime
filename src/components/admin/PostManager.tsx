@@ -233,7 +233,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         if (!imageUrl) return null;
 
-        const signalText = (overlayTag || '').trim() || 'NEW SIGNAL'; // Fallback if empty but visibility requested
+        const signalText = (overlayTag || '').trim() || 'NEWS'; // Fallback to NEWS to match frontend renderer
         setIsProcessingImage(true);
         setIsApplyingEffect(true);
         try {
@@ -242,7 +242,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: (title || topic || '').toUpperCase(),
+                    title: (title || topic || '').trim().toUpperCase(),
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
@@ -1385,7 +1385,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         className="text-white text-2xl font-[900] uppercase tracking-tighter leading-[0.8] max-w-sm flex flex-wrap justify-center gap-x-2"
                                                                         style={{ fontFamily: 'Outfit, var(--font-outfit), sans-serif' }}
                                                                     >
-                                                                        {`${overlayTag || 'NEWS'} ${title || topic || ''}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                        {`${(overlayTag || '').trim() || 'NEWS'} ${(title || topic || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                             <span
                                                                                 key={idx}
                                                                                 onPointerDown={(e) => {
