@@ -360,9 +360,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     // Modified Generate Preview to use the manually processed image if available
-    const handleGeneratePreview = async () => {
+    const handleSavePost = async (autoClose: boolean = false) => {
         setIsGenerating(true);
-        setPreviewPost(null);
+        // Do NOT reset previewPost here if we are just saving, 
+        // unless we want to hide it during the save.
 
         // Ensure we have a processed image if we have FX configuration active
         let finalImageToSave = processedImage;
@@ -378,7 +379,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // Enforce title requirements for Confirmation Alerts
         if (genType === 'CONFIRMATION_ALERT') {
             const validPrefixes = ['JUST CONFIRMED', 'OFFICIAL', 'CONFIRMED'];
-            const upperTitle = (title || topic).toUpperCase().trim();
+            const upperTitle = (title || topic || '').toUpperCase().trim();
             const hasValidPrefix = validPrefixes.some(prefix => upperTitle.startsWith(prefix));
 
             if (!hasValidPrefix) {
@@ -389,178 +390,112 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
 
         try {
-            if (genType === 'CUSTOM' || processedImage || editingPostId) {
-                // If we have a processed image, use Custom Post flow to save it
-                // Or if it's a manual custom post OR an edit
-                if (!title) {
-                    // If title missing but we have topic (from manual flow), use topic
-                    if (genType !== 'CUSTOM' && !topic) {
-                        alert('Title or Topic is required');
-                        setIsGenerating(false);
-                        return;
-                    }
-                }
+            const finalTitle = title || topic;
 
-                const finalTitle = title || topic;
-                const finalContent = content || `Check out the latest on ${finalTitle}.`;
+            // Convert Base64 processed image to File for upload
+            let imagePayload: File | null = null;
+            if (finalImageToSave && finalImageToSave.startsWith('data:')) {
+                const res = await fetch(finalImageToSave);
+                const blob = await res.blob();
+                imagePayload = new File([blob], "processed-image.png", { type: "image/png" });
+            } else if (customImage) {
+                imagePayload = customImage;
+            }
 
-                // If we have a processed Base64 image, we need to send it.
-                // The /api/admin/custom-post expects formData with 'image' file.
-                // We might need to convert base64 to blob or update the API.
-                // For now, let's assume we can Convert Base64 -> File
+            const formData = new FormData();
+            formData.append('title', finalTitle);
+            formData.append('content', content || `Check out the latest on ${finalTitle}.`);
+            formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
+            formData.append('headline', overlayTag);
 
-                let imagePayload: File | string | null = customImage;
+            if (imagePayload) {
+                formData.append('image', imagePayload);
+                formData.append('skipProcessing', 'true'); // We already processed it or it's raw
+            } else if (editingPostId && !customImage) {
+                // If editing and no new image, we keep the old one but might update metadata
+                formData.append('skipProcessing', 'true');
+            }
 
-                if (processedImage) {
-                    // Convert Base64 to Blob
-                    const res = await fetch(processedImage);
-                    const blob = await res.blob();
-                    imagePayload = new File([blob], "processed-image.png", { type: "image/png" });
-                }
+            if (editingPostId) {
+                formData.append('postId', editingPostId);
+            }
 
-                if (!imagePayload && !customImage && !editingPostId) {
-                    alert('Image required');
-                    setIsGenerating(false);
-                    return;
-                }
+            const response = await fetch('/api/admin/custom-post', {
+                method: 'POST',
+                body: formData
+            });
 
-                const formData = new FormData();
-                formData.append('title', finalTitle);
-                formData.append('content', finalContent);
-                formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
-                formData.append('headline', overlayTag);
-                if (imagePayload) formData.append('image', imagePayload as Blob);
-                if (processedImage || (!imagePayload && customImagePreview)) {
-                    formData.append('skipProcessing', 'true');
-                }
+            const data = await response.json();
+            if (data.success && data.post) {
+                // Update local list
                 if (editingPostId) {
-                    formData.append('postId', editingPostId);
+                    setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
+                } else {
+                    setPosts(current => [data.post, ...current]);
                 }
 
-                const response = await fetch('/api/admin/custom-post', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (data.success && data.post) {
-                    // If we have a processedImage, use it for the preview instead of the database image
-                    // This ensures the user sees their text overlay changes immediately
-                    const previewData = {
+                if (autoClose) {
+                    setShowModal(false);
+                    setPreviewPost(null);
+                    setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+                } else {
+                    // Update preview card to show it's saved
+                    setPreviewPost({
                         ...data.post,
                         image: finalImageToSave || data.post.image,
-                        headline: overlayTag || data.post.headline
-                    };
-                    setPreviewPost(previewData);
-                    if (editingPostId) {
-                        setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
-                    } else {
-                        setPosts([data.post, ...posts]);
-                    }
-                } else {
-                    alert('Save failed: ' + (data.error || 'Unknown error'));
+                        isSaved: true // flag to indicate DB sync is done
+                    } as any);
                 }
             } else {
-                // ... Original Auto-Gen Logic (Fallback if no manual image intervention) ...
-                if (editingPostId) {
-                    alert('Direct auto-gen in edit mode not supported. Please use the visual editor tools above.');
-                    setIsGenerating(false);
-                    return;
-                }
-                const response = await fetch('/api/admin/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: genType,
-                        topic: topic || undefined,
-                        title: title || undefined,
-                        content: content || undefined
-                    })
-                });
-
-                const data = await response.json();
-                if (data.success && data.post) {
-                    setPreviewPost(data.post);
-                    setPosts([data.post, ...posts]);
-                } else {
-                    alert('Generation failed: ' + (data.error || 'Unknown error'));
-                }
+                alert('Save failed: ' + (data.error || 'Unknown error'));
             }
         } catch (e: any) {
-            alert('Error generating post: ' + e.message);
+            alert('Error saving post: ' + e.message);
         } finally {
             setIsGenerating(false);
         }
     };
 
-    const handleConfirm = () => {
-        // Post is already saved by the API.
-        // User just closes modal and sees it in list.
-        setShowModal(false);
-        setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+    // Keep handleGeneratePreview for auto-gen compatibility but route to save
+    const handleGeneratePreview = () => handleSavePost(false);
+
+    const handleConfirm = async () => {
+        // If it's a preview that hasn't been saved yet, save it now.
+        if (previewPost && !(previewPost as any).isSaved) {
+            await handleSavePost(true);
+        } else {
+            setShowModal(false);
+            setPreviewPost(null);
+            setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+        }
     };
 
     const handleCommitToPreview = async () => {
         try {
-            // Get the base image
+            // Get the latest possible visuals
+            let finalImage = processedImage;
             const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
                 ? searchedImages[selectedImageIndex]
                 : customImagePreview;
 
-            if (!imageUrl) {
-                alert('No image available to preview');
-                return;
+            if (!finalImage && imageUrl) {
+                // If not processed yet, do it now
+                finalImage = await handleApplyText();
             }
 
-            // If there's text to apply, process the image first
-            let finalImage = processedImage || imageUrl;
-
-            if (overlayTag && (isApplyText || isApplyGradient)) {
-                setIsProcessingImage(true);
-                try {
-                    const res = await fetch('/api/admin/process-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            imageUrl,
-                            title: '',
-                            headline: overlayTag,
-                            scale: imageScale,
-                            position: imagePosition,
-                            applyText: isApplyText,
-                            applyGradient: isApplyGradient,
-                            textPos: textPosition,
-                            textScale,
-                            gradientPos: gradientPosition,
-                            purpleIndex: purpleWordIndices
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        finalImage = data.processedImage;
-                        setProcessedImage(data.processedImage);
-                    }
-                } catch (e) {
-                    console.error('Error processing image for preview:', e);
-                } finally {
-                    setIsProcessingImage(false);
-                }
-            }
-
-            // Create the preview with the processed image
-            const finalTitle = title || topic;
-            const finalContent = content || `Check out the latest on ${finalTitle}.`;
+            const finalTitle = title || topic || 'UNTITLED SIGNAL';
+            const finalContent = content || `Simulation content for ${finalTitle}.`;
 
             setPreviewPost({
-                id: editingPostId,
+                id: editingPostId || 'preview-' + Date.now(),
                 title: finalTitle,
                 content: finalContent,
                 type: genType || 'COMMUNITY',
-                image: finalImage,
+                image: finalImage || imageUrl,
                 headline: overlayTag,
-                slug: '',
                 timestamp: new Date().toISOString(),
-                isPublished: false
+                isPublished: false,
+                isSaved: false // Crucial: mark as NOT saved so Confirm handles it
             } as any);
         } catch (e: any) {
             alert('Error creating preview: ' + e.message);
@@ -569,19 +504,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     const handleCancel = async () => {
-        if (previewPost) {
-            // Remove from local state immediately so it 'disappears' for user
-            // Use functional update to ensure we have latest state
-            setPosts(currentPosts => currentPosts.filter(p => p.id !== previewPost.id));
+        // If we are editing, JUST CLOSE. Do NOT delete the post!
+        if (editingPostId) {
+            setPreviewPost(null);
+            setShowModal(false);
+            return;
+        }
 
-            // Delete from DB (Cleanup)
+        if (previewPost && (previewPost as any).isSaved) {
+            // Only delete if it's a NEW post that was saved to the DB as a temporary draft
             try {
                 const res = await fetch(`/api/posts?id=${encodeURIComponent(previewPost.id as string)}`, { method: 'DELETE' });
-                if (!res.ok) {
-
-                    console.error("Delete draft failed:", await res.text());
-                } else {
-                    console.log("Draft deleted successfully");
+                if (res.ok) {
+                    setPosts(currentPosts => currentPosts.filter(p => p.id !== previewPost.id));
                 }
             } catch (e) {
                 console.error("Failed to delete draft:", e);
@@ -1720,7 +1655,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         {/* Main Generation Action */}
                         <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                             <button
-                                onClick={handleGeneratePreview}
+                                onClick={() => handleSavePost(editingPostId ? true : false)}
                                 disabled={isGenerating || isApplyingEffect}
                                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
                             >
