@@ -1372,7 +1372,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         }}
                                                     >
                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={searchedImages[selectedImageIndex ?? 0]} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                                                        <img src={searchedImages[selectedImageIndex ?? 0]} alt="" className="w-full h-full object-contain pointer-events-none select-none" />
                                                     </div>
 
                                                     {/* 2. Gradient Layer (Visual Only) */}
@@ -1475,6 +1475,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     >
                                                         {isImageLocked ? <Lock size={12} /> : <Unlock size={12} />} {isImageLocked ? 'LOCKED' : 'UNLOCK'}
                                                     </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            const col = !isApplyGradient;
+                                                            setIsApplyGradient(col);
+                                                            handleApplyText(undefined, undefined, undefined, col);
+                                                        }}
+                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyGradient ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                    >
+                                                        {isApplyGradient ? <Zap size={12} /> : <EyeOff size={12} />} {isApplyGradient ? 'GRADIENT: ON' : 'GRADIENT: OFF'}
+                                                    </button>
                                                 </div>
 
                                                 {/* Text Tools */}
@@ -1513,6 +1523,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
                                                     >
                                                         {isTextLocked ? <Lock size={12} /> : <Unlock size={12} />} {isTextLocked ? 'FIXED' : 'FREE'}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            const newVal = !isApplyText;
+                                                            setIsApplyText(newVal);
+                                                            handleApplyText(undefined, undefined, newVal);
+                                                        }}
+                                                        className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyText ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                    >
+                                                        {isApplyText ? <Eye size={12} /> : <EyeOff size={12} />} {isApplyText ? 'TEXT: ON' : 'TEXT: OFF'}
                                                     </button>
                                                 </div>
                                             </div>
