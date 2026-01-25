@@ -225,7 +225,9 @@ export async function fetchOfficialAnimeImage(title: string): Promise<string | n
         });
         const json = await response.json();
         const media = json.data?.Media;
-        return media?.coverImage?.extraLarge || media?.bannerImage || media?.coverImage?.large || null;
+        // Prioritize Banner Image (Horizontal) for higher quality social cards
+        // extraLarge cover is often vertical and gets cropped poorly.
+        return media?.bannerImage || media?.coverImage?.extraLarge || media?.coverImage?.large || null;
     } catch {
         return null;
     }
@@ -238,13 +240,16 @@ export async function fetchOfficialAnimeImage(title: string): Promise<string | n
  * Fetches real Anime News from ANN/Crunchyroll RSS (Simulated parsing)
  */
 export async function fetchAnimeIntel(): Promise<any[]> {
+    let items: any[] = [];
+    const { CONTENT_RULES, SOURCE_TIERS } = await import('./sources-config');
+
+    // 1. Try to fetch from RSS
     try {
         // Using AnimeNewsNetwork RSS
         const response = await fetch('https://www.animenewsnetwork.com/news/rss.xml');
         const text = await response.text();
 
         // Simple regex RSS parser (lightweight, no deps)
-        const items = [];
         const itemRegex = /<item>[\s\S]*?<\/item>/g;
         const titleRegex = /<title>(.*?)<\/title>/;
         const linkRegex = /<link>(.*?)<\/link>/;
@@ -268,118 +273,78 @@ export async function fetchAnimeIntel(): Promise<any[]> {
 
                 if (!rawTitle) continue;
 
-                // INTEL KEYWORDS
-                const strictKeywords = ['Season', 'Cour', 'Trailer', 'Visual', 'PV', 'Release Date', 'Movie', 'Cast', 'Reveals', 'Unveils', 'Casts'];
-                const negativeKeywords = ['Ranking', 'List', 'Top', 'Chart', 'Box Office', 'Game', 'Video Game', 'RPG', 'Launch', 'Gameplay', 'Stream', 'Manga', 'Novel', 'Light Novel', 'Chapter', 'Volume', 'Live-Action', 'Stage Play', 'Musical', 'Award', 'Prize', 'Convention', 'Event', 'Interview', 'Cosplay', 'Figure', 'Merch', 'Blu-ray', 'Sales', 'Earnings', 'Financial', 'Stock', 'Actor', 'Voice Actor', 'Seiyuu', 'Director', 'Dub', 'English Dub'];
+                // --- NEW STRICT FILTERING LOGIC ---
+                // 1. Negative Filter (Kill immediately)
+                const hasNegative = CONTENT_RULES.NEGATIVE_KEYWORDS.some(k =>
+                    rawTitle.toLowerCase().includes(k.toLowerCase()) ||
+                    (rawDescription && rawDescription.toLowerCase().includes(k.toLowerCase()))
+                );
 
-                const hasPositive = strictKeywords.some(k => rawTitle.includes(k));
-                const hasNegative = negativeKeywords.some(k => rawTitle.includes(k) || rawDescription.includes(k));
+                if (hasNegative) continue;
 
-                if (hasPositive && !hasNegative) {
-                    // Recent news (last 72h)
-                    if (Date.now() - pubDate.getTime() < 72 * 60 * 60 * 1000) {
-                        let claimType: any = 'confirmed';
-                        if (rawTitle.includes('Delay') || rawTitle.includes('Postponed') || rawTitle.includes('Hiatus')) claimType = 'delayed';
-                        else if (rawTitle.includes('Trailer') || rawTitle.includes('PV')) claimType = 'trailer';
+                // 2. Positive Filter (Must have at least one important keyword)
+                const hasPositive = CONTENT_RULES.POSITIVE_KEYWORDS.some(k =>
+                    rawTitle.toLowerCase().includes(k.toLowerCase())
+                );
 
-                        let cleanTitle = rawTitle
-                            .replace(/Original TV Anime/gi, '')
-                            .replace(/TV Anime/gi, '')
-                            .replace(/Original Anime/gi, '')
-                            .replace(/Anime/gi, '')
-                            .replace(/\s+/g, ' ').trim();
+                // Allow "Studio/Committee" mentions to bypass positive keyword check slightly (trust tiers)
+                // But generally we want Action + Actor.
+                const combinedTiers = [...(SOURCE_TIERS.TIER_1_NAMES || []), ...(SOURCE_TIERS.TIER_2_NAMES || [])];
 
-                        if (cleanTitle.length < 5) cleanTitle = rawTitle;
+                const isTierMatch = combinedTiers.some(t => rawTitle.toLowerCase().includes(t.toLowerCase()));
+                if (!hasPositive && !isTierMatch) continue;
 
-                        let searchName = rawTitle.includes(':') ? rawTitle.split(':')[0].trim() : rawTitle;
-                        const noiseWords = ['Original', 'TV', 'Anime', 'The Movie', 'Movie', 'Season', 'Cour', 'Part', 'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff', 'Release Date', 'Delay', 'Postponed', 'Info'];
-                        noiseWords.forEach(word => {
-                            searchName = searchName.replace(new RegExp(`\\b${word}\\b`, 'gi'), '');
-                        });
-                        searchName = searchName.replace(/["'']/g, '').replace(/\s+/g, ' ').trim();
-                        if (searchName.length < 2) searchName = rawTitle.split(' ').slice(0, 3).join(' ');
+                // 3. Recency Check (Strict 48h)
+                if (Date.now() - pubDate.getTime() > 48 * 60 * 60 * 1000) continue;
 
-                        items.push({
-                            title: cleanTitle,
-                            fullTitle: cleanTitle,
-                            claimType,
-                            // premiereDate: undefined, // Let generator/engine find it or handle lack of it
-                            slug: 'intel-' + cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                            content: rawDescription.substring(0, 280),
-                            imageSearchTerm: searchName,
-                            source: 'AnimeNewsNetwork'
-                        });
-                    }
-                } else if (!hasNegative && (Date.now() - pubDate.getTime() < 48 * 60 * 60 * 1000)) {
-                    // Generic Fallback
-                    items.push({
-                        title: rawTitle,
-                        fullTitle: rawTitle,
-                        claimType: 'now_streaming',
-                        slug: 'news-' + rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                        content: rawDescription.substring(0, 280),
-                        imageSearchTerm: rawTitle.split(':')[0].trim(),
-                        source: 'ANN (Generic)'
-                    });
-                }
+                // Process Valid Item
+                let claimType: any = 'confirmed';
+                const lowerTitle = rawTitle.toLowerCase();
+
+                if (lowerTitle.includes('delay') || lowerTitle.includes('postponed') || lowerTitle.includes('rescheduled')) claimType = 'delayed';
+                else if (lowerTitle.includes('trailer') || lowerTitle.includes('pv') || lowerTitle.includes('teaser')) claimType = 'trailer';
+                else if (lowerTitle.includes('visual') || lowerTitle.includes('key visual')) claimType = 'new_visual';
+                else if (lowerTitle.includes('premiere') || lowerTitle.includes('debuts')) claimType = 'premiered';
+
+                let cleanTitle = rawTitle
+                    .replace(/Original TV Anime/gi, '')
+                    .replace(/TV Anime/gi, '')
+                    .replace(/Original Anime/gi, '')
+                    .replace(/Anime/gi, '')
+                    .replace(/\s+/g, ' ').trim();
+
+                if (cleanTitle.length < 5) cleanTitle = rawTitle;
+
+                let searchName = rawTitle.includes(':') ? rawTitle.split(':')[0].trim() : rawTitle;
+                const noiseWords = ['Original', 'TV', 'Anime', 'The Movie', 'Movie', 'Season', 'Cour', 'Part', 'Reveals', 'Announces', 'Confirms', 'Trailer', 'Visual', 'Cast', 'Staff', 'Release Date', 'Delay', 'Postponed', 'Info'];
+                noiseWords.forEach(word => {
+                    searchName = searchName.replace(new RegExp(`\\b${word}\\b`, 'gi'), '');
+                });
+                searchName = searchName.replace(/["'']/g, '').replace(/\s+/g, ' ').trim();
+
+                items.push({
+                    title: cleanTitle,
+                    fullTitle: cleanTitle,
+                    claimType,
+                    slug: 'intel-' + cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
+                    content: rawDescription.substring(0, 280),
+                    imageSearchTerm: searchName,
+                    source: 'AnimeNewsNetwork',
+                    tier_match: combinedTiers.some(t => rawTitle.toLowerCase().includes(t.toLowerCase())) ? 2 : 5 // Rough tier scoring
+                });
             } catch (err) {
                 console.error("[Image Engine] Error processing RSS item:", err);
             }
         }
-
-        // Return top 3 matches (prioritizing the first pushed ones which might be keyword matches if I sorted, but currently simple push)
-        // Let's sort to prioritize those capable of being 'confirmed' (keyword matches) if we modified strictness.
-        // For now, just return items.
-
-        // Ensure we have at least 3 items by supplementing with Trending Data
-        // If RSS was too strict or empty, this fills the gap with real anime.
-        if (items.length < 3) {
-            console.log(`Only found ${items.length} valid RSS items. Supplementing with AniList Trending...`);
-            try {
-                const trendingData = await fetchAniListTrendingRaw();
-
-                for (const trend of trendingData) {
-                    if (items.length >= 3) break;
-
-                    const title = trend.title.english || trend.title.romaji;
-                    // Dedupe
-                    if (items.some(i => i.title === title)) continue;
-
-                    items.push({
-                        title: title,
-                        fullTitle: title,
-                        claimType: 'now_streaming',
-                        slug: 'intel-trending-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50),
-                        content: (trend.description || "The anime community is buzzing about this top-trending series.").replace(/<[^>]*>?/gm, '').substring(0, 280),
-                        imageSearchTerm: title,
-                        source: 'AniList Trending'
-                    });
-                }
-            } catch (e) {
-                console.warn("Trending supplement failed:", e);
-            }
-        }
-
-        if (items.length === 0) {
-            // Absolute Fail Safe
-            return [{
-                title: "Anime Season Highlights",
-                fullTitle: "Community Highlights",
-                claimType: 'now_streaming',
-                premiereDate: new Date().toISOString().split('T')[0],
-                slug: 'fallback-' + Date.now(),
-                content: "Check out the latest discussions.",
-                imageSearchTerm: "Anime",
-                source: "System Fallback"
-            }];
-        }
-
-        return items.slice(0, 3); // Return top 3 matches
     } catch (e) {
         console.error("Failed to fetch RSS Intel:", e);
-        // Fallback to empty to allow safe failure
-        return [];
     }
+
+    // 2. Ensure we have at least 1 item.
+    // If we have literally nothing, returning empty is ACCEPTABLE per new rules ("Silence is acceptable").
+    // We do NOT supplement with Trending if nothing met the Strict Criteria.
+
+    return items.slice(0, 5); // Return top 5 matches for engine to sort
 }
 
 /**
@@ -516,25 +481,34 @@ import { checkSocialSignals } from '../social/signals';
  * The Master Aggregator Function
  */
 export async function fetchSmartTrendingCandidates(excludeTitles: string[] = []): Promise<any> {
+    const { CONTENT_RULES } = await import('./sources-config');
+
     // 1. Fetch All Sources in Parallel
     const [aniList, reddit, news] = await Promise.all([
         fetchAniListTrendingRaw(),
         fetchTrendingSignals(), // From Reddit
-        fetchAnimeIntel()       // From News (ANN as proxy for 'Crunchyroll'/News ecosystem)
+        fetchAnimeIntel()       // From News (Sourced via Strict RSS)
     ]);
 
     const candidates: Record<string, TrendingCandidate> = {};
     const normalizedExcludes = excludeTitles.map(normalizeTitle);
 
     // Helper to Add/Update Candidate
-    const addVote = (title: string, source: string, image?: string, desc?: string, status?: string) => {
+    const addVote = (title: string, source: string, image?: string, desc?: string, status?: string, tierScore: number = 0) => {
         if (!title) return;
         const norm = normalizeTitle(title);
 
-        // DUPLICATE CHECK (Strict)
+        // 1. DUPLICATE CHECK (Strict)
         if (normalizedExcludes.some(ex => norm.includes(ex) || ex.includes(norm))) {
             return; // Skip already published topics
         }
+
+        // 2. NEGATIVE KEYWORD CHECK (Global Enforcement)
+        const hasNegative = CONTENT_RULES.NEGATIVE_KEYWORDS.some(k =>
+            title.toLowerCase().includes(k.toLowerCase()) ||
+            (desc && desc.toLowerCase().includes(k.toLowerCase()))
+        );
+        if (hasNegative) return;
 
         let key = Object.keys(candidates).find(k => k === norm || k.includes(norm) || norm.includes(k));
         if (!key) {
@@ -552,17 +526,20 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         // Update entry
         if (!candidates[key].sources.includes(source)) {
             candidates[key].sources.push(source);
-            candidates[key].score += 1;
+            // Boost score based on Source Tier/Quality
+            candidates[key].score += 1 + tierScore;
         }
+
         // Upgrade image/desc if missing and this source has it
         if (!candidates[key].image && image) candidates[key].image = image;
         if (!candidates[key].status && status) candidates[key].status = status;
 
+        // Description priority: News > AniList > Reddit
         const isSynopsis = desc && desc.length > 50;
         if (source === 'Crunchyroll/News' && desc) {
-            candidates[key].description = desc; // News is most relevant/current
+            candidates[key].description = desc;
         } else if (source === 'AniList' && !candidates[key].description && isSynopsis) {
-            candidates[key].description = desc; // Fallback to synopsis
+            candidates[key].description = desc;
         } else if (!candidates[key].description && desc) {
             candidates[key].description = desc;
         }
@@ -570,37 +547,43 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
 
     // 2. Process Sources
 
-    // AniList (Visuals & Popularity)
+    // AniList (Visuals & Popularity) - Baseline
     aniList.forEach((item: any) => {
         const t = item.title.english || item.title.romaji;
         const img = item.bannerImage || item.coverImage?.extraLarge;
-        // Strip HTML from AniList description
         const cleanDesc = item.description ? item.description.replace(/<[^>]*>?/gm, '') : '';
-        addVote(t, 'AniList', img, cleanDesc, item.status);
+        addVote(t, 'AniList', img, cleanDesc, item.status, 0);
     });
 
     // Reddit (Discussion & Buzz)
     reddit.forEach((item: any) => {
-        addVote(item.title, 'Reddit', undefined, item.content);
+        // Reddit items are often lower quality unless corroborated
+        addVote(item.title, 'Reddit', undefined, item.content, undefined, 0.5);
     });
 
     // News (Crunchyroll/ANN - "Official" updates)
+    // These have already passed Strict Filters in fetchAnimeIntel
     news.forEach((item: any) => {
-        addVote(item.title, 'Crunchyroll/News', undefined, item.content);
+        // News items are heavily weighted (Tier 2/3 equivalent)
+        // If it comes from our strict fetchAnimeIntel, it's a TIER 2-3 candidate.
+        // We give it a massive boost so it overrides generic trending.
+        const boost = item.tier_match ? 5 : 3;
+        addVote(item.title, 'Crunchyroll/News', undefined, item.content, undefined, boost);
     });
 
     // 3. Ranking & Selection
     const ranked = Object.values(candidates).map(c => {
-        // SCORING ALGORITHM V2
-        // Base Score: Number of Sources
         let finalScore = c.score;
 
-        if (c.sources.includes('AniList')) finalScore += 5;
-        if (c.sources.includes('Reddit')) finalScore += 3;
-        if (c.sources.includes('Crunchyroll/News')) finalScore += 10; // News items are very valuable for tags
+        // POSITIVE KEYWORD BOOST (If checking mainly trending sources)
+        const hasPositive = CONTENT_RULES.POSITIVE_KEYWORDS.some(k => c.title.toLowerCase().includes(k.toLowerCase()));
+        if (hasPositive) finalScore += 5; // Major boost for "Trailer", "Visual", "Announcement"
 
-        const lowQualityKeywords = ['Cast', 'Theme Song', 'Performing', 'Preview', 'Visual', 'Film', 'Movie', 'Screening', 'Stage', 'Actor', 'Director'];
-        if (lowQualityKeywords.some(k => c.title.includes(k))) finalScore -= 3;
+        // POPULARITY BIAS (AniList is a proxy for popularity)
+        // If it's on AniList Trending AND has News, it's bigger than just News.
+        if (c.sources.includes('AniList') && c.sources.includes('Crunchyroll/News')) {
+            finalScore += 4;
+        }
 
         return { ...c, finalScore };
     }).sort((a, b) => b.finalScore - a.finalScore);
@@ -611,7 +594,12 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     const results = [];
 
     for (const winner of ranked.slice(0, 10)) {
-        // Clean Description Logic
+        // If score is too low, strictly prune (Silence is better than spam)
+        // A single Reddit thread (score ~1) should NOT pass.
+        // Needs at least (News=3) OR (AniList+Positive=6) OR (Reddit+AniList=2-3).
+        // Let's set a floor.
+        if (winner.finalScore < 2.5) continue;
+
         const finalContent = winner.description || `Latest updates and community discussions regarding ${winner.title}.`;
 
         // --- CONTEXTUAL TAG LOGIC (PRIORITIZED) ---
@@ -620,16 +608,12 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         const t = winner.title.toLowerCase();
         const c = finalContent.toLowerCase();
 
-        // 1. Production / News Tags (High Priority)
         if (t.includes('season') || c.includes('season')) possibleTags.push("SEASON ANNOUNCEMENT");
         if (t.includes('trailer') || t.includes('pv')) possibleTags.push("TRAILER REVEAL");
         if (t.includes('visual')) possibleTags.push("VISUAL REVEAL");
         if (t.includes('delay') || t.includes('hiatus')) possibleTags.push("PRODUCTION DELAY");
-
-        // 2. Engagement Tags
         if (t.includes('episode') && t.includes('discussion')) possibleTags.push("EPISODE REACTION");
 
-        // 3. Source-based Fallbacks
         if (winner.sources.includes('Reddit')) possibleTags.push("COMMUNITY BUZZ");
 
         if (winner.status === 'RELEASING' || winner.sources.includes('AniList')) {
@@ -637,7 +621,6 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
             else possibleTags.push("TRENDING NOW");
         }
 
-        // --- SELECTION (Pick the most specific tag) ---
         const priorityOrder = [
             "SEASON ANNOUNCEMENT", "TRAILER REVEAL", "PRODUCTION DELAY",
             "VISUAL REVEAL", "EPISODE REACTION", "COMMUNITY BUZZ",

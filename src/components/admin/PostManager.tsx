@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload } from 'lucide-react';
 
@@ -62,6 +62,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [purpleCursorIndex, setPurpleCursorIndex] = useState(0);
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(true);
+    const [containerScale, setContainerScale] = useState(1);
+    const imagePreviewRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!imagePreviewRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            const width = entries[0].contentRect.width;
+            setContainerScale(width / 1080);
+        });
+        observer.observe(imagePreviewRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
@@ -242,7 +254,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: (title || topic || '').trim().toUpperCase(),
+                    title: '', // FORCE EMPTY: User requested ONLY the "Image Text" be displayed on the image.
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
@@ -1320,7 +1332,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                         {/* --- THE PRO EDITOR STAGE --- */}
                                         <div className="flex flex-col lg:flex-row gap-6">
-                                            <div className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center">
+                                            <div
+                                                ref={imagePreviewRef}
+                                                onPointerMove={handleImagePointerMove}
+                                                onPointerUp={handleImagePointerUp}
+                                                className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none"
+                                            >
                                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
                                                 {/* Arrow Controls (Floating) */}
@@ -1375,7 +1392,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                 style={{
                                                                     transform: textPosition
-                                                                        ? `translate(${textPosition.x - (WIDTH / 2)}px, ${textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))}px) scale(${textScale})`
+                                                                        ? `translate(${(textPosition.x - (WIDTH / 2)) * containerScale}px, ${(textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))) * containerScale}px) scale(${textScale})`
                                                                         : `scale(${textScale})`,
                                                                     transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                 }}
@@ -1385,7 +1402,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         className="text-white text-2xl font-[900] uppercase tracking-tighter leading-[0.8] max-w-sm flex flex-wrap justify-center gap-x-2"
                                                                         style={{ fontFamily: 'Outfit, var(--font-outfit), sans-serif' }}
                                                                     >
-                                                                        {`${(overlayTag || '').trim() || 'NEWS'} ${(title || topic || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                        {`${(overlayTag || '').trim() || 'NEWS'}`.split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                             <span
                                                                                 key={idx}
                                                                                 onPointerDown={(e) => {

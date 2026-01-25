@@ -18,6 +18,7 @@ if (fs.existsSync(envPath)) {
 // 2. NOW it is safe to import the engine (dynamic import to avoid hoisting)
 async function main() {
     const { runBlogEngine } = await import('../src/lib/engine/engine');
+    const { logSchedulerRun } = await import('../src/lib/logging/scheduler');
 
     const slot = process.argv[2];
 
@@ -35,8 +36,14 @@ async function main() {
         } else {
             console.log('[INFO] No post published (criteria not met or already exists).');
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('[ERROR] Engine failure:', error);
+        // Attempt to log to DB (best effort)
+        try {
+            await logSchedulerRun(slot, 'error', 'Engine Crash', { error: error?.message || String(error) });
+        } catch (logInitError) {
+            console.error('Failed to write crash log:', logInitError);
+        }
         process.exit(1);
     }
 }

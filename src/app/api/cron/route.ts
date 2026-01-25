@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const slot = searchParams.get('slot');
 
-    if (!slot || !['08:00', '12:00', '16:00', '20:00'].includes(slot)) {
+    if (!slot || !['08:00', '12:00', '16:00', '20:00', '15:00', 'hourly'].includes(slot)) {
         return NextResponse.json({ error: 'Invalid or missing slot parameter.' }, { status: 400 });
     }
 

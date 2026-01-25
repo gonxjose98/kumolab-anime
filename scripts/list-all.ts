@@ -1,4 +1,4 @@
-export {};
+export { };
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,12 +20,12 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function listAll() {
-    const { data: posts } = await supabase.from('posts').select('id, title, slug, type, content');
+    const { data: posts } = await supabase.from('posts').select('id, title, slug, type, content, timestamp, is_published').order('timestamp', { ascending: false }).limit(5);
     console.log(`TOTAL POSTS: ${posts?.length}`);
     posts?.forEach(p => {
         const hasLog = p.content.includes('INTERNAL VERIFICATION');
         const hasEmDash = p.content.includes('—');
-        console.log(`[${p.type}] ID: ${p.id} | TITLE: ${p.title} | LOG: ${hasLog} | EM: ${hasEmDash}`);
+        console.log(`[${p.type}] (${p.is_published ? 'LIVE' : 'HIDDEN'}) ${p.timestamp} | SLUG: ${p.slug} | TITLE: ${p.title}`);
     });
 }
 

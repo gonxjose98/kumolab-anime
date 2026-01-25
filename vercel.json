@@ -1,20 +1,8 @@
 {
     "crons": [
         {
-            "path": "/api/cron?slot=08:00",
-            "schedule": "0 13 * * *"
-        },
-        {
-            "path": "/api/cron?slot=12:00",
-            "schedule": "0 17 * * *"
-        },
-        {
-            "path": "/api/cron?slot=16:00",
-            "schedule": "0 21 * * *"
-        },
-        {
-            "path": "/api/cron?slot=20:00",
-            "schedule": "0 1 * * *"
+            "path": "/api/cron?slot=hourly",
+            "schedule": "0 * * * *"
         }
     ]
 }

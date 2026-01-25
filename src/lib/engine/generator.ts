@@ -119,7 +119,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         now_streaming: "NOW STREAMING",
         delayed: "DELAYED",
         trailer: "NEW TRAILER",
-        finale_aired: "FINALE AIRED"
+        finale_aired: "FINALE AIRED",
+        new_visual: "NEW VISUAL"
     };
 
     const overlayTag = overlayTextMap[claimType] || "LATEST NEWS";
@@ -202,14 +203,26 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         }
     });
 
+    // CHECK FOR TEXT CLEANLINESS
+    // If post is a Visual Reveal, Trailer, or Poster, assume the image has text.
+    // In this case, disable the overlay text to avoid clutter.
+    const isVisual = topItem.claimType === 'new_visual' || topItem.fullTitle?.toLowerCase().includes('visual') || topItem.fullTitle?.toLowerCase().includes('poster');
+    const isTrailer = topItem.claimType === 'trailer' || topItem.fullTitle?.toLowerCase().includes('trailer') || topItem.fullTitle?.toLowerCase().includes('pv');
+
+    const shouldDisableOverlay = isVisual || isTrailer;
+    if (shouldDisableOverlay) {
+        console.log(`[Generator] Detected Visual/Trailer (${topItem.fullTitle}). Disabling text overlay.`);
+    }
+
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: validTitle, // Main Title (matches post title)
-            headline: '',           // Removed Branding Tag
-            purpleWordIndices,      // Dynamic Highlight
-            slug: topItem.slug || 'intel'
+            animeTitle: validTitle, // Main Title
+            headline: '',
+            purpleWordIndices,
+            slug: topItem.slug || 'intel',
+            applyText: !shouldDisableOverlay // Disable text if it's a visual
         });
 
         if (processedImageUrl) {
@@ -233,6 +246,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         isPublished: true
     };
 }
+
 
 /**
  * Formats YYYY-MM-DD to Month Day, Year
@@ -325,12 +339,22 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             }
         });
 
+        // CHECK FOR TEXT CLEANLINESS (Trending Version)
+        const isVisual = trendingItem.trendReason === 'VISUAL REVEAL' || (trendingItem.fullTitle || '').toLowerCase().includes('visual');
+        const isTrailer = trendingItem.trendReason === 'TRAILER REVEAL' || (trendingItem.fullTitle || '').toLowerCase().includes('trailer');
+
+        const shouldDisableOverlay = isVisual || isTrailer;
+        if (shouldDisableOverlay) {
+            console.log(`[Generator-Trending] Detected Visual/Trailer (${validTitle}). Disabling text overlay.`);
+        }
+
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: validTitle,
             headline: '', // Removed Branding Tag
             purpleWordIndices,
-            slug: trendingItem.slug || 'trending'
+            slug: trendingItem.slug || 'trending',
+            applyText: !shouldDisableOverlay
         });
 
         if (processedImageUrl) {

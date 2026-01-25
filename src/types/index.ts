@@ -1,5 +1,5 @@
 export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT';
-export type ClaimType = 'confirmed' | 'premiered' | 'now_streaming' | 'delayed' | 'trailer' | 'finale_aired';
+export type ClaimType = 'confirmed' | 'premiered' | 'now_streaming' | 'delayed' | 'trailer' | 'finale_aired' | 'new_visual';
 
 export interface BlogPost {
     id?: string;

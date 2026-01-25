@@ -21,52 +21,32 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Main engine function to run for a specific slot.
  * Now triggered by a single hourly cron (see vercel.json)
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' | '15:00', force: boolean = false) {
+export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
 
     const now = new Date();
+    // Vercel generally runs in UTC. Convert to EST for "Wall Clock" logic.
+    // We need to know if it is 8 AM EST.
+    const estTime = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+    const currentEstHour = estTime.getHours();
+
     const existingPosts = await getPosts();
     let newPost: BlogPost | null = null;
+    let explicitSlot = slot;
 
-    // Fix timestamp to match the slot time exactly (preserves "on time" appearance)
-    const slotHour = parseInt(slot.split(':')[0]);
-    const scheduledTime = new Date(now);
-    // Vercel/System is UTC, but logic is based on EST slot.
-    // However, the generator receives a Date object and calls .toISOString().
-    // If we want the stored timestamp to match the slot, we should set the time.
-    // Assuming the 'now' passed to generators is used for timestamping:
+    console.log(`[Engine] Running at ${now.toISOString()} (EST Hour: ${currentEstHour}). Trigger: ${slot}`);
 
-    // We want the timestamp to reflect the EST Slot Time relative to today.
-    // Current 'now' is close to execution.
-    // Let's create a date object that represents Today at Slot Time (EST).
-    // Getting complicated due to timezone.
-    // Simpler: Just rely on the execution time but maybe user meant "display" time?
-    // I already fixed display time to be Date Only.
-    // So the timestamp preciseness matters less IF I removed the time from display.
-    // But to be safe, let's keep 'now' as execution time for audit, but display logic handles the rest.
-    // WAIT, "posts should go up at their designated times".
-    // If I force the timestamp to be 12:00 EST, then even if it runs at 12:45, it says 12:00.
-    // I will stick with the current 'now' because I removed the time display on frontend.
+    // --- 1. DAILY DROPS (MANDATORY @ 8 AM EST) ---
+    // Even if triggered as 'hourly', if it is 8 AM, we force Daily Drops.
+    // allow a window (7 AM - 9 AM) to be safe or strict 8? 
+    // Scheduler is strict. If it runs at 8:00 EST, hour is 8.
 
-    // Re-evaluating: user said "12pm post went up late... it should not be time stamped".
-    // I removed the timestamp display. That is likely the fix.
+    if (explicitSlot === '08:00' || (explicitSlot === 'hourly' && currentEstHour === 8)) {
+        console.log('[Engine] Slot identified as Daily Drops (08:00 EST).');
 
-    if (slot === '08:00') {
         // --- 08:00 UTC: DAILY DROPS (LOCKED TO EST WINDOW) ---
-        // Requirement: "Releases are not being consistently filtered by TODAY’S DATE in America/New_York"
-
         // 1. Get the current date in EST
         const estDateStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
         const [month, day, year] = estDateStr.split('/');
-
-        // 2. Define the exact 00:00:00 and 23:59:59 window in EST
-        const startOfDayEST = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
-        const endOfDayEST = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T23:59:59`);
-
-        // Note: The 'Date' constructor above creates dates in the LOCAL timezone of the environment.
-        // We need to clarify that these represent EST times.
-        // A more robust way using Intl to get UTC offsets or just calculating the shift.
-        // Let's assume EST is UTC-5 (or UTC-4 for EDT). 
-        // Better: Use a reliable helper to get UTC edges of an EST day.
 
         const getESTBoundaries = (date: Date) => {
             const formatter = new Intl.DateTimeFormat('en-US', {
@@ -83,7 +63,6 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         };
 
         const { start: startLimit, end: endLimit } = getESTBoundaries(now);
-
         console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
 
         const episodes = await fetchAniListAiring(
@@ -93,79 +72,82 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
         newPost = generateDailyDropsPost(episodes, now);
 
-        // FALLBACK: If zero drops, trigger Intel
-        if (!newPost) {
-            console.log('Zero drops found, triggering Intel fallback...');
-            const intelItems = await fetchAnimeIntel();
-            newPost = await generateIntelPost(intelItems, now, true);
-        }
-    } else if (slot === '12:00') {
-        // --- 12:00 UTC: ANIME INTEL ---
-        // Fetch candidates (guaranteed ~3 items for redundancy)
-        const intelItems = await fetchAnimeIntel();
+        // If Daily Drops already exists for today, we might skip or allow update?
+        // validatePost will check distinct title.
 
-        // Select the first VALID candidate (avoid duplicates)
-        for (const item of intelItems) {
-            const candidate = await generateIntelPost([item], now);
-            if (candidate && validatePost(candidate, existingPosts, force)) {
-                newPost = candidate;
-                break; // We only want ONE post per day for this slot
+        // FALLBACK: If zero drops, do NOT post. User wants this fixed anchor. 
+        // If empty, it's better to be silent than spam.
+        if (!newPost) {
+            console.log('[Engine] Zero drops found for today. Skipping 8 AM slot.');
+        }
+
+    } else {
+        // --- 2. DYNAMIC NEWSROOM (ALL OTHER HOURS) ---
+        console.log('[Engine] Running Dynamic Newsroom Logic...');
+
+        // RATE LIMIT CHECK:
+        // Did we post anything in the last 60 minutes?
+        if (existingPosts.length > 0) {
+            const lastPost = existingPosts[0];
+            const lastPostTime = new Date(lastPost.timestamp);
+            const diffMinutes = (now.getTime() - lastPostTime.getTime()) / (1000 * 60);
+
+            if (diffMinutes < 55 && !force) {
+                console.log(`[Engine] Rate Limit Hit. Last post was ${Math.floor(diffMinutes)} mins ago. Skipping.`);
+                await logSchedulerRun(slot, 'skipped', 'Rate Limit Hit', { lastPost: lastPost.title });
+                return null;
             }
         }
-        if (!newPost) {
-            console.log(`[Engine] No valid Anime Intel found for slot 12:00. Items checked: ${intelItems.length}. Trying Trending fallback...`);
-            const trendingItems = await fetchSmartTrendingCandidates();
-            if (trendingItems && trendingItems.length > 0) {
-                for (const item of trendingItems) {
-                    const candidate = await generateTrendsPost(item, now);
-                    if (candidate && validatePost(candidate, existingPosts, force)) {
-                        newPost = candidate;
-                        break;
+
+        // 1. Fetch All Candidates (Intel + Trending)
+        const candidates = await fetchSmartTrendingCandidates();
+
+        // 2. Filter & Prioritize (Newsroom Logic)
+        // We want: High Quality, Breaking, NOT Posted.
+        for (const item of candidates) {
+            // GENERATE CANDIDATE
+            // We use generateTrendingPost as the generic wrapper now since it handles SmartItems
+            // But if it came from purely INTEL source (RSS), it might have ClaimType.
+
+            // Map to unified shape if needed or just use generateTrendingPost which effectively detects visual/trailer
+            // Actually fetchSmartTrendingCandidates returns unified objects now.
+
+            const post = await generateTrendingPost(item, now);
+
+            if (post) {
+                // VALIDATE
+                // 1. Deduplication (Critical)
+                if (validatePost(post, existingPosts, force)) {
+
+                    // 2. QUALITY THRESHOLD (The "Editorial" Filter)
+                    // If it is 'Generic News' or low score, maybe skip?
+                    // For now, if fetchSmartTrendingCandidates returned it in Top 10, it's decent.
+                    // But we want to ensure we don't post "fluff".
+
+                    // Check US-Centric "Debut" logic strictly here if not caught by fetcher
+                    if (post.title.includes("Debuts in") && !post.title.includes("US") && !post.title.includes("Global")) {
+                        console.log(`[Engine] Rejecting non-US Debut title: ${post.title}`);
+                        continue;
                     }
+
+                    newPost = post;
+                    break; // Found our 1 breaking story for this hour.
                 }
             }
         }
-    } else if (slot === '16:00' || slot === '15:00') {
-
-
-        // --- 16:00 EST: TRENDING NOW ---
-        // Use SmartSync to pull from Reddit + AniList + News to guarantee a hit
-        const topTrend = await fetchSmartTrendingCandidates();
-        if (topTrend && Array.isArray(topTrend) && topTrend.length > 0) {
-            for (const item of topTrend) {
-                const candidate = await generateTrendsPost(item, now);
-                if (candidate && validatePost(candidate, existingPosts, force)) {
-                    newPost = candidate;
-                    break;
-                }
-            }
-        }
-
-        if (!newPost) {
-            console.log("No valid Trending candidates found for slot 16:00. Trying Intel fallback...");
-            const intelItems = await fetchAnimeIntel();
-            for (const item of intelItems) {
-                const candidate = await generateIntelPost([item], now);
-                if (candidate && validatePost(candidate, existingPosts, force)) {
-                    newPost = candidate;
-                    break;
-                }
-            }
-        }
-
-
-    } else if (slot === '20:00') {
-        // --- 20:00 EST: COMMUNITY NIGHT ---
-        newPost = await generateCommunityNightPost(now);
     }
 
-    if (newPost && validatePost(newPost, existingPosts, force)) {
-        await publishPost(newPost);
-        await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug });
-        return newPost;
+    if (newPost) {
+        // Final Double-Check validation
+        if (validatePost(newPost, existingPosts, force)) {
+            await publishPost(newPost);
+            await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug });
+            return newPost;
+        }
     }
 
-    await logSchedulerRun(slot, 'skipped', 'No valid content generated', { reason: 'Fetchers empty or all duplicates' });
+    console.log('[Engine] No valid/new content found this hour.');
+    await logSchedulerRun(slot, 'skipped', 'No new content', { reason: 'No candidates met criteria' });
     return null;
 }
 
