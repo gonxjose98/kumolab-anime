@@ -1,0 +1,17 @@
+name: KumoLab Hourly Engine
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  trigger-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel Engine Endpoint
+        run: |
+          curl -X GET "https://kumolabanime.com/api/cron?slot=hourly" \
+          -H "Content-Type: application/json"
