@@ -13,6 +13,8 @@ export async function generateStaticParams() {
     }));
 }
 
+export const revalidate = 60;
+
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const { slug } = await params;
     const post = await getPostBySlug(slug);

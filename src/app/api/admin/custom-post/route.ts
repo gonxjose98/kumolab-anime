@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateIntelImage } from '@/lib/engine/image-processor';
 import { randomUUID } from 'crypto';
@@ -112,6 +113,17 @@ export async function POST(req: NextRequest) {
         // Clean up temp file ONLY if we generated a new one via processing
         if (tempFileName && !skipProcessing) {
             await supabaseAdmin.storage.from('blog-images').remove([tempFileName]);
+        }
+
+        // --- REVALIDATION ---
+        // Ensure the Next.js cache is purged for these paths so the update is visible immediately.
+        try {
+            await Promise.all([
+                revalidatePath('/', 'page'),
+                revalidatePath(`/blog/${data.slug}`, 'page')
+            ]);
+        } catch (e) {
+            console.warn('Revalidation failed:', e);
         }
 
         return NextResponse.json({
