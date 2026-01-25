@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid or missing slot parameter.' }, { status: 400 });
     }
 
-    console.log(`[Cron] Triggered for slot: ${slot}`);
+    console.log(`[Cron] Triggered for slot: ${slot} (Deploy Check: ${new Date().toISOString()})`);
 
     try {
         // Run the engine
