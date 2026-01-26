@@ -161,30 +161,24 @@ export async function generateIntelImage({
         ctx.imageSmoothingEnabled = true;
 
 
-        // Draw Image - CORRECTED OBJECT-COVER LOGIC
+        // Draw Image - LEGACY SCALING LOGIC (Reverted for stability)
         const img = await loadImage(buffer);
+        const imgRatio = img.width / img.height;
+        const canvasRatio = WIDTH / HEIGHT;
 
-        // "object-cover" math:
-        // Scale so that BOTH dimensions are >= canvas dimensions.
-        // Use the LARGER of the two required scale factors.
-        // (WIDTH / img.width) vs (HEIGHT / img.height)
-        const scaleX = WIDTH / img.width;
-        const scaleY = HEIGHT / img.height;
-        const coverScale = Math.max(scaleX, scaleY); // Coverage Base Scale
+        let drawWidth, drawHeight;
 
-        // Apply User Zoom (scale param)
-        const finalScale = coverScale * scale;
+        // If image is "wider" than canvas (e.g. 16:9 vs 4:5), fit Hight
+        if (imgRatio > canvasRatio) {
+            drawHeight = HEIGHT * scale;
+            drawWidth = drawHeight * imgRatio;
+        } else {
+            // If image is "taller" (or equal), fit Width
+            drawWidth = WIDTH * scale;
+            drawHeight = drawWidth / imgRatio; // Aspect correct
+        }
 
-        const drawWidth = img.width * finalScale;
-        const drawHeight = img.height * finalScale;
-
-        // Center the image by default (offset = difference / 2)
-        // Then apply User Translation (position param)
-        // NOTE: PostManager sends pixels.
-        // We assume position.x and y are in "canvas-equivalent pixels" relative to the preview.
-        // If the preview is 1080px wide (unlikely), it maps 1:1. 
-        // If standard drag controls, we treat '1' as '1 pixel'.
-        // REMOVED `* WIDTH` which was causing massive offsets.
+        // Center + Offset
         const dx = (WIDTH - drawWidth) / 2 + (position.x);
         const dy = (HEIGHT - drawHeight) / 2 + (position.y);
 
