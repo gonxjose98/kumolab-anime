@@ -8,10 +8,11 @@ export async function POST(request: NextRequest) {
     try {
         const {
             imageUrl, title, headline, scale, position, applyText, applyGradient,
-            textPos, textScale, gradientPos, purpleIndex
+            textPos, textScale, gradientPos, purpleIndex,
+            applyWatermark, watermarkPosition
         } = await request.json();
 
-        console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText, applyGradient });
+        console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText, applyGradient, applyWatermark });
 
         if (!imageUrl) {
             return NextResponse.json({ success: false, error: 'Image URL is required' }, { status: 400 });
@@ -35,7 +36,9 @@ export async function POST(request: NextRequest) {
             textPosition: textPos,
             textScale,
             gradientPosition: gradientPos,
-            purpleWordIndices: purpleIndex // Accepts array from client
+            purpleWordIndices: purpleIndex, // Accepts array from client
+            applyWatermark,
+            watermarkPosition
         });
 
 

@@ -32,6 +32,8 @@ interface IntelImageOptions {
     textScale?: number;
     gradientPosition?: 'top' | 'bottom';
     purpleWordIndices?: number[];
+    applyWatermark?: boolean;
+    watermarkPosition?: { x: number; y: number };
 }
 
 /**
@@ -85,7 +87,9 @@ export async function generateIntelImage({
     textPosition,
     textScale = 1,
     gradientPosition = 'bottom',
-    purpleWordIndices
+    purpleWordIndices,
+    applyWatermark = true,
+    watermarkPosition
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -102,31 +106,23 @@ export async function generateIntelImage({
         // 1. Dynamic Import
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
-        // --- NUCLEAR FONT LOADING ---
-        // 1. Load System Fonts (Backup)
-        // GlobalFonts.loadSystemFonts(); // Not available in current napi-rs version, skipping.
-
+        // --- FONT LOADING ---
         let fontToUse = 'sans-serif';
-
-        // 2. Load Custom Font via Buffer (Most Robust)
+        // Explicitly register font
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-        try {
-            if (fs.existsSync(fontPath)) {
-                // Read into buffer first - verified workaround for some Vercel/Lambda filesystem weirdness
-                const fontBuffer = fs.readFileSync(fontPath);
-                GlobalFonts.register(fontBuffer, 'Outfit');
+        if (fs.existsSync(fontPath)) {
+            try {
+                GlobalFonts.register(fs.readFileSync(fontPath), 'Outfit');
                 fontToUse = 'Outfit';
-                console.log(`[Image Engine] Registered Outfit from buffer (${fontBuffer.length} bytes)`);
-            } else {
-                console.error(`[Image Engine] Font file NOT FOUND at: ${fontPath}`);
-                // List files in public to debug if needed (optional)
+                console.log('[Image Engine] Font "Outfit" registered successfully.');
+            } catch (fontErr) {
+                console.warn('[Image Engine] Failed to register Outfit font:', fontErr);
             }
-        } catch (e) {
-            console.error('[Image Engine] Font registration failed:', e);
+        } else {
+            console.warn('[Image Engine] Outfit font file not found.');
         }
 
         const fullFontStack = `${fontToUse}, sans-serif`;
-        console.log(`[Image Engine] Final Font Stack: ${fullFontStack}`);
 
         // Helper for reliable measurement
         const safeMeasure = (t: string, currentFontSize: number) => {
@@ -164,23 +160,33 @@ export async function generateIntelImage({
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = true;
 
-        // Draw Image
+
+        // Draw Image - CORRECTED OBJECT-COVER LOGIC
         const img = await loadImage(buffer);
-        const imgRatio = img.width / img.height;
-        const canvasRatio = WIDTH / HEIGHT;
 
-        let drawWidth, drawHeight;
+        // "object-cover" math:
+        // Scale so that BOTH dimensions are >= canvas dimensions.
+        // Use the LARGER of the two required scale factors.
+        // (WIDTH / img.width) vs (HEIGHT / img.height)
+        const scaleX = WIDTH / img.width;
+        const scaleY = HEIGHT / img.height;
+        const coverScale = Math.max(scaleX, scaleY); // Coverage Base Scale
 
-        if (imgRatio > canvasRatio) {
-            drawHeight = HEIGHT * scale;
-            drawWidth = drawHeight * imgRatio;
-        } else {
-            drawWidth = WIDTH * scale;
-            drawHeight = drawWidth / imgRatio;
-        }
+        // Apply User Zoom (scale param)
+        const finalScale = coverScale * scale;
 
-        const dx = (WIDTH - drawWidth) / 2 + (position.x * WIDTH);
-        const dy = (HEIGHT - drawHeight) / 2 + (position.y * HEIGHT);
+        const drawWidth = img.width * finalScale;
+        const drawHeight = img.height * finalScale;
+
+        // Center the image by default (offset = difference / 2)
+        // Then apply User Translation (position param)
+        // NOTE: PostManager sends pixels.
+        // We assume position.x and y are in "canvas-equivalent pixels" relative to the preview.
+        // If the preview is 1080px wide (unlikely), it maps 1:1. 
+        // If standard drag controls, we treat '1' as '1 pixel'.
+        // REMOVED `* WIDTH` which was causing massive offsets.
+        const dx = (WIDTH - drawWidth) / 2 + (position.x);
+        const dy = (HEIGHT - drawHeight) / 2 + (position.y);
 
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -188,7 +194,7 @@ export async function generateIntelImage({
 
         const isTop = gradientPosition === 'top';
 
-        // 5. Typography
+        // 5. Typography Setup
         const availableWidth = WIDTH * 0.90;
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
@@ -218,23 +224,40 @@ export async function generateIntelImage({
             headlineLines = [cleanedHeadline.substring(0, 50)];
         }
 
-        // 6. Draw Gradient
+        // 6. Draw Gradient - CORRECTED SEAMLESS
         if (applyGradient) {
-            const gradientHeight = Math.max(totalBlockHeight + 400, 600);
+            // We use a fixed height for consistency, or dynamic based on text.
+            // To avoid "visible line", we start the gradient well above the text.
+            // And we use a "dead zone" of 0 opacity at the start.
+
+            const minGradH = 900;
+            const gradientHeight = Math.max(totalBlockHeight + 500, minGradH);
+
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
 
             if (isTop) {
                 gradient.addColorStop(0, 'rgba(0,0,0,0.95)');
+                gradient.addColorStop(0.4, 'rgba(0,0,0,0.6)');
                 gradient.addColorStop(1, 'rgba(0,0,0,0)');
             } else {
+                // SEAMLESS SCRIM CURVE
+                // 0.0 - 0.2: Pure Transparent Dead Zone (Safety Buffer)
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.5, 'rgba(0,0,0,0.6)');
-                gradient.addColorStop(1, 'rgba(0,0,0,0.95)');
+                gradient.addColorStop(0.15, 'rgba(0,0,0,0)');
+
+                // 0.2 - 1.0: The actual gradient
+                gradient.addColorStop(0.25, 'rgba(0,0,0,0.03)'); // Soft entry
+                gradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
+                gradient.addColorStop(0.6, 'rgba(0,0,0,0.6)');
+                gradient.addColorStop(0.85, 'rgba(0,0,0,0.95)');
+                gradient.addColorStop(1, 'rgba(0,0,0,1)');
             }
 
             ctx.save();
             ctx.fillStyle = gradient;
+            // We fill the strict rect defined by gradY
+            // Since 0.0 -> 0.15 is transparent, the "top line" at gradY is invisible.
             ctx.fillRect(0, gradY, WIDTH, gradientHeight);
             ctx.restore();
         }
@@ -242,11 +265,6 @@ export async function generateIntelImage({
         // 7. Draw Text
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
-
-            // Shadows DISABLED for reliability test
-            // ctx.shadowColor = 'rgba(0,0,0,0.95)';
-            // ctx.shadowBlur = 30;
-            // ctx.shadowOffsetY = 6;
 
             const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.95);
             const defaultY = isTop ? 120 : HEIGHT - totalH - 120;
@@ -260,10 +278,7 @@ export async function generateIntelImage({
 
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
-
-                // Calculate single line width
                 let lineWidth = 0;
-                // Pre-calculate word metrics
                 const metrics = words.map(w => {
                     ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     const wVal = safeMeasure(w + " ", finalFontSize);
@@ -275,15 +290,16 @@ export async function generateIntelImage({
 
                 words.forEach((word, idx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + idx);
-
-                    // SIMPLE DRAWING
                     ctx.save();
                     ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     ctx.textAlign = 'left';
                     ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                    // Text Shadow for pop
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetY = 4;
                     ctx.fillText(word, currentX, currentY);
                     ctx.restore();
-
                     currentX += metrics[idx];
                 });
 
@@ -291,12 +307,20 @@ export async function generateIntelImage({
                 currentY += finalFontSize * 0.95;
             }
         }
+
         // Watermark
-        ctx.font = 'bold 30px Arial, sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.textAlign = 'center';
-        ctx.shadowBlur = 0;
-        ctx.fillText('@KumoLabAnime', WIDTH / 2, HEIGHT - 50);
+        if (applyWatermark) {
+            ctx.font = 'bold 24px Arial, sans-serif'; // Crisp, small font
+            ctx.fillStyle = 'rgba(255,255,255,0.7)'; // Slightly more visible for clarity
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+
+            const wx = watermarkPosition ? watermarkPosition.x : WIDTH / 2;
+            const wy = watermarkPosition ? watermarkPosition.y : HEIGHT - 40;
+
+            ctx.fillText('@KumoLabAnime', wx, wy);
+        }
 
         const finalBuffer = await canvas.toBuffer('image/png');
         if (skipUpload) {

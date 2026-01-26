@@ -60,6 +60,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
     const [purpleCursorIndex, setPurpleCursorIndex] = useState(0);
+
+    // Watermark State
+    const [isApplyWatermark, setIsApplyWatermark] = useState(true);
+    const [watermarkPosition, setWatermarkPosition] = useState<{ x: number, y: number } | null>(null);
+    const [isWatermarkLocked, setIsWatermarkLocked] = useState(false);
+
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(true);
     const [containerScale, setContainerScale] = useState(1);
@@ -77,7 +83,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
-    const [dragTarget, setDragTarget] = useState<'image' | 'text' | null>(null);
+    const [dragTarget, setDragTarget] = useState<'image' | 'text' | 'watermark' | null>(null);
 
 
     // Multi-select state
@@ -165,8 +171,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setShowExpandedPreview(false);
         setIsApplyGradient(true);
         setIsApplyText(true);
+        setIsApplyWatermark(true);
+        setWatermarkPosition(null);
+        setIsWatermarkLocked(false);
         setShowModal(true);
-
     };
 
     const handleEditClick = (post: BlogPost) => {
@@ -201,6 +209,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setShowExpandedPreview(false);
         setIsApplyGradient(!!post.headline);
         setIsApplyText(!!post.headline);
+        setIsApplyWatermark(true); // Default to true for existing posts
+        setWatermarkPosition(null);
+        setIsWatermarkLocked(false);
         setShowModal(true);
     };
 
@@ -238,7 +249,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom'): Promise<string | null> => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean): Promise<string | null> => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -263,7 +274,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     textPos: textPosition,
                     textScale,
                     gradientPos: manualGradientPos ?? gradientPosition,
-                    purpleIndex: manualPurpleIndices ?? purpleWordIndices
+
+                    purpleIndex: manualPurpleIndices ?? purpleWordIndices,
+                    applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
+                    watermarkPosition
                 })
             });
             const data = await res.json();
@@ -288,9 +302,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-    const handleImagePointerDown = (e: React.PointerEvent, target: 'image' | 'text' = 'image') => {
+    const handleImagePointerDown = (e: React.PointerEvent, target: 'image' | 'text' | 'watermark' = 'image') => {
         if (target === 'image' && isImageLocked) return;
         if (target === 'text' && isTextLocked) return;
+        if (target === 'watermark' && isWatermarkLocked) return;
 
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         setIsDragging(true);
@@ -314,9 +329,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 y: prev.y + (deltaY / HEIGHT)
             }));
             setIsStageDirty(true);
-        } else if (dragTarget === 'text') {
             setTextPosition(prev => {
                 const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 100 : HEIGHT - 300 };
+                return {
+                    x: base.x + deltaX,
+                    y: base.y + deltaY
+                };
+            });
+            setIsStageDirty(true);
+        } else if (dragTarget === 'watermark') {
+            setWatermarkPosition(prev => {
+                const base = prev || { x: WIDTH / 2, y: HEIGHT - 40 };
                 return {
                     x: base.x + deltaX,
                     y: base.y + deltaY
@@ -332,6 +355,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsDragging(false);
         if (dragTarget === 'text' && isAutoSnap) {
             setTextPosition(null); // Snap back to default calculated position
+        }
+        if (dragTarget === 'watermark' && isAutoSnap) {
+            setWatermarkPosition(null);
         }
         setDragTarget(null);
         handleApplyText();
@@ -360,6 +386,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
+        setIsApplyWatermark(true);
+        setWatermarkPosition(null);
+        setIsWatermarkLocked(false);
         handleApplyText(1, { x: 0, y: 0 });
     };
 
@@ -1400,7 +1429,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 src={searchedImages[selectedImageIndex ?? 0]}
                                                                 crossOrigin="anonymous"
                                                                 alt=""
-                                                                className="w-full h-full object-contain pointer-events-none select-none"
+                                                                className="w-full h-full object-cover pointer-events-none select-none"
                                                             />
                                                         </div>
 
@@ -1413,9 +1442,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         {/* 3. Text Manipulation Proxy Layer */}
                                                         {isApplyText && (
-                                                            <div
-                                                                className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}
-                                                            >
+                                                            <div className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}>
                                                                 <div
                                                                     className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
@@ -1457,6 +1484,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             Drag to Place
                                                                         </div>
                                                                     )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* 4. Watermark Layer */}
+                                                        {isApplyWatermark && (
+                                                            <div className="absolute inset-0 pointer-events-none">
+                                                                <div
+                                                                    className={`absolute cursor-move select-none group/watermark transition-all ${isWatermarkLocked ? 'pointer-events-auto' : 'pointer-events-auto'}`}
+                                                                    onPointerDown={(e) => handleImagePointerDown(e, 'watermark')}
+                                                                    style={{
+                                                                        left: (watermarkPosition?.x ?? WIDTH / 2) * containerScale,
+                                                                        top: (watermarkPosition?.y ?? HEIGHT - 40) * containerScale,
+                                                                        transform: `translate(-50%, -50%) scale(${textScale})`,
+                                                                    }}
+                                                                >
+                                                                    <div className={`text-white/70 text-[10px] sm:text-xs font-bold tracking-wider drop-shadow-md bg-black/20 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10 ${isWatermarkLocked ? 'ring-0' : 'hover:bg-white/10 hover:border-white/30'}`}>
+                                                                        @KUMOLABANIME
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         )}
@@ -1564,6 +1610,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         >
                                                             {isApplyText ? <Eye size={12} /> : <EyeOff size={12} />} {isApplyText ? 'TEXT: ON' : 'TEXT: OFF'}
                                                         </button>
+                                                    </div>
+
+                                                    {/* Watermark Tools */}
+                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
+                                                            <span>Watermark</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setIsWatermarkLocked(!isWatermarkLocked)}
+                                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isWatermarkLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                            >
+                                                                {isWatermarkLocked ? <Lock size={12} /> : <Unlock size={12} />} {isWatermarkLocked ? 'LOCKED' : 'FREE'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newVal = !isApplyWatermark;
+                                                                    setIsApplyWatermark(newVal);
+                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, newVal);
+                                                                }}
+                                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyWatermark ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                            >
+                                                                {isApplyWatermark ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {isApplyWatermark ? 'ON' : 'OFF'}
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1923,6 +1994,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 )
             }
-        </div>
+        </div >
     );
 }

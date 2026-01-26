@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
  * Internally checks EST time to dispatch correct slots.
  */
 export async function GET(request: NextRequest) {
-    let slot: '08:00' | '12:00' | '16:00' | '20:00' | null = null;
+    let slot: '08:00' | '12:00' | '16:00' | '20:00' | 'hourly' | null = null;
     try {
         // 0. Security Check
         // Allow if triggered by Vercel Cron OR if a valid CRON_SECRET is provided (e.g. from GitHub Actions)
@@ -47,6 +47,11 @@ export async function GET(request: NextRequest) {
             else if (hourEST >= 12 && hourEST < 14) slot = '12:00';
             else if (hourEST >= 16 && hourEST < 18) slot = '16:00';
             else if (hourEST >= 20 && hourEST < 22) slot = '20:00';
+            else {
+                // FALLBACK: Run Dynamic Newsroom every other hour
+                // This ensures "every hour" coverage as requested.
+                slot = 'hourly';
+            }
         }
 
         if (!slot) {
