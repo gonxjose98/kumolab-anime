@@ -265,7 +265,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: '', // FORCE EMPTY: User requested ONLY the "Image Text" be displayed on the image.
+                    title: title || '', // Pass the user's title correctly
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
