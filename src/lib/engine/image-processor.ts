@@ -125,6 +125,10 @@ export async function generateIntelImage({
         // ... rest of init
         console.log(`[Image Engine] Using font stack: ${fullFontStack}`);
 
+        // DEBUG: Get available fonts
+        const availableFonts = GlobalFonts.families.map(f => f.family);
+        console.log('[Image Engine] Available Fonts:', availableFonts);
+
         // Helper for reliable measurement
         const safeMeasure = (t: string, currentFontSize: number) => {
             if (!t) return 0;
@@ -160,6 +164,7 @@ export async function generateIntelImage({
         // 3. Setup Canvas
         const canvas = createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true; // Ensure smooth rendering
 
         // Draw Image
         const img = await loadImage(buffer);
@@ -240,6 +245,14 @@ export async function generateIntelImage({
             ctx.restore();
         }
 
+        // DRAW DEBUG FONT LIST
+        ctx.save();
+        ctx.font = '20px sans-serif';
+        ctx.fillStyle = 'red';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Fonts: ${availableFonts.join(', ').substring(0, 100)}`, 50, 1300);
+        ctx.restore();
+
         // 7. Draw Text
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
@@ -270,6 +283,8 @@ export async function generateIntelImage({
                 let lineWidth = 0;
                 // Pre-calculate word metrics
                 const metrics = words.map(w => {
+                    // Ensure font is set for accurate measurement
+                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     const wVal = safeMeasure(w + " ", finalFontSize);
                     lineWidth += wVal;
                     return wVal;
@@ -281,13 +296,21 @@ export async function generateIntelImage({
                 words.forEach((word, idx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + idx);
 
+                    // DEBUG: Draw background box to verify coordinates
                     ctx.save();
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; // Changed alpha to 0.3 as per instruction
+                    const wVal = metrics[idx];
+                    ctx.fillRect(currentX, currentY, wVal, finalFontSize);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`; // Set font explicitly
                     ctx.textAlign = 'left';
                     ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF'; // Explicitly set to white for non-purple words
                     ctx.fillText(word, currentX, currentY);
                     ctx.restore();
 
-                    currentX += metrics[idx];
+                    currentX += wVal;
                 });
 
                 wordCursor += words.length;
