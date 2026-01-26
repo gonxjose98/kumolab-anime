@@ -99,41 +99,39 @@ export async function generateIntelImage({
     const HEIGHT = 1350;
 
     try {
-        // 1. Dynamic Import (Prevents build-time binary resolution issues)
+        // 1. Dynamic Import
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
-        // --- CRITICAL FONT FIX ---
-        // Vercel Serverless Functions often have NO system fonts installed.
-        // We MUST rely 100% on our bundled custom font. Fallbacks like 'Arial' will fail silently (no text).
-        const customFontName = 'Outfit';
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-        let fontReady = false;
+        // --- NUCLEAR FONT LOADING ---
+        // 1. Load System Fonts (Backup)
+        // GlobalFonts.loadSystemFonts(); // Not available in current napi-rs version, skipping.
 
+        let fontToUse = 'sans-serif';
+
+        // 2. Load Custom Font via Buffer (Most Robust)
+        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
         try {
-            if (GlobalFonts.has(customFontName)) {
-                fontReady = true;
-            } else if (fs.existsSync(fontPath)) {
-                GlobalFonts.registerFromPath(fontPath, customFontName);
-                fontReady = true;
-                console.log(`[Image Engine] Successfully registered ${customFontName} from ${fontPath}`);
+            if (fs.existsSync(fontPath)) {
+                // Read into buffer first - verified workaround for some Vercel/Lambda filesystem weirdness
+                const fontBuffer = fs.readFileSync(fontPath);
+                GlobalFonts.register(fontBuffer, 'Outfit');
+                fontToUse = 'Outfit';
+                console.log(`[Image Engine] Registered Outfit from buffer (${fontBuffer.length} bytes)`);
             } else {
-                console.error(`[Image Engine] CRITICAL: Font file missing at ${fontPath}`);
+                console.error(`[Image Engine] Font file NOT FOUND at: ${fontPath}`);
+                // List files in public to debug if needed (optional)
             }
         } catch (e) {
             console.error('[Image Engine] Font registration failed:', e);
         }
 
-        // Use ONLY the custom font. Removing system fallbacks prevents confusion if they are missing.
-        // If this font fails, we likely get squares or nothing, but 'sans-serif' was proven to fail too.
-        const fontToUse = customFontName;
-
-        console.log(`[Image Engine] Using font family: "${fontToUse}" (Ready: ${fontReady})`);
+        const fullFontStack = `${fontToUse}, sans-serif`;
+        console.log(`[Image Engine] Final Font Stack: ${fullFontStack}`);
 
         // Helper for reliable measurement
         const safeMeasure = (t: string, currentFontSize: number) => {
             if (!t) return 0;
             const m = ctx.measureText(t);
-            // If measurement fails (width 0), return approximation
             return (m && m.width > 0) ? m.width : (t.length * currentFontSize * 0.5);
         };
 
@@ -164,7 +162,7 @@ export async function generateIntelImage({
         // 3. Setup Canvas
         const canvas = createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = true; // Ensure smooth rendering
+        ctx.imageSmoothingEnabled = true;
 
         // Draw Image
         const img = await loadImage(buffer);
@@ -194,10 +192,6 @@ export async function generateIntelImage({
         const availableWidth = WIDTH * 0.90;
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        // Debugging Overlay
-        // ctx.fillStyle = 'red';
-        // ctx.fillText(`Debug: ApplyText=${applyText}`, 50, 50);
-
         let globalFontSize = 130;
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
@@ -207,8 +201,7 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            // STRICT FONT USAGE
-            ctx.font = `bold ${currentFS}px "${fontToUse}"`;
+            ctx.font = `bold ${currentFS}px ${fullFontStack}`;
             lineSpacing = currentFS * 0.95;
 
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
@@ -222,7 +215,7 @@ export async function generateIntelImage({
 
         // FAILSAFE
         if (headlineLines.length === 0 && cleanedHeadline.length > 0) {
-            headlineLines = [cleanedHeadline.substring(0, 50)]; // Limit length to avoid chaos
+            headlineLines = [cleanedHeadline.substring(0, 50)];
         }
 
         // 6. Draw Gradient
@@ -250,10 +243,10 @@ export async function generateIntelImage({
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
 
-            // Shadows
-            ctx.shadowColor = 'rgba(0,0,0,0.95)';
-            ctx.shadowBlur = 30;
-            ctx.shadowOffsetY = 6;
+            // Shadows DISABLED for reliability test
+            // ctx.shadowColor = 'rgba(0,0,0,0.95)';
+            // ctx.shadowBlur = 30;
+            // ctx.shadowOffsetY = 6;
 
             const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.95);
             const defaultY = isTop ? 120 : HEIGHT - totalH - 120;
@@ -272,8 +265,7 @@ export async function generateIntelImage({
                 let lineWidth = 0;
                 // Pre-calculate word metrics
                 const metrics = words.map(w => {
-                    // Ensure font is set for accurate measurement
-                    ctx.font = `bold ${finalFontSize}px "${fontToUse}"`;
+                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     const wVal = safeMeasure(w + " ", finalFontSize);
                     lineWidth += wVal;
                     return wVal;
@@ -284,9 +276,9 @@ export async function generateIntelImage({
                 words.forEach((word, idx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + idx);
 
-                    // ACTUAL DRAWING
+                    // SIMPLE DRAWING
                     ctx.save();
-                    ctx.font = `bold ${finalFontSize}px "${fontToUse}"`;
+                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     ctx.textAlign = 'left';
                     ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
                     ctx.fillText(word, currentX, currentY);
