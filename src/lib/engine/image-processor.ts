@@ -99,35 +99,35 @@ export async function generateIntelImage({
     const HEIGHT = 1350;
 
     try {
+        // 1. Dynamic Import (Prevents build-time binary resolution issues)
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
-        // --- ROBUST FONT LOADING ---
-        // Vercel / Amazon Linux likely doesn't have 'Arial'. Use 'sans-serif' for guaranteed fallback.
-        let fontToUse = 'sans-serif';
-
+        // --- CRITICAL FONT FIX ---
+        // Vercel Serverless Functions often have NO system fonts installed.
+        // We MUST rely 100% on our bundled custom font. Fallbacks like 'Arial' will fail silently (no text).
+        const customFontName = 'Outfit';
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+        let fontReady = false;
 
-        if (GlobalFonts.has('Outfit')) {
-            fontToUse = 'Outfit';
-        } else if (fs.existsSync(fontPath)) {
-            try {
-                GlobalFonts.registerFromPath(fontPath, 'Outfit');
-                fontToUse = 'Outfit';
-                console.log('[Image Engine] Registered custom font: Outfit');
-            } catch (e) {
-                console.warn('[Image Engine] Failed to register Outfit font:', e);
+        try {
+            if (GlobalFonts.has(customFontName)) {
+                fontReady = true;
+            } else if (fs.existsSync(fontPath)) {
+                GlobalFonts.registerFromPath(fontPath, customFontName);
+                fontReady = true;
+                console.log(`[Image Engine] Successfully registered ${customFontName} from ${fontPath}`);
+            } else {
+                console.error(`[Image Engine] CRITICAL: Font file missing at ${fontPath}`);
             }
+        } catch (e) {
+            console.error('[Image Engine] Font registration failed:', e);
         }
 
-        // Simpler stack. No quotes to avoid parsing issues in some canvas versions for single-word families.
-        const fullFontStack = `${fontToUse}, sans-serif`;
+        // Use ONLY the custom font. Removing system fallbacks prevents confusion if they are missing.
+        // If this font fails, we likely get squares or nothing, but 'sans-serif' was proven to fail too.
+        const fontToUse = customFontName;
 
-        // ... rest of init
-        console.log(`[Image Engine] Using font stack: ${fullFontStack}`);
-
-        // DEBUG: Get available fonts
-        const availableFonts = GlobalFonts.families.map(f => f.family);
-        console.log('[Image Engine] Available Fonts:', availableFonts);
+        console.log(`[Image Engine] Using font family: "${fontToUse}" (Ready: ${fontReady})`);
 
         // Helper for reliable measurement
         const safeMeasure = (t: string, currentFontSize: number) => {
@@ -207,7 +207,8 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            ctx.font = `bold ${currentFS}px ${fullFontStack}`;
+            // STRICT FONT USAGE
+            ctx.font = `bold ${currentFS}px "${fontToUse}"`;
             lineSpacing = currentFS * 0.95;
 
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
@@ -245,21 +246,9 @@ export async function generateIntelImage({
             ctx.restore();
         }
 
-        // DRAW DEBUG FONT LIST
-        ctx.save();
-        ctx.font = '20px sans-serif';
-        ctx.fillStyle = 'red';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Fonts: ${availableFonts.join(', ').substring(0, 100)}`, 50, 1300);
-        ctx.restore();
-
         // 7. Draw Text
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
-            // Explicitly set font again before drawing
-            ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
 
             // Shadows
             ctx.shadowColor = 'rgba(0,0,0,0.95)';
@@ -284,7 +273,7 @@ export async function generateIntelImage({
                 // Pre-calculate word metrics
                 const metrics = words.map(w => {
                     // Ensure font is set for accurate measurement
-                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
+                    ctx.font = `bold ${finalFontSize}px "${fontToUse}"`;
                     const wVal = safeMeasure(w + " ", finalFontSize);
                     lineWidth += wVal;
                     return wVal;
@@ -292,25 +281,18 @@ export async function generateIntelImage({
 
                 let currentX = startX - (lineWidth / 2);
 
-                // Word-by-word drawing
                 words.forEach((word, idx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + idx);
 
-                    // DEBUG: Draw background box to verify coordinates
+                    // ACTUAL DRAWING
                     ctx.save();
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; // Changed alpha to 0.3 as per instruction
-                    const wVal = metrics[idx];
-                    ctx.fillRect(currentX, currentY, wVal, finalFontSize);
-                    ctx.restore();
-
-                    ctx.save();
-                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`; // Set font explicitly
+                    ctx.font = `bold ${finalFontSize}px "${fontToUse}"`;
                     ctx.textAlign = 'left';
-                    ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF'; // Explicitly set to white for non-purple words
+                    ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
                     ctx.fillText(word, currentX, currentY);
                     ctx.restore();
 
-                    currentX += wVal;
+                    currentX += metrics[idx];
                 });
 
                 wordCursor += words.length;
