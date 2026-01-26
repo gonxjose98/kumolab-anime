@@ -179,8 +179,9 @@ export async function generateIntelImage({
         }
 
         // Center + Offset
-        const dx = (WIDTH - drawWidth) / 2 + (position.x);
-        const dy = (HEIGHT - drawHeight) / 2 + (position.y);
+        // Frontend sends normalized position (percentage of canvas), so multiply by WIDTH/HEIGHT
+        const dx = (WIDTH - drawWidth) / 2 + (position.x * WIDTH);
+        const dy = (HEIGHT - drawHeight) / 2 + (position.y * HEIGHT);
 
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
