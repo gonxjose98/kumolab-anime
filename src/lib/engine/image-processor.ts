@@ -102,10 +102,9 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // --- ROBUST FONT LOADING ---
-        // Default to system font (Arial) which is reliable on Vercel/Linux environments.
-        let fontToUse = 'Arial';
+        // Vercel / Amazon Linux likely doesn't have 'Arial'. Use 'sans-serif' for guaranteed fallback.
+        let fontToUse = 'sans-serif';
 
-        // Attempt to load 'Outfit' for premium look, but strict fallback if it fails.
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
 
         if (GlobalFonts.has('Outfit')) {
@@ -118,11 +117,10 @@ export async function generateIntelImage({
             } catch (e) {
                 console.warn('[Image Engine] Failed to register Outfit font:', e);
             }
-        } else {
-            console.warn('[Image Engine] Custom font file not found at:', fontPath);
         }
-        // Append fallback stack
-        const fullFontStack = `"${fontToUse}", Arial, sans-serif`;
+
+        // Simpler stack. No quotes to avoid parsing issues in some canvas versions for single-word families.
+        const fullFontStack = `${fontToUse}, sans-serif`;
 
         // ... rest of init
         console.log(`[Image Engine] Using font stack: ${fullFontStack}`);
