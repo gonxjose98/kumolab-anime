@@ -107,14 +107,16 @@ export async function generateIntelImage({
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
         // --- FONT LOADING ---
-        let fontToUse = 'sans-serif';
         // Explicitly register font
         const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+        let fontToUse = 'sans-serif';
+
         if (fs.existsSync(fontPath)) {
             try {
-                GlobalFonts.register(fs.readFileSync(fontPath), 'Outfit');
-                fontToUse = 'Outfit';
-                console.log('[Image Engine] Font "Outfit" registered successfully.');
+                // Register as distinct name to ensure we get exactly this file
+                GlobalFonts.register(fs.readFileSync(fontPath), 'KumoLabMain');
+                fontToUse = 'KumoLabMain';
+                console.log('[Image Engine] Font "KumoLabMain" registered successfully.');
             } catch (fontErr) {
                 console.warn('[Image Engine] Failed to register Outfit font:', fontErr);
             }
@@ -122,7 +124,7 @@ export async function generateIntelImage({
             console.warn('[Image Engine] Outfit font file not found.');
         }
 
-        const fullFontStack = `${fontToUse}, sans-serif`;
+        const fullFontStack = `"${fontToUse}", sans-serif`;
 
         // Helper for reliable measurement
         const safeMeasure = (t: string, currentFontSize: number) => {
@@ -130,6 +132,16 @@ export async function generateIntelImage({
             const m = ctx.measureText(t);
             return (m && m.width > 0) ? m.width : (t.length * currentFontSize * 0.5);
         };
+
+        // ... existing code ... Note: I need to skip the drawing parts to get to the loop
+
+        // [Assuming the middle part of the file is unchanged, jumping to the loop modification]
+        // Wait, replace_file_content needs contiguous block. 
+        // I will target the Font Loading block first, then the loop separately? 
+        // Or I can do it in one go if I include the drawing logic.
+        // The file content I viewed shows lines 100-300.
+        // Let's do a multi-replace.
+
 
         // 2. Download source
         let buffer: Buffer;
@@ -193,7 +205,7 @@ export async function generateIntelImage({
         const availableWidth = WIDTH * 0.90;
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        let globalFontSize = 130;
+        let globalFontSize = 110;
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -202,6 +214,7 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
+            // Use 'bold' to ensure the heaviest weight of the registered file is chosen
             ctx.font = `bold ${currentFS}px ${fullFontStack}`;
             lineSpacing = currentFS * 0.95;
 
@@ -210,7 +223,8 @@ export async function generateIntelImage({
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            if (totalBlockHeight < (HEIGHT * 0.45)) break;
+            // Updated Rule: Max 35% screen coverage (Hardcoded)
+            if (totalBlockHeight < (HEIGHT * 0.35)) break;
             globalFontSize -= 5;
         }
 
@@ -262,7 +276,19 @@ export async function generateIntelImage({
             const finalFontSize = Math.max(40, globalFontSize * textScale);
 
             const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.95);
-            const defaultY = isTop ? 120 : HEIGHT - totalH - 120;
+
+            // --- HARDCODED 35% ZONE POSITIONING ---
+            const zoneHeight = HEIGHT * 0.35;
+            let defaultY = 0;
+
+            if (isTop) {
+                // Centered within the TOP 35%
+                defaultY = (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+            } else {
+                // Centered within the BOTTOM 35%
+                const zoneStart = HEIGHT - zoneHeight;
+                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+            }
 
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
             const startY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : defaultY;
@@ -274,6 +300,8 @@ export async function generateIntelImage({
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
                 let lineWidth = 0;
+
+                // Calculate line width and word metrics first
                 const metrics = words.map(w => {
                     ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                     const wVal = safeMeasure(w + " ", finalFontSize);
@@ -295,7 +323,10 @@ export async function generateIntelImage({
                     ctx.shadowOffsetY = 4;
                     ctx.fillText(word, currentX, currentY);
                     ctx.restore();
-                    currentX += metrics[idx];
+                    // Advance X
+                    if (metrics[idx] !== undefined) {
+                        currentX += metrics[idx];
+                    }
                 });
 
                 wordCursor += words.length;
