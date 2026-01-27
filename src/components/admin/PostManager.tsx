@@ -71,6 +71,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [containerScale, setContainerScale] = useState(1);
     const imagePreviewRef = useRef<HTMLDivElement>(null);
 
+    // --- STRICT STATE MACHINE ---
+    type EditorMode = 'RAW' | 'PROCESSED';
+    const [editorMode, setEditorMode] = useState<EditorMode>('RAW');
+
     useEffect(() => {
         if (!imagePreviewRef.current) return;
         const observer = new ResizeObserver((entries) => {
@@ -166,6 +170,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setSearchPage(1); // Reset page
         setImageScale(1);
         setImagePosition({ x: 0, y: 0 });
+        setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
         setTextPosition(null);
@@ -205,8 +210,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
         setProcessedImage(null);
         setSearchPage(1);
-        setImageScale(1);
         setImagePosition({ x: 0, y: 0 });
+        setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
         setTextPosition(null);
@@ -363,7 +368,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const data = await res.json();
             if (data.success) {
                 setProcessedImage(data.processedImage);
-                setIsStageDirty(false); // We are now in sync
+                setEditorMode('PROCESSED'); // TRANSITION TO PROCESSED MODE
+                setIsStageDirty(false);
                 return data.processedImage;
             } else {
                 console.error('FX configuration failed: ' + data.error);
@@ -440,21 +446,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setWatermarkPosition(null);
         }
         setDragTarget(null);
-        handleApplyText();
+
+        // Only commit changes to backend if we are in PROCESSED mode (live edit)
+        if (editorMode === 'PROCESSED') {
+            handleApplyText();
+        }
     };
 
     const handleZoom = (delta: number, target: 'image' | 'text' = 'image') => {
         if (target === 'image') {
+            if (editorMode === 'PROCESSED') return; // Image locked in processed mode
             const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
             setImageScale(newScale);
             setIsStageDirty(true);
-            handleApplyText(newScale);
+            // RAW mode: No backend call
         } else {
             const newScale = Math.max(0.1, Math.min(3, textScale + delta));
             setTextScale(newScale);
             setIsStageDirty(true);
-            // Pass manualTextScale as the 8th argument
-            handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
+
+            // Only trigger backend re-render if we are editing the PROCESSED image
+            if (editorMode === 'PROCESSED') {
+                handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
+            }
         }
     };
 
@@ -463,6 +477,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setImagePosition({ x: 0, y: 0 });
         setIsImageLocked(false);
         setProcessedImage(null);
+        setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
         setTextPosition(null);
@@ -480,11 +495,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (type === 'text') {
             const newVal = !isApplyText;
             setIsApplyText(newVal);
-            handleApplyText(undefined, undefined, newVal, undefined);
+            // Only trigger backend if we are already in PROCESSED mode (to update the result)
+            if (editorMode === 'PROCESSED') {
+                handleApplyText(undefined, undefined, newVal, undefined);
+            }
         } else {
             const newVal = !isApplyGradient;
             setIsApplyGradient(newVal);
-            handleApplyText(undefined, undefined, undefined, newVal);
+            if (editorMode === 'PROCESSED') {
+                handleApplyText(undefined, undefined, undefined, newVal);
+            }
         }
     };
 
@@ -707,6 +727,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             // STEP 3: UPDATE STATE WITH HQ IMAGE
             setProcessedImage(data.processedImage); // Base64 HQ
+            setEditorMode('PROCESSED');
+            setIsStageDirty(false);
 
             const finalTitle = title || topic || 'UNTITLED SIGNAL';
             const finalContent = content || `Simulation content for ${finalTitle}.`;
@@ -1419,7 +1441,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                         value={title}
                                                         onChange={(e) => setTitle(e.target.value)}
-                                                        onBlur={() => handleApplyText()}
                                                     />
                                                     {genType === 'CONFIRMATION_ALERT' && (
                                                         <p className="mt-1 text-[9px] text-orange-500 font-bold uppercase tracking-tighter">
@@ -1478,7 +1499,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             setOverlayTag(newVal);
                                                             setIsApplyText(true);
                                                         }}
-                                                        onBlur={() => handleApplyText()}
                                                     />
                                                 </div>
 
@@ -1512,7 +1532,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         setTopic(e.target.value);
                                                         setIsApplyText(true);
                                                     }}
-                                                    onBlur={() => handleApplyText()}
                                                 />
                                             </div>
 
@@ -1592,12 +1611,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
                                                     {/* Arrow Controls (Floating) - STRICT MODE: Hide if processed preview is active */}
-                                                    {searchedImages.length > 1 && !isDragging && (!processedImage || isStageDirty) && (
+                                                    {searchedImages.length > 1 && !isDragging && editorMode === 'RAW' && (
                                                         <>
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setProcessedImage(null);
+                                                                    setEditorMode('RAW');
                                                                     setIsStageDirty(true);
                                                                     setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length);
                                                                 }}
@@ -1609,6 +1629,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setProcessedImage(null);
+                                                                    setEditorMode('RAW');
                                                                     setIsStageDirty(true);
                                                                     setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length);
                                                                 }}
@@ -1629,17 +1650,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             onPointerUp={handleImagePointerUp}
                                                             style={{
                                                                 // PREVENT DOUBLE TRANSFORM: 
-                                                                // If we have a processed image (which already has scale/pan baked in) and we are not editing,
-                                                                // we must NOT apply the CSS transform again.
-                                                                transform: (!isStageDirty && processedImage)
+                                                                // If in PROCESSED mode, the backend image has the crop baked in. 
+                                                                // We must disable CSS transforms.
+                                                                transform: (editorMode === 'PROCESSED')
                                                                     ? 'none'
                                                                     : `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
-                                                                transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
+                                                                transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)',
+                                                                pointerEvents: editorMode === 'PROCESSED' ? 'none' : 'auto'
                                                             }}
                                                         >
                                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                                             <img
-                                                                src={(!isStageDirty && processedImage)
+                                                                src={editorMode === 'PROCESSED' && processedImage
                                                                     ? processedImage
                                                                     : (searchedImages.length > 0 && selectedImageIndex !== null)
                                                                         ? searchedImages[selectedImageIndex]
@@ -1652,14 +1674,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         </div>
 
                                                         {/* 2. Gradient Layer (Visual Only) - Hide if processed */}
-                                                        {isApplyGradient && (isStageDirty || !processedImage) && (
+                                                        {isApplyGradient && editorMode === 'RAW' && (
                                                             <div
                                                                 className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
                                                             />
                                                         )}
 
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
-                                                        {isApplyText && (isStageDirty || !processedImage) && (
+                                                        {isApplyText && editorMode === 'RAW' && (
                                                             <div className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}>
                                                                 <div
                                                                     className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
