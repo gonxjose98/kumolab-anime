@@ -243,6 +243,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 if (reset) {
                     setSearchedImages(data.images);
                     setSelectedImageIndex(0);
+                    setProcessedImage(null);
+                    setIsStageDirty(true);
                 } else {
                     // Append new unique images
                     setSearchedImages(prev => [...new Set([...prev, ...data.images])]);
@@ -460,6 +462,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setImageScale(1);
         setImagePosition({ x: 0, y: 0 });
         setIsImageLocked(false);
+        setProcessedImage(null);
+        setIsStageDirty(true);
         setTextScale(1);
         setTextPosition(null);
         setIsTextLocked(false);
@@ -1446,6 +1450,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             setSelectedImageIndex(0);
                                                                             setImageScale(1);
                                                                             setImagePosition({ x: 0, y: 0 });
+                                                                            setProcessedImage(null);
+                                                                            setIsStageDirty(true);
                                                                         };
                                                                         reader.readAsDataURL(file);
                                                                     }
@@ -1547,6 +1553,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             setSelectedImageIndex(0);
                                                                             setImageScale(1);
                                                                             setImagePosition({ x: 0, y: 0 });
+                                                                            setProcessedImage(null);
+                                                                            setIsStageDirty(true);
                                                                         };
                                                                         reader.readAsDataURL(file);
                                                                     }
@@ -1583,17 +1591,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 >
                                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
-                                                    {/* Arrow Controls (Floating) */}
-                                                    {searchedImages.length > 1 && !isDragging && (
+                                                    {/* Arrow Controls (Floating) - STRICT MODE: Hide if processed preview is active */}
+                                                    {searchedImages.length > 1 && !isDragging && (!processedImage || isStageDirty) && (
                                                         <>
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length); }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setProcessedImage(null);
+                                                                    setIsStageDirty(true);
+                                                                    setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length);
+                                                                }}
                                                                 className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 -translate-x-12 opacity-0 group-hover/editor:opacity-100"
                                                             >
                                                                 <ChevronLeft size={20} />
                                                             </button>
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length); }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setProcessedImage(null);
+                                                                    setIsStageDirty(true);
+                                                                    setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length);
+                                                                }}
                                                                 className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 translate-x-12 opacity-0 group-hover/editor:opacity-100"
                                                             >
                                                                 <ChevronRight size={20} />
