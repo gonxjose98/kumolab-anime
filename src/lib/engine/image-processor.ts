@@ -212,7 +212,8 @@ export async function generateIntelImage({
 
         // DEDUPLICATION GUARD:
         // If the Override Visual Title (slug/headline) matches the Anime Title, suppress the duplicate.
-        if (cleanedHeadline === upperTitle) {
+        // We only deduplicate if there IS a title to match against.
+        if (cleanedHeadline === upperTitle && upperTitle.length > 0) {
             console.log(`[Image Engine] Deduplicating headline (matches title): "${cleanedHeadline}"`);
             cleanedHeadline = '';
         }
