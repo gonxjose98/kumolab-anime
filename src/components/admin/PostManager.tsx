@@ -447,8 +447,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
         setDragTarget(null);
 
-        // Only commit changes to backend if we are in PROCESSED mode (live edit)
-        if (editorMode === 'PROCESSED') {
+        // Only commit changes to backend if we are in PROCESSED mode
+        if (editorMode === 'PROCESSED' && (dragTarget === 'text' || dragTarget === 'watermark')) {
             handleApplyText();
         }
     };
@@ -459,14 +459,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
             setImageScale(newScale);
             setIsStageDirty(true);
-            // RAW mode: No backend call
         } else {
             const newScale = Math.max(0.1, Math.min(3, textScale + delta));
             setTextScale(newScale);
             setIsStageDirty(true);
 
-            // Only trigger backend re-render if we are editing the PROCESSED image
+            // Only trigger backend re-render if we are in PROCESSED mode
             if (editorMode === 'PROCESSED') {
+                // Debounce could be added here, but direct call is requested for "Action -> Result"
                 handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
             }
         }
@@ -1616,10 +1616,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
+                                                                    // Explicitly reset to RAW state
                                                                     setProcessedImage(null);
                                                                     setEditorMode('RAW');
                                                                     setIsStageDirty(true);
-                                                                    setSelectedImageIndex(prev => ((prev ?? 0) - 1 + searchedImages.length) % searchedImages.length);
+                                                                    // Safe index math
+                                                                    setSelectedImageIndex(prev => {
+                                                                        const p = prev ?? 0;
+                                                                        const len = searchedImages.length;
+                                                                        return (p - 1 + len) % len;
+                                                                    });
                                                                 }}
                                                                 className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 -translate-x-12 opacity-0 group-hover/editor:opacity-100"
                                                             >
@@ -1628,10 +1634,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
+                                                                    // Explicitly reset to RAW state
                                                                     setProcessedImage(null);
                                                                     setEditorMode('RAW');
                                                                     setIsStageDirty(true);
-                                                                    setSelectedImageIndex(prev => ((prev ?? 0) + 1) % searchedImages.length);
+                                                                    setSelectedImageIndex(prev => {
+                                                                        const p = prev ?? 0;
+                                                                        const len = searchedImages.length;
+                                                                        return (p + 1) % len;
+                                                                    });
                                                                 }}
                                                                 className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-white text-white hover:text-black rounded-full backdrop-blur-md border border-white/10 transition-all z-20 group-hover/editor:translate-x-0 translate-x-12 opacity-0 group-hover/editor:opacity-100"
                                                             >
@@ -1895,10 +1906,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
                                                             className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
                                                             value={overlayTag}
-                                                            onBlur={() => handleApplyText()}
                                                             onChange={(e) => {
                                                                 setOverlayTag(e.target.value);
-                                                                setPurpleWordIndices([]);
+                                                                // Reset purple indices when text changes to avoid misalignment
+                                                                if (purpleWordIndices.length > 0) setPurpleWordIndices([]);
                                                                 setIsApplyText(true);
                                                                 setIsStageDirty(true);
                                                             }}
