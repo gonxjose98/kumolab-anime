@@ -104,15 +104,60 @@ export async function generateIntelImage({
 
         // --- STRICT FONT LOADING ---
         const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+        console.log(`[Image Engine] process.cwd(): ${process.cwd()}`);
+        console.log(`[Image Engine] Target Font Path: ${outfitPath}`);
+        console.log(`[Image Engine] Exists? ${fs.existsSync(outfitPath)}`);
 
         if (!fs.existsSync(outfitPath)) {
+            // Debugging: check what IS in public/fonts
+            const fontsDir = path.dirname(outfitPath);
+            if (fs.existsSync(fontsDir)) {
+                console.log(`[Image Engine] Contents of ${fontsDir}:`, fs.readdirSync(fontsDir));
+            } else {
+                console.log(`[Image Engine] Fonts directory not found at ${fontsDir}`);
+                // Try looking in alternate locations?
+            }
             throw new Error(`CRITICAL: Font file missing at ${outfitPath}`);
         }
 
         // Use registerFromPath as primary method
-        const registered = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
-        if (!registered) {
-            throw new Error(`CRITICAL: GlobalFonts.registerFromPath returned false for ${outfitPath}`);
+        let isRegistered: boolean = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
+
+        if (!isRegistered) {
+            console.warn(`[Image Engine] registerFromPath failed for ${outfitPath}. Trying buffer registration...`);
+            try {
+                const fontBuffer = fs.readFileSync(outfitPath);
+                // register returns FontKey | null (or undefined depending on version), truthy if success
+                const fontKey = GlobalFonts.register(fontBuffer, 'Outfit');
+                if (fontKey) { // Check for truthiness
+                    isRegistered = true;
+                    console.log('[Image Engine] Font "Outfit" registered successfully via Buffer.');
+                }
+            } catch (bufferErr) {
+                console.error(`[Image Engine] Buffer registration failed:`, bufferErr);
+            }
+        }
+
+        if (!isRegistered) {
+            console.warn(`[Image Engine] Outfit font failed to load. Attempting fallback to SourceSans3...`);
+            const fallbackPath = path.join(process.cwd(), 'public', 'fonts', 'SourceSans3-Bold.otf');
+
+            if (fs.existsSync(fallbackPath)) {
+                // Try to register fallback as "Outfit" so we don't break the rest of the code
+                const fallbackRegistered = GlobalFonts.registerFromPath(fallbackPath, 'Outfit');
+                if (fallbackRegistered) {
+                    isRegistered = true;
+                    console.log('[Image Engine] FALLBACK: Registered SourceSans3 as "Outfit". Please replace corrupted Outfit-Black.ttf!');
+                } else {
+                    console.error(`[Image Engine] Fallback registration failed for ${fallbackPath}`);
+                }
+            } else {
+                console.error(`[Image Engine] Fallback font not found at ${fallbackPath}`);
+            }
+        }
+
+        if (!isRegistered) {
+            throw new Error(`CRITICAL: GlobalFonts.registerFromPath AND Buffer fallback returned false for ${outfitPath}`);
         }
 
         console.log('[Image Engine] Font "Outfit" registered successfully.');
@@ -354,6 +399,11 @@ export async function generateIntelImage({
         return publicUrl;
 
     } catch (e: any) {
+        console.log("!!! IMAGE ENGINE FATAL ERROR !!!");
+        console.log(e);
+        if (e instanceof Error) {
+            console.log(e.stack);
+        }
         console.error("Image Engine Fatal:", e);
         // Fallback Error Image
         // ... (simplified error image)
