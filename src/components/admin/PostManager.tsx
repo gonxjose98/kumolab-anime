@@ -322,17 +322,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const signalText = (overlayTag || '').trim() || 'NEWS'; // Fallback to NEWS to match frontend renderer
         setIsProcessingImage(true);
         setIsApplyingEffect(true);
+        setIsApplyingEffect(true);
+
+        // DEBUG TRACE
+        const payload = {
+            imageUrl: imageUrl.substring(0, 50) + '...',
+            title: title || topic || '',
+            topicState: topic,
+            titleState: title,
+            headline: signalText.toUpperCase(),
+            applyText: forcedApplyText ?? isApplyText,
+            forcedApplyText,
+            isApplyText
+        };
+        console.log('[PostManager] handleApplyText Payload:', payload);
+
         try {
             const res = await fetch('/api/admin/process-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: title || topic || '', // Pass the user's title correctly (fallback to topic)
-                    headline: signalText.toUpperCase(),
+                    title: payload.title, // Use the resolved title
+                    headline: payload.headline,
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
-                    applyText: forcedApplyText ?? isApplyText,
+                    applyText: payload.applyText,
                     applyGradient: forcedApplyGradient ?? isApplyGradient,
                     textPos: textPosition,
                     textScale,

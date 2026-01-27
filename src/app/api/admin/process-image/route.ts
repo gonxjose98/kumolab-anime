@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
             applyWatermark, watermarkPosition
         } = await request.json();
 
-        console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText, applyGradient, applyWatermark });
+        console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText });
+        console.log(`[Admin API] Title Length: ${title?.length}, Headline Length: ${headline?.length}`);
 
         if (!imageUrl) {
             return NextResponse.json({ success: false, error: 'Image URL is required' }, { status: 400 });
