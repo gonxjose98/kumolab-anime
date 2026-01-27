@@ -205,7 +205,7 @@ export async function generateIntelImage({
         const availableWidth = WIDTH * 0.90; // Standard intentional safe margin
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        let globalFontSize = 180;
+        let globalFontSize = 135; // Lower start to force 3+ words per line
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -223,8 +223,8 @@ export async function generateIntelImage({
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // STRICT 30% COVERAGE LIMIT (USER ENFORCED)
-            if (totalBlockHeight <= (HEIGHT * 0.30)) break;
+            // STRICT 25% COVERAGE LIMIT (Forces smaller font, more words per line)
+            if (totalBlockHeight <= (HEIGHT * 0.25)) break;
             globalFontSize -= 5;
         }
 
@@ -277,8 +277,8 @@ export async function generateIntelImage({
 
             const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.92);
 
-            // --- STRICT 30% UTILIZATION ZONE ---
-            const zoneHeight = HEIGHT * 0.30;
+            // --- STRICT 25% UTILIZATION ZONE ---
+            const zoneHeight = HEIGHT * 0.25;
             const bottomSafeMargin = 100;
             let defaultY = 0;
 
