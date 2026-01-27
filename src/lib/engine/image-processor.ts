@@ -214,10 +214,12 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            // Use 'bold' to ensure the heaviest weight of the registered file is chosen
+            // Use 'bold' to ensure the heaviest weight is chosen
             ctx.font = `bold ${currentFS}px ${fullFontStack}`;
-            lineSpacing = currentFS * 0.95;
+            // Tighter line spacing for that "impact" look (85% of font size)
+            lineSpacing = currentFS * 0.85;
 
+            // wrapText needs to account for the custom letter spacing too
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
@@ -299,38 +301,56 @@ export async function generateIntelImage({
 
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
-                let lineWidth = 0;
 
-                // Calculate line width and word metrics first
-                const metrics = words.map(w => {
-                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
-                    const wVal = safeMeasure(w + " ", finalFontSize);
-                    lineWidth += wVal;
-                    return wVal;
+                // --- CUSTOM KERNING LOGIC (-3% of font size) ---
+                const letterSpacing = -(finalFontSize * 0.03);
+
+                // Calculate line width with custom kerning
+                let lineWidth = 0;
+                const wordWidths = words.map(word => {
+                    let w = 0;
+                    for (const char of (word + " ")) {
+                        ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
+                        w += safeMeasure(char, finalFontSize) + letterSpacing;
+                    }
+                    return w;
                 });
+                lineWidth = wordWidths.reduce((a, b) => a + b, 0);
 
                 let currentX = startX - (lineWidth / 2);
 
-                words.forEach((word, idx) => {
-                    const isPurple = purpleWordIndices?.includes(wordCursor + idx);
-                    ctx.save();
-                    ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
-                    ctx.textAlign = 'left';
-                    ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                    // Text Shadow for pop
-                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowOffsetY = 4;
-                    ctx.fillText(word, currentX, currentY);
-                    ctx.restore();
-                    // Advance X
-                    if (metrics[idx] !== undefined) {
-                        currentX += metrics[idx];
+                words.forEach((word, wordIdx) => {
+                    const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
+
+                    // Draw Word Char-by-Char for Kerning
+                    for (const char of word) {
+                        ctx.save();
+                        ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
+                        ctx.textAlign = 'left';
+                        ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+
+                        // --- FATTEN THE FONT (STROKE) ---
+                        ctx.strokeStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                        ctx.lineWidth = finalFontSize * 0.04; // 4% gain in thickness
+                        ctx.lineJoin = 'round';
+                        ctx.strokeText(char, currentX, currentY);
+
+                        // Text Shadow
+                        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                        ctx.shadowBlur = 12;
+                        ctx.shadowOffsetY = 4;
+                        ctx.fillText(char, currentX, currentY);
+                        ctx.restore();
+
+                        currentX += safeMeasure(char, finalFontSize) + letterSpacing;
                     }
+
+                    // Space between words
+                    currentX += safeMeasure(" ", finalFontSize) + letterSpacing;
                 });
 
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.95;
+                currentY += finalFontSize * 0.85; // Match lineSpacing
             }
         }
 
