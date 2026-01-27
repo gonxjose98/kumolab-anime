@@ -36,8 +36,7 @@ interface IntelImageOptions {
 /**
  * Processes an image for the Intel Feed and Social Media.
  */
-import { createClient } from '@/lib/supabase/admin';
-import { v4 as uuidv4 } from 'uuid';
+
 
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
@@ -275,7 +274,7 @@ export async function generateIntelImage({
                 const words = line.split(/\s+/).filter(Boolean);
 
                 ctx.save();
-                ctx.font = `900 ${finalFontSize}px ${fullFontStack}`;
+                ctx.font = `900 ${finalFontSize}px "Outfit"`;
                 ctx.textAlign = 'center';
 
                 // Shadow
