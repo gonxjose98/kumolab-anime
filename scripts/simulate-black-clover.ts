@@ -16,7 +16,7 @@ async function runSimulation() {
         title: "Victory! Black Clover TV Anime Gets Season 2 Validation (Official)", // Intentionally noisy
         fullTitle: "Victory! Black Clover TV Anime Gets Season 2 Validation (Official)",
         claimType: 'confirmed',
-        slug: 'black-clover-test',
+        slug: `black-clover-test-${Date.now()}`,
         content: "The official website has finally announced that the Black Clover anime will return for a new season! Fans are losing their minds over the news. It is finally here.",
         imageSearchTerm: "Black Clover",
         source: "Simulation"
@@ -49,7 +49,7 @@ async function runSimulation() {
                 image: post.image,
                 timestamp: post.timestamp,
                 is_published: true,
-                verification_tier: 1, // Official Site
+                verification_tier: 'streamer', // Official/Streamer Tier
                 verification_reason: 'System Test'
             });
 

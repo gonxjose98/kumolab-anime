@@ -292,6 +292,8 @@ export async function generateIntelImage({
             const allLines = [...titleLines, ...headlineLines];
             let wordCursor = 0;
 
+            console.log(`[Image Engine] Drawing ${allLines.length} lines of text at startY=${startY}`);
+
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
 
@@ -319,6 +321,11 @@ export async function generateIntelImage({
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
                     ctx.save();
                     ctx.fillStyle = isPurple ? KUMOLAB_PURPLE : '#FFFFFF';
+                    // Force Opacity
+                    ctx.globalAlpha = 1.0;
+
+                    console.log(`[Image Engine] Drawing Word: "${word}" at (${Math.round(currentX)}, ${Math.round(currentY)}) Color: ${isPurple ? 'PURPLE' : 'WHITE'}`);
+
                     ctx.fillText(word, currentX + (metrics[wordIdx].wordW / 2), currentY);
                     ctx.restore();
                     currentX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
