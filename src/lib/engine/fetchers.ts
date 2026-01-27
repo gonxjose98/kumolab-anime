@@ -286,7 +286,7 @@ export async function fetchAnimeIntel(): Promise<any[]> {
                     const lowerDescRaw = rawDescription.toLowerCase();
 
                     // Title check is strict
-                    const forbiddenWords = [...CONTENT_RULES.NEGATIVE_KEYWORDS, 'manga', 'volume', 'webtoon', 'manhwa', 'novel', 'light novel'];
+                    const forbiddenWords = [...CONTENT_RULES.NEGATIVE_KEYWORDS, 'manga', 'volume', 'webtoon', 'manhwa', 'novel', 'light novel', 'live action', 'live-action'];
                     const titleNegative = forbiddenWords.some(k => lowerTitleRaw.includes(k.toLowerCase()));
                     if (titleNegative) {
                         console.log(`[Fetcher] Skipping (Negative/Manga Title): ${rawTitle}`);
