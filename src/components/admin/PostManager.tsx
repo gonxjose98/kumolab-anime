@@ -544,49 +544,71 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleCommitToPreview = async () => {
         setIsProcessingImage(true);
         try {
-            if (stageRef.current) {
-                const canvas = await html2canvas(stageRef.current, {
-                    useCORS: true,
-                    allowTaint: true,
-                    scale: 2,
-                    backgroundColor: '#000000',
-                    logging: false,
+            // STEP 1: RESOLVE THE IMAGE SOURCE
+            let finalImageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+                ? searchedImages[selectedImageIndex]
+                : customImagePreview;
+
+            // If it's a blob (local file), convert to Base64 so the server can see it
+            if (finalImageUrl?.startsWith('blob:')) {
+                // Fetch the blob and convert to base64
+                const blob = await fetch(finalImageUrl).then(r => r.blob());
+                finalImageUrl = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(blob);
                 });
-
-                const dataUrl = canvas.toDataURL('image/png', 1.0);
-
-                // Set the processed image to what we captured
-                setProcessedImage(dataUrl);
-
-                const finalTitle = title || topic || 'UNTITLED SIGNAL';
-                const finalContent = content || `Simulation content for ${finalTitle}.`;
-
-                setPreviewPost({
-                    id: editingPostId || 'preview-' + Date.now(),
-                    title: finalTitle,
-                    content: finalContent,
-                    type: genType || 'COMMUNITY',
-                    image: dataUrl, // USE CAPTURE
-                    headline: overlayTag,
-                    timestamp: new Date().toISOString(),
-                    isPublished: false,
-                    isSaved: false
-                } as any);
-
-                // If editing, auto-save the "draft" update to DB
-                if (editingPostId) {
-                    // logic to update draft if needed, but previewPost update handles UI
-                }
-
-            } else {
-                console.warn("Ref missing, fallback to server gen");
-                const finalImage = await handleApplyText();
-                if (!finalImage) throw new Error("Stage capture failed.");
             }
 
+            if (!finalImageUrl) throw new Error("No image selected to commit.");
+
+            // STEP 2: TRIGGER BACKEND GENERATION (Guaranteed 1080x1350)
+            const res = await fetch('/api/admin/process-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageUrl: finalImageUrl,
+                    title: title || '', // Pass title for text rendering
+                    headline: (overlayTag || '').trim().toUpperCase(),
+                    scale: imageScale,
+                    position: imagePosition,
+                    applyText: isApplyText,
+                    applyGradient: isApplyGradient,
+                    textPos: textPosition,
+                    textScale,
+                    gradientPos: gradientPosition,
+                    purpleIndex: purpleWordIndices,
+                    applyWatermark: isApplyWatermark,
+                    watermarkPosition
+                })
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.error || "Generation failed");
+            }
+
+            // STEP 3: UPDATE STATE WITH HQ IMAGE
+            setProcessedImage(data.processedImage); // Base64 HQ
+
+            const finalTitle = title || topic || 'UNTITLED SIGNAL';
+            const finalContent = content || `Simulation content for ${finalTitle}.`;
+
+            setPreviewPost({
+                id: editingPostId || 'preview-' + Date.now(),
+                title: finalTitle,
+                content: finalContent,
+                type: genType || 'COMMUNITY',
+                image: data.processedImage, // Use the Perfect 1080x1350 Render
+                headline: overlayTag,
+                timestamp: new Date().toISOString(),
+                isPublished: false,
+                isSaved: false
+            } as any);
+
         } catch (e: any) {
-            console.error("Capture failed:", e);
-            alert('Error capturing preview: ' + e.message);
+            console.error("Commit failed:", e);
+            alert('Error committing preview: ' + e.message);
         } finally {
             setIsProcessingImage(false);
         }
