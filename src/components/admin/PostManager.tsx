@@ -485,16 +485,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             : customImagePreview;
 
         if (imageUrl) {
-            // Check if we need to regenerate
-            // Strategy: Just ALWAYS regenerate for safety unless we are absolutely sure.
-            // But to save bandwidth, we check isStageDirty. 
-            // However, to fix the user's issue, we will BE AGGRESSIVE.
-            // We'll reuse 'processedImage' only if we are currently not dirty AND we have one.
-            // BUT WAIT: The user specifically said "Text isn't output". This means the cached image is WRONG.
-            // So we force a refresh.
-
-            console.log('[Admin] Forcing final image render before save...');
-            finalImageToSave = await handleApplyText();
+            // FORCE PARAMETERS for Save:
+            // 3. forcedApplyText: TRUE (Always force text on save if we have content)
+            // 7. forcedApplyWatermark: TRUE (Always force watermark on save)
+            console.log('[Admin] Generating FINAL save image with FORCED text/watermark...');
+            finalImageToSave = await handleApplyText(undefined, undefined, true, undefined, undefined, undefined, true);
         } else {
             console.warn('[Admin] No image found to process for save.');
         }
