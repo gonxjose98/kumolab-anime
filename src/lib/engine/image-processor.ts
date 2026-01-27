@@ -301,8 +301,8 @@ export async function generateIntelImage({
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
 
-                // --- AGGRESSIVE BUBBLY KERNING (-5% of font size) ---
-                const letterSpacing = -(finalFontSize * 0.05);
+                // --- CLEAN BUBBLY KERNING (-4% of font size) ---
+                const letterSpacing = -(finalFontSize * 0.04);
 
                 let lineWidth = 0;
                 const wordWidths = words.map(word => {
@@ -326,17 +326,17 @@ export async function generateIntelImage({
                         ctx.textAlign = 'left';
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
 
-                        // --- ULTRA BUBBLY STROKE (10% THICKNESS) ---
+                        // --- FATTEN FOR STRENGTH (7%) ---
                         ctx.strokeStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.lineWidth = finalFontSize * 0.10;
+                        ctx.lineWidth = finalFontSize * 0.07;
                         ctx.lineJoin = 'round';
                         ctx.lineCap = 'round';
                         ctx.strokeText(char, currentX, currentY);
 
-                        // Deep Shadow for 3D Pop
-                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                        ctx.shadowBlur = 18;
-                        ctx.shadowOffsetY = 8;
+                        // Clean, Flat Shadow for readability (No 3D effect)
+                        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                        ctx.shadowBlur = 8;
+                        ctx.shadowOffsetY = 2;
                         ctx.fillText(char, currentX, currentY);
                         ctx.restore();
 
@@ -347,7 +347,7 @@ export async function generateIntelImage({
                 });
 
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.80; // Extremely tight lines
+                currentY += finalFontSize * 0.85; // Clean, tight lines
             }
         }
 
