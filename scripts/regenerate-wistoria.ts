@@ -31,33 +31,9 @@ async function regenerateWistoria() {
     const post = posts[0];
     console.log(`Found Post: ${post.title} (${post.id})`);
 
-    // 2. Fetch Fresh Source Image
-    // Try reliable terms in order
-    const terms = [
-        'Wistoria Season 2',
-        'Wistoria: Wand and Sword Season 2',
-        'Wistoria: Wand and Sword'
-    ];
-
-    let sourceUrl: string | null = null;
-    let usedTerm = '';
-
-    for (const term of terms) {
-        console.log(`Trying search term: "${term}"...`);
-        sourceUrl = await fetchOfficialAnimeImage(term);
-        if (sourceUrl) {
-            usedTerm = term;
-            break;
-        }
-    }
-
-    if (!sourceUrl) {
-        console.error("Failed to find ANY official image.");
-        // Emergency Fallback to a known high-quality S1 poster if all else fails, 
-        // but likely 'Wistoria: Wand and Sword' will hit S1.
-        return;
-    }
-    console.log(`Source URL found using "${usedTerm}": ${sourceUrl}`);
+    // 2. Use User-Provided Image
+    const sourceUrl = `C:/Users/Jose G/.gemini/antigravity/brain/0ef14c83-fcc8-4692-9233-f9012698dab7/uploaded_media_1769490957961.jpg`;
+    console.log(`Using specific provided image: ${sourceUrl}`);
 
     // 3. Generate New Image
     console.log("Generating Intel Image...");
