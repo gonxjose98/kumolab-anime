@@ -8,6 +8,7 @@ import { BlogPost, PostType, ClaimType } from '@/types';
 import { generateIntelImage } from './image-processor';
 import { fetchOfficialAnimeImage } from './fetchers';
 import { randomUUID } from 'crypto';
+import { AntigravityAI } from './ai';
 
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
