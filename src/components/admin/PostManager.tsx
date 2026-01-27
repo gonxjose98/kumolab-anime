@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 import { BlogPost } from '@/types';
@@ -97,6 +97,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState<string | null>(null);
 
+    // AI Assistant State
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
+
     const handleFetchLogs = async () => {
         setIsLoadingLogs(true);
         try {
@@ -174,6 +179,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(true);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        // AI Reset
+        setAiPrompt('');
+        setAiChatHistory([]);
         setShowModal(true);
     };
 
@@ -217,8 +225,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     // New Handlers
-    const handleSearchImages = async (reset: boolean = true) => {
-        if (!topic) return alert('Please enter a topic first.');
+    const handleSearchImages = async (reset: boolean = true, searchTermOverride?: string) => {
+        const queryTerm = searchTermOverride || topic;
+        if (!queryTerm) return alert('Please enter a topic first.');
         setIsSearchingImages(true);
         const nextPage = reset ? 1 : searchPage + 1;
 
@@ -226,7 +235,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const res = await fetch('/api/admin/search-images', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic, page: nextPage })
+                body: JSON.stringify({ topic: queryTerm, page: nextPage })
             });
             const data = await res.json();
             if (data.success) {
@@ -246,6 +255,59 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             alert('Error searching images');
         } finally {
             setIsSearchingImages(false);
+        }
+    };
+
+    const handleAiAssistant = async () => {
+        if (!aiPrompt.trim()) return;
+
+        setIsAiLoading(true);
+        const userMessage = { role: 'user', content: aiPrompt };
+
+        try {
+            const res = await fetch('/api/admin/ai-assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: aiPrompt,
+                    history: aiChatHistory,
+                    currentDraft: { title, content }
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                const { draft } = data;
+                setTitle(draft.title);
+                setContent(draft.content);
+                setTopic(draft.imageSearchTerm || draft.title);
+                if (draft.type) setGenType(draft.type as any);
+                if (draft.status) {
+                    const tag = draft.status.replace(/_/g, ' ').toUpperCase();
+                    setOverlayTag(tag);
+                }
+
+                // Add to interactive history
+                setAiChatHistory(prev => [
+                    ...prev,
+                    userMessage,
+                    { role: 'assistant', content: draft.reasoning || 'Draft updated.' }
+                ]);
+                setAiPrompt('');
+
+                // Automatically search for suggested images
+                if (draft.imageSearchTerm) {
+                    await handleSearchImages(true, draft.imageSearchTerm);
+                }
+            } else {
+                alert(data.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('AI Assistant Error');
+        } finally {
+            setIsAiLoading(false);
         }
     };
 
@@ -850,6 +912,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             {/* Action Bar - Modern Aesthetic Compact */}
             <div className="flex flex-wrap gap-3 items-center">
                 <button
+                    onClick={() => handleGenerateClick('CUSTOM' as any)}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 border border-purple-400 backdrop-blur-xl shadow-lg shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 min-w-[120px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
+                        <Sparkles size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">AI Assist</span>
+                    </div>
+                </button>
+
+                <button
                     onClick={() => handleGenerateClick('INTEL')}
                     className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
@@ -1235,6 +1307,47 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             {/* Modal Content */}
                             <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                                {/* AI Assistant Interface */}
+                                <div className="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 rounded-xl space-y-3">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
+                                            <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">Editorial Assistant</span>
+                                        </div>
+                                        {isAiLoading && <Loader2 size={12} className="animate-spin text-purple-500" />}
+                                    </div>
+
+                                    {/* History / Status messages */}
+                                    {aiChatHistory.length > 0 && (
+                                        <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium italic border-l-2 border-purple-200 dark:border-purple-800/50 pl-3 py-1 mb-2">
+                                            {aiChatHistory[aiChatHistory.length - 1].content}
+                                        </div>
+                                    )}
+
+                                    <div className="relative">
+                                        <textarea
+                                            value={aiPrompt}
+                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                                    handleAiAssistant();
+                                                }
+                                            }}
+                                            placeholder="Solo Leveling just confirmed a new season..."
+                                            className="w-full bg-white dark:bg-black/50 border border-purple-200 dark:border-purple-500/30 rounded-lg p-3 pr-12 text-xs text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-400 dark:placeholder:text-neutral-600 resize-none h-20 transition-all"
+                                        />
+                                        <button
+                                            onClick={handleAiAssistant}
+                                            disabled={isAiLoading || !aiPrompt.trim()}
+                                            className="absolute bottom-2 right-2 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 transition-colors shadow-lg shadow-purple-500/20"
+                                        >
+                                            <Send size={16} />
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] text-neutral-500 font-mono tracking-tighter">
+                                        CMD+ENTER TO TRANSMIT
+                                    </p>
+                                </div>
                                 {/* Input Fields Container */}
                                 <div className="space-y-4">
                                     {genType === 'CUSTOM' || genType === 'CONFIRMATION_ALERT' ? (

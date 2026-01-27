@@ -112,12 +112,13 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         }
     }
 
-    // 3. CARD OVERLAY TEXT (LOCKED)
+    // 3. CARD OVERLAY TAG (LOCKED)
+    // Headline/Tag mapping for the visual overlay
     const overlayTextMap: Record<ClaimType, string> = {
-        confirmed: premiereDateStr ? `PREMIERES ${formatPremiereDate(premiereDateStr)}` : "CONFIRMED",
+        confirmed: premiereDateStr ? `PREMIERES ${formatPremiereDate(premiereDateStr)}` : "OFFICIALLY CONFIRMED",
         premiered: premiereDateStr ? `PREMIERED ${formatPremiereDate(premiereDateStr)}` : "PREMIERED",
         now_streaming: "NOW STREAMING",
-        delayed: "DELAYED",
+        delayed: "PRODUCTION DELAY",
         trailer: "NEW TRAILER",
         finale_aired: "FINALE AIRED",
         new_visual: "NEW VISUAL"
@@ -128,6 +129,9 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     // IMAGE RELEVANCE PROMPT (LOCKED)
     // "An anime always has to be chosen. Fallback image should never be used."
     let officialSourceImage = topItem.image;
+
+    // Use imageSearchTerm if provided by the fetcher
+    const searchTerm = topItem.imageSearchTerm || topItem.title.split(' Season')[0].split(':')[0].trim();
 
     // HELPER: Robust Searcher
     const findImageWithRetries = async (term: string) => {
@@ -149,13 +153,10 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
         console.log(`[Generator] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
 
-        // Strategy 3: First 3 Words (The "Hail Mary")
-        // "Inherit the Winds Members" -> "Inherit the Winds"
-        const words = escape(term).split('%20'); // Simple split by space
-        // Actually simpler to just split string
+        // Strategy 3: First 5 Words (Better for long titles)
         const simpleWords = term.split(' ');
-        if (simpleWords.length > 2) {
-            const shortTerm = simpleWords.slice(0, 3).join(' ');
+        if (simpleWords.length > 3) {
+            const shortTerm = simpleWords.slice(0, 5).join(' ');
             img = await fetchOfficialAnimeImage(shortTerm);
             if (img) return img;
         }
@@ -163,23 +164,20 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         return null;
     };
 
-    if (!officialSourceImage && topItem.imageSearchTerm) {
+    if (!officialSourceImage && searchTerm) {
         try {
-            officialSourceImage = await findImageWithRetries(topItem.imageSearchTerm);
+            officialSourceImage = await findImageWithRetries(searchTerm);
         } catch (e) {
             console.error('Failed to fetch official image via custom search:', e);
         }
     }
 
-    // HARD RULE: FALLBACK IF NO IMAGE FOUND
-    // User demand: "Fallback image should never be used."
-    // If we failed after all retries, we really just have to fallback or else we crash. 
-    // BUT we can try one last desperate search for JUST the first word if length > 4 chars
-    if (!officialSourceImage && topItem.imageSearchTerm) {
-        const firstWord = topItem.imageSearchTerm.split(' ')[0];
-        if (firstWord.length > 4) {
-            console.log(`[Generator] DESPERATE LAST RESORT: Searching for "${firstWord}"`);
-            officialSourceImage = await fetchOfficialAnimeImage(firstWord);
+    // DESPERATE LAST RESORT: Try searching for just the SERIES name without any detail
+    if (!officialSourceImage && searchTerm) {
+        const seriesName = searchTerm.split(' ')[0];
+        if (seriesName.length > 3) {
+            console.log(`[Generator] FINAL DESPERATE SEARCH for "${seriesName}"`);
+            officialSourceImage = await fetchOfficialAnimeImage(seriesName);
         }
     }
 
@@ -189,11 +187,17 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     }
 
     const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
-    const validContent = cleanBody(topItem.content, validTitle);
+
+    // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
+    let finalDisplayTitle = validTitle;
+    if (claimType === 'confirmed' && !finalDisplayTitle.toLowerCase().includes('confirmed')) {
+        finalDisplayTitle += ' Confirmed';
+    }
+
+    const validContent = cleanBody(topItem.content, finalDisplayTitle);
 
     // 3. DYNAMIC PURPLE HIGHLIGHT
-    // Highlight specific impact words: "Debut", "July", "Confirmed", etc.
-    const titleWords = validTitle.split(/\s+/).filter(Boolean);
+    const titleWords = finalDisplayTitle.split(/\s+/).filter(Boolean);
     const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
     const purpleWordIndices: number[] = [];
 
@@ -204,25 +208,23 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     });
 
     // CHECK FOR TEXT CLEANLINESS
-    // If post is a Visual Reveal, Trailer, or Poster, assume the image has text.
-    // In this case, disable the overlay text to avoid clutter.
-    const isVisual = topItem.claimType === 'new_visual' || topItem.fullTitle?.toLowerCase().includes('visual') || topItem.fullTitle?.toLowerCase().includes('poster');
-    const isTrailer = topItem.claimType === 'trailer' || topItem.fullTitle?.toLowerCase().includes('trailer') || topItem.fullTitle?.toLowerCase().includes('pv');
+    const isVisual = topItem.claimType === 'new_visual' || finalDisplayTitle.toLowerCase().includes('visual') || finalDisplayTitle.toLowerCase().includes('poster');
+    const isTrailer = topItem.claimType === 'trailer' || finalDisplayTitle.toLowerCase().includes('trailer') || finalDisplayTitle.toLowerCase().includes('pv');
 
     const shouldDisableOverlay = isVisual || isTrailer;
     if (shouldDisableOverlay) {
-        console.log(`[Generator] Detected Visual/Trailer (${topItem.fullTitle}). Disabling text overlay.`);
+        console.log(`[Generator] Detected Visual/Trailer (${finalDisplayTitle}). Disabling text overlay.`);
     }
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: validTitle, // Main Title
-            headline: '',
+            animeTitle: finalDisplayTitle,
+            headline: overlayTag, // Use the specific tag mapping for the visual
             purpleWordIndices,
             slug: topItem.slug || 'intel',
-            applyText: !shouldDisableOverlay // Disable text if it's a visual
+            applyText: !shouldDisableOverlay
         });
 
         if (processedImageUrl) {
@@ -235,7 +237,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     return {
         id: randomUUID(),
-        title: validTitle,
+        title: finalDisplayTitle,
         slug: `${topItem.slug || 'intel'}-${todayStr}`,
         type: 'INTEL',
         claimType,
@@ -292,10 +294,10 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
         console.log(`[Generator-Trending] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
 
-        // Strategy 3: First 3 Words
+        // Strategy 3: First 5 Words
         const simpleWords = term.split(' ');
-        if (simpleWords.length > 2) {
-            const shortTerm = simpleWords.slice(0, 3).join(' ');
+        if (simpleWords.length > 3) {
+            const shortTerm = simpleWords.slice(0, 5).join(' ');
             img = await fetchOfficialAnimeImage(shortTerm);
             if (img) return img;
         }
@@ -310,8 +312,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         // DESPERATE RESORT logic for Trending too
         if (!officialSourceImage) {
             const firstWord = trendingItem.imageSearchTerm.split(' ')[0];
-            if (firstWord.length > 4) {
-                console.log(`[Generator-Trending] DESPERATE LAST RESORT: Searching for "${firstWord}"`);
+            if (firstWord.length > 3) {
+                console.log(`[Generator-Trending] FINAL DESPERATE SEARCH: Searching for "${firstWord}"`);
                 officialSourceImage = await fetchOfficialAnimeImage(firstWord);
             }
         }
@@ -324,12 +326,19 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     }
 
     const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
-    const validContent = cleanBody(trendingItem.content, validTitle);
+
+    // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
+    let finalDisplayTitle = validTitle;
+    if (trendingItem.trendReason === 'SEASON ANNOUNCEMENT' && !finalDisplayTitle.toLowerCase().includes('confirmed')) {
+        finalDisplayTitle += ' Confirmed';
+    }
+
+    const validContent = cleanBody(trendingItem.content, finalDisplayTitle);
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         // Enforce KumoLab branding for Trending posts as requested by User
-        const titleWords = validTitle.split(/\s+/).filter(Boolean);
+        const titleWords = finalDisplayTitle.split(/\s+/).filter(Boolean);
         const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
         const purpleWordIndices: number[] = [];
 
@@ -340,18 +349,18 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         });
 
         // CHECK FOR TEXT CLEANLINESS (Trending Version)
-        const isVisual = trendingItem.trendReason === 'VISUAL REVEAL' || (trendingItem.fullTitle || '').toLowerCase().includes('visual');
-        const isTrailer = trendingItem.trendReason === 'TRAILER REVEAL' || (trendingItem.fullTitle || '').toLowerCase().includes('trailer');
+        const isVisual = trendingItem.trendReason === 'VISUAL REVEAL' || finalDisplayTitle.toLowerCase().includes('visual');
+        const isTrailer = trendingItem.trendReason === 'TRAILER REVEAL' || finalDisplayTitle.toLowerCase().includes('trailer');
 
         const shouldDisableOverlay = isVisual || isTrailer;
         if (shouldDisableOverlay) {
-            console.log(`[Generator-Trending] Detected Visual/Trailer (${validTitle}). Disabling text overlay.`);
+            console.log(`[Generator-Trending] Detected Visual/Trailer (${finalDisplayTitle}). Disabling text overlay.`);
         }
 
         const processedImageUrl = await generateIntelImage({
             sourceUrl: officialSourceImage,
-            animeTitle: validTitle,
-            headline: '', // Removed Branding Tag
+            animeTitle: finalDisplayTitle,
+            headline: trendingItem.trendReason || '', // Use the trend reason as a tag
             purpleWordIndices,
             slug: trendingItem.slug || 'trending',
             applyText: !shouldDisableOverlay
@@ -367,7 +376,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     return {
         id: randomUUID(),
-        title: validTitle,
+        title: finalDisplayTitle,
         slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
         type: 'TRENDING',
         content: validContent,
@@ -464,7 +473,14 @@ export function cleanTitle(title: string): string {
         clean = clean.replace(/Community/gi, 'Fans');
     }
 
-    // 5. Remove common RSS junk
+    // 5. Simplify Status Keywords
+    clean = clean.replace(/Officially Confirmed/gi, 'Confirmed')
+        .replace(/has been confirmed/gi, 'Confirmed')
+        .replace(/Announced to Get/gi, 'Gets')
+        .replace(/Reveals New/gi, 'New')
+        .replace(/Teases New/gi, 'New');
+
+    // 6. Remove common RSS junk
     clean = clean.replace(/News:/gi, '')
         .replace(/Create/gi, '')
         .replace(/Vote/gi, '')
@@ -473,21 +489,36 @@ export function cleanTitle(title: string): string {
     // 6. Remove questions
     clean = clean.replace(/\?/g, '');
 
-    // 7. Final Formatting: Remove extra spaces and trailing noise
+    // 7. Resolve Multiple Season Mentions (e.g. "Season 2... 3rd Season")
+    const seasonRegex = /(?:Season\s+(\d+))|(\d+)(?:st|nd|rd|th)?\s*Season/gi;
+    const seasonMentions = [...clean.matchAll(seasonRegex)];
+
+    if (seasonMentions && seasonMentions.length > 1) {
+        // Find the highest number
+        let highest = 0;
+        seasonMentions.forEach(m => {
+            const num = parseInt(m[1] || m[2] || '0');
+            if (num > highest) highest = num;
+        });
+        if (highest > 0) {
+            // Find first mention of ANY season to keep the anime title before it
+            const firstIdx = clean.search(/(?:Season\s+\d+)|(\d+)(?:st|nd|rd|th)?\s*Season/i);
+            const animeName = clean.substring(0, firstIdx).trim();
+            clean = `${animeName} Season ${highest}`;
+        }
+    }
+
+    // 8. Final Formatting: Remove extra spaces and trailing noise
     clean = clean.replace(/\s+/g, ' ').trim();
     // Remove leading/trailing non-alphanumeric (like - or :)
     clean = clean.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
-
-    // 8. Enforce Action/Status framing if missing (Simple Heuristic)
-    // If it's just a name "One Piece", maybe add nothing (could be unsafe to guess).
-    // But user wants "Anime Name + Action".
-    // We assume the input title usually has it.
 
     // 9. Hard Length Cap for Image Safety (User Limit: 100 chars)
     if (clean.length > 100) {
         // Try to truncate at last space
         const truncated = clean.substring(0, 100);
-        clean = truncated.substring(0, truncated.lastIndexOf(' ')) + '...';
+        const lastSpace = truncated.lastIndexOf(' ');
+        clean = (lastSpace > 50 ? truncated.substring(0, lastSpace) : truncated) + '...';
     }
 
     return clean;

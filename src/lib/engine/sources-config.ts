@@ -76,15 +76,15 @@ export const ANILIST_VALIDATION_ONLY = true;
 export const CONTENT_RULES = {
     // Keywords that strongly suggest 'Important' content
     POSITIVE_KEYWORDS: [
-        'New Anime', 'Announcement', 'Season 2', 'Season 3', 'Movie',
-        'Key Visual', 'Trailer', 'PV', 'Broadcast Date', 'Premiere',
-        'Delay', 'Postponed', 'Rescheduled'
+        'New Anime', 'Announcement', 'Season 2', 'Season 3', 'Season 4', 'Season 5',
+        '2nd Season', '3rd Season', '4th Season', '5th Season', 'Final Season',
+        'Movie', 'Key Visual', 'Trailer', 'PV', 'Broadcast Date', 'Premiere',
+        'Delay', 'Postponed', 'Rescheduled', 'Confirmed', 'Annihilated', 'Greenlit',
+        'Production', 'Sequel', 'New Visual', 'Streaming', 'Teaser'
     ],
     // Keywords strictly forbidden
     NEGATIVE_KEYWORDS: [
-        'Manga', 'Novel', 'Light Novel', 'Merch', 'Figure', 'Cafe', 'Event',
-        'Birthday', 'Cosplay', 'Game', 'Collaboration', 'Digest', 'Recap',
-        'Interview', 'Goods', 'Blu-ray', 'DVD', 'Box Set', 'Staff', 'Cast',
-        'Mario', 'AI'
+        'Birthday', 'Cafe', 'Merch', 'Figure', 'Goods', 'Collaboration',
+        'Blu-ray', 'DVD', 'Box Set', 'Interview', 'Event', 'Mario', 'AI'
     ]
 };

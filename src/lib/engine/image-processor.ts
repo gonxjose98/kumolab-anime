@@ -204,6 +204,24 @@ export async function generateIntelImage({
         // 5. Typography Setup
         const availableWidth = WIDTH * 0.90; // Standard intentional safe margin
         let cleanedHeadline = (headline || '').toUpperCase().trim();
+        const upperTitle = (animeTitle || '').toUpperCase().trim();
+
+        // REDUNDANCY CHECK: Simple deduplication
+        // If headline is "3RD SEASON CONFIRMED" and title is "VENDING MACHINE SEASON 3"
+        const titleWords = upperTitle.split(/\s+/);
+        const headlineWords = cleanedHeadline.split(/\s+/);
+
+        // If headline is almost entirely in title, or vice-versa, simplify
+        // Higher sensitivity: if ANY word over 3 chars overlaps, and we have few words, clear it.
+        const intersection = headlineWords.filter(w => titleWords.includes(w) && w.length > 3);
+        const isHighlyRedundant = intersection.length >= 2 ||
+            (cleanedHeadline.length > 0 && upperTitle.includes(cleanedHeadline)) ||
+            (intersection.length >= 1 && (titleWords.includes('CONFIRMED') || titleWords.includes('SEASON')));
+
+        if (isHighlyRedundant) {
+            console.log(`[Image Engine] Redundant headline detected ("${cleanedHeadline}" vs "${upperTitle}"). Clearing headline.`);
+            cleanedHeadline = '';
+        }
 
         let globalFontSize = 135; // Lower start to force 3+ words per line
         let titleLines: string[] = [];
@@ -218,7 +236,7 @@ export async function generateIntelImage({
             // Refined spacing (92% of font size) for balanced editorial look
             lineSpacing = currentFS * 0.92;
 
-            titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
+            titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
@@ -306,23 +324,30 @@ export async function generateIntelImage({
                 ctx.textAlign = 'center';
 
                 // Calculate word metrics for purple highlighting
-                let totalWidth = 0;
-                const metrics = words.map(w => {
-                    const m = ctx.measureText(w + " ");
-                    totalWidth += m.width;
-                    return m.width;
+                let lineTotalWidth = 0;
+                const metrics = words.map((w, i) => {
+                    const m = ctx.measureText(w);
+                    const spaceW = (i < words.length - 1) ? ctx.measureText(' ').width : 0;
+                    lineTotalWidth += m.width + spaceW;
+                    return { wordW: m.width, spaceW };
                 });
 
-                let currentX = startX - (totalWidth / 2);
+                let currentX = startX - (lineTotalWidth / 2);
 
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
                     ctx.save();
+
+                    // SUBTLE PREMIUM SHADOW
+                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                    ctx.shadowBlur = 12;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+
                     ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                    // STICK TO PURE FILLTEXT AS REQUESTED
-                    ctx.fillText(word, currentX + (metrics[wordIdx] / 2), currentY);
+                    ctx.fillText(word, currentX + (metrics[wordIdx].wordW / 2), currentY);
                     ctx.restore();
-                    currentX += metrics[wordIdx];
+                    currentX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
                 });
 
                 ctx.restore();
