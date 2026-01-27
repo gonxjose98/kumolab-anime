@@ -1,31 +1,30 @@
-import OpenAI from 'openai';
 import { EDITORIAL_SYSTEM_PROMPT } from './prompts';
 
 /**
  * Antigravity AI Engine
  * Single source of truth for all AI-assisted content generation and refinement.
- * This layer handles model selection, prompt management, and history.
  * 
- * It is designed to route through Antigravity's internal AI gateway,
- * unifying manual and automated workflows.
+ * ARCHITECTURE UPDATE:
+ * - Removed OpenAI SDK dependency.
+ * - Uses native fetch for protocol-agnostic API calls.
+ * - Routes exclusively to ANTIGRAVITY_AI_ENDPOINT.
  */
 export class AntigravityAI {
     private static instance: AntigravityAI;
-    private client: OpenAI | null = null;
+    private baseURL: string;
+    private apiKey: string;
     private model: string;
 
     private constructor() {
-        // Use Antigravity's internal engine configuration
-        // This abstracts away direct model provider dependencies in the component layer
-        const apiKey = process.env.ANTIGRAVITY_AI_KEY || process.env.OPENAI_API_KEY || 'internal';
-        const baseURL = process.env.ANTIGRAVITY_AI_ENDPOINT || 'https://api.openai.com/v1';
+        // Strict Configuration: No default to OpenAI
+        // The user must provide an endpoint or we fail.
+        this.baseURL = process.env.ANTIGRAVITY_AI_ENDPOINT || '';
+        this.apiKey = process.env.ANTIGRAVITY_AI_KEY || 'internal-bearer';
+        this.model = process.env.ANTIGRAVITY_AI_MODEL || 'antigravity-1.0';
 
-        this.model = process.env.ANTIGRAVITY_AI_MODEL || 'gpt-4o-mini';
-
-        this.client = new OpenAI({
-            apiKey,
-            baseURL
-        });
+        if (!this.baseURL) {
+            console.warn("[AntigravityAI] Warning: ANTIGRAVITY_AI_ENDPOINT is not set. AI features will fail.");
+        }
     }
 
     public static getInstance(): AntigravityAI {
@@ -36,6 +35,46 @@ export class AntigravityAI {
     }
 
     /**
+     * Internal Fetch Wrapper
+     * Sends standard chat completion payload to the configured endpoint.
+     */
+    private async sendCompletionRequest(messages: any[], jsonMode: boolean = true): Promise<any> {
+        if (!this.baseURL) {
+            throw new Error("Antigravity AI Configuration Missing: ANTIGRAVITY_AI_ENDPOINT is not set in .env.local");
+        }
+
+        const url = `${this.baseURL}/chat/completions`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: messages,
+                    temperature: 0.7,
+                    response_format: jsonMode ? { type: 'json_object' } : undefined
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`AI Engine HTTP ${response.status}: ${errText}`);
+            }
+
+            const data = await response.json();
+            return data;
+
+        } catch (error: any) {
+            console.error("[AntigravityAI] Request Fetch Error:", error);
+            throw error;
+        }
+    }
+
+    /**
      * Editorial Assist: Used for manual drafting and iterative refinement in the admin panel.
      */
     public async processEditorialPrompt(params: {
@@ -43,8 +82,6 @@ export class AntigravityAI {
         history?: any[];
         currentDraft?: any;
     }) {
-        if (!this.client) throw new Error('Antigravity AI Engine not initialized');
-
         const { prompt, history = [], currentDraft } = params;
 
         const messages: any[] = [
@@ -88,26 +125,23 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         }
         messages.push({ role: 'user', content: prompt });
 
-        const response = await this.client.chat.completions.create({
-            model: this.model,
-            messages,
-            response_format: { type: 'json_object' },
-            temperature: 0.7
-        });
+        const result = await this.sendCompletionRequest(messages, true);
+        const content = result.choices?.[0]?.message?.content;
 
-        const content = response.choices[0].message.content;
-        if (!content) throw new Error('Empty response from Antigravity AI');
+        if (!content) throw new Error('Empty response from AI Engine');
 
-        return JSON.parse(content);
+        try {
+            return JSON.parse(content);
+        } catch (e) {
+            console.error("JSON Parse Error on AI response:", content);
+            throw new Error("AI returned malformed JSON");
+        }
     }
 
     /**
      * Auto Engine: Used by the background automation to generate high-quality posts from raw intel.
-     * This ensures the same "Editorial Truth" is used for automated and manual posts.
      */
     public async generateFromIntel(sourceData: string, type: 'INTEL' | 'TRENDING') {
-        if (!this.client) throw new Error('Antigravity AI Engine not initialized');
-
         const messages: any[] = [
             {
                 role: 'system',
@@ -116,13 +150,9 @@ Current Date: ${new Date().toISOString().split('T')[0]}
             { role: 'user', content: sourceData }
         ];
 
-        const response = await this.client.chat.completions.create({
-            model: this.model,
-            messages,
-            response_format: { type: 'json_object' }
-        });
+        const result = await this.sendCompletionRequest(messages, true);
+        const content = result.choices?.[0]?.message?.content;
 
-        const content = response.choices[0].message.content;
         return content ? JSON.parse(content) : null;
     }
 }
