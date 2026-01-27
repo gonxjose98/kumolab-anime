@@ -108,13 +108,20 @@ export async function generateIntelImage({
 
         // --- FONT LOADING ---
         // Explicitly register font
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+        const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+        try {
+            const fontRegistered = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
+            console.log(`[Image Engine] Font Register Status for ${outfitPath}: ${fontRegistered}`);
+        } catch (e: any) {
+            console.error(`[Image Engine] CRITICAL FONT ERROR: Could not register font at ${outfitPath}`, e);
+        }
+
         let fontToUse = 'sans-serif';
 
-        if (fs.existsSync(fontPath)) {
+        if (fs.existsSync(outfitPath)) { // Changed from fontPath to outfitPath
             try {
                 // Register as distinct name to ensure we get exactly this file
-                GlobalFonts.register(fs.readFileSync(fontPath), 'KumoLabMain');
+                GlobalFonts.register(fs.readFileSync(outfitPath), 'KumoLabMain'); // Changed from fontPath to outfitPath
                 fontToUse = 'KumoLabMain';
                 console.log('[Image Engine] Font "KumoLabMain" registered successfully.');
             } catch (fontErr) {
@@ -211,13 +218,15 @@ export async function generateIntelImage({
         console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
         // --- HARDCODED DEBUG TEST ---
-        // Verify Canvas is writable
+        // --- HARDCODED DEBUG TEST: GEOMETRY ---
+        // Verify Canvas is writable with SHAPES (No fonts)
         ctx.save();
         ctx.fillStyle = 'red';
-        ctx.font = 'bold 100px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText("DEBUG: BACKEND TEST", WIDTH / 2, HEIGHT / 2);
+        ctx.fillRect(50, 50, 200, 200); // Top left red box
+        ctx.fillStyle = 'blue';
+        ctx.fillRect(WIDTH - 250, 50, 200, 200); // Top right blue box
         ctx.restore();
+        // ----------------------------
         // ----------------------------
 
         // FAILSAFE: If no headline provided for a visual that needs one, default.
