@@ -519,12 +519,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 return;
             }
 
-            // Reliable Base64 to File conversion (replaces buggy fetch on data-uris)
+            // Reliable Base64 to File conversion
             let imageFileToUpload: Blob | null = null;
-            let imageFileName: string = "image.png";
+            let imageFileName: string = "processed-vision.png";
 
-            if (finalImageToSave && finalImageToSave.startsWith('data:')) {
-                const parts = finalImageToSave.split(',');
+            // STRICT HIERARCHY:
+            // 1. Use the just-generated "Forced" image (Freshest)
+            // 2. Use the cached "Preview" image (Next best)
+            // 3. ERROR if strictly needed.
+            const targetImageString = finalImageToSave || processedImage;
+
+            if (targetImageString && targetImageString.startsWith('data:')) {
+                const parts = targetImageString.split(',');
                 const byteString = atob(parts[1]);
                 const mimeString = parts[0].split(':')[1].split(';')[0];
                 const ab = new ArrayBuffer(byteString.length);
@@ -534,10 +540,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 }
                 const blob = new Blob([ab], { type: mimeString });
                 imageFileToUpload = blob;
-                imageFileName = "processed-vision.png";
-            } else if (customImage) {
+            } else if (customImage && (genType === 'COMMUNITY' || !isApplyText)) {
+                // ONLY fall back to raw custom image if we are NOT applying text
+                // or if it's a simple Community post.
                 imageFileToUpload = customImage;
                 imageFileName = customImage.name;
+            } else if (!editingPostId) {
+                // If new post and no processed image...
+                alert('CRITICAL: Visual processing failed. Text overlay was not generated. Retrying...');
+                setIsGenerating(false);
+                return;
             }
 
             const formData = new FormData();
