@@ -202,28 +202,21 @@ export async function generateIntelImage({
         const isTop = gradientPosition === 'top';
 
         // 5. Typography Setup
-        const availableWidth = WIDTH * 0.90; // Standard intentional safe margin
+        const availableWidth = WIDTH * 0.90;
+
+        // STRICT: If user provides a headline, WE USE IT. No filtering.
         let cleanedHeadline = (headline || '').toUpperCase().trim();
         const upperTitle = (animeTitle || '').toUpperCase().trim();
 
-        // REDUNDANCY CHECK: Simple deduplication
-        // If headline is "3RD SEASON CONFIRMED" and title is "VENDING MACHINE SEASON 3"
-        const titleWords = upperTitle.split(/\s+/);
-        const headlineWords = cleanedHeadline.split(/\s+/);
+        console.log(`[Image Engine] Rendering - Title: "${upperTitle}", Headline: "${cleanedHeadline}"`);
 
-        // If headline is almost entirely in title, or vice-versa, simplify
-        // Higher sensitivity: if ANY word over 3 chars overlaps, and we have few words, clear it.
-        const intersection = headlineWords.filter(w => titleWords.includes(w) && w.length > 3);
-        const isHighlyRedundant = intersection.length >= 2 ||
-            (cleanedHeadline.length > 0 && upperTitle.includes(cleanedHeadline)) ||
-            (intersection.length >= 1 && (titleWords.includes('CONFIRMED') || titleWords.includes('SEASON')));
-
-        if (isHighlyRedundant) {
-            console.log(`[Image Engine] Redundant headline detected ("${cleanedHeadline}" vs "${upperTitle}"). (Auto-clearing disabled by user request).`);
-            // cleanedHeadline = ''; // DISABLED: User wants explicit control
+        // FAILSAFE: If no headline provided for a visual that needs one, default.
+        if (!cleanedHeadline && !skipUpload) {
+            // Only apply default if we are not skipping upload (which implies preview/custom mode)
+            // Actually, for custom mode we trust the user.
         }
 
-        let globalFontSize = 135; // Lower start to force 3+ words per line
+        let globalFontSize = 135;
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -232,8 +225,8 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
+            // Ensure font stack carries through
             ctx.font = `900 ${currentFS}px ${fullFontStack}`;
-            // Refined spacing (92% of font size) for balanced editorial look
             lineSpacing = currentFS * 0.92;
 
             titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, currentFS) : [];
@@ -241,25 +234,14 @@ export async function generateIntelImage({
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // STRICT 25% COVERAGE LIMIT (Forces smaller font, more words per line)
             if (totalBlockHeight <= (HEIGHT * 0.25)) break;
             globalFontSize -= 5;
         }
 
-        // FAILSAFE
-        if (headlineLines.length === 0 && cleanedHeadline.length > 0) {
-            headlineLines = [cleanedHeadline.substring(0, 50)];
-        }
-
-        // 6. Draw Gradient - CORRECTED SEAMLESS
+        // 6. Draw Gradient (Seamless Scrim)
         if (applyGradient) {
-            // We use a fixed height for consistency, or dynamic based on text.
-            // To avoid "visible line", we start the gradient well above the text.
-            // And we use a "dead zone" of 0 opacity at the start.
-
             const minGradH = 900;
             const gradientHeight = Math.max(totalBlockHeight + 500, minGradH);
-
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
 
@@ -268,13 +250,9 @@ export async function generateIntelImage({
                 gradient.addColorStop(0.4, 'rgba(0,0,0,0.6)');
                 gradient.addColorStop(1, 'rgba(0,0,0,0)');
             } else {
-                // SEAMLESS SCRIM CURVE
-                // 0.0 - 0.2: Pure Transparent Dead Zone (Safety Buffer)
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
                 gradient.addColorStop(0.15, 'rgba(0,0,0,0)');
-
-                // 0.2 - 1.0: The actual gradient
-                gradient.addColorStop(0.25, 'rgba(0,0,0,0.03)'); // Soft entry
+                gradient.addColorStop(0.25, 'rgba(0,0,0,0.03)');
                 gradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
                 gradient.addColorStop(0.6, 'rgba(0,0,0,0.6)');
                 gradient.addColorStop(0.85, 'rgba(0,0,0,0.95)');
@@ -283,28 +261,26 @@ export async function generateIntelImage({
 
             ctx.save();
             ctx.fillStyle = gradient;
-            // We fill the strict rect defined by gradY
-            // Since 0.0 -> 0.15 is transparent, the "top line" at gradY is invisible.
             ctx.fillRect(0, gradY, WIDTH, gradientHeight);
             ctx.restore();
         }
 
         // 7. Draw Text
-        if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
-            const finalFontSize = Math.max(40, globalFontSize * textScale);
+        if (applyText) {
+            if (headlineLines.length === 0 && titleLines.length === 0) {
+                console.warn("[Image Engine] Text enabled but no content to draw.");
+            }
 
+            const finalFontSize = Math.max(40, globalFontSize * textScale);
             const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.92);
 
-            // --- STRICT 25% UTILIZATION ZONE ---
             const zoneHeight = HEIGHT * 0.25;
             const bottomSafeMargin = 100;
             let defaultY = 0;
 
             if (isTop) {
-                // Inset from top
                 defaultY = 80 + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             } else {
-                // Anchored to bottom safe zone
                 const zoneStart = HEIGHT - zoneHeight - bottomSafeMargin;
                 defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             }
@@ -323,7 +299,12 @@ export async function generateIntelImage({
                 ctx.font = `900 ${finalFontSize}px ${fullFontStack}`;
                 ctx.textAlign = 'center';
 
-                // Calculate word metrics for purple highlighting
+                // Shadow
+                ctx.shadowColor = 'rgba(0,0,0,0.8)'; // Stronger shadow for visibility
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetX = 0; // Centered glow effect
+                ctx.shadowOffsetY = 4;
+
                 let lineTotalWidth = 0;
                 const metrics = words.map((w, i) => {
                     const m = ctx.measureText(w);
@@ -337,14 +318,7 @@ export async function generateIntelImage({
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
                     ctx.save();
-
-                    // SUBTLE PREMIUM SHADOW
-                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                    ctx.shadowBlur = 12;
-                    ctx.shadowOffsetX = 2;
-                    ctx.shadowOffsetY = 2;
-
-                    ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                    ctx.fillStyle = isPurple ? KUMOLAB_PURPLE : '#FFFFFF';
                     ctx.fillText(word, currentX + (metrics[wordIdx].wordW / 2), currentY);
                     ctx.restore();
                     currentX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
@@ -352,7 +326,7 @@ export async function generateIntelImage({
 
                 ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.92; // Consistent spacing
+                currentY += finalFontSize * 0.92;
             }
         }
 
