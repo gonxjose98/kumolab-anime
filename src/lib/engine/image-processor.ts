@@ -138,23 +138,6 @@ export async function generateIntelImage({
             }
         }
 
-        if (!isRegistered) {
-            console.warn(`[Image Engine] Outfit font failed to load. Attempting fallback to SourceSans3...`);
-            const fallbackPath = path.join(process.cwd(), 'public', 'fonts', 'SourceSans3-Bold.otf');
-
-            if (fs.existsSync(fallbackPath)) {
-                // Try to register fallback as "Outfit" so we don't break the rest of the code
-                const fallbackRegistered = GlobalFonts.registerFromPath(fallbackPath, 'Outfit');
-                if (fallbackRegistered) {
-                    isRegistered = true;
-                    console.log('[Image Engine] FALLBACK: Registered SourceSans3 as "Outfit". Please replace corrupted Outfit-Black.ttf!');
-                } else {
-                    console.error(`[Image Engine] Fallback registration failed for ${fallbackPath}`);
-                }
-            } else {
-                console.error(`[Image Engine] Fallback font not found at ${fallbackPath}`);
-            }
-        }
 
         if (!isRegistered) {
             throw new Error(`CRITICAL: GlobalFonts.registerFromPath AND Buffer fallback returned false for ${outfitPath}`);
@@ -226,6 +209,13 @@ export async function generateIntelImage({
         // STRICT: If user provides a headline, WE USE IT. No filtering.
         let cleanedHeadline = (headline || '').toUpperCase().trim();
         const upperTitle = (animeTitle || '').toUpperCase().trim();
+
+        // DEDUPLICATION GUARD:
+        // If the Override Visual Title (slug/headline) matches the Anime Title, suppress the duplicate.
+        if (cleanedHeadline === upperTitle) {
+            console.log(`[Image Engine] Deduplicating headline (matches title): "${cleanedHeadline}"`);
+            cleanedHeadline = '';
+        }
 
         console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
