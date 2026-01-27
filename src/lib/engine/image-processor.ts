@@ -216,16 +216,15 @@ export async function generateIntelImage({
             const currentFS = globalFontSize * textScale;
             // Use 'bold' to ensure the heaviest weight is chosen
             ctx.font = `bold ${currentFS}px ${fullFontStack}`;
-            // Tighter line spacing for that "impact" look (85% of font size)
-            lineSpacing = currentFS * 0.85;
+            // Extremely tight line spacing for the "bubbly" aesthetic (82% of font size)
+            lineSpacing = currentFS * 0.82;
 
-            // wrapText needs to account for the custom letter spacing too
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // Updated Rule: Max 35% screen coverage (Hardcoded)
+            // Strict 35% Limit
             if (totalBlockHeight < (HEIGHT * 0.35)) break;
             globalFontSize -= 5;
         }
