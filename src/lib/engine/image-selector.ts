@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { fetchOfficialAnimeImages } from './fetchers';
 
 // --- CONFIGURATION ---
-const MIN_RESOLUTION_SHORT = 1000; // Strict Pro Rule
+const MIN_RESOLUTION_SHORT = 450; // Relaxed from 1000 to allow high-quality AniList covers (~460px)
 const TARGET_ASPECT_RATIO = 0.8; // Portrait preferred (Posters), but landscape (Banners) are okay if high res.
 // Actually, for social media posts, 4:5 (1080x1350) is target. 
 // A wide banner (1920x1080) needs to be cropped. A tall poster (2000x3000) is better.
