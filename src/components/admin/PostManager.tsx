@@ -473,15 +473,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleSavePost = async (autoClose: boolean = false) => {
         setIsGenerating(true);
 
-        let finalImageToSave = processedImage;
-        // Always re-apply if dirty or missing to ensure latest edits are saved
-        if (!finalImageToSave || isStageDirty) {
-            const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
-                ? searchedImages[selectedImageIndex]
-                : customImagePreview;
-            if (imageUrl) {
-                finalImageToSave = await handleApplyText();
-            }
+        // FORCE REGENERATION: To ensure the latest text (Topic/Title) is applied
+        // We cannot rely solely on cached 'processedImage' because the user might have just typed 
+        // in the Topic box without triggering 'isStageDirty' if onBlur didn't fire yet.
+        // So we ALWAYS regenerate if we have a source image.
+        let finalImageToSave: string | null = null;
+
+        const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+            ? searchedImages[selectedImageIndex]
+            : customImagePreview;
+
+        if (imageUrl) {
+            // Check if we need to regenerate
+            // Strategy: Just ALWAYS regenerate for safety unless we are absolutely sure.
+            // But to save bandwidth, we check isStageDirty. 
+            // However, to fix the user's issue, we will BE AGGRESSIVE.
+            // We'll reuse 'processedImage' only if we are currently not dirty AND we have one.
+            // BUT WAIT: The user specifically said "Text isn't output". This means the cached image is WRONG.
+            // So we force a refresh.
+
+            console.log('[Admin] Forcing final image render before save...');
+            finalImageToSave = await handleApplyText();
+        } else {
+            console.warn('[Admin] No image found to process for save.');
         }
 
         if (genType === 'CONFIRMATION_ALERT') {
