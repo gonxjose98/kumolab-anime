@@ -9,6 +9,7 @@ import { generateIntelImage } from './image-processor';
 import { fetchOfficialAnimeImage } from './fetchers';
 import { randomUUID } from 'crypto';
 import { AntigravityAI } from './ai';
+import { selectBestImage } from './image-selector';
 
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
@@ -129,61 +130,18 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     // IMAGE RELEVANCE PROMPT (LOCKED)
     // "An anime always has to be chosen. Fallback image should never be used."
-    let officialSourceImage = topItem.image;
+    // IMAGE RELEVANCE PROMPT (LOCKED)
+    // "An anime always has to be chosen. Fallback image should never be used."
 
-    // Use imageSearchTerm if provided by the fetcher
+    // VISUAL INTELLIGENCE ENGINE (New Strict Logic)
     const searchTerm = topItem.imageSearchTerm || topItem.title.split(' Season')[0].split(':')[0].trim();
 
-    // HELPER: Robust Searcher
-    const findImageWithRetries = async (term: string) => {
-        if (!term) return null;
-
-        // Strategy 1: Exact Term
-        let img = await fetchOfficialAnimeImage(term);
-        if (img) return img;
-
-        console.log(`[Generator] Strategy 1 failed for "${term}". Trying Search Strategy 2...`);
-
-        // Strategy 2: Remove Numbers and "Season" keywords explicitly
-        // "Inherit the Winds 2 Members" -> "Inherit the Winds Members" -> "Inherit the Winds"
-        let clean = term.replace(/[0-9]+/g, '').replace(/Season/gi, '').replace(/\s+/g, ' ').trim();
-        if (clean !== term) {
-            img = await fetchOfficialAnimeImage(clean);
-            if (img) return img;
-        }
-
-        console.log(`[Generator] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
-
-        // Strategy 3: First 5 Words (Better for long titles)
-        const simpleWords = term.split(' ');
-        if (simpleWords.length > 3) {
-            const shortTerm = simpleWords.slice(0, 5).join(' ');
-            img = await fetchOfficialAnimeImage(shortTerm);
-            if (img) return img;
-        }
-
-        return null;
-    };
-
-    if (!officialSourceImage && searchTerm) {
-        try {
-            officialSourceImage = await findImageWithRetries(searchTerm);
-        } catch (e) {
-            console.error('Failed to fetch official image via custom search:', e);
-        }
-    }
-
-    // DESPERATE LAST RESORT: Try searching for just the SERIES name without any detail
-    if (!officialSourceImage && searchTerm) {
-        const seriesName = searchTerm.split(' ')[0];
-        if (seriesName.length > 3) {
-            console.log(`[Generator] FINAL DESPERATE SEARCH for "${seriesName}"`);
-            officialSourceImage = await fetchOfficialAnimeImage(seriesName);
-        }
-    }
+    // We ignore the low-res RSS image usually, unless we want to verify it. 
+    // But selectBestImage hunts for 4K/Official sources.
+    let officialSourceImage = await selectBestImage(searchTerm, topItem.claimType);
 
     if (!officialSourceImage) {
-        console.warn('No official source image found after ALL strategies. Using fallback.');
+        console.warn('Visual Intelligence Engine found no candidates. Using fallback.');
         officialSourceImage = '/hero-bg-final.png';
     }
 
@@ -274,49 +232,21 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     // Trending also follows the strict relevance rule
     // "An anime always has to be chosen. Fallback image should never be used."
-    let officialSourceImage = trendingItem.image;
+    // Trending also follows the strict relevance rule
+    // "An anime always has to be chosen. Fallback image should never be used."
 
-    // HELPER: Robust Searcher (Duplicated for safety/isolation)
-    const findImageWithRetries = async (term: string) => {
-        if (!term) return null;
+    // VISUAL INTELLIGENCE ENGINE (New Strict Logic) for Trending
+    // We re-evaluate to ensure we get the absolute best high-res confirmation
+    let officialSourceImage = await selectBestImage(
+        trendingItem.imageSearchTerm || trendingItem.title,
+        trendingItem.trendReason
+    );
 
-        // Strategy 1: Exact Term
-        let img = await fetchOfficialAnimeImage(term);
-        if (img) return img;
-
-        console.log(`[Generator-Trending] Strategy 1 failed for "${term}". Trying Search Strategy 2...`);
-
-        // Strategy 2: Remove Numbers and "Season" keywords explicitly
-        let clean = term.replace(/[0-9]+/g, '').replace(/Season/gi, '').replace(/\s+/g, ' ').trim();
-        if (clean !== term) {
-            img = await fetchOfficialAnimeImage(clean);
-            if (img) return img;
-        }
-
-        console.log(`[Generator-Trending] Strategy 2 failed for "${clean}". Trying Search Strategy 3...`);
-
-        // Strategy 3: First 5 Words
-        const simpleWords = term.split(' ');
-        if (simpleWords.length > 3) {
-            const shortTerm = simpleWords.slice(0, 5).join(' ');
-            img = await fetchOfficialAnimeImage(shortTerm);
-            if (img) return img;
-        }
-
-        return null;
-    };
-
-    if (!officialSourceImage && trendingItem.imageSearchTerm) {
-        // Try the robust search
-        officialSourceImage = await findImageWithRetries(trendingItem.imageSearchTerm);
-
-        // DESPERATE RESORT logic for Trending too
-        if (!officialSourceImage) {
-            const firstWord = trendingItem.imageSearchTerm.split(' ')[0];
-            if (firstWord.length > 3) {
-                console.log(`[Generator-Trending] FINAL DESPERATE SEARCH: Searching for "${firstWord}"`);
-                officialSourceImage = await fetchOfficialAnimeImage(firstWord);
-            }
+    if (!officialSourceImage) {
+        // Fallback to the candidate's own image if the engine found nothing new
+        // (but usually engine includes candidates source if valid)
+        if (trendingItem.image) {
+            officialSourceImage = trendingItem.image;
         }
     }
 
