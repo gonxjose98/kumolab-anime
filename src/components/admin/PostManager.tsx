@@ -327,7 +327,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: title || '', // Pass the user's title correctly
+                    title: title || topic || '', // Pass the user's title correctly (fallback to topic)
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
@@ -630,7 +630,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl: finalImageUrl,
-                    title: title || '', // Pass title for text rendering
+                    title: title || topic || '', // Pass title for text rendering (with fallback)
                     headline: (overlayTag || '').trim().toUpperCase(),
                     scale: imageScale,
                     position: imagePosition,
