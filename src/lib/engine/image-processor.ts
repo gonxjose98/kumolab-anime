@@ -301,10 +301,9 @@ export async function generateIntelImage({
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
 
-                // --- CUSTOM KERNING LOGIC (-3% of font size) ---
-                const letterSpacing = -(finalFontSize * 0.03);
+                // --- AGGRESSIVE BUBBLY KERNING (-5% of font size) ---
+                const letterSpacing = -(finalFontSize * 0.05);
 
-                // Calculate line width with custom kerning
                 let lineWidth = 0;
                 const wordWidths = words.map(word => {
                     let w = 0;
@@ -321,35 +320,34 @@ export async function generateIntelImage({
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
 
-                    // Draw Word Char-by-Char for Kerning
                     for (const char of word) {
                         ctx.save();
                         ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
                         ctx.textAlign = 'left';
                         ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
 
-                        // --- FATTEN THE FONT (STROKE) ---
+                        // --- ULTRA BUBBLY STROKE (10% THICKNESS) ---
                         ctx.strokeStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.lineWidth = finalFontSize * 0.04; // 4% gain in thickness
+                        ctx.lineWidth = finalFontSize * 0.10;
                         ctx.lineJoin = 'round';
+                        ctx.lineCap = 'round';
                         ctx.strokeText(char, currentX, currentY);
 
-                        // Text Shadow
-                        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                        ctx.shadowBlur = 12;
-                        ctx.shadowOffsetY = 4;
+                        // Deep Shadow for 3D Pop
+                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                        ctx.shadowBlur = 18;
+                        ctx.shadowOffsetY = 8;
                         ctx.fillText(char, currentX, currentY);
                         ctx.restore();
 
                         currentX += safeMeasure(char, finalFontSize) + letterSpacing;
                     }
 
-                    // Space between words
                     currentX += safeMeasure(" ", finalFontSize) + letterSpacing;
                 });
 
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.85; // Match lineSpacing
+                currentY += finalFontSize * 0.80; // Extremely tight lines
             }
         }
 
