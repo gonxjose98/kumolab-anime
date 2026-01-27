@@ -13,11 +13,8 @@ const KUMOLAB_PURPLE = '#9D7BFF'; // Vibrant Lavender/Purple from reference
 const HANDLE_TEXT = '@KumoLabAnime';
 
 // Ensure font availability
-import { GlobalFonts } from '@napi-rs/canvas';
-// We might not have a custom font file, so we rely on system fonts. 
-// Adding a console log to debug what families are available if needed, 
-// but for now, we'll use a very safe stack.
-const FONT_STACK = 'Arial, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+// Image-only imports
+// (GlobalFonts imported dynamically)
 
 interface IntelImageOptions {
     sourceUrl: string;
@@ -39,7 +36,8 @@ interface IntelImageOptions {
 /**
  * Processes an image for the Intel Feed and Social Media.
  */
-// ... (imports remain)
+import { createClient } from '@/lib/supabase/admin';
+import { v4 as uuidv4 } from 'uuid';
 
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
@@ -56,11 +54,10 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
         try {
             width = ctx.measureText(currentLine + " " + word).width;
         } catch {
-            // Fallback
-            width = (currentLine.length + word.length + 1) * (currentFS * 0.5);
+            width = 0;
         }
 
-        // Hard fallback if measureText returns 0
+        // Hard fallback if measureText returns 0 or fails
         if (width === 0) width = (currentLine.length + word.length + 1) * (currentFS * 0.5);
 
         if (width < maxWidth) {
@@ -106,49 +103,20 @@ export async function generateIntelImage({
         // 1. Dynamic Import
         const { createCanvas, loadImage, GlobalFonts } = await import('@napi-rs/canvas');
 
-        // --- FONT LOADING ---
-        // Explicitly register font
+        // --- STRICT FONT LOADING ---
         const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-        try {
-            const fontRegistered = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
-            console.log(`[Image Engine] Font Register Status for ${outfitPath}: ${fontRegistered}`);
-        } catch (e: any) {
-            console.error(`[Image Engine] CRITICAL FONT ERROR: Could not register font at ${outfitPath}`, e);
+
+        if (!fs.existsSync(outfitPath)) {
+            throw new Error(`CRITICAL: Font file missing at ${outfitPath}`);
         }
 
-        let fontToUse = 'sans-serif';
-
-        if (fs.existsSync(outfitPath)) { // Changed from fontPath to outfitPath
-            try {
-                // Register as distinct name to ensure we get exactly this file
-                GlobalFonts.register(fs.readFileSync(outfitPath), 'KumoLabMain'); // Changed from fontPath to outfitPath
-                fontToUse = 'KumoLabMain';
-                console.log('[Image Engine] Font "KumoLabMain" registered successfully.');
-            } catch (fontErr) {
-                console.warn('[Image Engine] Failed to register Outfit font:', fontErr);
-            }
-        } else {
-            console.warn('[Image Engine] Outfit font file not found.');
+        // Use registerFromPath as primary method
+        const registered = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
+        if (!registered) {
+            throw new Error(`CRITICAL: GlobalFonts.registerFromPath returned false for ${outfitPath}`);
         }
 
-        const fullFontStack = `"${fontToUse}", sans-serif`;
-
-        // Helper for reliable measurement
-        const safeMeasure = (t: string, currentFontSize: number) => {
-            if (!t) return 0;
-            const m = ctx.measureText(t);
-            return (m && m.width > 0) ? m.width : (t.length * currentFontSize * 0.5);
-        };
-
-        // ... existing code ... Note: I need to skip the drawing parts to get to the loop
-
-        // [Assuming the middle part of the file is unchanged, jumping to the loop modification]
-        // Wait, replace_file_content needs contiguous block. 
-        // I will target the Font Loading block first, then the loop separately? 
-        // Or I can do it in one go if I include the drawing logic.
-        // The file content I viewed shows lines 100-300.
-        // Let's do a multi-replace.
-
+        console.log('[Image Engine] Font "Outfit" registered successfully.');
 
         // 2. Download source
         let buffer: Buffer;
@@ -217,18 +185,6 @@ export async function generateIntelImage({
 
         console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
-        // --- HARDCODED DEBUG TEST ---
-        // --- HARDCODED DEBUG TEST: GEOMETRY ---
-        // Verify Canvas is writable with SHAPES (No fonts)
-        ctx.save();
-        ctx.fillStyle = 'red';
-        ctx.fillRect(50, 50, 200, 200); // Top left red box
-        ctx.fillStyle = 'blue';
-        ctx.fillRect(WIDTH - 250, 50, 200, 200); // Top right blue box
-        ctx.restore();
-        // ----------------------------
-        // ----------------------------
-
         // FAILSAFE: If no headline provided for a visual that needs one, default.
         if (!cleanedHeadline && !skipUpload) {
             // Only apply default if we are not skipping upload (which implies preview/custom mode)
@@ -244,9 +200,8 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            // Ensure font stack carries through
-            // Use system fallback to rule out font loading issues
-            ctx.font = `900 ${currentFS}px "Outfit", Arial, sans-serif`;
+            // STRICT FONT USAGE
+            ctx.font = `900 ${currentFS}px "Outfit"`;
             lineSpacing = currentFS * 0.92;
 
             titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, currentFS) : [];
