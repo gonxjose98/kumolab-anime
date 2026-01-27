@@ -301,53 +301,33 @@ export async function generateIntelImage({
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
 
-                // --- CLEAN BUBBLY KERNING (-4% of font size) ---
-                const letterSpacing = -(finalFontSize * 0.04);
+                ctx.save();
+                ctx.font = `900 ${finalFontSize}px ${fullFontStack}`;
+                ctx.textAlign = 'center';
 
-                let lineWidth = 0;
-                const wordWidths = words.map(word => {
-                    let w = 0;
-                    for (const char of (word + " ")) {
-                        ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
-                        w += safeMeasure(char, finalFontSize) + letterSpacing;
-                    }
-                    return w;
+                // Calculate word metrics for purple highlighting
+                let totalWidth = 0;
+                const metrics = words.map(w => {
+                    const m = ctx.measureText(w + " ");
+                    totalWidth += m.width;
+                    return m.width;
                 });
-                lineWidth = wordWidths.reduce((a, b) => a + b, 0);
 
-                let currentX = startX - (lineWidth / 2);
+                let currentX = startX - (totalWidth / 2);
 
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
-
-                    for (const char of word) {
-                        ctx.save();
-                        ctx.font = `bold ${finalFontSize}px ${fullFontStack}`;
-                        ctx.textAlign = 'left';
-                        ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-
-                        // --- FATTEN FOR STRENGTH (7%) ---
-                        ctx.strokeStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
-                        ctx.lineWidth = finalFontSize * 0.07;
-                        ctx.lineJoin = 'round';
-                        ctx.lineCap = 'round';
-                        ctx.strokeText(char, currentX, currentY);
-
-                        // Clean, Flat Shadow for readability (No 3D effect)
-                        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                        ctx.shadowBlur = 8;
-                        ctx.shadowOffsetY = 2;
-                        ctx.fillText(char, currentX, currentY);
-                        ctx.restore();
-
-                        currentX += safeMeasure(char, finalFontSize) + letterSpacing;
-                    }
-
-                    currentX += safeMeasure(" ", finalFontSize) + letterSpacing;
+                    ctx.save();
+                    ctx.fillStyle = isPurple ? '#9D7BFF' : '#FFFFFF';
+                    // STICK TO PURE FILLTEXT AS REQUESTED
+                    ctx.fillText(word, currentX + (metrics[wordIdx] / 2), currentY);
+                    ctx.restore();
+                    currentX += metrics[wordIdx];
                 });
 
+                ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.85; // Clean, tight lines
+                currentY += finalFontSize * 0.90; // Clean line spacing
             }
         }
 
