@@ -215,7 +215,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
         setShowExpandedPreview(false);
-        setIsApplyGradient(!!post.headline);
+
         setIsApplyGradient(!!(post.headline || post.title));
         setIsApplyText(!!(post.headline || post.title));
         setIsApplyWatermark(true); // Default to true for existing posts
