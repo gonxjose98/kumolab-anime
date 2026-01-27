@@ -312,7 +312,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean): Promise<string | null> => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean, manualTextScale?: number): Promise<string | null> => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -350,7 +350,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     applyText: payload.applyText,
                     applyGradient: forcedApplyGradient ?? isApplyGradient,
                     textPos: textPosition,
-                    textScale,
+                    textScale: manualTextScale ?? textScale,
                     gradientPos: manualGradientPos ?? gradientPosition,
 
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
@@ -448,10 +448,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setIsStageDirty(true);
             handleApplyText(newScale);
         } else {
-            const newScale = Math.max(0.1, Math.min(5, textScale + delta));
+            const newScale = Math.max(0.1, Math.min(3, textScale + delta));
             setTextScale(newScale);
             setIsStageDirty(true);
-            handleApplyText(undefined, undefined, undefined, undefined);
+            // Pass manualTextScale as the 8th argument
+            handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
         }
     };
 
@@ -550,7 +551,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 }
                 const blob = new Blob([ab], { type: mimeString });
                 imageFileToUpload = blob;
-            } else if (customImage && (genType === 'COMMUNITY' || !isApplyText)) {
+            } else if (customImage && (genType === null || !isApplyText)) {
                 // ONLY fall back to raw custom image if we are NOT applying text
                 // or if it's a simple Community post.
                 imageFileToUpload = customImage;
@@ -1609,7 +1610,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             onPointerMove={handleImagePointerMove} // redundant but safe
                                                             onPointerUp={handleImagePointerUp}
                                                             style={{
-                                                                transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                                // PREVENT DOUBLE TRANSFORM: 
+                                                                // If we have a processed image (which already has scale/pan baked in) and we are not editing,
+                                                                // we must NOT apply the CSS transform again.
+                                                                transform: (!isStageDirty && processedImage)
+                                                                    ? 'none'
+                                                                    : `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
                                                                 transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'
                                                             }}
                                                         >
