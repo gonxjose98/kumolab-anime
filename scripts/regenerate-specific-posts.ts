@@ -59,7 +59,8 @@ async function regeneratePost(partialTitle: string, searchTerm: string) {
         slug: post.slug,
         applyText: true,
         applyWatermark: true,
-        gradientPosition: 'top', // Moved to top to avoid blocking characters (Golden Kamuy specific fix)
+        scale: 0.85, // Zoom out to fit more of the character
+        position: { x: 0, y: 0.05 }, // Center adjustment
         purpleWordIndices: [0, 1] // Matches title style
     });
 
