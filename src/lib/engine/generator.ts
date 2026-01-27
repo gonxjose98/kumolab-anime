@@ -381,6 +381,18 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
  * Validates post before publishing (non-duplication, image validation).
  */
 export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): boolean {
+    // 0. BANNED TOPICS (HARD KILL SWITCH)
+    const BANNED_TOPICS = ['Mario', 'AI'];
+    const hasBannedTopic = BANNED_TOPICS.some(topic =>
+        post.title.toLowerCase().includes(topic.toLowerCase()) ||
+        post.content.toLowerCase().includes(topic.toLowerCase())
+    );
+
+    if (hasBannedTopic) {
+        console.error(`[Validator] REJECTED: Banned topic detected in post "${post.title}".`);
+        return false;
+    }
+
     // 1. Check for duplicates in the same day (UTC)
     const postDate = post.timestamp.split('T')[0];
     const isDuplicate = existingPosts.some(p =>

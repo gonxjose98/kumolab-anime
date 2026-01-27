@@ -84,6 +84,7 @@ export const CONTENT_RULES = {
     NEGATIVE_KEYWORDS: [
         'Manga', 'Novel', 'Light Novel', 'Merch', 'Figure', 'Cafe', 'Event',
         'Birthday', 'Cosplay', 'Game', 'Collaboration', 'Digest', 'Recap',
-        'Interview', 'Goods', 'Blu-ray', 'DVD', 'Box Set', 'Staff', 'Cast'
+        'Interview', 'Goods', 'Blu-ray', 'DVD', 'Box Set', 'Staff', 'Cast',
+        'Mario', 'AI'
     ]
 };
