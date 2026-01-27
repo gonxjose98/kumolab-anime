@@ -202,10 +202,10 @@ export async function generateIntelImage({
         const isTop = gradientPosition === 'top';
 
         // 5. Typography Setup
-        const availableWidth = WIDTH * 0.90;
+        const availableWidth = WIDTH * 0.84; // 8% margin on each side
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        let globalFontSize = 180; // Start larger to fill the space
+        let globalFontSize = 220; // Start very large to fill utilization area
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -214,17 +214,17 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            // PURE rendering: No hacks, just 900 weight Outfit
             ctx.font = `900 ${currentFS}px ${fullFontStack}`;
-            lineSpacing = currentFS * 0.90;
+            // Tighter vertical flow (85% of font size)
+            lineSpacing = currentFS * 0.85;
 
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // Updated Rule: Max 30% screen coverage
-            if (totalBlockHeight < (HEIGHT * 0.30)) break;
+            // Updated Rule: 35% Utilization (to fill more space)
+            if (totalBlockHeight < (HEIGHT * 0.35)) break;
             globalFontSize -= 5;
         }
 
@@ -275,19 +275,20 @@ export async function generateIntelImage({
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
 
-            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.90);
+            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.85);
 
-            // --- HARDCODED 30% ZONE POSITIONING ---
-            const zoneHeight = HEIGHT * 0.30;
+            // --- REFINED UTILIZATION ZONE (35% area, respecting bottom safe margin) ---
+            const zoneHeight = HEIGHT * 0.35;
+            const bottomSafeMargin = 100; // Text won't sit on the floor
             let defaultY = 0;
 
             if (isTop) {
-                // Centered within the TOP 30%
-                defaultY = (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
+                // Inset from top
+                defaultY = 80 + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
             } else {
-                // Centered within the BOTTOM 30%
-                const zoneStart = HEIGHT - zoneHeight;
-                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
+                // Anchored to bottom safe zone
+                const zoneStart = HEIGHT - zoneHeight - bottomSafeMargin;
+                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
             }
 
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
@@ -326,7 +327,7 @@ export async function generateIntelImage({
 
                 ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.90; // Clean line spacing
+                currentY += finalFontSize * 0.85; // Clean, tighter line spacing
             }
         }
 
