@@ -1970,7 +1970,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         if (!purpleWordIndices.includes(purpleCursorIndex)) {
                                                                             const newIndices = [...purpleWordIndices, purpleCursorIndex].sort((a, b) => a - b);
                                                                             setPurpleWordIndices(newIndices);
-                                                                            handleApplyText(undefined, undefined, undefined, undefined, newIndices);
+                                                                            // Only trigger backend if in PROCESSED mode to update the burn-in
+                                                                            if (editorMode === 'PROCESSED') {
+                                                                                handleApplyText(undefined, undefined, undefined, undefined, newIndices);
+                                                                            }
                                                                         }
                                                                     }}
                                                                     className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
@@ -1980,7 +1983,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 <button
                                                                     onClick={() => {
                                                                         setPurpleWordIndices([]);
-                                                                        handleApplyText(undefined, undefined, undefined, undefined, []);
+                                                                        if (editorMode === 'PROCESSED') {
+                                                                            handleApplyText(undefined, undefined, undefined, undefined, []);
+                                                                        }
                                                                     }}
                                                                     className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
                                                                 >
