@@ -216,7 +216,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setPurpleCursorIndex(0);
         setShowExpandedPreview(false);
         setIsApplyGradient(!!post.headline);
-        setIsApplyText(!!post.headline);
+        setIsApplyGradient(!!(post.headline || post.title));
+        setIsApplyText(!!(post.headline || post.title));
         setIsApplyWatermark(true); // Default to true for existing posts
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
@@ -1465,7 +1466,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     placeholder="e.g. One Piece, Jujutsu Kaisen (Leave empty for auto-scout)"
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={topic}
-                                                    onChange={(e) => setTopic(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setTopic(e.target.value);
+                                                        setIsApplyText(true);
+                                                    }}
                                                     onBlur={() => handleApplyText()}
                                                 />
                                             </div>
