@@ -208,7 +208,17 @@ export async function generateIntelImage({
         let cleanedHeadline = (headline || '').toUpperCase().trim();
         const upperTitle = (animeTitle || '').toUpperCase().trim();
 
-        console.log(`[Image Engine] Rendering - Title: "${upperTitle}", Headline: "${cleanedHeadline}"`);
+        console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
+
+        // --- HARDCODED DEBUG TEST ---
+        // Verify Canvas is writable
+        ctx.save();
+        ctx.fillStyle = 'red';
+        ctx.font = 'bold 100px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("DEBUG: BACKEND TEST", WIDTH / 2, HEIGHT / 2);
+        ctx.restore();
+        // ----------------------------
 
         // FAILSAFE: If no headline provided for a visual that needs one, default.
         if (!cleanedHeadline && !skipUpload) {
@@ -226,7 +236,8 @@ export async function generateIntelImage({
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
             // Ensure font stack carries through
-            ctx.font = `900 ${currentFS}px ${fullFontStack}`;
+            // Use system fallback to rule out font loading issues
+            ctx.font = `900 ${currentFS}px "Outfit", Arial, sans-serif`;
             lineSpacing = currentFS * 0.92;
 
             titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, currentFS) : [];
@@ -237,6 +248,8 @@ export async function generateIntelImage({
             if (totalBlockHeight <= (HEIGHT * 0.25)) break;
             globalFontSize -= 5;
         }
+
+        console.log(`[Image Engine] WRAPPING RESULTS -> TitleLines: ${titleLines.length}, HeadlineLines: ${headlineLines.length}`);
 
         // 6. Draw Gradient (Seamless Scrim)
         if (applyGradient) {
