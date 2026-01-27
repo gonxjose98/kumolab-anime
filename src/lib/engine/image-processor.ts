@@ -202,10 +202,10 @@ export async function generateIntelImage({
         const isTop = gradientPosition === 'top';
 
         // 5. Typography Setup
-        const availableWidth = WIDTH * 0.84; // 8% margin on each side
+        const availableWidth = WIDTH * 0.90; // Standard intentional safe margin
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        let globalFontSize = 220; // Start very large to fill utilization area
+        let globalFontSize = 180;
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -215,16 +215,16 @@ export async function generateIntelImage({
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
             ctx.font = `900 ${currentFS}px ${fullFontStack}`;
-            // Tighter vertical flow (85% of font size)
-            lineSpacing = currentFS * 0.85;
+            // Refined spacing (92% of font size) for balanced editorial look
+            lineSpacing = currentFS * 0.92;
 
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // Updated Rule: 35% Utilization (to fill more space)
-            if (totalBlockHeight < (HEIGHT * 0.35)) break;
+            // STRICT 30% COVERAGE LIMIT (USER ENFORCED)
+            if (totalBlockHeight <= (HEIGHT * 0.30)) break;
             globalFontSize -= 5;
         }
 
@@ -275,20 +275,20 @@ export async function generateIntelImage({
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
 
-            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.85);
+            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.92);
 
-            // --- REFINED UTILIZATION ZONE (35% area, respecting bottom safe margin) ---
-            const zoneHeight = HEIGHT * 0.35;
-            const bottomSafeMargin = 100; // Text won't sit on the floor
+            // --- STRICT 30% UTILIZATION ZONE ---
+            const zoneHeight = HEIGHT * 0.30;
+            const bottomSafeMargin = 100;
             let defaultY = 0;
 
             if (isTop) {
                 // Inset from top
-                defaultY = 80 + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+                defaultY = 80 + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             } else {
                 // Anchored to bottom safe zone
                 const zoneStart = HEIGHT - zoneHeight - bottomSafeMargin;
-                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             }
 
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
@@ -327,7 +327,7 @@ export async function generateIntelImage({
 
                 ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.85; // Clean, tighter line spacing
+                currentY += finalFontSize * 0.92; // Consistent spacing
             }
         }
 
