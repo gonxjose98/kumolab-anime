@@ -149,16 +149,13 @@ export async function generateIntelImage({
         let buffer: Buffer;
 
         if (sourceUrl.startsWith('http')) {
-            try {
-                const response = await fetch(sourceUrl);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                buffer = Buffer.from(await response.arrayBuffer());
-            } catch (fetchErr) {
-                const fallbackPath = path.join(process.cwd(), 'public/hero-bg-final.png');
-                buffer = fs.existsSync(fallbackPath)
-                    ? fs.readFileSync(fallbackPath)
-                    : Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+            console.log(`[Image Engine] Fetching source: ${sourceUrl}`);
+            const response = await fetch(sourceUrl);
+            if (!response.ok) {
+                console.error(`[Image Engine] Fetch failed: ${response.status} ${response.statusText} for ${sourceUrl}`);
+                throw new Error(`Failed to fetch source image: HTTP ${response.status}`);
             }
+            buffer = Buffer.from(await response.arrayBuffer());
         } else if (sourceUrl.startsWith('data:')) {
             const base64Data = sourceUrl.split(',')[1];
             buffer = Buffer.from(base64Data, 'base64');
