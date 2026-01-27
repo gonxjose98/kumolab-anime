@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateIntelImage } from '../src/lib/engine/image-processor';
-import { fetchOfficialAnimeImage } from '../src/lib/engine/fetchers';
+import { selectBestImage } from '../src/lib/engine/image-selector';
 
 // Setup Env
 const envPath = path.resolve(__dirname, '../.env.local');
@@ -33,18 +33,19 @@ async function regeneratePost(partialTitle: string, searchTerm: string) {
 
     if (error || !posts || posts.length === 0) {
         console.error("Post not found:", partialTitle);
+        // Fallback: Try searching for "Anime" + title just in case
         return;
     }
 
     const post = posts[0];
     console.log(`Found Post: ${post.title} (${post.id})`);
 
-    // 2. Fetch Fresh Source Image
+    // 2. Fetch Fresh Source Image using SMART SELECTOR
     console.log(`Fetching fresh source for: ${searchTerm}`);
-    const sourceUrl = await fetchOfficialAnimeImage(searchTerm);
+    const sourceUrl = await selectBestImage(searchTerm);
 
     if (!sourceUrl) {
-        console.error("Failed to find official image.");
+        console.error("Failed to find valid image candidate.");
         return;
     }
     console.log(`Source URL: ${sourceUrl}`);
@@ -53,16 +54,12 @@ async function regeneratePost(partialTitle: string, searchTerm: string) {
     console.log("Generating Intel Image...");
     const newImageUrl = await generateIntelImage({
         sourceUrl,
-        animeTitle: post.title, // Use full title for logic or simplified? generator usually handles it.
-        // Actually, let's use the search term as the "Anime Title" for the Visual, 
-        // and let the headline be the rest? 
-        // generateIntelImage uses `animeTitle` for the BIG TEXT.
-        // Let's rely on the text in the post title.
-        headline: '', // Assuming standard layout
+        animeTitle: post.title,
+        headline: '', // Assuming standard layout, title is enough
         slug: post.slug,
         applyText: true,
-        applyWatermark: true, // EXPLICIT
-        purpleWordIndices: [0, 1] // Dummy highlight, or we can calculate.
+        applyWatermark: true,
+        purpleWordIndices: [0, 1] // Matches title style
     });
 
     if (newImageUrl) {
@@ -85,8 +82,7 @@ async function regeneratePost(partialTitle: string, searchTerm: string) {
 }
 
 async function main() {
-    await regeneratePost('Vending Machine', 'Reborn as a Vending Machine, I Now Wander the Dungeon');
-    await regeneratePost('Wistoria', 'Wistoria: Wand and Sword');
+    await regeneratePost('Golden Kamuy', 'Golden Kamuy');
 }
 
 main();
