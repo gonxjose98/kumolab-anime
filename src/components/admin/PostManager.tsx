@@ -1615,22 +1615,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         >
                                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                                             <img
-                                                                src={searchedImages[selectedImageIndex ?? 0]}
+                                                                src={(!isStageDirty && processedImage)
+                                                                    ? processedImage
+                                                                    : (searchedImages.length > 0 && selectedImageIndex !== null)
+                                                                        ? searchedImages[selectedImageIndex]
+                                                                        : customImagePreview
+                                                                }
                                                                 crossOrigin="anonymous"
                                                                 alt=""
                                                                 className="w-full h-full object-cover pointer-events-none select-none"
                                                             />
                                                         </div>
 
-                                                        {/* 2. Gradient Layer (Visual Only) */}
-                                                        {isApplyGradient && (
+                                                        {/* 2. Gradient Layer (Visual Only) - Hide if processed */}
+                                                        {isApplyGradient && (isStageDirty || !processedImage) && (
                                                             <div
                                                                 className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
                                                             />
                                                         )}
 
-                                                        {/* 3. Text Manipulation Proxy Layer */}
-                                                        {isApplyText && (
+                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
+                                                        {isApplyText && (isStageDirty || !processedImage) && (
                                                             <div className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}>
                                                                 <div
                                                                     className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
