@@ -662,18 +662,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             if (!finalImageUrl) throw new Error("No image selected to commit.");
 
             // STEP 2: TRIGGER BACKEND GENERATION (Guaranteed 1080x1350)
+
+            // PRIORITY FIX: Use Topic first, as that is the active input for Intel/Trending
+            const effectiveTitle = topic || title || '';
+            const effectiveHeadline = (overlayTag || '').trim().toUpperCase();
+
+            console.log('[PostManager] Committing Preview with:', {
+                title: effectiveTitle,
+                headline: effectiveHeadline,
+                topicState: topic,
+                titleState: title
+            });
+
             const res = await fetch('/api/admin/process-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl: finalImageUrl,
-                    title: title || topic || '', // Pass title for text rendering (with fallback)
-                    headline: (overlayTag || '').trim().toUpperCase(),
+                    title: effectiveTitle,
+                    headline: effectiveHeadline,
                     scale: imageScale,
                     position: imagePosition,
-                    applyText: isApplyText,
+                    applyText: true, // FORCE TEXT ON COMMIT
                     applyGradient: isApplyGradient,
                     textPos: textPosition,
+
                     textScale,
                     gradientPos: gradientPosition,
                     purpleIndex: purpleWordIndices,
