@@ -362,7 +362,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
                     applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
-                    watermarkPosition
+                    watermarkPosition,
+                    disableAutoScaling: true // STRICT MODE: Backend must respect our exact scale/layout
                 })
             });
             const data = await res.json();
@@ -1698,16 +1699,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
+                                                                        // STRICT WYSIWYG TRANSFORM:
+                                                                        // We render at 1080p scale (135px font) then scale down to stage size using containerScale.
+                                                                        // AND we apply the user's textScale.
                                                                         transform: textPosition
-                                                                            ? `translate(${(textPosition.x - (WIDTH / 2)) * containerScale}px, ${(textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))) * containerScale}px) scale(${textScale})`
-                                                                            : `scale(${textScale})`,
+                                                                            ? `translate(${(textPosition.x - (WIDTH / 2)) * containerScale}px, ${(textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))) * containerScale}px) scale(${textScale * containerScale})`
+                                                                            : `scale(${textScale * containerScale})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
                                                                     <div className="text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
                                                                         <div
-                                                                            className="text-white text-2xl font-[900] uppercase tracking-tighter leading-[0.8] max-w-sm flex flex-wrap justify-center gap-x-2"
-                                                                            style={{ fontFamily: 'Outfit, var(--font-outfit), sans-serif' }}
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2"
+                                                                            // STRICT WYSIWYG STYLING: Matching backend constants exactly
+                                                                            style={{
+                                                                                fontFamily: 'Outfit, var(--font-outfit), sans-serif',
+                                                                                fontSize: '135px',
+                                                                                lineHeight: '0.92',
+                                                                                width: '972px', // 90% of 1080px available width (from backend)
+                                                                            }}
                                                                         >
                                                                             {`${(overlayTag || '').trim() || 'NEWS'}`.split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                 <span

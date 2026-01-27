@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
         const {
             imageUrl, title, headline, scale, position, applyText, applyGradient,
             textPos, textScale, gradientPos, purpleIndex,
-            applyWatermark, watermarkPosition
+            applyWatermark, watermarkPosition, disableAutoScaling
         } = await request.json();
 
         console.log(`[Admin API] Processing Image Request:`, { title, headline, scale, applyText });
@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
             gradientPosition: gradientPos,
             purpleWordIndices: purpleIndex, // Accepts array from client
             applyWatermark,
-            watermarkPosition
+            watermarkPosition,
+            disableAutoScaling
         });
 
 

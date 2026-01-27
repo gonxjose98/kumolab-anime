@@ -31,6 +31,7 @@ interface IntelImageOptions {
     purpleWordIndices?: number[];
     applyWatermark?: boolean;
     watermarkPosition?: { x: number; y: number };
+    disableAutoScaling?: boolean;
 }
 
 /**
@@ -85,7 +86,8 @@ export async function generateIntelImage({
     gradientPosition = 'bottom',
     purpleWordIndices,
     applyWatermark = true,
-    watermarkPosition
+    watermarkPosition,
+    disableAutoScaling = false,
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -230,6 +232,8 @@ export async function generateIntelImage({
         let totalBlockHeight = 0;
 
         // Iterative Sizing
+        // If disableAutoScaling is true (e.g. strict editor mode), we skip the shrinking loop.
+        // We still run the loop ONCE to generate lines, but we break immediately.
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
             // STRICT FONT USAGE
@@ -241,6 +245,7 @@ export async function generateIntelImage({
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
+            if (disableAutoScaling) break; // STOP here if we are in strict mode
             if (totalBlockHeight <= (HEIGHT * 0.25)) break;
             globalFontSize -= 5;
         }
