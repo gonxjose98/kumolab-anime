@@ -219,8 +219,8 @@ export async function generateIntelImage({
             (intersection.length >= 1 && (titleWords.includes('CONFIRMED') || titleWords.includes('SEASON')));
 
         if (isHighlyRedundant) {
-            console.log(`[Image Engine] Redundant headline detected ("${cleanedHeadline}" vs "${upperTitle}"). Clearing headline.`);
-            cleanedHeadline = '';
+            console.log(`[Image Engine] Redundant headline detected ("${cleanedHeadline}" vs "${upperTitle}"). (Auto-clearing disabled by user request).`);
+            // cleanedHeadline = ''; // DISABLED: User wants explicit control
         }
 
         let globalFontSize = 135; // Lower start to force 3+ words per line

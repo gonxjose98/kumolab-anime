@@ -10,4 +10,7 @@ const nextConfig = {
     },
 };
 
+
+
 export default nextConfig;
+// Refreshed env vars for Pro Model
