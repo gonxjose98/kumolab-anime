@@ -205,7 +205,7 @@ export async function generateIntelImage({
         const availableWidth = WIDTH * 0.90;
         let cleanedHeadline = (headline || '').toUpperCase().trim();
 
-        let globalFontSize = 110;
+        let globalFontSize = 180; // Start larger to fill the space
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let lineSpacing = 0;
@@ -214,18 +214,17 @@ export async function generateIntelImage({
         // Iterative Sizing
         while (globalFontSize >= 45) {
             const currentFS = globalFontSize * textScale;
-            // Use 'bold' to ensure the heaviest weight is chosen
-            ctx.font = `bold ${currentFS}px ${fullFontStack}`;
-            // Extremely tight line spacing for the "bubbly" aesthetic (82% of font size)
-            lineSpacing = currentFS * 0.82;
+            // PURE rendering: No hacks, just 900 weight Outfit
+            ctx.font = `900 ${currentFS}px ${fullFontStack}`;
+            lineSpacing = currentFS * 0.90;
 
             titleLines = (animeTitle || '').trim().length > 0 ? wrapText(ctx, (animeTitle || '').toUpperCase(), availableWidth, 6, currentFS) : [];
             headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
 
             totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
 
-            // Strict 35% Limit
-            if (totalBlockHeight < (HEIGHT * 0.35)) break;
+            // Updated Rule: Max 30% screen coverage
+            if (totalBlockHeight < (HEIGHT * 0.30)) break;
             globalFontSize -= 5;
         }
 
@@ -276,19 +275,19 @@ export async function generateIntelImage({
         if (applyText && (headlineLines.length > 0 || titleLines.length > 0)) {
             const finalFontSize = Math.max(40, globalFontSize * textScale);
 
-            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.95);
+            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.90);
 
-            // --- HARDCODED 35% ZONE POSITIONING ---
-            const zoneHeight = HEIGHT * 0.35;
+            // --- HARDCODED 30% ZONE POSITIONING ---
+            const zoneHeight = HEIGHT * 0.30;
             let defaultY = 0;
 
             if (isTop) {
-                // Centered within the TOP 35%
-                defaultY = (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+                // Centered within the TOP 30%
+                defaultY = (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             } else {
-                // Centered within the BOTTOM 35%
+                // Centered within the BOTTOM 30%
                 const zoneStart = HEIGHT - zoneHeight;
-                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.8);
+                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
             }
 
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
