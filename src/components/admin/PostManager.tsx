@@ -98,28 +98,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         try {
             const rect = node.getBoundingClientRect();
             // Critical guard: protect against 0/unstable states
-            const safeTextScale = Math.max(0.0001, textScale);
-            const safeContainerScale = Math.max(0.0001, containerScale);
+            const safeTextScale = Math.max(0.01, textScale);
+            const safeContainerScale = Math.max(0.01, containerScale);
 
             if (rect.height <= 0) return;
 
             // Normalize measured height to 1080p native space
             const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
-            if (!Number.isFinite(nativeHeight) || nativeHeight <= 0) return;
+            if (!Number.isFinite(nativeHeight) || nativeHeight <= 1) return;
 
             const maxAllowedHeight = 405; // 30% of 1350
             const currentScaledHeight = nativeHeight * textScale;
 
             // CORRECTIVE AUTO-SCALE: Shrink only if violating the 405px contract
-            if (currentScaledHeight > maxAllowedHeight + 0.5) {
+            if (currentScaledHeight > maxAllowedHeight + 1.0) {
                 const targetScale = maxAllowedHeight / nativeHeight;
-                if (Number.isFinite(targetScale) && targetScale > 0 && targetScale < textScale) {
-                    setTextScale(targetScale);
+                // Never scale below 0.1 (10%) to ensure text stays visible
+                const cappedTarget = Math.max(0.1, targetScale);
+
+                if (Number.isFinite(cappedTarget) && cappedTarget < textScale - 0.001) {
+                    setTextScale(cappedTarget);
                     setIsStageDirty(true);
                 }
             }
         } catch (e) {
-            console.warn('[Editor] Scaling invariant guard caught exception:', e);
+            console.warn('[Editor] Scaling guard suppressed error:', e);
         }
     }, [overlayTag, textScale, containerScale]);
 
@@ -519,7 +522,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 }
             }
 
-            const newScale = Math.max(0.01, Math.min(maxScaleForContent, textScale + delta));
+            const newScale = Math.max(0.1, Math.min(maxScaleForContent, textScale + delta));
 
             // Reversible check: only block scale-up if we are at the limit
             if (delta > 0 && textScale >= maxScaleForContent - 0.001) {
@@ -1774,12 +1777,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         <div
                                                                             ref={textContainerRef}
                                                                             className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2 break-words whitespace-pre-wrap"
-                                                                            // STRICT WYSIWYG STYLING: Matching backend constants exactly
+                                                                            // RE-ENGINEERED CENTERING: 1080px width with explicit gutters matching backend (90% width)
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
                                                                                 fontSize: '135px',
                                                                                 lineHeight: '0.92',
-                                                                                width: '972px', // 90% of 1080px available width (from backend)
+                                                                                width: '1080px',
+                                                                                padding: '0 54px',
+                                                                                textAlign: 'center'
                                                                             }}
                                                                         >
                                                                             {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
@@ -2324,7 +2329,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.1.4 (UI Re-Engineered)</span>
+                <span>KumoLab Admin OS v2.1.5 (UI Re-Engineered)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>
