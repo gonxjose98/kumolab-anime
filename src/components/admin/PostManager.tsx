@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -69,22 +69,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(false);
     const [containerScale, setContainerScale] = useState(1);
-    const stageRef = useRef<HTMLDivElement>(null);
 
     // --- STRICT STATE MACHINE ---
     type EditorMode = 'RAW' | 'PROCESSED';
     const [editorMode, setEditorMode] = useState<EditorMode>('RAW');
 
-    useEffect(() => {
-        if (!stageRef.current) return;
-        const observer = new ResizeObserver((entries) => {
-            const width = entries[0].contentRect.width;
-            const newScale = width / 1080;
-            console.log('[Editor] Stage Ref Width:', width, 'Calculated Scale:', newScale);
-            setContainerScale(newScale > 0 ? newScale : 1); // Prevent 0-scale invisible text
-        });
-        observer.observe(stageRef.current);
-        return () => observer.disconnect();
+    // Callback ref to reliably track stage size, even if it mounts late
+    const stageContainerRef = useCallback((node: HTMLDivElement | null) => {
+        if (node !== null) {
+            const updateScale = () => {
+                const width = node.getBoundingClientRect().width;
+                const newScale = width / 1080;
+                setContainerScale(newScale > 0 ? newScale : 1);
+            };
+            updateScale();
+            const observer = new ResizeObserver(updateScale);
+            observer.observe(node);
+        }
     }, []);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
@@ -161,7 +162,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic('');
         setTitle('');
         setContent('');
-        setOverlayTag(type === 'TRENDING' ? 'TRENDING' : type === 'CONFIRMATION_ALERT' ? 'OFFICIAL' : 'NEWS');
+        setOverlayTag('');
         setCustomImage(null);
         setCustomImagePreview('');
         setPreviewPost(null);
@@ -198,7 +199,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        setOverlayTag(post.headline || 'NEWS');
+        setOverlayTag(post.headline || '');
         setCustomImage(null);
         setCustomImagePreview(post.image || '');
         setPreviewPost(null);
@@ -423,6 +424,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setTextPosition(prev => {
                 // Initialize default if null. This MUST match the renderer's default fallback exactly.
                 const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 150 : HEIGHT - 300 };
+                // REVERT: deltaX is already in 1080p units from handleImagePointerMove math.
                 return {
                     x: base.x + deltaX,
                     y: base.y + deltaY
@@ -445,9 +447,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleImagePointerUp = (e: React.PointerEvent) => {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
         setIsDragging(false);
-        if (dragTarget === 'text' && isAutoSnap) {
-            setTextPosition(null); // Snap back to default calculated position
-        }
+        // Removed snap-back logic to ensure text stays where released
         if (dragTarget === 'watermark' && isAutoSnap) {
             setWatermarkPosition(null);
         }
@@ -466,13 +466,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
+            // Strictly enforce 30% rule (max scale 3.0)
             const newScale = Math.max(0.1, Math.min(3, textScale + delta));
             setTextScale(newScale);
             setIsStageDirty(true);
 
             // Only trigger backend re-render if we are in PROCESSED mode
             if (editorMode === 'PROCESSED') {
-                // Debounce could be added here, but direct call is requested for "Action -> Result"
                 handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
             }
         }
@@ -720,7 +720,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     gradientPos: gradientPosition,
                     purpleIndex: purpleWordIndices,
                     applyWatermark: isApplyWatermark,
-                    watermarkPosition
+                    watermarkPosition,
+                    disableAutoScaling: true
                 })
             });
 
@@ -1499,9 +1500,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                         value={overlayTag}
                                                         onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            console.log('[Editor] overlayTag input:', val);
-                                                            setOverlayTag(val);
+                                                            setOverlayTag(e.target.value);
                                                             // Visibility is now derived purely from content length.
                                                         }}
                                                     />
@@ -1608,10 +1607,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             {/* --- THE PRO EDITOR STAGE --- */}
                                             <div className="flex flex-col lg:flex-row gap-6">
                                                 <div
-                                                    ref={stageRef}
+                                                    ref={stageContainerRef}
                                                     onPointerMove={handleImagePointerMove}
                                                     onPointerUp={handleImagePointerUp}
-                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none"
+                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none z-0"
                                                 >
                                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
@@ -1700,70 +1699,65 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
-                                                        {/* 3. Text Manipulation Proxy Layer - STRICT: Render if content exists. */}
-                                                        {(() => {
-                                                            const shouldRender = overlayTag && overlayTag.trim().length > 0;
-                                                            console.log('[Editor] Render Check - Content:', overlayTag, 'Scale:', containerScale, 'Visible:', shouldRender);
-                                                            return shouldRender;
-                                                        })() && (
-                                                                <div className="absolute inset-0 pointer-events-none z-10">
-                                                                    <div
-                                                                        className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
-                                                                        onPointerDown={(e) => handleImagePointerDown(e, 'text')}
-                                                                        style={{
-                                                                            // STRICT WYSIWYG TRANSFORM:
-                                                                            // Origin is top-left (0,0). We translate to absolute X/Y.
-                                                                            // Center the text block horizontally (-50% X).
-                                                                            // Y position is the top of the text block.
-                                                                            left: 0,
-                                                                            top: 0,
-                                                                            transformOrigin: 'top center',
-                                                                            transform: textPosition
-                                                                                ? `translate(${(textPosition.x * containerScale)}px, ${(textPosition.y * containerScale)}px) translate(-50%, 0) scale(${textScale * containerScale})`
-                                                                                : `translate(${WIDTH / 2 * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) translate(-50%, 0) scale(${textScale * containerScale})`, // Default position fallback
-                                                                            transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
-                                                                        }}
-                                                                    >
-                                                                        <div className="text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
-                                                                            <div
-                                                                                className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2"
-                                                                                // STRICT WYSIWYG STYLING: Matching backend constants exactly
-                                                                                style={{
-                                                                                    fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                    fontSize: '135px',
-                                                                                    lineHeight: '0.92',
-                                                                                    width: '972px', // 90% of 1080px available width (from backend)
-                                                                                }}
-                                                                            >
-                                                                                {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                    <span
-                                                                                        key={idx}
-                                                                                        onPointerDown={(e) => {
-                                                                                            if (isTextLocked) e.stopPropagation();
-                                                                                        }}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            e.preventDefault();
-                                                                                            const newIndices = purpleWordIndices.includes(idx)
-                                                                                                ? purpleWordIndices.filter(i => i !== idx)
-                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                            setPurpleWordIndices(newIndices);
-                                                                                        }}
-                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
-                                                                                    >
-                                                                                        {word}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
+                                                        {/* 3. Text Manipulation Proxy Layer - STRICT: Render if content exists AND toggled ON. */}
+                                                        {overlayTag && overlayTag.trim().length > 0 && isApplyText && (
+                                                            <div className="absolute inset-0 pointer-events-none z-10">
+                                                                <div
+                                                                    className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
+                                                                    onPointerDown={(e) => handleImagePointerDown(e, 'text')}
+                                                                    style={{
+                                                                        // STRICT WYSIWYG TRANSFORM:
+                                                                        // X/Y are in 1080p pixels. We map them to screen.
+                                                                        // Formula: ScreenPixelMove(X*s, Y*s) -> Scale(s) -> Scale(textScale) -> Center(-50%)
+                                                                        left: 0,
+                                                                        top: 0,
+                                                                        transformOrigin: 'top center',
+                                                                        transform: textPosition
+                                                                            ? `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`
+                                                                            : `translate(${(WIDTH / 2) * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`,
+                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
+                                                                    }}
+                                                                >
+                                                                    <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                                                                        <div
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2 break-words whitespace-pre-wrap"
+                                                                            // STRICT WYSIWYG STYLING: Matching backend constants exactly
+                                                                            style={{
+                                                                                fontFamily: 'Outfit, var(--font-outfit), sans-serif',
+                                                                                fontSize: '135px',
+                                                                                lineHeight: '0.92',
+                                                                                width: '972px', // 90% of 1080px available width (from backend)
+                                                                            }}
+                                                                        >
+                                                                            {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    onPointerDown={(e) => {
+                                                                                        if (isTextLocked) e.stopPropagation();
+                                                                                    }}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        e.preventDefault();
+                                                                                        const newIndices = purpleWordIndices.includes(idx)
+                                                                                            ? purpleWordIndices.filter(i => i !== idx)
+                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                        setPurpleWordIndices(newIndices);
+                                                                                    }}
+                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
+                                                                                >
+                                                                                    {word}
+                                                                                </span>
+                                                                            ))}
                                                                         </div>
-                                                                        {!isTextLocked && !isDragging && (
-                                                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
-                                                                                Drag to Place
-                                                                            </div>
-                                                                        )}
                                                                     </div>
+                                                                    {!isTextLocked && !isDragging && (
+                                                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
+                                                                            Drag to Place
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            )}
+                                                            </div>
+                                                        )}
 
                                                         {/* 4. Watermark Layer */}
                                                         {isApplyWatermark && (
