@@ -79,7 +79,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (!stageRef.current) return;
         const observer = new ResizeObserver((entries) => {
             const width = entries[0].contentRect.width;
-            setContainerScale(width / 1080);
+            const newScale = width / 1080;
+            console.log('[Editor] Stage Ref Width:', width, 'Calculated Scale:', newScale);
+            setContainerScale(newScale > 0 ? newScale : 1); // Prevent 0-scale invisible text
         });
         observer.observe(stageRef.current);
         return () => observer.disconnect();
@@ -1701,7 +1703,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Manipulation Proxy Layer - STRICT: Render if content exists. */}
                                                         {(() => {
                                                             const shouldRender = overlayTag && overlayTag.trim().length > 0;
-                                                            console.log('[Editor] Render Text Layer?', shouldRender, 'Content:', overlayTag);
+                                                            console.log('[Editor] Render Check - Content:', overlayTag, 'Scale:', containerScale, 'Visible:', shouldRender);
                                                             return shouldRender;
                                                         })() && (
                                                                 <div className="absolute inset-0 pointer-events-none z-10">
