@@ -143,6 +143,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // --- DEBOUNCED AUTHORITATIVE SYNC ---
     useEffect(() => {
+        // KILL SWITCH: If text is OFF, do NOT sync layout with headline
+        if (!isApplyText) {
+            if (layoutMetadata) setLayoutMetadata(null);
+            return;
+        }
+
         if (!overlayTag || overlayTag.trim().length === 0) {
             if (layoutMetadata) setLayoutMetadata(null);
             return;
@@ -153,7 +159,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }, 300); // 300ms debounce for typing
 
         return () => clearTimeout(timer);
-    }, [overlayTag]);
+    }, [overlayTag, isApplyText]);
 
     const handleRegenerateSlot = async (slot: string) => {
         if (!confirm(`Force regenerate post for slot ${slot}? This will bypass schedule checks.`)) return;
@@ -410,10 +416,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             if (data.success) {
                 setProcessedImage(data.processedImage);
-                if (data.layout) {
-                    setLayoutMetadata(data.layout);
+                // AUTHORITATIVE SYNC: Always update layoutMetadata, even if null.
+                const newLayout = data.layout ?? null;
+                setLayoutMetadata(newLayout);
+
+                if (newLayout) {
                     // SYNC FRONTEND SCALE WITH BACKEND APPROVAL
-                    setTextScale(data.layout.finalScale);
+                    setTextScale(newLayout.finalScale);
+                } else {
+                    // Reset text-specific states if layout is gone
+                    setTextScale(1);
                 }
                 setEditorMode('PROCESSED'); // TRANSITION TO PROCESSED MODE
                 setIsStageDirty(false);
@@ -595,7 +607,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
 
         try {
-            const finalTitle = (title || topic || '').trim();
+            // AUTHORITATIVE VALIDATION: Title is only required for the DB record.
+            // If TEXT OFF, we allow a metadata-only fallback to prevent UX deadlock.
+            const finalTitle = (title || topic || (isApplyText ? '' : `UNTITLED DROP ${Date.now()}`)).trim();
             if (!finalTitle) {
                 alert('Title or Topic is required to save a transmission.');
                 setIsGenerating(false);
@@ -772,6 +786,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             if (!data.success) {
                 throw new Error(data.error || "Generation failed");
             }
+
+            // AUTHORITATIVE SYNC: Ensure state is cleared if backend returned no layout
+            setLayoutMetadata(data.layout ?? null);
 
             // STEP 3: UPDATE STATE WITH HQ IMAGE
             setProcessedImage(data.processedImage); // Base64 HQ
@@ -1947,6 +1964,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             onClick={() => {
                                                                 const newVal = !isApplyText;
                                                                 setIsApplyText(newVal);
+                                                                if (!newVal) {
+                                                                    // KILL SWITCH: Clear all layout state immediately
+                                                                    setLayoutMetadata(null);
+                                                                    setTextScale(1);
+                                                                }
                                                                 handleApplyText(undefined, undefined, newVal);
                                                             }}
                                                             className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyText ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
@@ -2341,7 +2363,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.2.3 (Text Authority Locked)</span>
+                <span>KumoLab Admin OS v2.2.4 (Kill Switch Authority)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>
