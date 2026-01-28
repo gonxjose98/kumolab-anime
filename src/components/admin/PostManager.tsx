@@ -122,6 +122,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
+    const lastRequestTimestamp = useRef<number>(0);
 
     const handleFetchLogs = async () => {
         setIsLoadingLogs(true);
@@ -139,6 +140,20 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setIsLoadingLogs(false);
         }
     };
+
+    // --- DEBOUNCED AUTHORITATIVE SYNC ---
+    useEffect(() => {
+        if (!overlayTag || overlayTag.trim().length === 0) {
+            if (layoutMetadata) setLayoutMetadata(null);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            handleApplyText();
+        }, 300); // 300ms debounce for typing
+
+        return () => clearTimeout(timer);
+    }, [overlayTag]);
 
     const handleRegenerateSlot = async (slot: string) => {
         if (!confirm(`Force regenerate post for slot ${slot}? This will bypass schedule checks.`)) return;
@@ -344,10 +359,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         if (!imageUrl) return null;
 
-        const signalText = (overlayTag || '').trim(); // NO 'NEWS' FALLBACK
+        const signalText = (overlayTag || '').trim();
         setIsProcessingImage(true);
         setIsApplyingEffect(true);
-        setIsApplyingEffect(true);
+
+        const timestamp = Date.now();
+        lastRequestTimestamp.current = timestamp;
 
         // DEBUG TRACE
         const payload = {
@@ -384,6 +401,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 })
             });
             const data = await res.json();
+
+            // DROP OUTDATED RESPONSES
+            if (timestamp < lastRequestTimestamp.current) {
+                console.log('[PostManager] Dropping outdated response');
+                return null;
+            }
+
             if (data.success) {
                 setProcessedImage(data.processedImage);
                 if (data.layout) {
@@ -550,11 +574,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             : customImagePreview;
 
         if (imageUrl) {
-            // FORCE PARAMETERS for Save:
-            // 3. forcedApplyText: TRUE (Always force text on save if we have content)
+            // 3. forcedApplyText: Respect isApplyText (Do NOT force true)
             // 7. forcedApplyWatermark: TRUE (Always force watermark on save)
-            console.log('[Admin] Generating FINAL save image with FORCED text/watermark...');
-            finalImageToSave = await handleApplyText(undefined, undefined, true, undefined, undefined, undefined, true);
+            console.log(`[Admin] Generating FINAL save image (Text: ${isApplyText ? 'ON' : 'OFF'})...`);
+            finalImageToSave = await handleApplyText(undefined, undefined, isApplyText, undefined, undefined, undefined, true);
         } else {
             console.warn('[Admin] No image found to process for save.');
         }
@@ -731,9 +754,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     imageUrl: finalImageUrl,
                     title: effectiveTitle,
                     headline: effectiveHeadline,
-                    scale: imageScale,
                     position: imagePosition,
-                    applyText: true, // FORCE TEXT ON COMMIT
+                    applyText: isApplyText,
                     applyGradient: isApplyGradient,
                     textPos: textPosition,
 
@@ -1720,8 +1742,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
-                                                        {/* 3. Text Manipulation Proxy Layer - Authoritative: Render if content exists. */}
-                                                        {overlayTag && overlayTag.trim().length > 0 && (
+                                                        {/* 3. Text Manipulation Proxy Layer - Authoritative: Render if enabled and content exists. */}
+                                                        {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
@@ -1737,12 +1759,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap"
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
                                                                                 fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * containerScale}px` : `${135 * textScale * containerScale}px`,
                                                                                 lineHeight: layoutMetadata?.lineHeight ? `${layoutMetadata.lineHeight * containerScale}px` : '0.92',
-                                                                                width: `${1080 * containerScale}px`,
+                                                                                width: `${WIDTH * containerScale}px`,
+                                                                                maxWidth: `${WIDTH * containerScale}px`,
                                                                                 padding: `0 ${54 * containerScale}px`,
                                                                                 textAlign: 'center'
                                                                             }}
@@ -2318,7 +2341,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.2.1 (Deterministic Backend Authority)</span>
+                <span>KumoLab Admin OS v2.2.3 (Text Authority Locked)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>

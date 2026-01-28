@@ -226,8 +226,6 @@ export async function generateIntelImage({
         const upperTitle = (animeTitle || '').toUpperCase().trim();
 
         // DEDUPLICATION GUARD:
-        // If the Override Visual Title (slug/headline) matches the Anime Title, suppress the duplicate.
-        // We only deduplicate if there IS a title to match against.
         if (cleanedHeadline === upperTitle && upperTitle.length > 0) {
             console.log(`[Image Engine] Deduplicating headline (matches title): "${cleanedHeadline}"`);
             cleanedHeadline = '';
@@ -235,35 +233,19 @@ export async function generateIntelImage({
 
         console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
-        // FAILSAFE: If no headline provided for a visual that needs one, default.
-        if (!cleanedHeadline && !skipUpload) {
-            // Only apply default if we are not skipping upload (which implies preview/custom mode)
-            // Actually, for custom mode we trust the user.
-        }
-
-        let globalFontSize = 135;
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
-        let lineSpacing = 0;
         let totalBlockHeight = 0;
 
-        // Iterative Sizing
-        // If disableAutoScaling is true (e.g. strict editor mode), we skip the shrinking loop.
-        // We still run the loop ONCE to generate lines, but we break immediately.
-        while (globalFontSize >= 45) {
-            const currentFS = globalFontSize * textScale;
-            // STRICT FONT USAGE
-            ctx.font = `900 ${currentFS}px "Outfit"`;
-            lineSpacing = currentFS * 0.92;
-
-            titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, currentFS) : [];
-            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, currentFS) : [];
-
-            totalBlockHeight = (titleLines.length + headlineLines.length) * lineSpacing;
-
-            if (disableAutoScaling) break; // STOP here if we are in strict mode
-            if (totalBlockHeight <= (HEIGHT * 0.25)) break;
-            globalFontSize -= 5;
+        // Establish base lines at default size for gradient measurement
+        if (applyGradient || applyText) {
+            ctx.font = `900 135px "Outfit"`;
+            const baseTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, 135) : [];
+            const baseHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, 135) : [];
+            const allBaseLines = [...baseTitleLines, ...baseHeadlineLines];
+            titleLines = baseTitleLines;
+            headlineLines = baseHeadlineLines;
+            totalBlockHeight = allBaseLines.length * (135 * 0.92);
         }
 
         console.log(`[Image Engine] WRAPPING RESULTS -> TitleLines: ${titleLines.length}, HeadlineLines: ${headlineLines.length}`);
@@ -296,7 +278,9 @@ export async function generateIntelImage({
         }
 
         // 7. Draw Text
-        if (applyText) {
+        if (!applyText) {
+            (ctx as any)._layoutMetadata = null;
+        } else {
             if (headlineLines.length === 0 && titleLines.length === 0) {
                 console.warn("[Image Engine] Text enabled but no content to draw.");
             }
@@ -443,16 +427,7 @@ export async function generateIntelImage({
 
         return {
             processedImage: publicUrl,
-            layout: (ctx as any)._layoutMetadata || {
-                fontSize: 135,
-                lineHeight: 124,
-                y: 1300,
-                lines: [],
-                finalScale: 1,
-                zone: 'FOOTER',
-                numLines: 0,
-                totalHeight: 0
-            }
+            layout: (ctx as any)._layoutMetadata
         };
 
     } catch (e: any) {
