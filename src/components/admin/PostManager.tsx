@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -89,21 +89,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     }, []);
 
-    // --- AUTHORITATIVE AUTO-SCALING (30% RULE ENFORCEMENT) ---
-    useEffect(() => {
+    // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (30% RULE) ---
+    // This runs BEFORE paint to ensure the user NEVER sees an invalid layout.
+    useLayoutEffect(() => {
         if (!textContainerRef.current || !overlayTag) return;
 
-        // Measure the native height (at scale 1.0) of the current text content
+        // Measure native height at scale 1.0 (internal size of the 972px container)
         const nativeHeight = textContainerRef.current.offsetHeight;
         if (nativeHeight <= 0) return;
 
         const maxAllowedHeight = HEIGHT * 0.3; // 405px
         const currentScaledHeight = nativeHeight * textScale;
 
-        // If current state violates the rule, immediately and automatically correct it
-        if (currentScaledHeight > maxAllowedHeight + 1) { // +1 for floating point safety
+        // If current state violates the 30% limit, pull it down instantly
+        if (currentScaledHeight > maxAllowedHeight + 0.5) {
             const targetScale = maxAllowedHeight / nativeHeight;
-            console.log(`[Editor] Auto-adjusting scale ${textScale} -> ${targetScale} to satisfy 30% rule.`);
+            console.log(`[Editor] Synchronous Scale Clamp: ${textScale} -> ${targetScale}`);
             setTextScale(targetScale);
             setIsStageDirty(true);
         }
@@ -443,13 +444,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // STRICT SEPARATION: Image drag NEVER moves text
         } else if (dragTarget === 'text') {
             setTextPosition(prev => {
-                // Initialize default if null. This MUST match the renderer's default fallback exactly.
-                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 150 : HEIGHT - 300 };
-                // REVERT: deltaX is already in 1080p units from handleImagePointerMove math.
-                return {
-                    x: base.x + deltaX,
-                    y: base.y + deltaY
-                };
+                // Initialize default if null. Anchor to footer zone (bottom 30% = Y > 945)
+                const base = prev || { x: WIDTH / 2, y: HEIGHT - 350 };
+
+                let nextX = base.x + deltaX;
+                let nextY = base.y + deltaY;
+
+                // AUTHORITATIVE CLAMPING: Prevent text leaving the footer zone or stage
+                const zoneStart = HEIGHT * 0.7; // 945
+                nextX = Math.max(0, Math.min(WIDTH, nextX));
+                nextY = Math.max(zoneStart, Math.min(HEIGHT - 50, nextY));
+
+                return { x: nextX, y: nextY };
             });
             setIsStageDirty(true);
         } else if (dragTarget === 'watermark') {
@@ -487,23 +493,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
-            // Strictly enforce 30% rule (limit total height to ~405px on a 1350px canvas)
-            let maxScale = 3.0; // Hard cap
+            // Manual scale check: calculate max scale for current content
+            let maxScaleForContent = 3.0;
             if (textContainerRef.current) {
-                // The ref is on the inner div with 972px width and 135px font.
-                // Its offsetHeight is the native 1080p-space height.
                 const nativeHeight = textContainerRef.current.offsetHeight;
                 if (nativeHeight > 0) {
-                    // Rule: nativeHeight * textScale <= (HEIGHT * 0.3)
-                    maxScale = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
+                    maxScaleForContent = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
                 }
             }
 
-            const newScale = Math.max(0.1, Math.min(maxScale, textScale + delta));
+            const newScale = Math.max(0.1, Math.min(maxScaleForContent, textScale + delta));
+
+            // Reversible check: only block scale-up if we are at the limit
+            if (delta > 0 && textScale >= maxScaleForContent - 0.01) {
+                // Already at limit
+                return;
+            }
+
             setTextScale(newScale);
             setIsStageDirty(true);
 
-            // Only trigger backend re-render if we are in PROCESSED mode
             if (editorMode === 'PROCESSED') {
                 handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
             }
@@ -1738,15 +1747,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        // STRICT WYSIWYG TRANSFORM:
-                                                                        // Origin is top-left. We translate to the target center (X), 
-                                                                        // then shift back by half of the scaled width (-50%) to achieve perfect centering.
                                                                         left: 0,
                                                                         top: 0,
                                                                         transformOrigin: 'top left',
                                                                         transform: textPosition
-                                                                            ? `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`
-                                                                            : `translate(${(WIDTH / 2) * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`,
+                                                                            ? `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`
+                                                                            : `translate(${(WIDTH / 2) * containerScale}px, ${(HEIGHT - 350) * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
@@ -2297,16 +2303,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 )
                             }
 
-                            <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
+                            <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto">
                                 <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
                                 <span>System Status: ONLINE</span>
                             </div>
-
-
-                        </div >
-                    </div >
-                )
-            }
-        </div >
+                        </div>
+                    </div>
+                )}
+        </div>
     );
 }
