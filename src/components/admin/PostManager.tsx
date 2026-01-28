@@ -326,7 +326,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         if (!imageUrl) return null;
 
-        const signalText = (overlayTag || '').trim() || 'NEWS'; // Fallback to NEWS to match frontend renderer
+        const signalText = (overlayTag || '').trim(); // NO 'NEWS' FALLBACK
         setIsProcessingImage(true);
         setIsApplyingEffect(true);
         setIsApplyingEffect(true);
@@ -416,8 +416,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 y: prev.y + (deltaY / HEIGHT)
             }));
             setIsStageDirty(true);
+            // STRICT SEPARATION: Image drag NEVER moves text
+        } else if (dragTarget === 'text') {
             setTextPosition(prev => {
-                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 100 : HEIGHT - 300 };
+                // Initialize default if null, based on gradient position logic
+                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? (HEIGHT * 0.1) : (HEIGHT - (HEIGHT * 0.15)) };
                 return {
                     x: base.x + deltaX,
                     y: base.y + deltaY
@@ -1719,7 +1722,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 width: '972px', // 90% of 1080px available width (from backend)
                                                                             }}
                                                                         >
-                                                                            {`${(overlayTag || '').trim() || 'NEWS'}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                            {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                 <span
                                                                                     key={idx}
                                                                                     onPointerDown={(e) => {
