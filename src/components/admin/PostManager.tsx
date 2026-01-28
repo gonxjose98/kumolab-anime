@@ -92,25 +92,28 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (30% RULE) ---
     // This runs BEFORE paint to ensure the user NEVER sees an invalid layout.
     useLayoutEffect(() => {
-        if (!textContainerRef.current || !overlayTag || overlayTag.trim().length === 0) return;
+        const node = textContainerRef.current;
+        if (!node || !overlayTag || overlayTag.trim().length === 0) return;
 
-        // NATIVE COORDINATE NORMALIZATION:
-        // getBoundingClientRect returns screen pixels. We divide by (containerScale * textScale)
-        // to find exactly what the content height IS in the 1080p native coordinate system.
-        const rect = textContainerRef.current.getBoundingClientRect();
-        if (rect.height <= 0 || containerScale === 0 || textScale === 0) return;
+        try {
+            const rect = node.getBoundingClientRect();
+            if (rect.height <= 0 || (containerScale || 0) <= 0 || (textScale || 0) <= 0) return;
 
-        const nativeHeight = rect.height / (containerScale * textScale);
-        const maxAllowedHeight = HEIGHT * 0.3; // 405px
-        const currentScaledHeight = nativeHeight * textScale;
+            const nativeHeight = rect.height / (containerScale * textScale);
+            if (!Number.isFinite(nativeHeight) || nativeHeight <= 0) return;
 
-        // If current state violates the 30% limit, pull it down instantly
-        // Buffer of 0.5 for stability
-        if (currentScaledHeight > maxAllowedHeight + 0.5) {
-            const targetScale = maxAllowedHeight / nativeHeight;
-            console.log(`[Editor] Authoritative Clamp: ${textScale} -> ${targetScale} (Native Height: ${Math.round(nativeHeight)}px)`);
-            setTextScale(targetScale);
-            setIsStageDirty(true);
+            const maxAllowedHeight = HEIGHT * 0.3; // 405px
+            const currentScaledHeight = nativeHeight * textScale;
+
+            if (currentScaledHeight > maxAllowedHeight + 1.0) {
+                const targetScale = maxAllowedHeight / nativeHeight;
+                if (Number.isFinite(targetScale) && targetScale > 0 && targetScale < textScale - 0.0001) {
+                    setTextScale(targetScale);
+                    setIsStageDirty(true);
+                }
+            }
+        } catch (e) {
+            console.error('[Editor] Scaling error suppressed:', e);
         }
     }, [overlayTag, textScale, containerScale]);
 
@@ -202,7 +205,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 950 });
+        setTextPosition({ x: WIDTH / 2, y: 1000 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -243,7 +246,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 950 });
+        setTextPosition({ x: WIDTH / 2, y: 1000 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -497,16 +500,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             let maxScaleForContent = 3.0;
             if (textContainerRef.current) {
                 const rect = textContainerRef.current.getBoundingClientRect();
-                if (rect.height > 0 && containerScale > 0 && textScale > 0) {
-                    const nativeHeight = rect.height / (containerScale * textScale);
-                    maxScaleForContent = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
+                const safeTextScale = Math.max(0.001, textScale);
+                const safeContainerScale = Math.max(0.001, containerScale);
+
+                if (rect.height > 0 && safeContainerScale > 0) {
+                    const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
+                    if (Number.isFinite(nativeHeight) && nativeHeight > 0) {
+                        maxScaleForContent = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
+                    }
                 }
             }
 
             const newScale = Math.max(0.1, Math.min(maxScaleForContent, textScale + delta));
 
             // Reversible check: only block scale-up if we are at the limit
-            if (delta > 0 && textScale >= maxScaleForContent - 0.01) {
+            if (delta > 0 && textScale >= maxScaleForContent - 0.001) {
                 return;
             }
 
@@ -527,7 +535,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 950 });
+        setTextPosition({ x: WIDTH / 2, y: 1000 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
