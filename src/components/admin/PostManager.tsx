@@ -419,7 +419,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // STRICT SEPARATION: Image drag NEVER moves text
         } else if (dragTarget === 'text') {
             setTextPosition(prev => {
-                // Initialize default if null, based on gradient position logic
+                // Initialize default if null. This MUST match the renderer's default fallback exactly.
                 const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 150 : HEIGHT - 300 };
                 return {
                     x: base.x + deltaX,
@@ -1499,9 +1499,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                         value={overlayTag}
                                                         onChange={(e) => {
-                                                            const newVal = e.target.value;
-                                                            setOverlayTag(newVal);
-                                                            setIsApplyText(true);
+                                                            setOverlayTag(e.target.value);
+                                                            // Visibility is now derived purely from content length.
                                                         }}
                                                     />
                                                 </div>
@@ -1697,7 +1696,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
-                                                        {isApplyText && editorMode === 'RAW' && (
+                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
+                                                        {overlayTag?.trim().length > 0 && editorMode === 'RAW' && (
                                                             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
