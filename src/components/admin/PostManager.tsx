@@ -97,23 +97,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         try {
             const rect = node.getBoundingClientRect();
-            if (rect.height <= 0 || (containerScale || 0) <= 0 || (textScale || 0) <= 0) return;
+            // Defensive math: protect against zero/unstable scales
+            const safeTextScale = Math.max(0.0001, textScale);
+            const safeContainerScale = Math.max(0.0001, containerScale);
 
-            const nativeHeight = rect.height / (containerScale * textScale);
+            if (rect.height <= 0) return;
+
+            // Normalize measured height to 1080p native space
+            const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
             if (!Number.isFinite(nativeHeight) || nativeHeight <= 0) return;
 
             const maxAllowedHeight = HEIGHT * 0.3; // 405px
             const currentScaledHeight = nativeHeight * textScale;
 
+            // CORRECTIVE AUTO-SCALE: Shrink only if violating the 30% contract
             if (currentScaledHeight > maxAllowedHeight + 1.0) {
                 const targetScale = maxAllowedHeight / nativeHeight;
-                if (Number.isFinite(targetScale) && targetScale > 0 && targetScale < textScale - 0.0001) {
+                if (Number.isFinite(targetScale) && targetScale > 0 && targetScale < textScale) {
                     setTextScale(targetScale);
                     setIsStageDirty(true);
                 }
             }
         } catch (e) {
-            console.error('[Editor] Scaling error suppressed:', e);
+            console.warn('[Editor] Scaling invariant guard caught exception:', e);
         }
     }, [overlayTag, textScale, containerScale]);
 
@@ -205,7 +211,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1000 });
+        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -246,7 +252,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1000 });
+        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -454,9 +460,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 let nextY = prev.y + deltaY;
 
                 // AUTHORITATIVE CLAMPING: Prevent text leaving the footer zone or stage
-                const zoneStart = HEIGHT * 0.7; // 945
+                const zoneStart = gradientPosition === 'top' ? 0 : HEIGHT * 0.7; // Header: 0, Footer: 945
+                const zoneEnd = gradientPosition === 'top' ? HEIGHT * 0.3 : HEIGHT; // Header: 405, Footer: 1350
                 nextX = Math.max(0, Math.min(WIDTH, nextX));
-                nextY = Math.max(zoneStart, Math.min(HEIGHT - 50, nextY));
+                nextY = Math.max(zoneStart, Math.min(zoneEnd, nextY));
 
                 return { x: nextX, y: nextY };
             });
@@ -535,7 +542,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1000 });
+        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -1758,7 +1765,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         left: 0,
                                                                         top: 0,
                                                                         transformOrigin: 'top left',
-                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`,
+                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, -50%)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
@@ -2314,7 +2321,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.1.1 (UI Re-Engineered)</span>
+                <span>KumoLab Admin OS v2.1.3 (UI Re-Engineered)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>
