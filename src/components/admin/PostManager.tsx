@@ -2298,13 +2298,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 )
                             }
 
-                            <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto">
-                                <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
-                                <span>System Status: ONLINE</span>
-                            </div>
                         </div>
                     </div>
                 )}
+
+            <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
+                <span>KumoLab Admin OS v2.1.1 (UI Re-Engineered)</span>
+                <span>System Status: ONLINE</span>
+            </div>
         </div>
     );
 }
