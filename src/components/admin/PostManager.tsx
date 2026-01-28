@@ -69,19 +69,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(false);
     const [containerScale, setContainerScale] = useState(1);
-    const imagePreviewRef = useRef<HTMLDivElement>(null);
+    const stageRef = useRef<HTMLDivElement>(null);
 
     // --- STRICT STATE MACHINE ---
     type EditorMode = 'RAW' | 'PROCESSED';
     const [editorMode, setEditorMode] = useState<EditorMode>('RAW');
 
     useEffect(() => {
-        if (!imagePreviewRef.current) return;
+        if (!stageRef.current) return;
         const observer = new ResizeObserver((entries) => {
             const width = entries[0].contentRect.width;
             setContainerScale(width / 1080);
         });
-        observer.observe(imagePreviewRef.current);
+        observer.observe(stageRef.current);
         return () => observer.disconnect();
     }, []);
 
@@ -665,7 +665,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const stageRef = useRef<HTMLDivElement>(null);
+    // stageRef moved to top level
 
     const handleCommitToPreview = async () => {
         setIsProcessingImage(true);
@@ -1657,8 +1657,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     {/* Stage Content */}
                                                     <div className="relative w-full h-full overflow-hidden bg-black">
                                                         {/* 1. Background Image Layer */}
+                                                        {/* 1. Background Image Layer */}
                                                         <div
-                                                            className="absolute inset-0 cursor-move will-change-transform"
+                                                            className="absolute inset-0 cursor-move will-change-transform z-0"
                                                             onPointerDown={(e) => handleImagePointerDown(e, 'image')}
                                                             onPointerMove={handleImagePointerMove} // redundant but safe
                                                             onPointerUp={handleImagePointerUp}
@@ -1703,7 +1704,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             console.log('[Editor] Render Text Layer?', shouldRender, 'Content:', overlayTag);
                                                             return shouldRender;
                                                         })() && (
-                                                                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                                                                <div className="absolute inset-0 pointer-events-none z-10">
                                                                     <div
                                                                         className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                         onPointerDown={(e) => handleImagePointerDown(e, 'text')}
