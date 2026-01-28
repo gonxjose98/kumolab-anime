@@ -1497,7 +1497,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
                                                         value={overlayTag}
                                                         onChange={(e) => {
-                                                            setOverlayTag(e.target.value);
+                                                            const val = e.target.value;
+                                                            console.log('[Editor] overlayTag input:', val);
+                                                            setOverlayTag(val);
                                                             // Visibility is now derived purely from content length.
                                                         }}
                                                     />
@@ -1695,65 +1697,70 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
-                                                        {overlayTag?.trim().length > 0 && editorMode === 'RAW' && (
-                                                            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                                                                <div
-                                                                    className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
-                                                                    onPointerDown={(e) => handleImagePointerDown(e, 'text')}
-                                                                    style={{
-                                                                        // STRICT WYSIWYG TRANSFORM:
-                                                                        // Origin is top-left (0,0). We translate to absolute X/Y.
-                                                                        // Center the text block horizontally (-50% X).
-                                                                        // Y position is the top of the text block.
-                                                                        left: 0,
-                                                                        top: 0,
-                                                                        transformOrigin: 'top center',
-                                                                        transform: textPosition
-                                                                            ? `translate(${(textPosition.x * containerScale)}px, ${(textPosition.y * containerScale)}px) translate(-50%, 0) scale(${textScale * containerScale})`
-                                                                            : `translate(${WIDTH / 2 * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) translate(-50%, 0) scale(${textScale * containerScale})`, // Default position fallback
-                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
-                                                                    }}
-                                                                >
-                                                                    <div className="text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
-                                                                        <div
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2"
-                                                                            // STRICT WYSIWYG STYLING: Matching backend constants exactly
-                                                                            style={{
-                                                                                fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                fontSize: '135px',
-                                                                                lineHeight: '0.92',
-                                                                                width: '972px', // 90% of 1080px available width (from backend)
-                                                                            }}
-                                                                        >
-                                                                            {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                <span
-                                                                                    key={idx}
-                                                                                    onPointerDown={(e) => {
-                                                                                        if (isTextLocked) e.stopPropagation();
-                                                                                    }}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        e.preventDefault();
-                                                                                        const newIndices = purpleWordIndices.includes(idx)
-                                                                                            ? purpleWordIndices.filter(i => i !== idx)
-                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                        setPurpleWordIndices(newIndices);
-                                                                                    }}
-                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
-                                                                                >
-                                                                                    {word}
-                                                                                </span>
-                                                                            ))}
+                                                        {/* 3. Text Manipulation Proxy Layer - STRICT: Render if content exists. */}
+                                                        {(() => {
+                                                            const shouldRender = overlayTag && overlayTag.trim().length > 0;
+                                                            console.log('[Editor] Render Text Layer?', shouldRender, 'Content:', overlayTag);
+                                                            return shouldRender;
+                                                        })() && (
+                                                                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                                                                    <div
+                                                                        className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
+                                                                        onPointerDown={(e) => handleImagePointerDown(e, 'text')}
+                                                                        style={{
+                                                                            // STRICT WYSIWYG TRANSFORM:
+                                                                            // Origin is top-left (0,0). We translate to absolute X/Y.
+                                                                            // Center the text block horizontally (-50% X).
+                                                                            // Y position is the top of the text block.
+                                                                            left: 0,
+                                                                            top: 0,
+                                                                            transformOrigin: 'top center',
+                                                                            transform: textPosition
+                                                                                ? `translate(${(textPosition.x * containerScale)}px, ${(textPosition.y * containerScale)}px) translate(-50%, 0) scale(${textScale * containerScale})`
+                                                                                : `translate(${WIDTH / 2 * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) translate(-50%, 0) scale(${textScale * containerScale})`, // Default position fallback
+                                                                            transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
+                                                                        }}
+                                                                    >
+                                                                        <div className="text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+                                                                            <div
+                                                                                className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2"
+                                                                                // STRICT WYSIWYG STYLING: Matching backend constants exactly
+                                                                                style={{
+                                                                                    fontFamily: 'Outfit, var(--font-outfit), sans-serif',
+                                                                                    fontSize: '135px',
+                                                                                    lineHeight: '0.92',
+                                                                                    width: '972px', // 90% of 1080px available width (from backend)
+                                                                                }}
+                                                                            >
+                                                                                {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                    <span
+                                                                                        key={idx}
+                                                                                        onPointerDown={(e) => {
+                                                                                            if (isTextLocked) e.stopPropagation();
+                                                                                        }}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            e.preventDefault();
+                                                                                            const newIndices = purpleWordIndices.includes(idx)
+                                                                                                ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                            setPurpleWordIndices(newIndices);
+                                                                                        }}
+                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
+                                                                                    >
+                                                                                        {word}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
                                                                         </div>
+                                                                        {!isTextLocked && !isDragging && (
+                                                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
+                                                                                Drag to Place
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    {!isTextLocked && !isDragging && (
-                                                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
-                                                                            Drag to Place
-                                                                        </div>
-                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            )}
 
                                                         {/* 4. Watermark Layer */}
                                                         {isApplyWatermark && (
