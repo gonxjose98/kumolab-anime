@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            processedImage // Base64 string
+            processedImage: processedImage.processedImage,
+            layout: processedImage.layout
         });
     } catch (error: any) {
         console.error('Error generating preview:', error);

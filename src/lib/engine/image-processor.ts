@@ -16,6 +16,17 @@ const HANDLE_TEXT = '@KumoLabAnime';
 // Image-only imports
 // (GlobalFonts imported dynamically)
 
+export interface LayoutMetadata {
+    fontSize: number;
+    lineHeight: number;
+    y: number;
+    lines: string[];
+    finalScale: number;
+    zone: 'HEADER' | 'FOOTER';
+    numLines: number;
+    totalHeight: number;
+}
+
 interface IntelImageOptions {
     sourceUrl: string;
     animeTitle: string;
@@ -32,6 +43,11 @@ interface IntelImageOptions {
     applyWatermark?: boolean;
     watermarkPosition?: { x: number; y: number };
     disableAutoScaling?: boolean;
+}
+
+export interface ImageProcessingResult {
+    processedImage: string;
+    layout: LayoutMetadata;
 }
 
 /**
@@ -88,7 +104,7 @@ export async function generateIntelImage({
     applyWatermark = true,
     watermarkPosition,
     disableAutoScaling = false,
-}: IntelImageOptions & { skipUpload?: boolean }): Promise<string | null> {
+}: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
     if (!fs.existsSync(outputDir)) {
@@ -286,24 +302,57 @@ export async function generateIntelImage({
             }
 
             const zoneHeight = 405; // 30% of 1350
-            const finalFontSize = Math.max(40, globalFontSize * textScale);
-            const lineSpacing = finalFontSize * 0.92;
-            const totalH = (headlineLines.length + titleLines.length) * lineSpacing;
-            const numLines = headlineLines.length + titleLines.length;
+            const lineSpacingFactor = 0.92;
+
+            // MIN READABLE SCALE Floor
+            const requestedScale = Math.max(0.1, textScale);
+            let finalFontSize = 135 * requestedScale;
+            let currentLineSpacing = finalFontSize * lineSpacingFactor;
+
+            // Generate lines one time to establish base block
+            ctx.font = `900 ${finalFontSize}px "Outfit"`;
+            const currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 10, finalFontSize) : [];
+            const currentHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
+            const allLines = [...currentTitleLines, ...currentHeadlineLines];
+            const numLines = allLines.length;
+
+            let totalH = numLines * currentLineSpacing;
+
+            // 30% HEIGHT ENFORCEMENT LOOP
+            // If the block is too tall, we shrink the fontSize until it fits 405px.
+            if (numLines > 0 && totalH > zoneHeight && !disableAutoScaling) {
+                while (totalH > zoneHeight && finalFontSize > 15) {
+                    finalFontSize -= 2;
+                    currentLineSpacing = finalFontSize * lineSpacingFactor;
+                    totalH = numLines * currentLineSpacing;
+                }
+            }
 
             const defaultY = isTop ? 50 : 1300;
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
             const startY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : defaultY;
 
-            // BASELINE-ANCHORED UNIDIRECTIONAL GROWTH
-            // Header: startY is the TOP edge. First line's baseline is startY + ascent.
-            // Footer: startY is the BOTTOM edge. Last line's baseline is startY.
+            // Compute actual currentY for the render loop
             let currentY = isTop
                 ? startY + (finalFontSize * 0.85)
-                : startY - (numLines > 1 ? (numLines - 1) * lineSpacing : 0);
-            const allLines = [...titleLines, ...headlineLines];
-            let wordCursor = 0;
+                : startY - (numLines > 1 ? (numLines - 1) * currentLineSpacing : 0);
 
+            // Construct Metadata for frontend
+            const layout: LayoutMetadata = {
+                fontSize: finalFontSize,
+                lineHeight: currentLineSpacing,
+                y: startY,
+                lines: allLines,
+                finalScale: finalFontSize / 135,
+                zone: isTop ? 'HEADER' : 'FOOTER',
+                numLines,
+                totalHeight: totalH
+            };
+
+            // ATTACH TO SCOPE FOR RETURN
+            (ctx as any)._layoutMetadata = layout;
+
+            let wordCursor = 0;
             console.log(`[Image Engine] Drawing ${allLines.length} lines of text at startY=${startY}`);
 
             for (const line of allLines) {
@@ -364,8 +413,13 @@ export async function generateIntelImage({
         }
 
         const finalBuffer = await canvas.toBuffer('image/png');
+        const processedImageBase64 = `data:image/png;base64,${finalBuffer.toString('base64')}`;
+
         if (skipUpload) {
-            return `data:image/png;base64,${finalBuffer.toString('base64')}`;
+            return {
+                processedImage: processedImageBase64,
+                layout: (ctx as any)._layoutMetadata // We'll attach it to the context temporarily or just pass it through
+            };
         }
 
         // Upload Logic (omitted for brevity in this replace, assuming only used for Preview here mostly)
@@ -387,7 +441,19 @@ export async function generateIntelImage({
             .from(bucketName)
             .getPublicUrl(`${outputFileName}`);
 
-        return publicUrl;
+        return {
+            processedImage: publicUrl,
+            layout: (ctx as any)._layoutMetadata || {
+                fontSize: 135,
+                lineHeight: 124,
+                y: 1300,
+                lines: [],
+                finalScale: 1,
+                zone: 'FOOTER',
+                numLines: 0,
+                totalHeight: 0
+            }
+        };
 
     } catch (e: any) {
         console.log("!!! IMAGE ENGINE FATAL ERROR !!!");

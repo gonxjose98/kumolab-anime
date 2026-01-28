@@ -14,6 +14,17 @@ interface PostManagerProps {
 const WIDTH = 1080;
 const HEIGHT = 1350;
 
+export interface LayoutMetadata {
+    fontSize: number;
+    lineHeight: number;
+    y: number;
+    lines: string[];
+    finalScale: number;
+    zone: 'HEADER' | 'FOOTER';
+    numLines: number;
+    totalHeight: number;
+}
+
 export default function PostManager({ initialPosts }: PostManagerProps) {
     // Normalize posts to ensure isPublished and social stats are present
     const normalizedPosts = initialPosts.map(p => ({
@@ -89,42 +100,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     }, []);
 
-    // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (405px RULE) ---
-    // This runs BEFORE paint to ensure the user NEVER sees an invalid layout.
-    useLayoutEffect(() => {
-        const node = textContainerRef.current;
-        if (!node || !overlayTag || overlayTag.trim().length === 0) return;
-
-        try {
-            const rect = node.getBoundingClientRect();
-            // Critical guard: protect against 0/unstable states
-            const safeTextScale = Math.max(0.01, textScale);
-            const safeContainerScale = Math.max(0.01, containerScale);
-
-            if (rect.height <= 0) return;
-
-            // Normalize measured height to 1080p native space
-            const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
-            if (!Number.isFinite(nativeHeight) || nativeHeight <= 1) return;
-
-            const maxAllowedHeight = 405; // 30% of 1350
-            const currentScaledHeight = nativeHeight * textScale;
-
-            // CORRECTIVE AUTO-SCALE: Shrink only if violating the 405px contract
-            if (currentScaledHeight > maxAllowedHeight + 1.0) {
-                const targetScale = maxAllowedHeight / nativeHeight;
-                // Never scale below 0.1 (10%) to ensure text stays visible
-                const cappedTarget = Math.max(0.1, targetScale);
-
-                if (Number.isFinite(cappedTarget) && cappedTarget < textScale - 0.001) {
-                    setTextScale(cappedTarget);
-                    setIsStageDirty(true);
-                }
-            }
-        } catch (e) {
-            console.warn('[Editor] Scaling guard suppressed error:', e);
-        }
-    }, [overlayTag, textScale, containerScale]);
+    const [layoutMetadata, setLayoutMetadata] = useState<LayoutMetadata | null>(null);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
@@ -410,6 +386,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const data = await res.json();
             if (data.success) {
                 setProcessedImage(data.processedImage);
+                if (data.layout) {
+                    setLayoutMetadata(data.layout);
+                    // SYNC FRONTEND SCALE WITH BACKEND APPROVAL
+                    setTextScale(data.layout.finalScale);
+                }
                 setEditorMode('PROCESSED'); // TRANSITION TO PROCESSED MODE
                 setIsStageDirty(false);
                 return data.processedImage;
@@ -507,28 +488,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
-            // Manual scale check: calculate max scale for current content
-            let maxScaleForContent = 100.0;
-            if (textContainerRef.current) {
-                const rect = textContainerRef.current.getBoundingClientRect();
-                const safeTextScale = Math.max(0.0001, textScale);
-                const safeContainerScale = Math.max(0.0001, containerScale);
-
-                if (rect.height > 0 && safeContainerScale > 0) {
-                    const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
-                    if (Number.isFinite(nativeHeight) && nativeHeight > 0) {
-                        maxScaleForContent = 405 / nativeHeight;
-                    }
-                }
-            }
-
-            const newScale = Math.max(0.1, Math.min(maxScaleForContent, textScale + delta));
-
-            // Reversible check: only block scale-up if we are at the limit
-            if (delta > 0 && textScale >= maxScaleForContent - 0.001) {
-                return;
-            }
-
+            const newScale = Math.max(0.1, textScale + delta);
             setTextScale(newScale);
             setIsStageDirty(true);
 
@@ -550,6 +510,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
+        setLayoutMetadata(null);
         setIsApplyWatermark(true);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
@@ -1768,44 +1729,72 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     style={{
                                                                         left: 0,
                                                                         top: 0,
-                                                                        transformOrigin: gradientPosition === 'top' ? 'top center' : 'bottom center',
-                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, ${gradientPosition === 'top' ? '0' : '-100%'})`,
+                                                                        transformOrigin: (layoutMetadata?.zone || gradientPosition) === 'top' ? 'top center' : 'bottom center',
+                                                                        transform: `translate(${textPosition.x * containerScale}px, ${(layoutMetadata?.y ?? textPosition.y) * containerScale}px) scale(${containerScale}) translate(-50%, ${(layoutMetadata?.zone || gradientPosition) === 'top' ? '0' : '-100%'})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2 break-words whitespace-pre-wrap"
-                                                                            // RE-ENGINEERED CENTERING: 1080px width with explicit gutters matching backend (90% width)
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                fontSize: '135px',
-                                                                                lineHeight: '0.92',
-                                                                                width: '1080px',
-                                                                                padding: '0 54px',
+                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * containerScale}px` : `${135 * textScale * containerScale}px`,
+                                                                                lineHeight: layoutMetadata?.lineHeight ? `${layoutMetadata.lineHeight * containerScale}px` : '0.92',
+                                                                                width: `${1080 * containerScale}px`,
+                                                                                padding: `0 ${54 * containerScale}px`,
                                                                                 textAlign: 'center'
                                                                             }}
                                                                         >
-                                                                            {`${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                <span
-                                                                                    key={idx}
-                                                                                    onPointerDown={(e) => {
-                                                                                        if (isTextLocked) e.stopPropagation();
-                                                                                    }}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        e.preventDefault();
-                                                                                        const newIndices = purpleWordIndices.includes(idx)
-                                                                                            ? purpleWordIndices.filter(i => i !== idx)
-                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                        setPurpleWordIndices(newIndices);
-                                                                                    }}
-                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
-                                                                                >
-                                                                                    {word}
-                                                                                </span>
-                                                                            ))}
+                                                                            {layoutMetadata?.lines ? (
+                                                                                layoutMetadata.lines.map((line, lIdx) => (
+                                                                                    <div key={lIdx} className="w-full flex justify-center gap-x-[0.2em]">
+                                                                                        {line.split(/\s+/).filter(Boolean).map((word, wIdx) => {
+                                                                                            // Calculate global word index
+                                                                                            const wordsBeforeCount = layoutMetadata.lines.slice(0, lIdx).join(' ').split(/\s+/).filter(Boolean).length;
+                                                                                            const globalIdx = wordsBeforeCount + wIdx;
+                                                                                            return (
+                                                                                                <span
+                                                                                                    key={wIdx}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        const newIndices = purpleWordIndices.includes(globalIdx)
+                                                                                                            ? purpleWordIndices.filter(i => i !== globalIdx)
+                                                                                                            : [...purpleWordIndices, globalIdx].sort((a, b) => a - b);
+                                                                                                        setPurpleWordIndices(newIndices);
+                                                                                                        setIsStageDirty(true);
+                                                                                                        handleApplyText(undefined, undefined, undefined, undefined, newIndices);
+                                                                                                    }}
+                                                                                                    className={`${purpleWordIndices.includes(globalIdx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                                >
+                                                                                                    {word}
+                                                                                                </span>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                ))
+                                                                            ) : (
+                                                                                `${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                    <span
+                                                                                        key={idx}
+                                                                                        onPointerDown={(e) => {
+                                                                                            if (isTextLocked) e.stopPropagation();
+                                                                                        }}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            e.preventDefault();
+                                                                                            const newIndices = purpleWordIndices.includes(idx)
+                                                                                                ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                            setPurpleWordIndices(newIndices);
+                                                                                        }}
+                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
+                                                                                    >
+                                                                                        {word}
+                                                                                    </span>
+                                                                                ))
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2329,7 +2318,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.1.5 (UI Re-Engineered)</span>
+                <span>KumoLab Admin OS v2.2.1 (Deterministic Backend Authority)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>
