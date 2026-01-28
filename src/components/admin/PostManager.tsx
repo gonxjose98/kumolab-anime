@@ -60,6 +60,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
     const [purpleCursorIndex, setPurpleCursorIndex] = useState(0);
+    const textContainerRef = useRef<HTMLDivElement>(null);
 
     // Watermark State
     const [isApplyWatermark, setIsApplyWatermark] = useState(true);
@@ -466,8 +467,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
-            // Strictly enforce 30% rule (max scale 3.0)
-            const newScale = Math.max(0.1, Math.min(3, textScale + delta));
+            // Strictly enforce 30% rule (limit total height to ~405px on a 1350px canvas)
+            let maxScale = 3.0; // Hard cap
+            if (textContainerRef.current) {
+                // The ref is on the inner div with 972px width and 135px font.
+                // Its offsetHeight is the native 1080p-space height.
+                const nativeHeight = textContainerRef.current.offsetHeight;
+                if (nativeHeight > 0) {
+                    // Rule: nativeHeight * textScale <= (HEIGHT * 0.3)
+                    maxScale = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
+                }
+            }
+
+            const newScale = Math.max(0.1, Math.min(maxScale, textScale + delta));
             setTextScale(newScale);
             setIsStageDirty(true);
 
@@ -1707,11 +1719,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
                                                                         // STRICT WYSIWYG TRANSFORM:
-                                                                        // X/Y are in 1080p pixels. We map them to screen.
-                                                                        // Formula: ScreenPixelMove(X*s, Y*s) -> Scale(s) -> Scale(textScale) -> Center(-50%)
+                                                                        // Origin is top-left. We translate to the target center (X), 
+                                                                        // then shift back by half of the scaled width (-50%) to achieve perfect centering.
                                                                         left: 0,
                                                                         top: 0,
-                                                                        transformOrigin: 'top center',
+                                                                        transformOrigin: 'top left',
                                                                         transform: textPosition
                                                                             ? `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`
                                                                             : `translate(${(WIDTH / 2) * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) scale(${containerScale}) scale(${textScale}) translate(-50%, 0)`,
@@ -1720,6 +1732,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 >
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
+                                                                            ref={textContainerRef}
                                                                             className="text-white font-[900] uppercase tracking-tighter flex flex-wrap justify-center gap-x-2 break-words whitespace-pre-wrap"
                                                                             // STRICT WYSIWYG STYLING: Matching backend constants exactly
                                                                             style={{
@@ -1750,12 +1763,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             ))}
                                                                         </div>
                                                                     </div>
-                                                                    {!isTextLocked && !isDragging && (
-                                                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
-                                                                            Drag to Place
-                                                                        </div>
-                                                                    )}
                                                                 </div>
+                                                                {!isTextLocked && !isDragging && (
+                                                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
+                                                                        Drag to Place
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -2094,10 +2107,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         />
                                     </div>
                                 </div>
-                            </div>
+                            </div >
 
                             {/* Main Generation Action */}
-                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                            < div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]" >
                                 <button
                                     onClick={() => handleSavePost(editingPostId ? true : false)}
                                     disabled={isGenerating || isApplyingEffect}
@@ -2106,159 +2119,163 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
                                     {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
                                 </button>
-                            </div>
+                            </div >
 
                             {/* PREVIEW POST CARD (Result) */}
-                            {previewPost && (
-                                <div className="p-5 border-t border-white/10 bg-black/40 animate-in fade-in slide-in-from-bottom-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-[10px] font-black text-green-400 uppercase tracking-widest">
-                                            {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
-                                        </h4>
-                                        <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
-                                    </div>
-
-                                    <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
-                                        <div className="md:w-[40%] aspect-[4/5] bg-neutral-900 relative border-b md:border-b-0 md:border-r border-white/10">
-                                            {previewPost.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={previewPost.image} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-neutral-700">NO VISUAL</div>
-                                            )}
+                            {
+                                previewPost && (
+                                    <div className="p-5 border-t border-white/10 bg-black/40 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-[10px] font-black text-green-400 uppercase tracking-widest">
+                                                {genType === 'CONFIRMATION_ALERT' ? 'LIVE BROADCAST SIGNAL' : 'Simulation Result'}
+                                            </h4>
+                                            <span className="text-[10px] bg-white/10 text-white px-2 py-1 rounded font-mono">DRAFT_ID: {previewPost.id?.split('-')[1] || 'NEW'}</span>
                                         </div>
-                                        <div className="p-6 md:w-[60%] flex flex-col">
-                                            <div className="mb-auto">
-                                                <h3 className="text-xl font-bold text-white mb-3 leading-tight">{previewPost.title}</h3>
-                                                <p className="text-sm text-neutral-400 leading-relaxed line-clamp-4">{previewPost.content}</p>
+
+                                        <div className="bg-black/80 border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
+                                            <div className="md:w-[40%] aspect-[4/5] bg-neutral-900 relative border-b md:border-b-0 md:border-r border-white/10">
+                                                {previewPost.image ? (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img src={previewPost.image} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="absolute inset-0 flex items-center justify-center text-neutral-700">NO VISUAL</div>
+                                                )}
                                             </div>
-                                            <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 text-[10px] font-mono text-neutral-500 uppercase">
-                                                <div>
-                                                    <span className="block text-neutral-700">Type</span>
-                                                    {previewPost.type}
+                                            <div className="p-6 md:w-[60%] flex flex-col">
+                                                <div className="mb-auto">
+                                                    <h3 className="text-xl font-bold text-white mb-3 leading-tight">{previewPost.title}</h3>
+                                                    <p className="text-sm text-neutral-400 leading-relaxed line-clamp-4">{previewPost.content}</p>
                                                 </div>
-                                                <div>
-                                                    <span className="block text-neutral-700">Timestamp</span>
-                                                    {new Date(previewPost.timestamp).toLocaleTimeString()}
+                                                <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-4 text-[10px] font-mono text-neutral-500 uppercase">
+                                                    <div>
+                                                        <span className="block text-neutral-700">Type</span>
+                                                        {previewPost.type}
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-neutral-700">Timestamp</span>
+                                                        {new Date(previewPost.timestamp).toLocaleTimeString()}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <div className="mt-6 flex justify-end gap-3">
+                                            <button
+                                                onClick={handleCancel}
+                                                className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
+                                            >
+                                                Discard
+                                            </button>
+                                            <button
+                                                onClick={handleConfirm}
+                                                className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
+                                            >
+                                                {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
+                                            </button>
+                                        </div>
+
+
                                     </div>
-
-                                    <div className="mt-6 flex justify-end gap-3">
-                                        <button
-                                            onClick={handleCancel}
-                                            className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
-                                        >
-                                            Discard
-                                        </button>
-                                        <button
-                                            onClick={handleConfirm}
-                                            className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
-                                        >
-                                            {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
-                                        </button>
-                                    </div>
-
-
-                                </div>
-                            )}
+                                )
+                            }
 
 
                             {/* SCHEDULER LOGS MODAL */}
-                            {showLogsModal && (
-                                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                                    <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                                        {/* Header */}
-                                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                                    <Terminal size={20} className="text-blue-400" />
+                            {
+                                showLogsModal && (
+                                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                                            {/* Header */}
+                                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                                        <Terminal size={20} className="text-blue-400" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
+                                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                                    <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                                </div>
+                                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
+                                                    <XCircle size={24} />
+                                                </button>
                                             </div>
-                                            <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                                <XCircle size={24} />
-                                            </button>
-                                        </div>
 
-                                        {/* Logs Content */}
-                                        <div className="flex-1 overflow-auto p-0 md:p-6">
-                                            {isLoadingLogs ? (
-                                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                                    <Loader2 size={32} className="animate-spin text-blue-500" />
-                                                    <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                                </div>
-                                            ) : schedulerLogs.length === 0 ? (
-                                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                                    <Terminal size={32} className="opacity-20" />
-                                                    <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
-                                                </div>
-                                            ) : (
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                                        <tr>
-                                                            <th className="p-4 border-b border-white/5">Time</th>
-                                                            <th className="p-4 border-b border-white/5">Slot</th>
-                                                            <th className="p-4 border-b border-white/5">Status</th>
-                                                            <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                            <th className="p-4 border-b border-white/5 text-right">Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                                        {schedulerLogs.map((log: any) => (
-                                                            <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                                <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                                    {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                                </td>
-                                                                <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                                <td className="p-4">
-                                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                                        log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                                        }`}>
-                                                                        {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                                        {log.status}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="p-4 text-neutral-300">
-                                                                    {log.message}
-                                                                    {log.details && (
-                                                                        <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                            {log.details}
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-4 text-right">
-                                                                    {log.status !== 'success' && (
-                                                                        <button
-                                                                            onClick={() => handleRegenerateSlot(log.slot)}
-                                                                            disabled={isRegenerating === log.slot}
-                                                                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                                        >
-                                                                            {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                            Regenerate
-                                                                        </button>
-                                                                    )}
-                                                                </td>
+                                            {/* Logs Content */}
+                                            <div className="flex-1 overflow-auto p-0 md:p-6">
+                                                {isLoadingLogs ? (
+                                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                                        <Loader2 size={32} className="animate-spin text-blue-500" />
+                                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
+                                                    </div>
+                                                ) : schedulerLogs.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                                        <Terminal size={32} className="opacity-20" />
+                                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                                                    </div>
+                                                ) : (
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
+                                                            <tr>
+                                                                <th className="p-4 border-b border-white/5">Time</th>
+                                                                <th className="p-4 border-b border-white/5">Slot</th>
+                                                                <th className="p-4 border-b border-white/5">Status</th>
+                                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
+                                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            )}
-                                        </div>
-                                        <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                            <span>Logs persist for 7 days</span>
-                                            <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                                <RotateCcw size={12} /> Refresh
-                                            </button>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
+                                                            {schedulerLogs.map((log: any) => (
+                                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
+                                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                                    </td>
+                                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
+                                                                    <td className="p-4">
+                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                                            }`}>
+                                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
+                                                                            {log.status}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-4 text-neutral-300">
+                                                                        {log.message}
+                                                                        {log.details && (
+                                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
+                                                                                {log.details}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-4 text-right">
+                                                                        {log.status !== 'success' && (
+                                                                            <button
+                                                                                onClick={() => handleRegenerateSlot(log.slot)}
+                                                                                disabled={isRegenerating === log.slot}
+                                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
+                                                                            >
+                                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                                                                                Regenerate
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
+                                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                                                <span>Logs persist for 7 days</span>
+                                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
+                                                    <RotateCcw size={12} /> Refresh
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )
+                            }
 
                             <div className="pt-8 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
                                 <span>KumoLab Admin OS v2.1.0 (UI Re-Engineered)</span>
@@ -2266,8 +2283,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             </div>
 
 
-                        </div>
-                    </div>
+                        </div >
+                    </div >
                 )
             }
         </div >
