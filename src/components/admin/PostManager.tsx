@@ -33,7 +33,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
-    const [overlayTag, setOverlayTag] = useState('NEWS');
+    const [overlayTag, setOverlayTag] = useState('');
     const [customImage, setCustomImage] = useState<File | null>(null);
     const [customImagePreview, setCustomImagePreview] = useState<string>('');
     const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
@@ -67,7 +67,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isWatermarkLocked, setIsWatermarkLocked] = useState(false);
 
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
-    const [isAutoSnap, setIsAutoSnap] = useState(true);
+    const [isAutoSnap, setIsAutoSnap] = useState(false);
     const [containerScale, setContainerScale] = useState(1);
     const imagePreviewRef = useRef<HTMLDivElement>(null);
 
@@ -420,7 +420,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         } else if (dragTarget === 'text') {
             setTextPosition(prev => {
                 // Initialize default if null, based on gradient position logic
-                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? (HEIGHT * 0.1) : (HEIGHT - (HEIGHT * 0.15)) };
+                const base = prev || { x: WIDTH / 2, y: gradientPosition === 'top' ? 150 : HEIGHT - 300 };
                 return {
                     x: base.x + deltaX,
                     y: base.y + deltaY
@@ -1696,18 +1696,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         )}
 
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
+                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {isApplyText && editorMode === 'RAW' && (
-                                                            <div className={`absolute inset-0 flex pointer-events-none ${gradientPosition === 'top' ? 'items-start' : 'items-end'} justify-center p-8`}>
+                                                            <div className="absolute inset-0 pointer-events-none overflow-hidden">
                                                                 <div
-                                                                    className={`pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
+                                                                    className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
                                                                         // STRICT WYSIWYG TRANSFORM:
-                                                                        // We render at 1080p scale (135px font) then scale down to stage size using containerScale.
-                                                                        // AND we apply the user's textScale.
+                                                                        // Origin is top-left (0,0). We translate to absolute X/Y.
+                                                                        // Center the text block horizontally (-50% X).
+                                                                        // Y position is the top of the text block.
+                                                                        left: 0,
+                                                                        top: 0,
+                                                                        transformOrigin: 'top center',
                                                                         transform: textPosition
-                                                                            ? `translate(${(textPosition.x - (WIDTH / 2)) * containerScale}px, ${(textPosition.y - (HEIGHT * (gradientPosition === 'top' ? 0.1 : 0.85))) * containerScale}px) scale(${textScale * containerScale})`
-                                                                            : `scale(${textScale * containerScale})`,
+                                                                            ? `translate(${(textPosition.x * containerScale)}px, ${(textPosition.y * containerScale)}px) translate(-50%, 0) scale(${textScale * containerScale})`
+                                                                            : `translate(${WIDTH / 2 * containerScale}px, ${(gradientPosition === 'top' ? 150 : HEIGHT - 300) * containerScale}px) translate(-50%, 0) scale(${textScale * containerScale})`, // Default position fallback
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
