@@ -499,10 +499,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (type === 'text') {
             const newVal = !isApplyText;
             setIsApplyText(newVal);
-            // Only trigger backend if we are already in PROCESSED mode (to update the result)
-            if (editorMode === 'PROCESSED') {
-                handleApplyText(undefined, undefined, newVal, undefined);
-            }
+            // In strict mode, we do NOT trigger backend. We rely on content length mostly, 
+            // but if we keep this toggle for UI, it should just be local.
         } else {
             const newVal = !isApplyGradient;
             setIsApplyGradient(newVal);
