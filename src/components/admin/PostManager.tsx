@@ -55,7 +55,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
-    const [textPosition, setTextPosition] = useState<{ x: number, y: number } | null>(null);
+    const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: HEIGHT - 350 });
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
@@ -92,7 +92,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (30% RULE) ---
     // This runs BEFORE paint to ensure the user NEVER sees an invalid layout.
     useLayoutEffect(() => {
-        if (!textContainerRef.current || !overlayTag) return;
+        if (!textContainerRef.current || !overlayTag || overlayTag.trim().length === 0) return;
 
         // Measure native height at scale 1.0 (internal size of the 972px container)
         const nativeHeight = textContainerRef.current.offsetHeight;
@@ -102,9 +102,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const currentScaledHeight = nativeHeight * textScale;
 
         // If current state violates the 30% limit, pull it down instantly
+        // Buffer of 0.5 for floating point stability
         if (currentScaledHeight > maxAllowedHeight + 0.5) {
             const targetScale = maxAllowedHeight / nativeHeight;
-            console.log(`[Editor] Synchronous Scale Clamp: ${textScale} -> ${targetScale}`);
+            console.log(`[Editor] 30% Rule Invariant: Clamping scale ${textScale} -> ${targetScale}`);
             setTextScale(targetScale);
             setIsStageDirty(true);
         }
@@ -198,7 +199,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition(null);
+        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -239,7 +240,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition(null);
+        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -381,10 +382,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     position: manualPos ?? imagePosition,
                     applyText: payload.applyText,
                     applyGradient: forcedApplyGradient ?? isApplyGradient,
-                    textPos: textPosition,
+                    textPos: textPosition, // Now always non-null
                     textScale: manualTextScale ?? textScale,
                     gradientPos: manualGradientPos ?? gradientPosition,
-
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
                     applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
                     watermarkPosition,
@@ -444,11 +444,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // STRICT SEPARATION: Image drag NEVER moves text
         } else if (dragTarget === 'text') {
             setTextPosition(prev => {
-                // Initialize default if null. Anchor to footer zone (bottom 30% = Y > 945)
-                const base = prev || { x: WIDTH / 2, y: HEIGHT - 350 };
-
-                let nextX = base.x + deltaX;
-                let nextY = base.y + deltaY;
+                let nextX = prev.x + deltaX;
+                let nextY = prev.y + deltaY;
 
                 // AUTHORITATIVE CLAMPING: Prevent text leaving the footer zone or stage
                 const zoneStart = HEIGHT * 0.7; // 945
@@ -527,7 +524,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition(null);
+        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -1750,9 +1747,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         left: 0,
                                                                         top: 0,
                                                                         transformOrigin: 'top left',
-                                                                        transform: textPosition
-                                                                            ? `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`
-                                                                            : `translate(${(WIDTH / 2) * containerScale}px, ${(HEIGHT - 350) * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`,
+                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, 0)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
