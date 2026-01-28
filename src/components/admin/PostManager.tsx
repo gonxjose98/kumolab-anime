@@ -94,22 +94,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     useLayoutEffect(() => {
         if (!textContainerRef.current || !overlayTag || overlayTag.trim().length === 0) return;
 
-        // Measure native height at scale 1.0 (internal size of the 972px container)
-        const nativeHeight = textContainerRef.current.offsetHeight;
-        if (nativeHeight <= 0) return;
+        // NATIVE COORDINATE NORMALIZATION:
+        // getBoundingClientRect returns screen pixels. We divide by (containerScale * textScale)
+        // to find exactly what the content height IS in the 1080p native coordinate system.
+        const rect = textContainerRef.current.getBoundingClientRect();
+        if (rect.height <= 0 || containerScale === 0 || textScale === 0) return;
 
+        const nativeHeight = rect.height / (containerScale * textScale);
         const maxAllowedHeight = HEIGHT * 0.3; // 405px
         const currentScaledHeight = nativeHeight * textScale;
 
         // If current state violates the 30% limit, pull it down instantly
-        // Buffer of 0.5 for floating point stability
+        // Buffer of 0.5 for stability
         if (currentScaledHeight > maxAllowedHeight + 0.5) {
             const targetScale = maxAllowedHeight / nativeHeight;
-            console.log(`[Editor] 30% Rule Invariant: Clamping scale ${textScale} -> ${targetScale}`);
+            console.log(`[Editor] Authoritative Clamp: ${textScale} -> ${targetScale} (Native Height: ${Math.round(nativeHeight)}px)`);
             setTextScale(targetScale);
             setIsStageDirty(true);
         }
-    }, [overlayTag, textScale]);
+    }, [overlayTag, textScale, containerScale]);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
@@ -199,7 +202,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
+        setTextPosition({ x: WIDTH / 2, y: 950 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -240,7 +243,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
+        setTextPosition({ x: WIDTH / 2, y: 950 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -485,7 +488,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const handleZoom = (delta: number, target: 'image' | 'text' = 'image') => {
         if (target === 'image') {
-            if (editorMode === 'PROCESSED') return; // Image locked in processed mode
+            if (editorMode === 'PROCESSED') return;
             const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
             setImageScale(newScale);
             setIsStageDirty(true);
@@ -493,8 +496,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // Manual scale check: calculate max scale for current content
             let maxScaleForContent = 3.0;
             if (textContainerRef.current) {
-                const nativeHeight = textContainerRef.current.offsetHeight;
-                if (nativeHeight > 0) {
+                const rect = textContainerRef.current.getBoundingClientRect();
+                if (rect.height > 0 && containerScale > 0 && textScale > 0) {
+                    const nativeHeight = rect.height / (containerScale * textScale);
                     maxScaleForContent = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
                 }
             }
@@ -503,7 +507,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             // Reversible check: only block scale-up if we are at the limit
             if (delta > 0 && textScale >= maxScaleForContent - 0.01) {
-                // Already at limit
                 return;
             }
 
@@ -524,7 +527,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: HEIGHT - 350 });
+        setTextPosition({ x: WIDTH / 2, y: 950 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
