@@ -89,6 +89,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     }, []);
 
+    // --- AUTHORITATIVE AUTO-SCALING (30% RULE ENFORCEMENT) ---
+    useEffect(() => {
+        if (!textContainerRef.current || !overlayTag) return;
+
+        // Measure the native height (at scale 1.0) of the current text content
+        const nativeHeight = textContainerRef.current.offsetHeight;
+        if (nativeHeight <= 0) return;
+
+        const maxAllowedHeight = HEIGHT * 0.3; // 405px
+        const currentScaledHeight = nativeHeight * textScale;
+
+        // If current state violates the rule, immediately and automatically correct it
+        if (currentScaledHeight > maxAllowedHeight + 1) { // +1 for floating point safety
+            const targetScale = maxAllowedHeight / nativeHeight;
+            console.log(`[Editor] Auto-adjusting scale ${textScale} -> ${targetScale} to satisfy 30% rule.`);
+            setTextScale(targetScale);
+            setIsStageDirty(true);
+        }
+    }, [overlayTag, textScale]);
+
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
     const [dragTarget, setDragTarget] = useState<'image' | 'text' | 'watermark' | null>(null);
@@ -1711,8 +1731,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
                                                         {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
-                                                        {/* 3. Text Manipulation Proxy Layer - STRICT: Render if content exists AND toggled ON. */}
-                                                        {overlayTag && overlayTag.trim().length > 0 && isApplyText && (
+                                                        {/* 3. Text Manipulation Proxy Layer - Authoritative: Render if content exists. */}
+                                                        {overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
