@@ -89,7 +89,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     }, []);
 
-    // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (30% RULE) ---
+    // --- AUTHORITATIVE SYNCHRONOUS AUTO-SCALING (405px RULE) ---
     // This runs BEFORE paint to ensure the user NEVER sees an invalid layout.
     useLayoutEffect(() => {
         const node = textContainerRef.current;
@@ -97,7 +97,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         try {
             const rect = node.getBoundingClientRect();
-            // Defensive math: protect against zero/unstable scales
+            // Critical guard: protect against 0/unstable states
             const safeTextScale = Math.max(0.0001, textScale);
             const safeContainerScale = Math.max(0.0001, containerScale);
 
@@ -107,11 +107,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
             if (!Number.isFinite(nativeHeight) || nativeHeight <= 0) return;
 
-            const maxAllowedHeight = HEIGHT * 0.3; // 405px
+            const maxAllowedHeight = 405; // 30% of 1350
             const currentScaledHeight = nativeHeight * textScale;
 
-            // CORRECTIVE AUTO-SCALE: Shrink only if violating the 30% contract
-            if (currentScaledHeight > maxAllowedHeight + 1.0) {
+            // CORRECTIVE AUTO-SCALE: Shrink only if violating the 405px contract
+            if (currentScaledHeight > maxAllowedHeight + 0.5) {
                 const targetScale = maxAllowedHeight / nativeHeight;
                 if (Number.isFinite(targetScale) && targetScale > 0 && targetScale < textScale) {
                     setTextScale(targetScale);
@@ -211,7 +211,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
+        // Default to baseline inside the footer zone
+        setTextPosition({ x: WIDTH / 2, y: 1300 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -252,7 +253,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
+        setTextPosition({ x: WIDTH / 2, y: 1300 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -504,21 +505,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setIsStageDirty(true);
         } else {
             // Manual scale check: calculate max scale for current content
-            let maxScaleForContent = 3.0;
+            let maxScaleForContent = 100.0;
             if (textContainerRef.current) {
                 const rect = textContainerRef.current.getBoundingClientRect();
-                const safeTextScale = Math.max(0.001, textScale);
-                const safeContainerScale = Math.max(0.001, containerScale);
+                const safeTextScale = Math.max(0.0001, textScale);
+                const safeContainerScale = Math.max(0.0001, containerScale);
 
                 if (rect.height > 0 && safeContainerScale > 0) {
                     const nativeHeight = rect.height / (safeContainerScale * safeTextScale);
                     if (Number.isFinite(nativeHeight) && nativeHeight > 0) {
-                        maxScaleForContent = Math.min(3.0, (HEIGHT * 0.3) / nativeHeight);
+                        maxScaleForContent = 405 / nativeHeight;
                     }
                 }
             }
 
-            const newScale = Math.max(0.1, Math.min(maxScaleForContent, textScale + delta));
+            const newScale = Math.max(0.01, Math.min(maxScaleForContent, textScale + delta));
 
             // Reversible check: only block scale-up if we are at the limit
             if (delta > 0 && textScale >= maxScaleForContent - 0.001) {
@@ -542,7 +543,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
+        setTextPosition({ x: WIDTH / 2, y: 1300 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -1764,8 +1765,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     style={{
                                                                         left: 0,
                                                                         top: 0,
-                                                                        transformOrigin: 'top left',
-                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, -50%)`,
+                                                                        transformOrigin: gradientPosition === 'top' ? 'top center' : 'bottom center',
+                                                                        transform: `translate(${textPosition.x * containerScale}px, ${textPosition.y * containerScale}px) scale(${containerScale * textScale}) translate(-50%, ${gradientPosition === 'top' ? '0' : '-100%'})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
@@ -1900,6 +1901,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={() => {
                                                                     setGradientPosition('top');
+                                                                    setTextPosition(prev => ({ ...prev, y: 50 }));
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
                                                                 }}
                                                                 className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
@@ -1909,6 +1911,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={() => {
                                                                     setGradientPosition('bottom');
+                                                                    setTextPosition(prev => ({ ...prev, y: 1300 }));
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
                                                                 }}
                                                                 className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
@@ -2321,7 +2324,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.1.3 (UI Re-Engineered)</span>
+                <span>KumoLab Admin OS v2.1.4 (UI Re-Engineered)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>

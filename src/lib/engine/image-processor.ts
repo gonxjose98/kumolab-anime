@@ -285,24 +285,22 @@ export async function generateIntelImage({
                 console.warn("[Image Engine] Text enabled but no content to draw.");
             }
 
+            const zoneHeight = 405; // 30% of 1350
             const finalFontSize = Math.max(40, globalFontSize * textScale);
-            const totalH = (headlineLines.length + titleLines.length) * (finalFontSize * 0.92);
+            const lineSpacing = finalFontSize * 0.92;
+            const totalH = (headlineLines.length + titleLines.length) * lineSpacing;
+            const numLines = headlineLines.length + titleLines.length;
 
-            const zoneHeight = HEIGHT * 0.25;
-            const bottomSafeMargin = 100;
-            let defaultY = 0;
-
-            if (isTop) {
-                defaultY = 80 + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
-            } else {
-                const zoneStart = HEIGHT - zoneHeight - bottomSafeMargin;
-                defaultY = zoneStart + (zoneHeight - totalH) / 2 + (finalFontSize * 0.85);
-            }
-
+            const defaultY = isTop ? 50 : 1300;
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
             const startY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : defaultY;
 
-            let currentY = startY;
+            // BASELINE-ANCHORED UNIDIRECTIONAL GROWTH
+            // Header: startY is the TOP edge. First line's baseline is startY + ascent.
+            // Footer: startY is the BOTTOM edge. Last line's baseline is startY.
+            let currentY = isTop
+                ? startY + (finalFontSize * 0.85)
+                : startY - (numLines > 1 ? (numLines - 1) * lineSpacing : 0);
             const allLines = [...titleLines, ...headlineLines];
             let wordCursor = 0;
 
