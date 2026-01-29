@@ -65,7 +65,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
-    const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: HEIGHT - 350 });
+    const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: 1147.5 }); // Regional Control Center
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
@@ -477,19 +477,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setIsStageDirty(true);
             // STRICT SEPARATION: Image drag NEVER moves text
         } else if (dragTarget === 'text') {
-            setTextPosition(prev => {
-                let nextX = prev.x + deltaX;
-                let nextY = prev.y + deltaY;
-
-                // AUTHORITATIVE CLAMPING: Prevent text leaving the footer zone or stage
-                const zoneStart = gradientPosition === 'top' ? 0 : HEIGHT * 0.7; // Header: 0, Footer: 945
-                const zoneEnd = gradientPosition === 'top' ? HEIGHT * 0.3 : HEIGHT; // Header: 405, Footer: 1350
-                nextX = Math.max(0, Math.min(WIDTH, nextX));
-                nextY = Math.max(zoneStart, Math.min(zoneEnd, nextY));
-
-                return { x: nextX, y: nextY };
-            });
-            setIsStageDirty(true);
+            // LOCKED: No manual text drift allowed. 
+            // Text position is governed strictly by region-based centering.
         } else if (dragTarget === 'watermark') {
             setWatermarkPosition(prev => {
                 const base = prev || { x: WIDTH / 2, y: HEIGHT - 40 };
@@ -551,6 +540,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(true);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        setTextPosition({ x: WIDTH / 2, y: 1147.5 });
         handleApplyText(1, { x: 0, y: 0 });
     };
 
@@ -1771,8 +1761,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     style={{
                                                                         left: 0,
                                                                         top: 0,
-                                                                        transformOrigin: (layoutMetadata?.zone || gradientPosition) === 'top' ? 'top center' : 'bottom center',
-                                                                        transform: `translate(${textPosition.x * containerScale}px, ${(layoutMetadata?.y ?? textPosition.y) * containerScale}px) scale(${containerScale}) translate(-50%, ${(layoutMetadata?.zone || gradientPosition) === 'top' ? '0' : '-100%'})`,
+                                                                        transformOrigin: 'top center',
+                                                                        // STRICT PARITY: Horizontal center is always WIDTH / 2. Vertical is top of block (layoutMetadata.y or calculated region start).
+                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 - (135 * textScale / 2) : 1147.5 - (135 * textScale / 2))) * containerScale}px) scale(${containerScale}) translate(-50%, 0)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
@@ -1833,7 +1824,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                                 : [...purpleWordIndices, idx].sort((a, b) => a - b);
                                                                                             setPurpleWordIndices(newIndices);
                                                                                         }}
-                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-move'}`}
+                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                                                                                     >
                                                                                         {word}
                                                                                     </span>
@@ -1842,11 +1833,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                                {!isTextLocked && !isDragging && (
-                                                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group/text-hover:opacity-100 transition-opacity bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter shadow-xl">
-                                                                        Drag to Place
-                                                                    </div>
-                                                                )}
+                                                                {/* LOCKED: Manual drag disabled to enforce regional centering */}
                                                             </div>
                                                         )}
 
@@ -1939,7 +1926,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={() => {
                                                                     setGradientPosition('top');
-                                                                    setTextPosition(prev => ({ ...prev, y: 50 }));
+                                                                    setTextPosition(prev => ({ ...prev, y: 202.5 }));
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
                                                                 }}
                                                                 className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
@@ -1949,7 +1936,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={() => {
                                                                     setGradientPosition('bottom');
-                                                                    setTextPosition(prev => ({ ...prev, y: 1210 }));
+                                                                    setTextPosition(prev => ({ ...prev, y: 1147.5 }));
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
                                                                 }}
                                                                 className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}

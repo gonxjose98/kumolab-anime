@@ -331,14 +331,16 @@ export async function generateIntelImage({
                 }
             }
 
-            const defaultY = isTop ? 50 : 1210;
-            const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
-            const startY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : defaultY;
+            // STRICT REGION MATH: Centered in Header (0-405) or Footer (945-1350)
+            const zoneY = isTop ? 202.5 : 1147.5; // Centers for 30% zones
+            const startX = WIDTH / 2; // LOCKED: Horizontal Center
 
-            // Compute actual currentY for the render loop
-            let currentY = isTop
-                ? startY + (finalFontSize * 0.85)
-                : startY - (numLines > 1 ? (numLines - 1) * currentLineSpacing : 0);
+            // Calculate startY such that the block is centered vertically within the zone
+            const blockTop = zoneY - (totalH / 2);
+            const startY = blockTop;
+
+            // Offset for baseline (Outfit font baseline is approx 85% of fontSize)
+            let currentY = startY + (finalFontSize * 0.85);
 
             // Construct Metadata for frontend
             const layout: LayoutMetadata = {
