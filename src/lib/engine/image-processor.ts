@@ -231,6 +231,12 @@ export async function generateIntelImage({
             cleanedHeadline = '';
         }
 
+        // BANNED WORDS GUARD:
+        if (cleanedHeadline.includes('TRENDING')) {
+            console.log(`[Image Engine] Banning "TRENDING" from headline: "${cleanedHeadline}"`);
+            cleanedHeadline = '';
+        }
+
         console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
         let titleLines: string[] = [];
@@ -240,8 +246,9 @@ export async function generateIntelImage({
         // Establish base lines at default size for gradient measurement
         if (applyGradient || applyText) {
             ctx.font = `900 135px "Outfit"`;
-            const baseTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 6, 135) : [];
-            const baseHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 6, 135) : [];
+            // Wrap WITHOUT truncation (high limit) to assess true height
+            const baseTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, 135) : [];
+            const baseHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, 135) : [];
             const allBaseLines = [...baseTitleLines, ...baseHeadlineLines];
             titleLines = baseTitleLines;
             headlineLines = baseHeadlineLines;
@@ -295,24 +302,36 @@ export async function generateIntelImage({
 
             // Generate lines one time to establish base block
             ctx.font = `900 ${finalFontSize}px "Outfit"`;
-            const currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 10, finalFontSize) : [];
+            // Wrap WITHOUT truncation to ensure full title visibility
+            const currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
             const currentHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
-            const allLines = [...currentTitleLines, ...currentHeadlineLines];
-            const numLines = allLines.length;
+            let allLines = [...currentTitleLines, ...currentHeadlineLines];
+            let numLines = allLines.length;
+            let titleLinesCount = currentTitleLines.length;
 
             let totalH = numLines * currentLineSpacing;
 
             // 30% HEIGHT ENFORCEMENT LOOP
-            // If the block is too tall, we shrink the fontSize until it fits 405px.
-            if (numLines > 0 && totalH > zoneHeight && !disableAutoScaling) {
-                while (totalH > zoneHeight && finalFontSize > 15) {
+            // If the block is too tall OR title exceeds 3 lines, we shrink the fontSize.
+            // This forces density up and line count down.
+            if (numLines > 0 && (totalH > zoneHeight || titleLinesCount > 3) && !disableAutoScaling) {
+                while ((totalH > zoneHeight || titleLinesCount > 3) && finalFontSize > 15) {
                     finalFontSize -= 2;
                     currentLineSpacing = finalFontSize * lineSpacingFactor;
+
+                    // Re-measure and re-wrap
+                    ctx.font = `900 ${finalFontSize}px "Outfit"`;
+                    const tLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
+                    const hLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
+
+                    allLines = [...tLines, ...hLines];
+                    numLines = allLines.length;
+                    titleLinesCount = tLines.length;
                     totalH = numLines * currentLineSpacing;
                 }
             }
 
-            const defaultY = isTop ? 50 : 1300;
+            const defaultY = isTop ? 50 : 1210;
             const startX = (textPosition && !isNaN(Number(textPosition.x))) ? Number(textPosition.x) : WIDTH / 2;
             const startY = (textPosition && !isNaN(Number(textPosition.y))) ? Number(textPosition.y) : defaultY;
 

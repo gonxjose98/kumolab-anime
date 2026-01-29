@@ -149,7 +149,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             return;
         }
 
-        if (!overlayTag || overlayTag.trim().length === 0) {
+        const signalText = (overlayTag || '').trim();
+        const effectiveTitle = (title || topic || '').trim();
+
+        if (signalText.length === 0 && effectiveTitle.length === 0) {
             if (layoutMetadata) setLayoutMetadata(null);
             return;
         }
@@ -159,7 +162,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }, 300); // 300ms debounce for typing
 
         return () => clearTimeout(timer);
-    }, [overlayTag, isApplyText]);
+    }, [overlayTag, title, topic, isApplyText]);
 
     const handleRegenerateSlot = async (slot: string) => {
         if (!confirm(`Force regenerate post for slot ${slot}? This will bypass schedule checks.`)) return;
@@ -211,8 +214,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW'); // FORCE RAW
         setIsImageLocked(false);
         setTextScale(1);
-        // Default to baseline inside the footer zone
-        setTextPosition({ x: WIDTH / 2, y: 1300 });
+        // Default to baseline inside the footer zone (Match Engine: 1210)
+        setTextPosition({ x: WIDTH / 2, y: 1210 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -253,7 +256,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1300 });
+        setTextPosition({ x: WIDTH / 2, y: 1210 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -403,7 +406,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
                     applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: true // STRICT MODE: Backend must respect our exact scale/layout
+                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
                 })
             });
             const data = await res.json();
@@ -542,7 +545,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1300 });
+        setTextPosition({ x: WIDTH / 2, y: 1210 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -778,7 +781,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     purpleIndex: purpleWordIndices,
                     applyWatermark: isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: true
+                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
                 })
             });
 
@@ -1776,7 +1779,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
+                                                                            className={`text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300 ${editorMode === 'PROCESSED' ? 'opacity-0' : 'opacity-100'}`}
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
                                                                                 fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * containerScale}px` : `${135 * textScale * containerScale}px`,
@@ -1815,7 +1818,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                     </div>
                                                                                 ))
                                                                             ) : (
-                                                                                `${(overlayTag || '').trim()}`.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                // RAW FALLBACK (Mirror Engine Composition)
+                                                                                `${(title || topic || '')} ${(overlayTag || '')}`.trim().split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                     <span
                                                                                         key={idx}
                                                                                         onPointerDown={(e) => {
@@ -1945,7 +1949,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             <button
                                                                 onClick={() => {
                                                                     setGradientPosition('bottom');
-                                                                    setTextPosition(prev => ({ ...prev, y: 1300 }));
+                                                                    setTextPosition(prev => ({ ...prev, y: 1210 }));
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
                                                                 }}
                                                                 className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}

@@ -177,7 +177,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
-        const processedImageUrl = await generateIntelImage({
+        const result = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: finalDisplayTitle,
             headline: overlayTag, // Use the specific tag mapping for the visual
@@ -186,8 +186,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
             applyText: !shouldDisableOverlay
         });
 
-        if (processedImageUrl) {
-            finalImage = processedImageUrl;
+        if (result && result.processedImage) {
+            finalImage = result.processedImage;
         } else {
             console.warn('Image generation/upload failed. Falling back to raw official source.');
             finalImage = officialSourceImage;
@@ -235,10 +235,13 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     // Trending also follows the strict relevance rule
     // "An anime always has to be chosen. Fallback image should never be used."
 
+    const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
+
     // VISUAL INTELLIGENCE ENGINE (New Strict Logic) for Trending
     // We re-evaluate to ensure we get the absolute best high-res confirmation
+    // We use the CLEANED title to avoid noise in metadata search
     let officialSourceImage = await selectBestImage(
-        trendingItem.imageSearchTerm || trendingItem.title,
+        trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim(),
         trendingItem.trendReason
     );
 
@@ -255,8 +258,6 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         console.warn("Trending post missing image after ALL strategies. Applying universal fallback.");
         officialSourceImage = '/hero-bg-final.png';
     }
-
-    const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
 
     // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
     let finalDisplayTitle = validTitle;
@@ -288,7 +289,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             console.log(`[Generator-Trending] Detected Visual/Trailer (${finalDisplayTitle}). Disabling text overlay.`);
         }
 
-        const processedImageUrl = await generateIntelImage({
+        const result = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: finalDisplayTitle,
             headline: trendingItem.trendReason || '', // Use the trend reason as a tag
@@ -297,8 +298,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             applyText: !shouldDisableOverlay
         });
 
-        if (processedImageUrl) {
-            finalImage = processedImageUrl;
+        if (result && result.processedImage) {
+            finalImage = result.processedImage;
         } else {
             console.warn('Trending image generation failed. Falling back to raw official source.');
             finalImage = officialSourceImage;

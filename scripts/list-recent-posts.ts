@@ -23,9 +23,9 @@ async function listRecentPosts() {
 
     const { data, error } = await supabase
         .from('posts')
-        .select('*')
+        .select('id, title, timestamp')
         .order('timestamp', { ascending: false })
-        .limit(20);
+        .limit(5);
 
     if (error) {
         console.error("Error searching:", error);
@@ -35,9 +35,8 @@ async function listRecentPosts() {
     if (data && data.length > 0) {
         data.forEach(p => {
             console.log(`\nTITLE: ${p.title}`);
-            console.log(`SLUG: ${p.slug}`);
-            console.log(`IMAGE: ${p.image}`);
-            console.log(`VERIFICATION_SOURCES:`, p.verification_sources);
+            console.log(`ID: ${p.id}`);
+            console.log(`DATE: ${p.timestamp}`);
         });
     }
 }
