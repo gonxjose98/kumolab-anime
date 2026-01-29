@@ -323,10 +323,9 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
  */
 export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): boolean {
     // 0. BANNED TOPICS (HARD KILL SWITCH)
-    const BANNED_TOPICS = ['Mario', 'AI'];
-    const hasBannedTopic = BANNED_TOPICS.some(topic =>
-        post.title.toLowerCase().includes(topic.toLowerCase()) ||
-        post.content.toLowerCase().includes(topic.toLowerCase())
+    const BANNED_TOPICS = [/\bMario\b/i, /\bAI\b/i];
+    const hasBannedTopic = BANNED_TOPICS.some(pattern =>
+        pattern.test(post.title) || pattern.test(post.content)
     );
 
     if (hasBannedTopic) {

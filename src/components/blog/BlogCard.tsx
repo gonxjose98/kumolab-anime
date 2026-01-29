@@ -43,9 +43,11 @@ const BlogCard = ({ post }: BlogCardProps) => {
                 ) : (
                     <div className={styles.placeholder} />
                 )}
-                <span className={`${styles.badge} ${post.type === 'INTEL' ? styles.intelBadge : ''}`}>
+                {/* REMOVED: Duplicate badge overlay to ensure Single Source of Truth. 
+                    The backend now bakes all headlines directly into the visual asset. */}
+                {/* <span className={`${styles.badge} ${post.type === 'INTEL' ? styles.intelBadge : ''}`}>
                     {getOverlayText()}
-                </span>
+                </span> */}
             </div>
             <div className={styles.content}>
                 <div className={styles.meta}>

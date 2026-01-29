@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send } from 'lucide-react';
-import html2canvas from 'html2canvas';
 
 import { BlogPost } from '@/types';
 
@@ -150,9 +149,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
 
         const signalText = (overlayTag || '').trim();
-        const effectiveTitle = (title || topic || '').trim();
 
-        if (signalText.length === 0 && effectiveTitle.length === 0) {
+        if (signalText.length === 0) {
             if (layoutMetadata) setLayoutMetadata(null);
             return;
         }
@@ -162,7 +160,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }, 300); // 300ms debounce for typing
 
         return () => clearTimeout(timer);
-    }, [overlayTag, title, topic, isApplyText]);
+    }, [overlayTag, isApplyText]);
 
     const handleRegenerateSlot = async (slot: string) => {
         if (!confirm(`Force regenerate post for slot ${slot}? This will bypass schedule checks.`)) return;
@@ -394,8 +392,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    title: payload.title, // Use the resolved title
-                    headline: payload.headline,
+                    title: "", // HARD SEPARATION: NEVER RENDER TOPIC/TITLE TEXT ON IMAGE
+                    headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
                     applyText: payload.applyText,
@@ -1592,14 +1590,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    placeholder="e.g. One Piece, Jujutsu Kaisen (Leave empty for auto-scout)"
+                                                    placeholder="e.g. One Piece, Jujutsu Kaisen (Metadata & image lookup only)"
                                                     className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                                                     value={topic}
                                                     onChange={(e) => {
                                                         setTopic(e.target.value);
-                                                        setIsApplyText(true);
                                                     }}
                                                 />
+                                                <p className="mt-1 text-[9px] text-blue-500/70 font-bold uppercase tracking-tighter">
+                                                    Lookup Only: This text will NEVER appear on the image.
+                                                </p>
                                             </div>
 
                                             {/* IMAGE SELECTOR V2 */}
@@ -1818,8 +1818,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                     </div>
                                                                                 ))
                                                                             ) : (
-                                                                                // RAW FALLBACK (Mirror Engine Composition)
-                                                                                `${(title || topic || '')} ${(overlayTag || '')}`.trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                // RAW FALLBACK (Authoritative Override Visual Title Only)
+                                                                                `${(overlayTag || '')}`.trim().split(/\s+/).filter(Boolean).map((word, idx) => (
                                                                                     <span
                                                                                         key={idx}
                                                                                         onPointerDown={(e) => {
@@ -1859,7 +1859,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     style={{
                                                                         left: (watermarkPosition?.x ?? WIDTH / 2) * containerScale,
                                                                         top: (watermarkPosition?.y ?? HEIGHT - 40) * containerScale,
-                                                                        transform: `translate(-50%, -50%) scale(${textScale})`,
+                                                                        transform: `translate(-50%, -50%) scale(1)`,
                                                                     }}
                                                                 >
                                                                     <div className={`text-white/70 text-[10px] sm:text-xs font-bold tracking-wider drop-shadow-md bg-black/20 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10 ${isWatermarkLocked ? 'ring-0' : 'hover:bg-white/10 hover:border-white/30'}`}>
@@ -1971,7 +1971,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 if (!newVal) {
                                                                     // KILL SWITCH: Clear all layout state immediately
                                                                     setLayoutMetadata(null);
-                                                                    setTextScale(1);
                                                                 }
                                                                 handleApplyText(undefined, undefined, newVal);
                                                             }}
@@ -2013,7 +2012,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <Type size={14} className="text-purple-400" />
-                                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title</span>
+                                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title (Sole Visual Content)</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded-md">
+                                                        <Zap size={10} className="text-purple-400" />
+                                                        <span className="text-[8px] font-bold text-purple-400 uppercase tracking-tighter">Engine Parity Active</span>
                                                     </div>
                                                 </div>
 

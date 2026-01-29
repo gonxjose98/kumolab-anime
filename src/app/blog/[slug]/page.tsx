@@ -33,7 +33,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
             <div className={styles.header}>
                 <div className={styles.meta}>
-                    <span className={styles.badge}>{post.headline || post.type}</span>
+                    {/* <span className={styles.badge}>{post.headline || post.type}</span> */}
                     <time className={styles.date}>
                         {new Date(post.timestamp).toLocaleDateString(undefined, {
                             weekday: 'long',
