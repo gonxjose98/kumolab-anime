@@ -11,8 +11,10 @@ const TARGET_ASPECT_RATIO = 0.8; // Portrait preferred (Posters), but landscape 
 
 const PREFERRED_DOMAINS = [
     'animenewsnetwork.com', 'crunchyroll.com', 'netflix.com',
-    'bilibili.com', 'disneyplus.com', 'twitter.com', 'x.com'
+    'bilibili.com', 'disneyplus.com', 'twitter.com', 'x.com', 's4.anilist.co'
 ];
+
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 interface ImageCandidate {
     url: string;
@@ -27,7 +29,7 @@ interface ImageCandidate {
  * THE VISUAL INTELLIGENCE ENGINE
  * Selects the absolute best image for a KumoLab post based on strict editorial rules.
  */
-export async function selectBestImage(animeTitle: string, context: string = 'General'): Promise<string | null> {
+export async function selectBestImage(animeTitle: string, context: string = 'General'): Promise<{ url: string, hasText: boolean } | null> {
     console.log(`[Image Selector] Hunting for visual assets for: "${animeTitle}"`);
 
     const candidates: ImageCandidate[] = [];
@@ -50,22 +52,24 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
             const siteImage = await scrapeOgImage(officialSite);
             if (siteImage) await processCandidate(siteImage, 'Official Website (OG)', 1, candidates);
         }
-
-        // C. Official Twitter Crawl (Tier 2) - via External Links
-        // (Simulated via OG Scraping of the Twitter URL if provided)
-        const twitterLink = aniListData.externalLinks?.find((l: any) => l.site.toLowerCase().includes('twitter') || l.site.toLowerCase().includes('x'));
-        if (twitterLink) {
-            // Twitter blocking is heavy, but we can try basic OG or rely on the Tier 1 site often embedding the tweet
-            // Skipping direct Twitter crawl for now to avoid ban/auth issues, 
-            // but acknowledging it exists in provenance could be useful.
-        }
     }
 
     // --- STRATEGY 2: REDDIT DISCOVERY (Tier 6) ---
-    // "Official media shared by users"
-    // We search for "Title + Visual" to find high-res uploads
-    const redditImages = await searchRedditImages(animeTitle);
-    for (const img of redditImages) {
+    const searchVariations = [
+        `${animeTitle} visual`,
+        `${animeTitle} official`,
+        `${animeTitle} poster`,
+        animeTitle
+    ];
+
+    const redditUrls = new Set<string>();
+    for (const variation of searchVariations) {
+        if (candidates.length >= 10 && variation !== searchVariations[0]) break;
+        const results = await searchRedditImages(variation);
+        results.forEach(u => redditUrls.add(u));
+    }
+
+    for (const img of redditUrls) {
         await processCandidate(img, 'Reddit Community', 6, candidates);
     }
 
@@ -82,7 +86,16 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
     console.log(`[Image Selector] Winner: ${winner.source} (${winner.width}x${winner.height}) Score: ${winner.score.toFixed(1)}`);
     console.log(`[Image Selector] Asset: ${winner.url}`);
 
-    return winner.url;
+    // HEURISTIC TEXT DETECTION
+    // Cover images, Posters, and Official Site OG images almost always have the logo/title on them.
+    const sourcesWithText = ['AniList Cover', 'Official Website (OG)'];
+    const isLikelyPoster = winner.source.includes('Poster') || winner.source.includes('Visual');
+    const hasText = sourcesWithText.includes(winner.source) || isLikelyPoster;
+
+    return {
+        url: winner.url,
+        hasText
+    };
 }
 
 // --- HELPERS ---
@@ -125,9 +138,9 @@ async function processCandidate(url: string, source: string, tier: number, list:
 
         list.push({ url, source, tier, width, height, score });
 
-    } catch (e) {
+    } catch (e: any) {
         // Silent fail on invalid URLs
-        // console.warn(`Failed to process candidate ${url}:`, e);
+        console.warn(`[Image Selector] Failed to process candidate ${url}:`, e?.message || String(e));
     }
 }
 
@@ -137,10 +150,15 @@ async function processCandidate(url: string, source: string, tier: number, list:
  */
 async function validateImageQuality(url: string): Promise<{ width: number, height: number } | null> {
     try {
-        const res = await fetch(url);
-        if (!res.ok) return null;
+        const res = await fetch(url, {
+            headers: { 'User-Agent': BROWSER_UA }
+        });
+        if (!res.ok) {
+            console.log(`[Image Selector] Fetch failed for ${url}: ${res.status}`);
+            return null;
+        }
 
-        const buffer = await res.arrayBuffer();
+        const buffer = Buffer.from(await res.arrayBuffer());
         const meta = await sharp(buffer).metadata();
 
         if (!meta.width || !meta.height) return null;
@@ -149,12 +167,14 @@ async function validateImageQuality(url: string): Promise<{ width: number, heigh
 
         // STRICT QUALITY GATE
         if (shortest < MIN_RESOLUTION_SHORT) {
-            // console.log(`[Image Selector] Rejected ${url} (Resolution ${meta.width}x${meta.height} too low)`);
+            // Relaxing for very specific cases could be done here, but let's keep it for now
+            // Unless we have ZERO candidates, we might want to reconsider.
             return null;
         }
 
         return { width: meta.width, height: meta.height };
-    } catch (e) {
+    } catch (e: any) {
+        console.warn(`[Image Selector] sharp/fetch error for ${url}:`, e?.message || String(e));
         return null;
     }
 }
@@ -224,15 +244,18 @@ async function searchRedditImages(term: string): Promise<string[]> {
         for (const post of posts) {
             const d = post.data;
             // Provenance Check: Is it an image?
-            if (d.url && (d.url.includes('i.redd.it') || d.url.includes('imgur.com'))) {
+            // Allow reddit, imgur, and generic high-traffic static hosts
+            const url = d.url || '';
+            if (url && (url.includes('redd.it') || url.includes('imgur.com') || url.includes('static'))) {
                 // Ignore gifs?
-                if (!d.url.endsWith('.gif') && !d.url.endsWith('.gifv')) {
-                    images.push(d.url);
+                if (!url.endsWith('.gif') && !url.endsWith('.gifv') && !url.includes('external-preview')) {
+                    images.push(url);
                 }
             }
         }
         return images;
-    } catch {
+    } catch (e: any) {
+        console.error(`[Reddit Search] Error for ${term}:`, e?.message || String(e));
         return [];
     }
 }

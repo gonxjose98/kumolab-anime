@@ -189,11 +189,18 @@ export async function generateIntelImage({
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = true;
 
-
         // Draw Image - LEGACY SCALING LOGIC (Reverted for stability)
         const img = await loadImage(buffer);
         const imgRatio = img.width / img.height;
         const canvasRatio = WIDTH / HEIGHT;
+
+        // --- AUTO TEXT DETECTION (Aspect Ratio Heuristic) ---
+        // If the image is a portrait poster (e.g. 2:3), it almost always has text.
+        const isPortraitPoster = imgRatio < 0.8;
+        if (isPortraitPoster && applyText) {
+            console.log(`[Image Engine] Image aspect ratio (${imgRatio.toFixed(2)}) suggests a Poster. Disabling text overlay to avoid clutter.`);
+            applyText = false;
+        }
 
         let drawWidth, drawHeight;
 

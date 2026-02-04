@@ -138,12 +138,15 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
 
     // We ignore the low-res RSS image usually, unless we want to verify it. 
     // But selectBestImage hunts for 4K/Official sources.
-    let officialSourceImage = await selectBestImage(searchTerm, topItem.claimType);
+    const imageResult = await selectBestImage(searchTerm, topItem.claimType);
 
-    if (!officialSourceImage) {
-        console.warn('Visual Intelligence Engine found no candidates. Using fallback.');
-        officialSourceImage = '/hero-bg-final.png';
+    if (!imageResult || imageResult.url === '/hero-bg-final.png') {
+        console.warn('Visual Intelligence Engine found no valid candidates. Aborting Intel post.');
+        return null;
     }
+
+    const officialSourceImage = imageResult.url;
+    const detectedExistingText = imageResult.hasText;
 
     const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
 
@@ -170,9 +173,9 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     const isVisual = topItem.claimType === 'new_visual' || finalDisplayTitle.toLowerCase().includes('visual') || finalDisplayTitle.toLowerCase().includes('poster');
     const isTrailer = topItem.claimType === 'trailer' || finalDisplayTitle.toLowerCase().includes('trailer') || finalDisplayTitle.toLowerCase().includes('pv');
 
-    const shouldDisableOverlay = isVisual || isTrailer;
+    const shouldDisableOverlay = isVisual || isTrailer || detectedExistingText;
     if (shouldDisableOverlay) {
-        console.log(`[Generator] Detected Visual/Trailer (${finalDisplayTitle}). Disabling text overlay.`);
+        console.log(`[Generator] Detected Visual/Trailer or Existing Text (${finalDisplayTitle}). Disabling text overlay.`);
     }
 
     let finalImage: string | undefined = undefined;
@@ -193,7 +196,6 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
             finalImage = officialSourceImage;
         }
     }
-
     return {
         id: randomUUID(),
         title: finalDisplayTitle,
@@ -202,7 +204,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         claimType,
         premiereDate: premiereDateStr,
         content: validContent,
-        image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
+        image: finalImage || '', // validatePost will reject if this is empty
         timestamp: date.toISOString(),
         isPublished: true
     };
@@ -238,25 +240,36 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
 
     // VISUAL INTELLIGENCE ENGINE (New Strict Logic) for Trending
-    // We re-evaluate to ensure we get the absolute best high-res confirmation
-    // We use the CLEANED title to avoid noise in metadata search
-    let officialSourceImage = await selectBestImage(
+    const imageResult = await selectBestImage(
         trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim(),
         trendingItem.trendReason
     );
 
+    let officialSourceImage = imageResult?.url;
+    let detectedExistingText = imageResult?.hasText || false;
+
     if (!officialSourceImage) {
         // Fallback to the candidate's own image if the engine found nothing new
-        // (but usually engine includes candidates source if valid)
         if (trendingItem.image) {
             officialSourceImage = trendingItem.image;
         }
     }
 
-    // Universal Image Fallback
+    // Universal Image Fallback Level 1: Try a simpler search if first one failed
     if (!officialSourceImage) {
-        console.warn("Trending post missing image after ALL strategies. Applying universal fallback.");
-        officialSourceImage = '/hero-bg-final.png';
+        const simpleTerm = validTitle.split(' Season')[0].split(':')[0].split(' –')[0].trim();
+        if (simpleTerm !== (trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim())) {
+            console.log(`[Generator] Retrying image search with simpler term: "${simpleTerm}"`);
+            const retryResult = await selectBestImage(simpleTerm, trendingItem.trendReason);
+            officialSourceImage = retryResult?.url;
+            detectedExistingText = retryResult?.hasText || false;
+        }
+    }
+
+    // Universal Image Fallback Level 2: Reject if no image found
+    if (!officialSourceImage || officialSourceImage === '/hero-bg-final.png') {
+        console.warn("Trending post missing image after ALL strategies. Aborting Trend post.");
+        return null;
     }
 
     // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
@@ -284,9 +297,9 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         const isVisual = trendingItem.trendReason === 'VISUAL REVEAL' || finalDisplayTitle.toLowerCase().includes('visual');
         const isTrailer = trendingItem.trendReason === 'TRAILER REVEAL' || finalDisplayTitle.toLowerCase().includes('trailer');
 
-        const shouldDisableOverlay = isVisual || isTrailer;
+        const shouldDisableOverlay = isVisual || isTrailer || detectedExistingText;
         if (shouldDisableOverlay) {
-            console.log(`[Generator-Trending] Detected Visual/Trailer (${finalDisplayTitle}). Disabling text overlay.`);
+            console.log(`[Generator-Trending] Detected Visual/Trailer or Existing Text (${finalDisplayTitle}). Disabling text overlay.`);
         }
 
         const result = await generateIntelImage({
@@ -312,7 +325,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
         type: 'TRENDING',
         content: validContent,
-        image: finalImage || '/hero-bg-final.png', // Absolute safety fallback
+        image: finalImage || '',
         timestamp: date.toISOString(),
         isPublished: true
     };
@@ -333,26 +346,33 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
         return false;
     }
 
-    // 1. Check for duplicates in the same day (UTC)
-    const postDate = post.timestamp.split('T')[0];
-    const isDuplicate = existingPosts.some(p =>
-        p.timestamp.split('T')[0] === postDate &&
-        p.title === post.title
-    );
+    // 1. ADVANCED DEDUPLICATION
+    // Check for duplicates in the last 100 posts regardless of day
+    const normalizedNewTitle = post.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    const isDuplicate = existingPosts.some(p => {
+        const normalizedOldTitle = p.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+        const sameTitle = normalizedNewTitle === normalizedOldTitle;
+        const sameSlug = p.slug === post.slug;
+        const verySimilarContent = p.content.slice(0, 50) === post.content.slice(0, 50);
 
-    if (isDuplicate && !force) return false;
+        return sameTitle || sameSlug || verySimilarContent;
+    });
 
-    // 2. Image validation: allow http URLs, local paths (/), and data URIs (data:)
-    if (post.image && !post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
-        console.warn(`[Validator] Invalid image path detected: ${post.image.substring(0, 50)}...`);
-        console.warn(`[Validator] Applying safety fallback: /hero-bg-final.png`);
-        post.image = '/hero-bg-final.png';
+    if (isDuplicate && !force) {
+        console.log(`[Validator] REJECTED: Duplicate content detected for "${post.title}"`);
+        return false;
     }
 
-    // 3. FINAL SAFETY CHECK: Ensure Image is NEVER null/undefined
-    if (!post.image) {
-        console.warn(`[Validator] Post ${post.title} has NO image. Applying safety fallback.`);
-        post.image = '/hero-bg-final.png';
+    // 2. STRICT IMAGE VALIDATION
+    // "Every automated post must include an image. If a valid image cannot be found, the post should not publish."
+    if (!post.image || post.image === '/hero-bg-final.png') {
+        console.error(`[Validator] REJECTED: Post "${post.title}" is missing a valid image.`);
+        return false;
+    }
+
+    if (!post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
+        console.warn(`[Validator] REJECTED: Invalid image path detected: ${post.image.substring(0, 50)}...`);
+        return false;
     }
 
     return true;
@@ -436,6 +456,14 @@ export function cleanTitle(title: string): string {
             const firstIdx = clean.search(/(?:Season\s+\d+)|(\d+)(?:st|nd|rd|th)?\s*Season/i);
             const animeName = clean.substring(0, firstIdx).trim();
             clean = `${animeName} Season ${highest}`;
+        }
+    } else {
+        // Even if only one season mention, try to clean up noise AFTER it (like "Episode 3")
+        const seasonIdx = clean.search(/(?:Season\s+\d+)|(\d+)(?:st|nd|rd|th)?\s*Season/i);
+        if (seasonIdx !== -1) {
+            const seasonPart = clean.match(/(?:Season\s+\d+)|(\d+)(?:st|nd|rd|th)?\s*Season/i)![0];
+            const animeName = clean.substring(0, seasonIdx).trim();
+            clean = `${animeName} ${seasonPart}`;
         }
     }
 

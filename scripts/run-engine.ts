@@ -22,15 +22,15 @@ async function main() {
 
     const slot = process.argv[2];
 
-    if (!slot || !['08:00', '12:00', '16:00', '20:00'].includes(slot)) {
-        console.error('Usage: npx tsx scripts/run-engine.ts <08:00|12:00|16:00|20:00>');
+    if (!slot || !['08:00', '12:00', '16:00', '20:00', 'hourly'].includes(slot)) {
+        console.error('Usage: npx tsx scripts/run-engine.ts <08:00|12:00|16:00|20:00|hourly>');
         process.exit(1);
     }
 
     console.log(`[${new Date().toISOString()}] Running Blog Engine for slot: ${slot}`);
 
     try {
-        const post = await runBlogEngine(slot as any, true);
+        const post = await runBlogEngine(slot as any, false); // Disabled force to prevent duplicates
         if (post) {
             console.log(`[SUCCESS] Published post: ${post.title}`);
         } else {
