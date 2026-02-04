@@ -55,13 +55,14 @@ export async function POST(req: NextRequest) {
             if (skipProcessing) {
                 finalImageUrl = publicUrl;
             } else {
-                finalImageUrl = await generateIntelImage({
+                const result = await generateIntelImage({
                     sourceUrl: publicUrl,
                     animeTitle: title,
                     headline: headline,
                     slug: slug,
                     gradientPosition: 'bottom'
                 });
+                finalImageUrl = result?.processedImage || null;
             }
         }
 
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
         try {
             await Promise.all([
                 revalidatePath('/', 'page'),
+                revalidatePath('/blog', 'page'),
                 revalidatePath(`/blog/${data.slug}`, 'page')
             ]);
         } catch (e) {

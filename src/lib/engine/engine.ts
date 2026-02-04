@@ -22,47 +22,42 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Now triggered by a single hourly cron (see vercel.json)
  */
 export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
-
     const now = new Date();
-    // Vercel generally runs in UTC. Convert to EST for "Wall Clock" logic.
-    // We need to know if it is 8 AM EST.
-    const estTime = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-    const currentEstHour = estTime.getHours();
+    // 1. Convert to EST for "Wall Clock" logic (Sticky Triggering)
+    const estFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: 'numeric', hour12: false
+    });
+    const parts = estFormatter.formatToParts(now);
+    const findPart = (type: string) => parts.find(p => p.type === type)?.value || '';
 
-    const existingPosts = await getPosts();
+    const y = findPart('year');
+    const m = findPart('month');
+    const d = findPart('day');
+    const currentEstHour = parseInt(findPart('hour'));
+    const estDateSlug = `${y}-${m}-${d}`;
+
+    const existingPosts = await getPosts(true);
+    const hasDailyDropsToday = existingPosts.some(p => p.type === 'DROP' && p.slug.includes(estDateSlug));
+
     let newPost: BlogPost | null = null;
     let explicitSlot = slot;
 
-    console.log(`[Engine] Running at ${now.toISOString()} (EST Hour: ${currentEstHour}). Trigger: ${slot}`);
+    console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
-    // --- 1. DAILY DROPS (MANDATORY @ 8 AM EST) ---
-    // Even if triggered as 'hourly', if it is 8 AM, we force Daily Drops.
-    // allow a window (7 AM - 9 AM) to be safe or strict 8? 
-    // Scheduler is strict. If it runs at 8:00 EST, hour is 8.
+    // --- 1. DAILY DROPS (STICKY TRIGGER @ 8 AM EST OR LATER) ---
+    // If it's 8 AM or later and we haven't posted today's drops, prioritize them.
+    const isDailyDropsSlot = explicitSlot === '08:00' || (explicitSlot === 'hourly' && currentEstHour >= 8 && !hasDailyDropsToday);
 
-    if (explicitSlot === '08:00' || (explicitSlot === 'hourly' && currentEstHour === 8)) {
-        console.log('[Engine] Slot identified as Daily Drops (08:00 EST).');
+    if (isDailyDropsSlot) {
+        console.log(`[Engine] Slot identified as Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
 
-        // --- 08:00 UTC: DAILY DROPS (LOCKED TO EST WINDOW) ---
-        // 1. Get the current date in EST
-        const estDateStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
-        const [month, day, year] = estDateStr.split('/');
+        // Create UTC dates representing the start and end of the current EST day
+        // We use the already extracted y, m, d
+        const startLimit = new Date(`${y}-${m}-${d}T00:00:00-05:00`);
+        const endLimit = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
 
-        const getESTBoundaries = (date: Date) => {
-            const formatter = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/New_York',
-                year: 'numeric', month: '2-digit', day: '2-digit'
-            });
-            const [{ value: m }, , { value: d }, , { value: y }] = formatter.formatToParts(date);
-
-            // Create UTC dates representing the start and end of that EST day
-            const start = new Date(`${y}-${m}-${d}T00:00:00-05:00`); // Standard EST
-            const end = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
-
-            return { start, end };
-        };
-
-        const { start: startLimit, end: endLimit } = getESTBoundaries(now);
         console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
 
         const episodes = await fetchAniListAiring(
@@ -70,19 +65,21 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
             Math.floor(endLimit.getTime() / 1000)
         );
 
-        newPost = generateDailyDropsPost(episodes, now);
+        // Pass the EST date string to ensure the post slug stays consistent with the EST day
+        newPost = generateDailyDropsPost(episodes, now, estDateSlug);
 
-        // If Daily Drops already exists for today, we might skip or allow update?
-        // validatePost will check distinct title.
-
-        // FALLBACK: If zero drops, do NOT post. User wants this fixed anchor. 
-        // If empty, it's better to be silent than spam.
         if (!newPost) {
-            console.log('[Engine] Zero drops found for today. Skipping 8 AM slot.');
+            console.log('[Engine] Zero drops found for today. Skipping Daily Drops.');
+            // We don't return here, we let it fall through to Dynamic Newsroom IF it was an hourly trigger
+            // But if it was explicitly '08:00', we might want to stop? 
+            // Better to allow Dynamic Newsroom as a fallback if no drops exist.
         }
 
-    } else {
-        // --- 2. DYNAMIC NEWSROOM (ALL OTHER HOURS) ---
+    }
+
+    // Only run Dynamic Newsroom if we didn't just generate a Daily Drops post
+    if (!newPost) {
+        // --- 2. DYNAMIC NEWSROOM ---
         console.log('[Engine] Running Dynamic Newsroom Logic...');
 
         // RATE LIMIT CHECK:
@@ -189,6 +186,16 @@ async function publishPost(post: BlogPost) {
         const posts: BlogPost[] = JSON.parse(fileContents);
         posts.unshift(post);
         fs.writeFileSync(POSTS_PATH, JSON.stringify(posts, null, 2));
+    }
+
+    // --- REVALIDATION ---
+    try {
+        const { revalidatePath } = await import('next/cache');
+        revalidatePath('/');
+        revalidatePath('/blog');
+        revalidatePath(`/blog/${post.slug}`);
+    } catch (e) {
+        console.warn('[Engine] Revalidation failed:', e);
     }
 
     console.log(`Successfully published: ${post.title}`);

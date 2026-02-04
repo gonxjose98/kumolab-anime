@@ -256,6 +256,16 @@ export async function POST(req: NextRequest) {
 
             if (updateError) {
                 console.error("DB Update Failed (Non-fatal for publishing):", updateError);
+            } else {
+                // --- REVALIDATION ---
+                try {
+                    const { revalidatePath } = await import('next/cache');
+                    revalidatePath('/');
+                    revalidatePath('/blog');
+                    revalidatePath(`/blog/${post.slug}`);
+                } catch (revError) {
+                    console.warn('[Social Revalidate] Failed:', revError);
+                }
             }
         } catch (dbError) {
             console.error("DB Update Exception (Non-fatal, social posts likely live):", dbError);

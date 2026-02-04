@@ -5,6 +5,7 @@ import MostRecentFeed from '@/components/home/MostRecentFeed';
 import Manifesto from '@/components/home/Manifesto';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function Home() {
   const posts = await getPosts();

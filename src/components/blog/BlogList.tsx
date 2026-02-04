@@ -19,7 +19,7 @@ const BlogList = ({ initialPosts }: BlogListProps) => {
             const matchesType = filter === 'ALL' || post.type === filter;
             const matchesSearch = post.title.toLowerCase().includes(search.toLowerCase()) ||
                 post.content.toLowerCase().includes(search.toLowerCase());
-            return matchesType && matchesSearch;
+            return matchesType && matchesSearch && post.isPublished;
         });
     }, [initialPosts, filter, search]);
 
