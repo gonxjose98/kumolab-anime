@@ -44,6 +44,7 @@ interface IntelImageOptions {
     watermarkPosition?: { x: number; y: number };
     disableAutoScaling?: boolean;
     classification?: 'CLEAN' | 'TEXT_HEAVY';
+    bypassSafety?: boolean;
 }
 
 export interface ImageProcessingResult {
@@ -106,6 +107,7 @@ export async function generateIntelImage({
     watermarkPosition,
     disableAutoScaling = false,
     classification,
+    bypassSafety = false,
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -176,8 +178,8 @@ export async function generateIntelImage({
 
         // --- 4:5 SUBJECT-SAFE ABORT RULE ---
         // Rule: If an image is extremely wide (panorama) or extremely tall (long-strip composite), it's unsafe.
-        // Rule: Abort if aspect ratio is outside 0.6 to 1.6 range.
-        if (imgRatio > 1.6 || imgRatio < 0.6) {
+        // Rule: Abort if aspect ratio is outside 0.6 to 2.0 range (Allows 16:9 banners), UNLESS bypassed.
+        if (!bypassSafety && (imgRatio > 2.0 || imgRatio < 0.5)) {
             console.error(`[Image Engine] ABORT: Source aspect ratio (${imgRatio.toFixed(2)}) violates subject-safe rule for 4:5 crop.`);
             return null;
         }

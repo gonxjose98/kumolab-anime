@@ -32,7 +32,7 @@ async function reprocessPost(id: string, customImageUrl?: string) {
 
     if (!sourceImage) {
         // Try to find image with a cleaner title
-        const seriesName = post.title.split(' Season')[0].split(':')[0].split(' –')[0].trim();
+        const seriesName = "Pokemon Horizons Rayquaza Rising";
         console.log(`Searching for image for series: ${seriesName}`);
         const imageResult = await selectBestImage(seriesName);
         sourceImage = imageResult?.url;
@@ -63,7 +63,8 @@ async function reprocessPost(id: string, customImageUrl?: string) {
         purpleWordIndices,
         slug: post.slug,
         classification,
-        applyText: true
+        applyText: true,
+        bypassSafety: !!customImageUrl
     });
 
     if (result && result.processedImage) {

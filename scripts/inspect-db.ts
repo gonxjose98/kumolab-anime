@@ -10,19 +10,15 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function inspect() {
-    console.log('Inspecting posts table...');
-    const { data, error } = await supabase.from('posts').select('*').limit(1);
+    const { data, error } = await supabase
+        .from('posts')
+        .select('id, title, type, content')
+        .eq('type', 'CONFIRMATION_ALERT')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error('Error:', error);
-        return;
-    }
-
-    if (data && data.length > 0) {
-        console.log('First Record Keys:', Object.keys(data[0]));
-    } else {
-        console.log('No posts found to inspect.');
-    }
+    if (error) console.error(error);
+    else console.log(JSON.stringify(data, null, 2));
 }
 
+// const id = process.argv[2];
 inspect();

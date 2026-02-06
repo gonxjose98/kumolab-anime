@@ -1,4 +1,6 @@
 
+'use client';
+
 import styles from './MostRecentFeed.module.css';
 import { BlogPost } from '@/types';
 import Link from 'next/link';

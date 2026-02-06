@@ -49,7 +49,9 @@ export async function getPosts(includeHidden: boolean = false): Promise<BlogPost
                 isPublished: post.is_published === true, // Strict boolean mapping
                 claimType: post.claim_type,
                 premiereDate: post.premiere_date
-            }));
+            }))
+            // CLEANSE: Ensure strictly serializable data for Next.js Client Components
+            .map(p => JSON.parse(JSON.stringify(p)));
     }
 
     // Local JSON Fallback
