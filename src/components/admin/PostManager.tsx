@@ -65,7 +65,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
-    const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: 1147.5 }); // Regional Control Center
+    const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: 1113.75 }); // Regional Control Center (35% zone center)
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
@@ -213,7 +213,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsImageLocked(false);
         setTextScale(1);
         // Default to baseline inside the footer zone (Match Engine: 1210)
-        setTextPosition({ x: WIDTH / 2, y: 1210 });
+        setTextPosition({ x: WIDTH / 2, y: 1113.75 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -254,7 +254,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsImageLocked(false);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1210 });
+        setTextPosition({ x: WIDTH / 2, y: 1113.75 });
         setIsTextLocked(false);
         setGradientPosition('bottom');
         setPurpleWordIndices([]);
@@ -532,7 +532,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setEditorMode('RAW');
         setIsStageDirty(true);
         setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1210 });
+        setTextPosition({ x: WIDTH / 2, y: 1113.75 });
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);

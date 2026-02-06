@@ -33,6 +33,7 @@ async function monitorIntegrity() {
     const { data: posts, error } = await supabase
         .from('posts')
         .select('*')
+        .eq('is_published', true)
         .order('timestamp', { ascending: false })
         .limit(20);
 

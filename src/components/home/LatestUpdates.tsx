@@ -142,10 +142,18 @@ const LatestUpdates = ({ posts }: LatestUpdatesProps) => {
                         <Link href={`/blog/${post.slug}`} key={`${post.id}-${index}`} className={styles.card}>
                             <div className={styles.imageWrapper}>
                                 {post.image ? (
-                                    <>
+                                    <div className={styles.imageContainer}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={post.image} alt={post.title} className={styles.image} />
-                                    </>
+                                        <img
+                                            src={post.image}
+                                            alt={post.title}
+                                            className={styles.image}
+                                            loading="lazy"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = '/hero-bg-final.png';
+                                            }}
+                                        />
+                                    </div>
                                 ) : (
                                     <div className={styles.placeholderImage} />
                                 )}

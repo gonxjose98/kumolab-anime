@@ -1,0 +1,27 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ΓÜÖ∩╕Å  override existing env vars with { override: true }
+--- Last 10 Posts ---
+[2026-01-28T17:50:00.191+00:00] ID: a45f8a95-0282-4bf0-8033-a0c3c573efab | TYPE: TRENDING | IMAGE: YES | TITLE: My Hero Academia: Vigilantes Season 2 ΓÇÆ Episode 17 Confirmed
+  IMAGE URL: /hero-bg-final.png
+[2026-01-28T10:58:47.398+00:00] ID: 18cf63aa-c535-4811-9e48-54e644a5ff81 | TYPE: TRENDING | IMAGE: YES | TITLE: From Old Country Bumpkin to Master Swordsman Season 2 Streams 1st Video Confirmed
+  IMAGE URL: /hero-bg-final.png
+[2026-01-28T07:03:16.052+00:00] ID: 8401d7ea-e34d-4858-b5bf-6defbfdda0fc | TYPE: TRENDING | IMAGE: YES | TITLE: Golden Kamuy Final Season ΓÇÆ Episode 53 Confirmed
+  IMAGE URL: /hero-bg-final.png
+[2026-01-28T05:54:46.387+00:00] ID: a19003cb-3de0-457b-a692-6c570aa0b86f | TYPE: TRENDING | IMAGE: YES | TITLE: Kumarba Gets 3rd Season in April, Shifts From 3D to 2D Confirmed
+  IMAGE URL: /hero-bg-final.png
+[2026-01-28T03:34:26.69+00:00] ID: f8c06ab5-28be-4842-b025-be0970273531 | TYPE: INTEL | IMAGE: YES | TITLE: 'Sparks of Tomorrow' Officially Premieres July 2026
+  IMAGE URL: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/sparks-of-tomorrow-premieres-july-2026-social.png
+[2026-01-27T17:02:28.286+00:00] ID: ede5b0fd-5020-4019-8a97-923f9f920b71 | TYPE: TRENDING | IMAGE: YES | TITLE: Golden Kamuy Final Season ΓÇÆ Episode 53 Confirmed
+  IMAGE URL: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/trending-trending-golden-kamuy-final-season-episode-53-1769533348926-2026-01-27-social.png
+[2026-01-27T09:02:43.102+00:00] ID: e1f5759b-1146-4780-bc2c-ff46f71f4219 | TYPE: TRENDING | IMAGE: YES | TITLE: My Hero Academia: Vigilantes Season 2 Confirmed
+  IMAGE URL: https://s4.anilist.co/file/anilistcdn/media/anime/banner/195322-LBvpKyDllb8T.jpg
+[2026-01-27T07:22:14.602+00:00] ID: 4c8b58ac-a8e0-441c-bfb6-7cc9932a4609 | TYPE: INTEL | IMAGE: YES | TITLE: Victory! Black Clover Gets Season 2 Validation Official Confirmed
+  IMAGE URL: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/black-clover-test-1769498534602-social.png
+[2026-01-27T07:03:35.746+00:00] ID: 1ef0e997-de24-402a-88a9-b7522fcafaa0 | TYPE: TRENDING | IMAGE: YES | TITLE: Frieren: Beyond JourneyΓÇÖs End Season 2 Confirmed
+  IMAGE URL: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/temp-1769557320109-processed-vision.png
+[2026-01-27T05:59:29.891089+00:00] ID: c6ce1401-0ce1-4b2b-92c2-173d8964fa7c | TYPE: INTEL | IMAGE: YES | TITLE: Reborn as a Vending Machine Season 3 Confirmed
+  IMAGE URL: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/vending-machine-s3-official-1769493568139-social.png
+
+--- Searching for Golden Kamuy Duplicates ---
+Found 2 Golden Kamuy posts:
+ID: ede5b0fd-5020-4019-8a97-923f9f920b71 | [2026-01-27T17:02:28.286+00:00] TITLE: Golden Kamuy Final Season ΓÇÆ Episode 53 Confirmed | SLUG: trending-trending-golden-kamuy-final-season-episode-53-1769533348926-2026-01-27
+ID: 8401d7ea-e34d-4858-b5bf-6defbfdda0fc | [2026-01-28T07:03:16.052+00:00] TITLE: Golden Kamuy Final Season ΓÇÆ Episode 53 Confirmed | SLUG: trending-trending-golden-kamuy-final-season-episode-53-1769583797069-2026-01-28

@@ -14,10 +14,10 @@ import { selectBestImage } from './image-selector';
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
  */
-export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date): BlogPost | null {
+export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, forceDateStr?: string): BlogPost | null {
     if (episodes.length === 0) return null;
 
-    const dateString = date.toISOString().split('T')[0];
+    const dateString = forceDateStr || date.toISOString().split('T')[0];
 
     // 1. Build the visible list (STRICT TWO-LINE FORMAT)
     const episodeList = episodes.map(ep => {
@@ -134,7 +134,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
     // "An anime always has to be chosen. Fallback image should never be used."
 
     // VISUAL INTELLIGENCE ENGINE (New Strict Logic)
-    const searchTerm = topItem.imageSearchTerm || topItem.title.split(' Season')[0].split(':')[0].trim();
+    const searchTerm = (topItem.imageSearchTerm || topItem.title.split(' Season')[0].split(':')[0].trim())
+        .replace(/[—–]/g, '-');
 
     // We ignore the low-res RSS image usually, unless we want to verify it. 
     // But selectBestImage hunts for 4K/Official sources.
@@ -145,8 +146,8 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         return null;
     }
 
+    const classification = imageResult.classification;
     const officialSourceImage = imageResult.url;
-    const detectedExistingText = imageResult.hasText;
 
     const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
 
@@ -156,7 +157,7 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         finalDisplayTitle += ' Confirmed';
     }
 
-    const validContent = cleanBody(topItem.content, finalDisplayTitle);
+    const validContent = cleanBody(topItem.content, finalDisplayTitle, topItem.trendReason);
 
     // 3. DYNAMIC PURPLE HIGHLIGHT
     const titleWords = finalDisplayTitle.split(/\s+/).filter(Boolean);
@@ -169,15 +170,6 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
         }
     });
 
-    // CHECK FOR TEXT CLEANLINESS
-    const isVisual = topItem.claimType === 'new_visual' || finalDisplayTitle.toLowerCase().includes('visual') || finalDisplayTitle.toLowerCase().includes('poster');
-    const isTrailer = topItem.claimType === 'trailer' || finalDisplayTitle.toLowerCase().includes('trailer') || finalDisplayTitle.toLowerCase().includes('pv');
-
-    const shouldDisableOverlay = isVisual || isTrailer || detectedExistingText;
-    if (shouldDisableOverlay) {
-        console.log(`[Generator] Detected Visual/Trailer or Existing Text (${finalDisplayTitle}). Disabling text overlay.`);
-    }
-
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
         const result = await generateIntelImage({
@@ -186,14 +178,16 @@ export async function generateIntelPost(intelItems: any[], date: Date, isFallbac
             headline: overlayTag, // Use the specific tag mapping for the visual
             purpleWordIndices,
             slug: topItem.slug || 'intel',
-            applyText: !shouldDisableOverlay
+            classification,
+            applyText: true, // Let the processor decide based on classification
+            applyGradient: true
         });
 
         if (result && result.processedImage) {
             finalImage = result.processedImage;
         } else {
-            console.warn('Image generation/upload failed. Falling back to raw official source.');
-            finalImage = officialSourceImage;
+            console.error('[Generator] ABORT: Image safety check failed or processing error.');
+            return null; // HARD ABORT
         }
     }
     return {
@@ -240,13 +234,15 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
 
     // VISUAL INTELLIGENCE ENGINE (New Strict Logic) for Trending
+    const trendingSearchTerm = (trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim())
+        .replace(/[—–]/g, '-');
     const imageResult = await selectBestImage(
-        trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim(),
+        trendingSearchTerm,
         trendingItem.trendReason
     );
 
     let officialSourceImage = imageResult?.url;
-    let detectedExistingText = imageResult?.hasText || false;
+    let classification = imageResult?.classification;
 
     if (!officialSourceImage) {
         // Fallback to the candidate's own image if the engine found nothing new
@@ -262,7 +258,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             console.log(`[Generator] Retrying image search with simpler term: "${simpleTerm}"`);
             const retryResult = await selectBestImage(simpleTerm, trendingItem.trendReason);
             officialSourceImage = retryResult?.url;
-            detectedExistingText = retryResult?.hasText || false;
+            classification = retryResult?.classification;
         }
     }
 
@@ -278,7 +274,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         finalDisplayTitle += ' Confirmed';
     }
 
-    const validContent = cleanBody(trendingItem.content, finalDisplayTitle);
+    const validContent = cleanBody(trendingItem.content, finalDisplayTitle, trendingItem.trendReason);
 
     let finalImage: string | undefined = undefined;
     if (officialSourceImage) {
@@ -293,29 +289,21 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             }
         });
 
-        // CHECK FOR TEXT CLEANLINESS (Trending Version)
-        const isVisual = trendingItem.trendReason === 'VISUAL REVEAL' || finalDisplayTitle.toLowerCase().includes('visual');
-        const isTrailer = trendingItem.trendReason === 'TRAILER REVEAL' || finalDisplayTitle.toLowerCase().includes('trailer');
-
-        const shouldDisableOverlay = isVisual || isTrailer || detectedExistingText;
-        if (shouldDisableOverlay) {
-            console.log(`[Generator-Trending] Detected Visual/Trailer or Existing Text (${finalDisplayTitle}). Disabling text overlay.`);
-        }
-
         const result = await generateIntelImage({
             sourceUrl: officialSourceImage,
             animeTitle: finalDisplayTitle,
             headline: trendingItem.trendReason || '', // Use the trend reason as a tag
             purpleWordIndices,
             slug: trendingItem.slug || 'trending',
-            applyText: !shouldDisableOverlay
+            classification,
+            applyText: true
         });
 
         if (result && result.processedImage) {
             finalImage = result.processedImage;
         } else {
-            console.warn('Trending image generation failed. Falling back to raw official source.');
-            finalImage = officialSourceImage;
+            console.error('[Generator] ABORT: Trending image safety check failed or processing error.');
+            return null; // HARD ABORT
         }
     }
 
@@ -353,7 +341,18 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
         const normalizedOldTitle = p.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
         const sameTitle = normalizedNewTitle === normalizedOldTitle;
         const sameSlug = p.slug === post.slug;
-        const verySimilarContent = p.content.slice(0, 50) === post.content.slice(0, 50);
+
+        // Content similarity check: 
+        // For Daily Drops, we ignore the common header and check the actual list.
+        // For other posts, we use the standard 50-char slice.
+        let verySimilarContent = false;
+        if (post.type === 'DROP' && p.type === 'DROP') {
+            // Only consider it a content duplicate if the titles match (already covered)
+            // or if the content is EXACTLY the same (unlikely for different days)
+            verySimilarContent = p.content === post.content;
+        } else {
+            verySimilarContent = p.content.slice(0, 50) === post.content.slice(0, 50);
+        }
 
         return sameTitle || sameSlug || verySimilarContent;
     });
@@ -437,7 +436,8 @@ export function cleanTitle(title: string): string {
         .replace(/Vote/gi, '')
         .replace(/Poll/gi, '');
 
-    // 6. Remove questions
+    // 6. Remove all unicode dashes (—, –, ‒, ―) and questions
+    clean = clean.replace(/[—–‒―]/g, '-');
     clean = clean.replace(/\?/g, '');
 
     // 7. Resolve Multiple Season Mentions (e.g. "Season 2... 3rd Season")
@@ -479,6 +479,9 @@ export function cleanTitle(title: string): string {
         const lastSpace = truncated.lastIndexOf(' ');
         clean = (lastSpace > 50 ? truncated.substring(0, lastSpace) : truncated) + '...';
     }
+
+    // 10. Remove all unicode dashes (—, –, ‒, ―)
+    clean = clean.replace(/[—–‒―]/g, '-');
 
     return clean;
 }

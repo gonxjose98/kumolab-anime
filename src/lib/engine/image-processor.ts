@@ -43,6 +43,7 @@ interface IntelImageOptions {
     applyWatermark?: boolean;
     watermarkPosition?: { x: number; y: number };
     disableAutoScaling?: boolean;
+    classification?: 'CLEAN' | 'TEXT_HEAVY';
 }
 
 export interface ImageProcessingResult {
@@ -104,6 +105,7 @@ export async function generateIntelImage({
     applyWatermark = true,
     watermarkPosition,
     disableAutoScaling = false,
+    classification,
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -122,58 +124,38 @@ export async function generateIntelImage({
 
         // --- STRICT FONT LOADING ---
         const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-        console.log(`[Image Engine] process.cwd(): ${process.cwd()}`);
-        console.log(`[Image Engine] Target Font Path: ${outfitPath}`);
-        console.log(`[Image Engine] Exists? ${fs.existsSync(outfitPath)}`);
 
         if (!fs.existsSync(outfitPath)) {
-            // Debugging: check what IS in public/fonts
-            const fontsDir = path.dirname(outfitPath);
-            if (fs.existsSync(fontsDir)) {
-                console.log(`[Image Engine] Contents of ${fontsDir}:`, fs.readdirSync(fontsDir));
-            } else {
-                console.log(`[Image Engine] Fonts directory not found at ${fontsDir}`);
-                // Try looking in alternate locations?
-            }
             throw new Error(`CRITICAL: Font file missing at ${outfitPath}`);
         }
 
-        // Use registerFromPath as primary method
         let isRegistered: boolean = GlobalFonts.registerFromPath(outfitPath, 'Outfit');
-
         if (!isRegistered) {
-            console.warn(`[Image Engine] registerFromPath failed for ${outfitPath}. Trying buffer registration...`);
-            try {
-                const fontBuffer = fs.readFileSync(outfitPath);
-                // register returns FontKey | null (or undefined depending on version), truthy if success
-                const fontKey = GlobalFonts.register(fontBuffer, 'Outfit');
-                if (fontKey) { // Check for truthiness
-                    isRegistered = true;
-                    console.log('[Image Engine] Font "Outfit" registered successfully via Buffer.');
-                }
-            } catch (bufferErr) {
-                console.error(`[Image Engine] Buffer registration failed:`, bufferErr);
-            }
+            const fontBuffer = fs.readFileSync(outfitPath);
+            const fontKey = GlobalFonts.register(fontBuffer, 'Outfit');
+            if (fontKey) isRegistered = true;
         }
 
-
         if (!isRegistered) {
-            throw new Error(`CRITICAL: GlobalFonts.registerFromPath AND Buffer fallback returned false for ${outfitPath}`);
+            throw new Error(`CRITICAL: Font registration failed for ${outfitPath}`);
         }
-
-        console.log('[Image Engine] Font "Outfit" registered successfully.');
 
         // 2. Download source
         let buffer: Buffer;
 
         if (sourceUrl.startsWith('http')) {
-            console.log(`[Image Engine] Fetching source: ${sourceUrl}`);
-            const response = await fetch(sourceUrl);
+            console.log(`[Image Engine] Fetching: ${sourceUrl}`);
+            const response = await fetch(sourceUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
             if (!response.ok) {
-                console.error(`[Image Engine] Fetch failed: ${response.status} ${response.statusText} for ${sourceUrl}`);
-                throw new Error(`Failed to fetch source image: HTTP ${response.status}`);
+                console.error(`[Image Engine] Fetch failed: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch source: ${response.status}`);
             }
             buffer = Buffer.from(await response.arrayBuffer());
+            console.log(`[Image Engine] Downloaded ${buffer.length} bytes`);
         } else if (sourceUrl.startsWith('data:')) {
             const base64Data = sourceUrl.split(',')[1];
             buffer = Buffer.from(base64Data, 'base64');
@@ -189,84 +171,109 @@ export async function generateIntelImage({
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = true;
 
-        // Draw Image - LEGACY SCALING LOGIC (Reverted for stability)
         const img = await loadImage(buffer);
         const imgRatio = img.width / img.height;
-        const canvasRatio = WIDTH / HEIGHT;
 
-        // --- AUTO TEXT DETECTION (Aspect Ratio Heuristic) ---
-        // If the image is a portrait poster (e.g. 2:3), it almost always has text.
-        const isPortraitPoster = imgRatio < 0.8;
-        if (isPortraitPoster && applyText) {
-            console.log(`[Image Engine] Image aspect ratio (${imgRatio.toFixed(2)}) suggests a Poster. Disabling text overlay to avoid clutter.`);
-            applyText = false;
+        // --- 4:5 SUBJECT-SAFE ABORT RULE ---
+        // Rule: If an image is extremely wide (panorama) or extremely tall (long-strip composite), it's unsafe.
+        // Rule: Abort if aspect ratio is outside 0.6 to 1.6 range.
+        if (imgRatio > 1.6 || imgRatio < 0.6) {
+            console.error(`[Image Engine] ABORT: Source aspect ratio (${imgRatio.toFixed(2)}) violates subject-safe rule for 4:5 crop.`);
+            return null;
         }
 
-        let drawWidth, drawHeight;
+        // --- BUCKET-BASED DECISION LOGIC (User Rule) ---
+        const isPortraitPoster = imgRatio < 0.85;
+        const derivedClassification = classification || (isPortraitPoster ? 'TEXT_HEAVY' : 'CLEAN');
 
-        // If image is "wider" than canvas (e.g. 16:9 vs 4:5), fit Hight
-        if (imgRatio > canvasRatio) {
-            drawHeight = HEIGHT * scale;
-            drawWidth = drawHeight * imgRatio;
-        } else {
-            // If image is "taller" (or equal), fit Width
-            drawWidth = WIDTH * scale;
-            drawHeight = drawWidth / imgRatio; // Aspect correct
+        let finalApplyText = derivedClassification === 'CLEAN';
+        let finalApplyGradient = derivedClassification === 'CLEAN'; // Case 3: No gradient on posters
+        let finalApplyWatermark = finalApplyText;
+
+        // MANUAL OVERRIDE: Respect the explicit kill switch (TEXT OFF)
+        if (applyText === false) {
+            finalApplyText = false;
+            finalApplyGradient = false;
+            finalApplyWatermark = false;
+        } else if (applyText === true) {
+            finalApplyText = true;
+            finalApplyWatermark = true;
+            // HARD RULE: Even if text is forced ON, we NEVER want a gradient on a text-heavy poster.
+            if (derivedClassification === 'TEXT_HEAVY') {
+                finalApplyGradient = false;
+            } else {
+                finalApplyGradient = (applyGradient !== undefined) ? applyGradient : true;
+            }
         }
 
-        // Center + Offset
-        // Frontend sends normalized position (percentage of canvas), so multiply by WIDTH/HEIGHT
+        // --- FINAL REJECTION: HARD CONTRACT ---
+        if (derivedClassification === 'TEXT_HEAVY') {
+            finalApplyGradient = false;
+        }
+
+        // --- CLEAN TEXT PRE-VALIDATION ---
+        let cleanedHeadline = (headline || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
+        const upperTitle = (animeTitle || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
+
+        // Deduplication
+        if (cleanedHeadline === upperTitle && upperTitle.length > 0) cleanedHeadline = '';
+        if (cleanedHeadline.includes('TRENDING')) cleanedHeadline = '';
+
+        const hasActualText = (upperTitle.length > 0 || cleanedHeadline.length > 0);
+
+        // HARD CONTRACT: No text = No visual treatments.
+        if (!finalApplyText || !hasActualText) {
+            finalApplyText = false;
+            finalApplyGradient = false;
+            finalApplyWatermark = false;
+        }
+
+        // --- SAFE ZONE DETECTION ---
+        let finalGradientPosition = gradientPosition;
+        if (finalApplyText && !textPosition) {
+            try {
+                const topRegion = { left: 0, top: 0, width: img.width, height: Math.floor(img.height * 0.3) };
+                const bottomRegion = { left: 0, top: Math.floor(img.height * 0.7), width: img.width, height: Math.floor(img.height * 0.3) };
+                const [topStats, bottomStats] = await Promise.all([
+                    sharp(buffer).extract(topRegion).stats(),
+                    sharp(buffer).extract(bottomRegion).stats()
+                ]);
+                finalGradientPosition = topStats.entropy < bottomStats.entropy ? 'top' : 'bottom';
+            } catch {
+                finalGradientPosition = 'bottom';
+            }
+        }
+
+        // Scaling (Center Crop)
+        const horizontalScale = WIDTH / img.width;
+        const verticalScale = HEIGHT / img.height;
+        const finalScale = Math.max(horizontalScale, verticalScale) * scale;
+        const drawWidth = img.width * finalScale;
+        const drawHeight = img.height * finalScale;
         const dx = (WIDTH - drawWidth) / 2 + (position.x * WIDTH);
         const dy = (HEIGHT - drawHeight) / 2 + (position.y * HEIGHT);
 
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
 
-        const isTop = gradientPosition === 'top';
-
-        // 5. Typography Setup
+        const isTop = finalGradientPosition === 'top';
         const availableWidth = WIDTH * 0.90;
-
-        // STRICT: If user provides a headline, WE USE IT. No filtering.
-        let cleanedHeadline = (headline || '').toUpperCase().trim();
-        const upperTitle = (animeTitle || '').toUpperCase().trim();
-
-        // DEDUPLICATION GUARD:
-        if (cleanedHeadline === upperTitle && upperTitle.length > 0) {
-            console.log(`[Image Engine] Deduplicating headline (matches title): "${cleanedHeadline}"`);
-            cleanedHeadline = '';
-        }
-
-        // BANNED WORDS GUARD:
-        if (cleanedHeadline.includes('TRENDING')) {
-            console.log(`[Image Engine] Banning "TRENDING" from headline: "${cleanedHeadline}"`);
-            cleanedHeadline = '';
-        }
-
-        console.log(`[Image Engine] INPUTS -> Title: "${upperTitle}", Headline: "${cleanedHeadline}", ApplyText: ${applyText}`);
 
         let titleLines: string[] = [];
         let headlineLines: string[] = [];
         let totalBlockHeight = 0;
 
-        // Establish base lines at default size for gradient measurement
-        if (applyGradient || applyText) {
+        if (finalApplyText) {
             ctx.font = `900 135px "Outfit"`;
-            // Wrap WITHOUT truncation (high limit) to assess true height
-            const baseTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, 135) : [];
-            const baseHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, 135) : [];
-            const allBaseLines = [...baseTitleLines, ...baseHeadlineLines];
-            titleLines = baseTitleLines;
-            headlineLines = baseHeadlineLines;
-            totalBlockHeight = allBaseLines.length * (135 * 0.92);
+            titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, 135) : [];
+            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, 135) : [];
+            totalBlockHeight = (titleLines.length + headlineLines.length) * (135 * 0.92);
         }
 
-        console.log(`[Image Engine] WRAPPING RESULTS -> TitleLines: ${titleLines.length}, HeadlineLines: ${headlineLines.length}`);
-
-        // 6. Draw Gradient (Seamless Scrim)
-        if (applyGradient) {
-            const minGradH = 900;
+        // --- GRADIENT LOGIC (Strictly dependent on Rendering) ---
+        if (finalApplyGradient && finalApplyText && totalBlockHeight > 0) {
+            const minGradH = 800;
             const gradientHeight = Math.max(totalBlockHeight + 500, minGradH);
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
@@ -277,8 +284,6 @@ export async function generateIntelImage({
                 gradient.addColorStop(1, 'rgba(0,0,0,0)');
             } else {
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.15, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.25, 'rgba(0,0,0,0.03)');
                 gradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
                 gradient.addColorStop(0.6, 'rgba(0,0,0,0.6)');
                 gradient.addColorStop(0.85, 'rgba(0,0,0,0.95)');
@@ -291,93 +296,67 @@ export async function generateIntelImage({
             ctx.restore();
         }
 
-        // 7. Draw Text
-        if (!applyText) {
-            (ctx as any)._layoutMetadata = null;
-        } else {
-            if (headlineLines.length === 0 && titleLines.length === 0) {
-                console.warn("[Image Engine] Text enabled but no content to draw.");
-            }
-
-            const zoneHeight = 405; // 30% of 1350
-            const lineSpacingFactor = 0.92;
-
-            // MIN READABLE SCALE Floor
+        // --- DRAW TEXT ---
+        if (finalApplyText && totalBlockHeight > 0) {
+            const margin = 100; // Hard safety margin from canvas edges
+            const zoneHeight = (HEIGHT * 0.35) - 40; // Reduced zone height for better padding
+            const lineSpacingFactor = 1.05; // Less cramped spacing
             const requestedScale = Math.max(0.1, textScale);
-            let finalFontSize = 135 * requestedScale;
+            let finalFontSize = 120 * requestedScale; // Reduced base size to prevent 'oversized' feel
             let currentLineSpacing = finalFontSize * lineSpacingFactor;
 
-            // Generate lines one time to establish base block
             ctx.font = `900 ${finalFontSize}px "Outfit"`;
-            // Wrap WITHOUT truncation to ensure full title visibility
-            const currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
-            const currentHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
+            let currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
+            let currentHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
             let allLines = [...currentTitleLines, ...currentHeadlineLines];
-            let numLines = allLines.length;
             let titleLinesCount = currentTitleLines.length;
+            let totalH = allLines.length * currentLineSpacing;
 
-            let totalH = numLines * currentLineSpacing;
-
-            // 30% HEIGHT ENFORCEMENT LOOP
-            // If the block is too tall OR title exceeds 3 lines, we shrink the fontSize.
-            // This forces density up and line count down.
-            if (numLines > 0 && (totalH > zoneHeight || titleLinesCount > 3) && !disableAutoScaling) {
+            if (allLines.length > 0 && (totalH > zoneHeight || titleLinesCount > 3) && !disableAutoScaling) {
                 while ((totalH > zoneHeight || titleLinesCount > 3) && finalFontSize > 15) {
                     finalFontSize -= 2;
                     currentLineSpacing = finalFontSize * lineSpacingFactor;
-
-                    // Re-measure and re-wrap
                     ctx.font = `900 ${finalFontSize}px "Outfit"`;
                     const tLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
                     const hLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
-
                     allLines = [...tLines, ...hLines];
-                    numLines = allLines.length;
                     titleLinesCount = tLines.length;
-                    totalH = numLines * currentLineSpacing;
+                    totalH = allLines.length * currentLineSpacing;
                 }
             }
 
-            // STRICT REGION MATH: Centered in Header (0-405) or Footer (945-1350)
-            const zoneY = isTop ? 202.5 : 1147.5; // Centers for 30% zones
-            const startX = WIDTH / 2; // LOCKED: Horizontal Center
+            const zoneY = isTop ? (HEIGHT * 0.175) + 30 : HEIGHT - (HEIGHT * 0.175) - 30;
+            const startX = WIDTH / 2;
+            let centerCenterY = textPosition ? textPosition.y : zoneY;
 
-            // Calculate startY such that the block is centered vertically within the zone
-            const blockTop = zoneY - (totalH / 2);
-            const startY = blockTop;
+            // Strict Margin Enforcement
+            const minY = margin + (totalH / 2);
+            const maxY = HEIGHT - margin - (totalH / 2);
+            centerCenterY = Math.max(minY, Math.min(maxY, centerCenterY));
 
-            // Offset for baseline (Outfit font baseline is approx 85% of fontSize)
+            const startY = centerCenterY - (totalH / 2);
             let currentY = startY + (finalFontSize * 0.85);
 
-            // Construct Metadata for frontend
-            const layout: LayoutMetadata = {
+            (ctx as any)._layoutMetadata = {
                 fontSize: finalFontSize,
                 lineHeight: currentLineSpacing,
                 y: startY,
                 lines: allLines,
                 finalScale: finalFontSize / 135,
                 zone: isTop ? 'HEADER' : 'FOOTER',
-                numLines,
+                numLines: allLines.length,
                 totalHeight: totalH
             };
 
-            // ATTACH TO SCOPE FOR RETURN
-            (ctx as any)._layoutMetadata = layout;
-
             let wordCursor = 0;
-            console.log(`[Image Engine] Drawing ${allLines.length} lines of text at startY=${startY}`);
-
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
-
                 ctx.save();
                 ctx.font = `900 ${finalFontSize}px "Outfit"`;
                 ctx.textAlign = 'center';
 
-                // Shadow
-                ctx.shadowColor = 'rgba(0,0,0,0.8)'; // Stronger shadow for visibility
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
                 ctx.shadowBlur = 15;
-                ctx.shadowOffsetX = 0; // Centered glow effect
                 ctx.shadowOffsetY = 4;
 
                 let lineTotalWidth = 0;
@@ -388,20 +367,15 @@ export async function generateIntelImage({
                     return { wordW: m.width, spaceW };
                 });
 
-                let currentX = startX - (lineTotalWidth / 2);
+                let currentLineX = startX - (lineTotalWidth / 2);
 
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
                     ctx.save();
                     ctx.fillStyle = isPurple ? KUMOLAB_PURPLE : '#FFFFFF';
-                    // Force Opacity
-                    ctx.globalAlpha = 1.0;
-
-                    console.log(`[Image Engine] Drawing Word: "${word}" at (${Math.round(currentX)}, ${Math.round(currentY)}) Color: ${isPurple ? 'PURPLE' : 'WHITE'}`);
-
-                    ctx.fillText(word, currentX + (metrics[wordIdx].wordW / 2), currentY);
+                    ctx.fillText(word, currentLineX + (metrics[wordIdx].wordW / 2), currentY);
                     ctx.restore();
-                    currentX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
+                    currentLineX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
                 });
 
                 ctx.restore();
@@ -410,17 +384,15 @@ export async function generateIntelImage({
             }
         }
 
-        // Watermark
-        if (applyWatermark) {
-            ctx.font = 'bold 24px Arial, sans-serif'; // Crisp, small font
-            ctx.fillStyle = 'rgba(255,255,255,0.7)'; // Slightly more visible for clarity
+        // --- WATERMARK (Strictly dependent on text) ---
+        if (finalApplyWatermark && finalApplyText) {
+            ctx.font = 'bold 24px Arial, sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.textAlign = 'center';
             ctx.shadowBlur = 4;
             ctx.shadowColor = "rgba(0,0,0,0.8)";
-
             const wx = watermarkPosition ? watermarkPosition.x : WIDTH / 2;
             const wy = watermarkPosition ? watermarkPosition.y : HEIGHT - 40;
-
             ctx.fillText('@KumoLabAnime', wx, wy);
         }
 
@@ -430,28 +402,21 @@ export async function generateIntelImage({
         if (skipUpload) {
             return {
                 processedImage: processedImageBase64,
-                layout: (ctx as any)._layoutMetadata // We'll attach it to the context temporarily or just pass it through
+                layout: (ctx as any)._layoutMetadata
             };
         }
 
-        // Upload Logic (omitted for brevity in this replace, assuming only used for Preview here mostly)
-        // Re-implement basic upload if needed, but the route usually skips upload for preview.
+        // Upload
         const bucketName = 'blog-images';
         const { supabaseAdmin } = await import('../supabase/admin');
         const { error: uploadError } = await supabaseAdmin
             .storage
             .from(bucketName)
-            .upload(`${outputFileName}`, finalBuffer, {
-                contentType: 'image/png',
-                upsert: true
-            });
+            .upload(`${outputFileName}`, finalBuffer, { contentType: 'image/png', upsert: true });
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabaseAdmin
-            .storage
-            .from(bucketName)
-            .getPublicUrl(`${outputFileName}`);
+        const { data: { publicUrl } } = supabaseAdmin.storage.from(bucketName).getPublicUrl(`${outputFileName}`);
 
         return {
             processedImage: publicUrl,
@@ -459,14 +424,7 @@ export async function generateIntelImage({
         };
 
     } catch (e: any) {
-        console.log("!!! IMAGE ENGINE FATAL ERROR !!!");
-        console.log(e);
-        if (e instanceof Error) {
-            console.log(e.stack);
-        }
         console.error("Image Engine Fatal:", e);
-        // Fallback Error Image
-        // ... (simplified error image)
         return null;
     }
 }
