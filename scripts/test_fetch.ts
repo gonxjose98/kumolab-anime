@@ -1,14 +1,13 @@
 
 import fetch from 'node-fetch';
-import fs from 'fs';
 
 async function testFetch() {
     console.log("Testing fetch...");
     try {
-        const url = "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx158871-u2G2y5a0W33w.jpg";
+        const url = "https://gbf.wiki/images/thumb/5/52/Granblue_Fantasy_Relink_Visual.jpg/800px-Granblue_Fantasy_Relink_Visual.jpg";
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         });
         console.log("Status:", response.status);

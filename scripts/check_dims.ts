@@ -14,8 +14,7 @@ async function checkDims(url: string, label: string) {
 }
 
 async function run() {
-    await checkDims("https://s4.anilist.co/file/anilistcdn/media/anime/banner/158871-jKfsW5HCGA3K.jpg", "Banner");
-    await checkDims("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx158871-u2G2y5a0W33w.jpg", "Cover");
+    await checkDims("https://image.api.playstation.com/vulcan/ap/rnd/202006/1400/a290h6wGNxdaXldfBBCAAxe8.jpg", "PS_Image");
 }
 
 run();
