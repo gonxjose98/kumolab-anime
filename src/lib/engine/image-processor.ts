@@ -200,16 +200,33 @@ export async function generateIntelImage({
         } else if (applyText === true) {
             finalApplyText = true;
             finalApplyWatermark = true;
-            // HARD RULE: Even if text is forced ON, we NEVER want a gradient on a text-heavy poster.
+
+            // Refined Rule:
+            // 1. If explicitly asking for text (applyText = true), we generally WANT the gradient for readability.
+            // 2. EXCEPT if it's a poster (TEXT_HEAVY) AND the user hasn't explicitly asked for it (applyGradient undefined).
+            // 3. User can Force Gradient ON even on posters.
+
             if (derivedClassification === 'TEXT_HEAVY') {
-                finalApplyGradient = false;
+                // On posters, default to NO gradient, unless user explicitly requested it? 
+                // Actually, user says: "text should always come with gradient unless otherwise specified."
+                // So if applyText is TRUE, applyGradient should generally be TRUE.
+                // But we have the 'TEXT_HEAVY' safety rule. 
+
+                // Let's relax the TEXT_HEAVY check if 'applyGradient' is explicitly true.
+                if (applyGradient === true) {
+                    finalApplyGradient = true;
+                } else {
+                    finalApplyGradient = false; // Default for posters remains clean
+                }
             } else {
-                finalApplyGradient = (applyGradient !== undefined) ? applyGradient : true;
+                // CLEAN images: Always gradient if text is on.
+                finalApplyGradient = (applyGradient !== false);
             }
         }
 
         // --- FINAL REJECTION: HARD CONTRACT ---
-        if (derivedClassification === 'TEXT_HEAVY') {
+        // If text is OFF, Gradient is OFF.
+        if (!finalApplyText) {
             finalApplyGradient = false;
         }
 

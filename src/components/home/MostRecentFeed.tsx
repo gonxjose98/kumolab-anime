@@ -32,6 +32,19 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                 <div className={styles.feed}>
                     {filteredPosts.map((post) => (
                         <Link href={`/blog/${post.slug}`} key={post.id} className={styles.card}>
+                            <div className={styles.content}>
+                                <div className={styles.meta}>
+                                    <time className={styles.date}>
+                                        {new Date(post.timestamp).toLocaleDateString(undefined, {
+                                            month: 'long', day: 'numeric', year: 'numeric'
+                                        })}
+                                    </time>
+                                </div>
+                                <h3 className={styles.title}>
+                                    {post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                                </h3>
+                            </div>
+
                             <div className={styles.imageWrapper}>
                                 {post.image ? (
                                     <div className={styles.imageAspectRatio}>
@@ -50,19 +63,6 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     <div className={styles.placeholder} />
                                 )}
                                 <span className={styles.badge}>{post.type}</span>
-                            </div>
-
-                            <div className={styles.content}>
-                                <div className={styles.meta}>
-                                    <time className={styles.date}>
-                                        {new Date(post.timestamp).toLocaleDateString(undefined, {
-                                            month: 'long', day: 'numeric', year: 'numeric'
-                                        })}
-                                    </time>
-                                </div>
-                                <h3 className={styles.title}>
-                                    {post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '')}
-                                </h3>
                             </div>
                         </Link>
                     ))}
