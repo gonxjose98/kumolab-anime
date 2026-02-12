@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runBlogEngine } from '@/lib/engine/engine';
+import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
 
 // Vercel Cron ensures this header is present if secured, 
 // but for now we'll allow flexible execution or check CRON_SECRET if you set it.
@@ -20,15 +20,16 @@ export async function GET(req: NextRequest) {
     console.log(`[Cron] Triggered for slot: ${slot} (Deploy Check: ${new Date().toISOString()})`);
 
     try {
-        // Run the engine
-        // We pass 'true' to force validation if needed, or false to be strict/safe.
-        // Usually, cron runs once per slot, so false is safer (avoids dupes).
+        // 1. Publish any posts scheduled for this hour
+        await publishScheduledPosts();
+
+        // 2. Run the engine to find new pending posts
         const result = await runBlogEngine(slot as any, false);
 
         if (result) {
             return NextResponse.json({ success: true, post: result.title });
         } else {
-            return NextResponse.json({ success: true, message: 'Engine ran but no new post generated (criteria or duplicate).' });
+            return NextResponse.json({ success: true, message: 'Engine ran & Published check complete.' });
         }
     } catch (error: any) {
         console.error('[Cron] Engine Error:', error);

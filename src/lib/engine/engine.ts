@@ -13,6 +13,7 @@ import path from 'path';
 
 import { supabaseAdmin } from '../supabase/admin';
 import { publishToSocials } from '../social/publisher';
+import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -43,6 +44,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
     let newPost: BlogPost | null = null;
     let explicitSlot = slot;
+    let telemetry: any = null;
 
     console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
@@ -97,54 +99,99 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         }
 
         // 1. Fetch All Candidates (Intel + Trending)
-        const candidates = await fetchSmartTrendingCandidates();
+        const result = await fetchSmartTrendingCandidates();
+        const candidates = result.candidates;
+        telemetry = result.telemetry;
+
+        const abortLogs: any[] = [];
 
         // 2. Filter & Prioritize (Newsroom Logic)
-        // We want: High Quality, Breaking, NOT Posted.
         for (const item of candidates) {
-            // GENERATE CANDIDATE
-            // We use generateTrendingPost as the generic wrapper now since it handles SmartItems
-            // But if it came from purely INTEL source (RSS), it might have ClaimType.
+            // Check for explicit ABORT/SKIPS already identified by fetcher
+            // 1. Check for explicit ABORTS identified by fetcher (Reality Checks)
+            if (['OTHER_ABORT', 'STALE_CONFIRMATION_ABORT', 'STALE_OR_DUPLICATE_FACT'].includes(item.claimType)) {
+                abortLogs.push({
+                    anime: item.title,
+                    event_type: item.claimType,
+                    source: item.source || 'KumoLab SmartSync',
+                    reason: `FETCHER_ABORT: ${item.claimType}`
+                });
+                continue;
+            }
 
-            // Map to unified shape if needed or just use generateTrendingPost which effectively detects visual/trailer
-            // Actually fetchSmartTrendingCandidates returns unified objects now.
+            const post = await (item.source === 'KumoLab SmartSync' ? generateTrendingPost(item, now) : generateIntelPost([item], now));
 
-            const post = await generateTrendingPost(item, now);
+            if (!post) {
+                // If generator returned null, it was an internal abort (e.g. missing visual)
+                abortLogs.push({
+                    anime: item.title,
+                    event_type: item.claimType,
+                    source: item.source || 'KumoLab SmartSync',
+                    reason: 'GENERATOR_ABORT (Likely missing visual or strict rule)'
+                });
+                continue;
+            }
 
-            if (post) {
-                // VALIDATE
-                // 1. Deduplication (Critical)
-                if (validatePost(post, existingPosts, force)) {
-
-                    // 2. QUALITY THRESHOLD (The "Editorial" Filter)
-                    // If it is 'Generic News' or low score, maybe skip?
-                    // For now, if fetchSmartTrendingCandidates returned it in Top 10, it's decent.
-                    // But we want to ensure we don't post "fluff".
-
-                    // Check US-Centric "Debut" logic strictly here if not caught by fetcher
-                    if (post.title.includes("Debuts in") && !post.title.includes("US") && !post.title.includes("Global")) {
-                        console.log(`[Engine] Rejecting non-US Debut title: ${post.title}`);
+            // VALIDATE
+            const existingPostsForDup = await getPosts(true);
+            if (validatePost(post, existingPostsForDup, false)) {
+                // NEW: Manual Approval Logic
+                if (USE_SUPABASE) {
+                    const duplicateResult = await checkForDuplicate(post.title, supabaseAdmin);
+                    if (duplicateResult === 'DECLINED') {
+                        console.log(`[Engine] Skipping "${post.title}" - Already in declined_posts.`);
                         continue;
                     }
 
-                    newPost = post;
-                    break; // Found our 1 breaking story for this hour.
+                    const sourceTier = await getSourceTier(item.source || 'Unknown', supabaseAdmin);
+                    const relevanceScore = calculateRelevanceScore({ title: post.title, source_tier: sourceTier });
+
+                    (post as any).status = 'pending';
+                    (post as any).source_tier = sourceTier;
+                    (post as any).relevance_score = relevanceScore;
+                    (post as any).is_duplicate = duplicateResult !== null;
+                    (post as any).duplicate_of = typeof duplicateResult === 'number' ? duplicateResult : null;
+                    (post as any).scraped_at = new Date().toISOString();
+                    (post as any).is_published = false;
+                    (post as any).source = item.source || 'Unknown';
                 }
+
+                newPost = post;
+                break; // Found our 1 breaking story for this hour.
+            } else {
+                abortLogs.push({
+                    anime: post.title,
+                    event_type: post.claimType,
+                    source: item.source || 'KumoLab SmartSync',
+                    reason: 'VALIDATION_REJECT (Duplicate or Image Check)',
+                    fingerprint: post.event_fingerprint
+                });
             }
+        }
+
+        if (abortLogs.length > 0) {
+            console.log(`[Engine] Aborted ${abortLogs.length} candidates. Logging top aborts.`);
+            await logSchedulerRun(slot, 'skipped', `Aborted ${abortLogs.length} candidates`, { aborts: abortLogs.slice(0, 20) });
         }
     }
 
     if (newPost) {
-        // Final Double-Check validation
-        if (validatePost(newPost, existingPosts, force)) {
-            await publishPost(newPost);
-            await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug });
-            return newPost;
-        }
+        await publishPost(newPost);
+        await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug, fingerprint: newPost.event_fingerprint });
+        return newPost;
     }
 
     console.log('[Engine] No valid/new content found this hour.');
-    await logSchedulerRun(slot, 'skipped', 'No new content', { reason: 'No candidates met criteria' });
+
+    // ANOMALY DETECTION: If we found many items but they all got rejected, log a warning instead of a simple skip
+    if (telemetry && telemetry.negativeKeywordsSkipped > 15 && telemetry.candidatesFound === 0) {
+        await logSchedulerRun(slot, 'warning' as any, 'High Content Rejection Rate Detected', {
+            reason: 'Excessive negative keyword filtering. Verify if rules are too strict.',
+            telemetry
+        });
+    } else {
+        await logSchedulerRun(slot, 'skipped', 'No new content', { reason: 'No candidates met criteria', telemetry });
+    }
     return null;
 }
 
@@ -166,10 +213,22 @@ async function publishPost(post: BlogPost) {
                 is_published: post.isPublished,
                 claim_type: post.claimType,
                 premiere_date: post.premiereDate,
+                event_fingerprint: post.event_fingerprint,
+                truth_fingerprint: post.truth_fingerprint,
+                anime_id: post.anime_id,
+                season_label: post.season_label,
                 // Provenance Columns
                 verification_tier: post.verification_tier,
                 verification_reason: post.verification_reason,
-                verification_sources: post.verification_sources
+                verification_sources: post.verification_sources,
+                // New Approval Columns
+                status: (post as any).status || 'published',
+                source_tier: (post as any).source_tier || 3,
+                relevance_score: (post as any).relevance_score || 0,
+                is_duplicate: (post as any).is_duplicate || false,
+                duplicate_of: (post as any).duplicate_of || null,
+                scraped_at: (post as any).scraped_at || post.timestamp,
+                source: (post as any).source || 'Unknown'
             }], { onConflict: 'slug' });
 
         if (error) {
@@ -199,6 +258,69 @@ async function publishPost(post: BlogPost) {
     }
 
     console.log(`Successfully published: ${post.title}`);
+}
+
+/**
+ * Checks for scheduled posts and publishes them.
+ */
+export async function publishScheduledPosts() {
+    const now = new Date();
+    console.log(`[Publisher] Checking for scheduled posts at ${now.toISOString()}`);
+
+    if (!USE_SUPABASE) return;
+
+    const { data: scheduledPosts, error } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .eq('status', 'approved')
+        .lte('scheduled_post_time', now.toISOString());
+
+    if (error) {
+        console.error('[Publisher] Error fetching scheduled posts:', error);
+        return;
+    }
+
+    if (!scheduledPosts || scheduledPosts.length === 0) {
+        console.log('[Publisher] No posts scheduled for this hour.');
+        return;
+    }
+
+    console.log(`[Publisher] Found ${scheduledPosts.length} posts to publish.`);
+
+    for (const post of scheduledPosts) {
+        try {
+            console.log(`[Publisher] Publishing scheduled post: ${post.title}`);
+
+            // Update status and is_published
+            const { error: updateError } = await supabaseAdmin
+                .from('posts')
+                .update({
+                    status: 'published',
+                    is_published: true,
+                    timestamp: now.toISOString() // Update timestamp to now for "Newness"
+                })
+                .eq('id', post.id);
+
+            if (updateError) {
+                console.error(`[Publisher] Failed to update post ${post.id}:`, updateError);
+                continue;
+            }
+
+            // [OPTIONAL] Revalidate
+            try {
+                const { revalidatePath } = await import('next/cache');
+                revalidatePath('/');
+                revalidatePath('/blog');
+                revalidatePath(`/blog/${post.slug}`);
+            } catch (e) {
+                console.warn('[Publisher] Revalidation failed:', e);
+            }
+
+            console.log(`[Publisher] Successfully published: ${post.title}`);
+        } catch (e) {
+            console.error(`[Publisher] Error publishing post ${post.title}:`, e);
+        }
+    }
 }
 
 // Internal helper for generator consistency
@@ -236,7 +358,8 @@ async function generateCommunityNightPost(date: Date): Promise<BlogPost | null> 
             content,
             image: '/hero-bg-final.png', // Fallback image
             timestamp: date.toISOString(),
-            isPublished: true
+            isPublished: true,
+            status: 'published'
         };
     } catch (error) {
         console.log('Community Night skipped (no content):', error);

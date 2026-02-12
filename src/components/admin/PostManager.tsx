@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import Link from 'next/link';
-import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send } from 'lucide-react';
+import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send, Check, X, Calendar, AlertTriangle } from 'lucide-react';
 
 import { BlogPost } from '@/types';
 
@@ -34,7 +34,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
-    const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN'>('ALL');
+    const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -186,11 +186,72 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const filteredPosts = posts.filter(post => {
-        if (filter === 'LIVE') return post.isPublished;
-        if (filter === 'HIDDEN') return !post.isPublished;
+    const handleApprove = async (postIds: string[]) => {
+        setIsPublishing(true);
+        try {
+            const resp = await fetch('/api/admin/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ postIds })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                setPosts(prev => prev.map(p => postIds.includes(p.id!) ? { ...p, status: 'approved' as const } : p));
+                setSelectedIds([]);
+            } else {
+                alert('Approve failed: ' + result.error);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    const handleDecline = async (postIds: string[], reason: string = '') => {
+        setIsPublishing(true);
+        try {
+            const resp = await fetch('/api/admin/decline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ postIds, reason })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
+                setSelectedIds([]);
+            } else {
+                alert('Decline failed: ' + result.error);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    const filteredPosts = posts.filter((post) => {
+        if (filter === 'ALL') return true;
+        if (filter === 'LIVE') return post.isPublished === true;
+        if (filter === 'HIDDEN') return post.isPublished === false && post.status !== 'pending' && post.status !== 'approved';
+        if (filter === 'PENDING') return post.status === 'pending';
+        if (filter === 'APPROVED') return post.status === 'approved';
         return true;
+    }).sort((a, b) => {
+        if (filter === 'PENDING') {
+            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+            }
+            return (a.sourceTier || 3) - (b.sourceTier || 3);
+        }
+        if (filter === 'APPROVED') {
+            return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
+        }
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
+
+    const pendingCount = posts.filter(p => p.status === 'pending').length;
+    const approvedCount = posts.filter(p => p.status === 'approved').length;
 
     const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
         setEditingPostId(null);
@@ -1021,12 +1082,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex bg-white/60 dark:bg-black/40 p-1.5 rounded-xl border border-gray-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-none">
-                    {(['ALL', 'LIVE', 'HIDDEN'] as const).map((f) => (
+                <div className="flex bg-white/60 dark:bg-black/40 p-1.5 rounded-xl border border-gray-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-none overflow-x-auto">
+                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={`relative px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest rounded-lg transition-all duration-300 ${filter === f
+                            className={`relative px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest rounded-lg transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${filter === f
                                 ? 'text-white shadow-[0_4px_10px_rgba(168,85,247,0.3)]'
                                 : 'text-slate-500 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/5'
                                 }`}
@@ -1034,7 +1095,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             {filter === f && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg -z-10" />
                             )}
-                            {f}
+                            <span>{f}</span>
+                            {f === 'PENDING' && pendingCount > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-purple-600' : 'bg-purple-600 text-white'}`}>
+                                    {pendingCount}
+                                </span>
+                            )}
+                            {f === 'APPROVED' && approvedCount > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'}`}>
+                                    {approvedCount}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -1129,13 +1200,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         </button>
 
                         <button
+                            onClick={() => handleApprove(selectedIds)}
+                            disabled={isPublishing}
+                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 border border-green-400 backdrop-blur-xl shadow-lg shadow-green-500/20 hover:-translate-y-0.5 transition-all duration-300"
+                        >
+                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                <span className="text-[10px] font-black uppercase tracking-widest">Approve ({selectedIds.length})</span>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => handleDecline(selectedIds)}
+                            disabled={isPublishing}
+                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 border border-red-400 backdrop-blur-xl shadow-lg shadow-red-500/20 hover:-translate-y-0.5 transition-all duration-300"
+                        >
+                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                                <span className="text-[10px] font-black uppercase tracking-widest">Decline ({selectedIds.length})</span>
+                            </div>
+                        </button>
+
+                        <button
                             onClick={handlePublishToSocials}
                             disabled={isPublishing}
                             className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
                         >
                             <div className="flex items-center justify-center gap-2 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
                                 {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Publish ({selectedIds.length})</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">Broadcast ({selectedIds.length})</span>
                             </div>
                         </button>
                     </div>
@@ -1157,7 +1250,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider">Signal Status</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-wider">
+                                    {filter === 'PENDING' ? 'Metadata' : 'Signal Status'}
+                                </th>
                                 <th className="p-4 text-xs font-bold uppercase tracking-wider">Visual</th>
                                 <th className="p-4 text-xs font-bold uppercase tracking-wider w-full">Intel</th>
                                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-right pr-6">Controls</th>
@@ -1174,24 +1269,46 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-4 align-top w-[120px]">
-                                        <div className="flex flex-col gap-2">
-                                            <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
-                                                ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
-                                                : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
-                                                }`}>
-                                                {post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
-                                            </span>
-                                            <div className="flex items-center justify-center gap-1.5 pt-1">
-                                                <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
-                                                <Instagram size={10} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
-                                                <Facebook size={10} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
-                                                <Share2 size={10} className={post.socialIds?.threads ? 'text-white' : 'text-neutral-700 opacity-20'} />
+                                    <td className="p-4 align-top w-[140px]">
+                                        {filter === 'PENDING' ? (
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-black tracking-[0.1em] border ${post.sourceTier === 1 ? 'bg-green-500/10 text-green-500 border-green-500/20' : post.sourceTier === 2 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20'}`}>
+                                                        TIER {post.sourceTier || 3}
+                                                    </span>
+                                                    <span className="text-[9px] font-black text-white/40 font-mono">
+                                                        {post.relevanceScore || 0}%
+                                                    </span>
+                                                </div>
+                                                <div className="text-[9px] font-bold text-neutral-500 truncate uppercase tracking-tighter">
+                                                    {post.source || 'Unknown Source'}
+                                                </div>
+                                                <div className="text-[8px] font-mono text-neutral-600">
+                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleTimeString() : 'Manual'}
+                                                </div>
                                             </div>
-                                            <span className="text-[10px] text-center font-mono text-slate-500 dark:text-neutral-600 uppercase">
-                                                {post.type}
-                                            </span>
-                                        </div>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
+                                                    ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                                    : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
+                                                    }`}>
+                                                    {post.status === 'approved' ? 'SCHEDULED' : post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
+                                                </span>
+                                                {post.status === 'approved' && post.scheduledPostTime && (
+                                                    <div className="flex items-center justify-center gap-1.5 text-[9px] font-black text-blue-400 uppercase tracking-tighter">
+                                                        <Calendar size={10} />
+                                                        {new Date(post.scheduledPostTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center justify-center gap-1.5 pt-1">
+                                                    <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
+                                                    <Instagram size={10} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
+                                                    <Facebook size={10} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
+                                                    <Share2 size={10} className={post.socialIds?.threads ? 'text-white' : 'text-neutral-700 opacity-20'} />
+                                                </div>
+                                            </div>
+                                        )}
                                     </td>
 
                                     <td className="p-4 align-top w-[100px]">
@@ -1207,9 +1324,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         </div>
                                     </td>
                                     <td className="p-4 align-top">
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors mb-1">
-                                            {post.title}
-                                        </h3>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
+                                                {post.title}
+                                            </h3>
+                                            {post.isDuplicate && (
+                                                <span className="px-1.5 py-0.5 bg-yellow-400/10 border border-yellow-400/20 text-yellow-500 text-[8px] font-black uppercase tracking-widest rounded flex items-center gap-1">
+                                                    <AlertTriangle size={8} /> DUPLICATE
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide">
                                             <span>{new Date(post.timestamp).toLocaleDateString()}</span>
                                             <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
@@ -1218,6 +1342,24 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
                                         <div className="flex justify-end gap-2">
+                                            {filter === 'PENDING' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleApprove([post.id!])}
+                                                        title="Approve Transmission"
+                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 hover:bg-green-500 text-green-500 hover:text-white border border-green-500/20 transition-all"
+                                                    >
+                                                        <Check size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDecline([post.id!])}
+                                                        title="Decline Transmission"
+                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 transition-all"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
                                                 title="Visual Mission Control"
@@ -1265,19 +1407,30 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex flex-col gap-1">
-                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.isPublished
+                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.isPublished
                                                 ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
                                                 : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
                                                 }`}>
-                                                {post.isPublished ? 'LIVE' : 'HIDDEN'}
+                                                {post.status === 'approved' ? 'SCHEDULED' : post.isPublished ? 'LIVE' : 'HIDDEN'}
                                             </span>
-                                            <div className="flex gap-1">
-                                                <Twitter size={8} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
-                                                <Instagram size={8} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
-                                                <Facebook size={8} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
-                                            </div>
+                                            {filter === 'PENDING' && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] font-black p-0.5 bg-purple-500/10 text-purple-400 rounded">
+                                                        {post.relevanceScore || 0}%
+                                                    </span>
+                                                    <span className="text-[8px] font-bold text-neutral-600 uppercase">
+                                                        T{post.sourceTier || 3}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex gap-2">
+                                            {filter === 'PENDING' && (
+                                                <>
+                                                    <button onClick={() => handleApprove([post.id!])} className="text-green-500 hover:text-green-400"><Check size={16} /></button>
+                                                    <button onClick={() => handleDecline([post.id!])} className="text-red-500 hover:text-red-400"><X size={16} /></button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
                                                 className="text-purple-600 dark:text-purple-400 hover:text-purple-700"
@@ -1296,9 +1449,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
                                         {post.title}
                                     </h3>
-                                    <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
-                                        {new Date(post.timestamp).toLocaleDateString()}
-                                    </p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
+                                            {new Date(post.timestamp).toLocaleDateString()}
+                                        </p>
+                                        {post.status === 'approved' && post.scheduledPostTime && (
+                                            <p className="text-[9px] font-black text-blue-400 uppercase">
+                                                {new Date(post.scheduledPostTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

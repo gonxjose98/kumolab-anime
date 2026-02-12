@@ -80,6 +80,11 @@ export async function POST(req: NextRequest) {
 
         // Deployment Logic: Alerts are always published immediately
         postData.is_published = type === 'CONFIRMATION_ALERT';
+        postData.status = 'published'; // Manual posts bypass pending status
+        postData.source_tier = 1; // Admin is Tier 1
+        postData.relevance_score = 100;
+        postData.source = 'Admin Dashboard';
+        postData.scraped_at = new Date().toISOString();
 
         // Only generate id/slug/timestamp for NEW posts
         if (!postId) {

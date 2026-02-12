@@ -44,12 +44,37 @@ export async function getPosts(includeHidden: boolean = false): Promise<BlogPost
 
                 return post.is_published === true;
             })
-            .map(post => ({
-                ...post,
-                isPublished: post.is_published === true, // Strict boolean mapping
-                claimType: post.claim_type,
-                premiereDate: post.premiere_date
-            }))
+            .map(post => {
+                const mapped: BlogPost = {
+                    ...post,
+                    isPublished: post.is_published === true,
+                    claimType: post.claim_type,
+                    premiereDate: post.premiere_date,
+                    truth_fingerprint: post.truth_fingerprint,
+                    event_fingerprint: post.event_fingerprint,
+                    anime_id: post.anime_id,
+                    season_label: post.season_label,
+                    status: post.status,
+                    sourceTier: post.source_tier,
+                    relevanceScore: post.relevance_score,
+                    isDuplicate: post.is_duplicate,
+                    duplicateOf: post.duplicate_of,
+                    scrapedAt: post.scraped_at,
+                    source: post.source
+                };
+
+                // RECONSTRUCTION: If truth_fingerprint is missing from DB (legacy), reconstruct it for local deduplication
+                if (!mapped.truth_fingerprint && mapped.anime_id && mapped.claimType) {
+                    const { generateTruthFingerprint } = require('./engine/utils');
+                    mapped.truth_fingerprint = generateTruthFingerprint({
+                        anime_id: mapped.anime_id,
+                        event_type: mapped.claimType,
+                        season_label: mapped.season_label || undefined
+                    });
+                }
+
+                return mapped;
+            })
             // CLEANSE: Ensure strictly serializable data for Next.js Client Components
             .map(p => JSON.parse(JSON.stringify(p)));
     }
