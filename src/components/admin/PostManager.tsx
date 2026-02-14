@@ -26,11 +26,15 @@ export interface LayoutMetadata {
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
     // Normalize posts to ensure isPublished and social stats are present
-    const normalizedPosts = initialPosts.map(p => ({
-        ...p,
-        isPublished: (p as any).is_published ?? p.isPublished,
-        socialIds: (p as any).social_ids ?? (p.socialIds || {})
-    }));
+    const normalizedPosts = initialPosts.map(p => {
+        const scheduledTime = (p as any).scheduled_post_time ?? p.scheduledPostTime;
+        return {
+            ...p,
+            isPublished: (p as any).is_published ?? p.isPublished,
+            scheduledPostTime: scheduledTime,
+            socialIds: (p as any).social_ids ?? (p.socialIds || {})
+        };
+    });
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
@@ -99,6 +103,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     }, []);
 
+    useEffect(() => {
+        console.log('[PostManager] Admin OS v2.2.5 Active', {
+            totalPosts: posts.length,
+            approved: posts.filter(p => p.status === 'approved').length
+        });
+        (window as any).debugPosts = posts;
+    }, [posts]);
+
     const [layoutMetadata, setLayoutMetadata] = useState<LayoutMetadata | null>(null);
 
     const [isApplyGradient, setIsApplyGradient] = useState(true);
@@ -110,6 +122,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isPublishing, setIsPublishing] = useState(false);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
+    const [schedulingPostId, setSchedulingPostId] = useState<string | null>(null);
 
     // Scheduler Logs State
     const [showLogsModal, setShowLogsModal] = useState(false);
@@ -196,10 +209,61 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
-                setPosts(prev => prev.map(p => postIds.includes(p.id!) ? { ...p, status: 'approved' as const } : p));
-                setSelectedIds([]);
+                // Fetch updated posts or update locally
+                // For simplicity, update locally with estimated times (or refresh)
+                setFilter('APPROVED');
+                window.location.reload(); // Reliable sync
             } else {
                 alert('Approve failed: ' + result.error);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    const handleUpdateSchedule = async (postId: string, newTime: Date) => {
+        setIsPublishing(true);
+        try {
+            const resp = await fetch('/api/admin/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ postId, scheduledTime: newTime.toISOString() })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                setPosts(prev => prev.map(p => p.id === postId ? { ...p, scheduledPostTime: newTime.toISOString() } : p));
+                setSchedulingPostId(null);
+            } else {
+                alert('Schedule update failed: ' + result.error);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    const handleCancelApproval = async (postId: string) => {
+        if (!confirm('Revert this post to pending status?')) return;
+        setIsPublishing(true);
+        try {
+            const resp = await fetch('/api/posts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: postId,
+                    status: 'pending',
+                    scheduled_post_time: null,
+                    is_published: false
+                })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: 'pending', scheduledPostTime: undefined } : p));
+            } else {
+                alert('Reset failed: ' + result.error);
             }
         } catch (e) {
             console.error(e);
@@ -1295,10 +1359,71 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     }`}>
                                                     {post.status === 'approved' ? 'SCHEDULED' : post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
                                                 </span>
-                                                {post.status === 'approved' && post.scheduledPostTime && (
-                                                    <div className="flex items-center justify-center gap-1.5 text-[9px] font-black text-blue-400 uppercase tracking-tighter">
-                                                        <Calendar size={10} />
-                                                        {new Date(post.scheduledPostTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {post.status === 'approved' && (
+                                                    <div className="flex flex-col items-center gap-1.5 pt-1">
+                                                        {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
+                                                            <div className="flex flex-col items-center text-[9px] font-black text-blue-400 uppercase tracking-tighter leading-tight">
+                                                                <div className="flex items-center gap-1">
+                                                                    <Calendar size={10} />
+                                                                    {new Date(post.scheduledPostTime || (post as any).scheduled_post_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </div>
+                                                                <div className="opacity-60">
+                                                                    {new Date(post.scheduledPostTime || (post as any).scheduled_post_time).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' })}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-[9px] font-black text-red-500 uppercase tracking-tighter flex items-center gap-1">
+                                                                <AlertTriangle size={10} />
+                                                                Pending Slot
+                                                            </div>
+                                                        )}
+
+                                                        {schedulingPostId === post.id ? (
+                                                            <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-1.5 rounded-lg border border-blue-500/20 animate-in fade-in zoom-in-95">
+                                                                {[10, 14, 18, 21].map(h => (
+                                                                    <button
+                                                                        key={h}
+                                                                        onClick={() => {
+                                                                            const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
+                                                                            const d = new Date(sched);
+                                                                            d.setHours(h, 0, 0, 0);
+                                                                            handleUpdateSchedule(post.id!, d);
+                                                                        }}
+                                                                        className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors text-left uppercase"
+                                                                    >
+                                                                        {h > 12 ? `${h - 12}:00 PM` : h === 12 ? '12:00 PM' : `${h}:00 AM`}
+                                                                    </button>
+                                                                ))}
+                                                                <input
+                                                                    type="datetime-local"
+                                                                    className="text-center text-[8px] font-bold bg-black/40 border border-white/10 rounded p-1 text-white outline-none focus:border-blue-500/50 mt-1"
+                                                                    onChange={(e) => {
+                                                                        if (e.target.value) handleUpdateSchedule(post.id!, new Date(e.target.value));
+                                                                    }}
+                                                                />
+                                                                <button
+                                                                    onClick={() => setSchedulingPostId(null)}
+                                                                    className="text-[8px] font-black text-red-400/70 hover:text-red-400 uppercase tracking-widest mt-1 py-1"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col gap-1 w-full opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => setSchedulingPostId(post.id!)}
+                                                                    className="text-[8px] font-black py-1 px-2 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white border border-blue-500/20 rounded uppercase tracking-widest transition-all"
+                                                                >
+                                                                    Change
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleCancelApproval(post.id!)}
+                                                                    className="text-[8px] font-black py-1 px-2 text-neutral-500 hover:text-red-400 uppercase tracking-widest transition-colors"
+                                                                >
+                                                                    Revoke
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                                 <div className="flex items-center justify-center gap-1.5 pt-1">
@@ -1453,10 +1578,73 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
                                             {new Date(post.timestamp).toLocaleDateString()}
                                         </p>
-                                        {post.status === 'approved' && post.scheduledPostTime && (
-                                            <p className="text-[9px] font-black text-blue-400 uppercase">
-                                                {new Date(post.scheduledPostTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
+                                        {post.status === 'approved' && (
+                                            <div className="flex flex-col items-end text-right gap-2">
+                                                {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-blue-400 uppercase leading-none">
+                                                            {new Date(post.scheduledPostTime || (post as any).scheduled_post_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                        <p className="text-[8px] font-bold text-blue-400/60 uppercase mt-0.5">
+                                                            {new Date(post.scheduledPostTime || (post as any).scheduled_post_time).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' })}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[9px] font-black text-red-500 uppercase flex items-center gap-1">
+                                                        <AlertTriangle size={10} />
+                                                        Pending Slot
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setSchedulingPostId(post.id!)}
+                                                        className="text-[8px] font-black py-1 px-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded uppercase tracking-widest"
+                                                    >
+                                                        Change
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCancelApproval(post.id!)}
+                                                        className="text-[8px] font-black py-1 px-2 text-neutral-500 hover:text-red-400 uppercase tracking-widest"
+                                                    >
+                                                        Revoke
+                                                    </button>
+                                                </div>
+
+                                                {schedulingPostId === post.id && (
+                                                    <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-2 rounded-lg border border-blue-500/20 mt-2">
+                                                        <div className="grid grid-cols-2 gap-1">
+                                                            {[10, 14, 18, 21].map(h => (
+                                                                <button
+                                                                    key={h}
+                                                                    onClick={() => {
+                                                                        const sched = post.scheduledPostTime || (post as any).scheduled_post_time;
+                                                                        const d = new Date(sched);
+                                                                        d.setHours(h, 0, 0, 0);
+                                                                        handleUpdateSchedule(post.id!, d);
+                                                                    }}
+                                                                    className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors uppercase"
+                                                                >
+                                                                    {h > 12 ? `${h - 12} PM` : h === 12 ? '12 PM' : `${h} AM`}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <input
+                                                            type="datetime-local"
+                                                            className="text-center text-[10px] font-bold bg-black/40 border border-white/10 rounded p-1.5 text-white outline-none focus:border-blue-500/50 mt-1"
+                                                            onChange={(e) => {
+                                                                if (e.target.value) handleUpdateSchedule(post.id!, new Date(e.target.value));
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={() => setSchedulingPostId(null)}
+                                                            className="text-[8px] font-black text-red-400/70 hover:text-red-400 uppercase tracking-widest mt-1 py-1"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -2517,7 +2705,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 )}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
-                <span>KumoLab Admin OS v2.2.4 (Kill Switch Authority)</span>
+                <span>KumoLab Admin OS v2.2.5 (UPDATED: 01:00 AM EST)</span>
                 <span>System Status: ONLINE</span>
             </div>
         </div>

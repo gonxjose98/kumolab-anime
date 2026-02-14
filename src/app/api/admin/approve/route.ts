@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
                 .from('posts')
                 .update({
                     status: 'approved',
+                    is_published: false,
                     scheduled_post_time: scheduledTime.toISOString(),
                     approved_at: now.toISOString(),
                     approved_by: 'admin' // Placeholder

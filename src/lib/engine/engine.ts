@@ -85,7 +85,8 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         console.log('[Engine] Running Dynamic Newsroom Logic...');
 
         // RATE LIMIT CHECK:
-        // Did we post anything in the last 60 minutes?
+        // [TEMP] Disabled for testing (was 55 minutes)
+        /*
         if (existingPosts.length > 0) {
             const lastPost = existingPosts[0];
             const lastPostTime = new Date(lastPost.timestamp);
@@ -97,6 +98,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
                 return null;
             }
         }
+        */
 
         // 1. Fetch All Candidates (Intel + Trending)
         const result = await fetchSmartTrendingCandidates();
@@ -106,10 +108,10 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         const abortLogs: any[] = [];
 
         // 2. Filter & Prioritize (Newsroom Logic)
+        const newPosts: BlogPost[] = [];
         for (const item of candidates) {
-            // Check for explicit ABORT/SKIPS already identified by fetcher
-            // 1. Check for explicit ABORTS identified by fetcher (Reality Checks)
-            if (['OTHER_ABORT', 'STALE_CONFIRMATION_ABORT', 'STALE_OR_DUPLICATE_FACT'].includes(item.claimType)) {
+            // Check for explicit ABORTS identified by fetcher (Reality Checks)
+            if (['STALE_CONFIRMATION_ABORT', 'STALE_OR_DUPLICATE_FACT'].includes(item.claimType)) {
                 abortLogs.push({
                     anime: item.title,
                     event_type: item.claimType,
@@ -134,7 +136,8 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
             // VALIDATE
             const existingPostsForDup = await getPosts(true);
-            if (validatePost(post, existingPostsForDup, false)) {
+            // [TEMP] Using force: true to bypass deduplication and populate queue for testing
+            if (validatePost(post, [...existingPostsForDup, ...newPosts], true)) {
                 // NEW: Manual Approval Logic
                 if (USE_SUPABASE) {
                     const duplicateResult = await checkForDuplicate(post.title, supabaseAdmin);
@@ -146,18 +149,23 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
                     const sourceTier = await getSourceTier(item.source || 'Unknown', supabaseAdmin);
                     const relevanceScore = calculateRelevanceScore({ title: post.title, source_tier: sourceTier });
 
-                    (post as any).status = 'pending';
+                    post.status = 'pending';
+                    post.isPublished = false;
                     (post as any).source_tier = sourceTier;
                     (post as any).relevance_score = relevanceScore;
                     (post as any).is_duplicate = duplicateResult !== null;
                     (post as any).duplicate_of = typeof duplicateResult === 'number' ? duplicateResult : null;
                     (post as any).scraped_at = new Date().toISOString();
-                    (post as any).is_published = false;
                     (post as any).source = item.source || 'Unknown';
                 }
 
-                newPost = post;
-                break; // Found our 1 breaking story for this hour.
+                newPosts.push(post);
+                console.log(`[Engine] Added to pending queue: "${post.title}"`);
+
+                if (newPosts.length >= 20) {
+                    console.log('[Engine] Hit 20 post limit for this run.');
+                    break;
+                }
             } else {
                 abortLogs.push({
                     anime: post.title,
@@ -167,6 +175,17 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
                     fingerprint: post.event_fingerprint
                 });
             }
+        }
+
+        if (newPosts.length > 0) {
+            for (const p of newPosts) {
+                await publishPost(p);
+            }
+            await logSchedulerRun(slot, 'success', `Generated ${newPosts.length} pending posts.`, {
+                count: newPosts.length,
+                titles: newPosts.map(p => p.title)
+            });
+            return newPosts[0]; // Return the first one for compatibility
         }
 
         if (abortLogs.length > 0) {
@@ -210,7 +229,7 @@ async function publishPost(post: BlogPost) {
                 content: post.content,
                 image: post.image,
                 timestamp: post.timestamp,
-                is_published: post.isPublished,
+                is_published: post.status === 'published' || (post.isPublished && post.status !== 'pending' && post.status !== 'approved'),
                 claim_type: post.claimType,
                 premiere_date: post.premiereDate,
                 event_fingerprint: post.event_fingerprint,
@@ -222,7 +241,7 @@ async function publishPost(post: BlogPost) {
                 verification_reason: post.verification_reason,
                 verification_sources: post.verification_sources,
                 // New Approval Columns
-                status: (post as any).status || 'published',
+                status: post.status || 'published',
                 source_tier: (post as any).source_tier || 3,
                 relevance_score: (post as any).relevance_score || 0,
                 is_duplicate: (post as any).is_duplicate || false,

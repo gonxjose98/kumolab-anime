@@ -184,50 +184,32 @@ export async function generateIntelImage({
             return null;
         }
 
-        // --- BUCKET-BASED DECISION LOGIC (User Rule) ---
+        // --- BUCKET-BASED DECISION LOGIC (RAW IMAGE MODE) ---
         const isPortraitPoster = imgRatio < 0.85;
         const derivedClassification = classification || (isPortraitPoster ? 'TEXT_HEAVY' : 'CLEAN');
 
         let finalApplyText = derivedClassification === 'CLEAN';
-        let finalApplyGradient = derivedClassification === 'CLEAN'; // Case 3: No gradient on posters
-        let finalApplyWatermark = finalApplyText;
+        let finalApplyGradient = derivedClassification === 'CLEAN';
+        let finalApplyWatermark = derivedClassification === 'CLEAN';
 
-        // MANUAL OVERRIDE: Respect the explicit kill switch (TEXT OFF)
+        // USER MANUAL OVERRIDE
         if (applyText === false) {
+            finalApplyText = false;
+        } else if (applyText === true && derivedClassification === 'CLEAN') {
+            finalApplyText = true;
+        }
+
+        // HARD CONTRACT: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
+        if (derivedClassification === 'TEXT_HEAVY') {
             finalApplyText = false;
             finalApplyGradient = false;
             finalApplyWatermark = false;
-        } else if (applyText === true) {
-            finalApplyText = true;
-            finalApplyWatermark = true;
-
-            // Refined Rule:
-            // 1. If explicitly asking for text (applyText = true), we generally WANT the gradient for readability.
-            // 2. EXCEPT if it's a poster (TEXT_HEAVY) AND the user hasn't explicitly asked for it (applyGradient undefined).
-            // 3. User can Force Gradient ON even on posters.
-
-            if (derivedClassification === 'TEXT_HEAVY') {
-                // On posters, default to NO gradient, unless user explicitly requested it? 
-                // Actually, user says: "text should always come with gradient unless otherwise specified."
-                // So if applyText is TRUE, applyGradient should generally be TRUE.
-                // But we have the 'TEXT_HEAVY' safety rule. 
-
-                // Let's relax the TEXT_HEAVY check if 'applyGradient' is explicitly true.
-                if (applyGradient === true) {
-                    finalApplyGradient = true;
-                } else {
-                    finalApplyGradient = false; // Default for posters remains clean
-                }
-            } else {
-                // CLEAN images: Always gradient if text is on.
-                finalApplyGradient = (applyGradient !== false);
-            }
         }
 
-        // --- FINAL REJECTION: HARD CONTRACT ---
-        // If text is OFF, Gradient is OFF.
+        // REVALIDATION: If hasText is false (either derived or forced), all overlays MUST BE ZERO
         if (!finalApplyText) {
             finalApplyGradient = false;
+            finalApplyWatermark = false;
         }
 
         // --- CLEAN TEXT PRE-VALIDATION ---

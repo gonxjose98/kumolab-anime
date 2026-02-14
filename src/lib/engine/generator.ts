@@ -10,6 +10,7 @@ import { fetchOfficialAnimeImage } from './fetchers';
 import { randomUUID } from 'crypto';
 import { AntigravityAI } from './ai';
 import { selectBestImage } from './image-selector';
+import { generateEventFingerprint } from './utils';
 
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
@@ -57,6 +58,7 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
         image: '/daily-drops-permanent.jpg', // Permanent branded image
         timestamp: date.toISOString(),
         isPublished: true,
+        status: 'published',
         verification_tier: episodes[0].provenance?.tier,
         verification_reason: 'Strict Primary Source Verified',
         verification_sources: sourcesMap
@@ -66,142 +68,166 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
 /**
  * Generates an Anime Intel (INTEL) post.
  */
-export async function generateIntelPost(intelItems: any[], date: Date, isFallback: boolean = false): Promise<BlogPost | null> {
-    if (intelItems.length === 0) {
-        return null;
-    }
+export async function generateIntelPost(intelItems: any[], date: Date): Promise<BlogPost | null> {
+    if (intelItems.length === 0) return null;
 
-    const topItem = intelItems[0];
+    const item = intelItems[0];
     const todayStr = date.toISOString().split('T')[0];
-    const today = new Date(todayStr);
 
-    let claimType: ClaimType = topItem.claimType;
-    const premiereDateStr: string | undefined = topItem.premiereDate;
-
-    // 1. FAILSAFE: REQUIRED FIELDS (If missing, abort)
-    if (!claimType) {
-        console.error('Abort: No claimType provided for Anime Intel post.');
-        return null;
-    }
-
-    // premiere_date is often missing for early confirmations
-    if (['premiered', 'now_streaming'].includes(claimType) && !premiereDateStr) {
-        // Fallback for missing date on already aired content
-        console.warn(`[Generator] Warning: claim_type "${claimType}" lacks premiere_date. Defaulting to safe labels.`);
-    }
-
-    // 2. DATE LOGIC & HARD RULES
-    if (premiereDateStr) {
-        const premiereDate = new Date(premiereDateStr);
-        // Calculate difference in days (positive means premiered/past)
-        const diffDays = Math.floor((today.getTime() - premiereDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        // DATE LOGIC (Autocorrect instead of Abort)
-        if (claimType === 'confirmed') {
-            if (today >= premiereDate) {
-                // Was "confirmed" but date is past/today? Switch to 'premiered'
-                console.warn(`[Generator] Autocorrecting 'confirmed' post to 'premiered' because date ${premiereDateStr} is today/past.`);
-                claimType = 'premiered';
-            }
-        }
-
-        // AUTOMATIC CONVERSIONS
-        if (claimType === 'premiered') {
-            if (diffDays > 7) {
-                // "premiered + (today > premiere_date + 7 days) -> upgrade to now_streaming"
-                claimType = 'now_streaming';
-            }
+    // 1. STRICT CLASSIFICATION & SOURCE CHECK
+    const claimType = item.claimType as ClaimType;
+    if (claimType === 'NEW_SEASON_CONFIRMED') {
+        const isTier12 = item.verification_tier <= 2;
+        if (!isTier12) {
+            console.error(`[Generator] ABORT: NEW_SEASON_CONFIRMED requires Tier 1/2 source. Got: ${item.verification_tier}`);
+            return null; // Should quarantine in engine
         }
     }
 
-    // 3. CARD OVERLAY TAG (LOCKED)
-    // Headline/Tag mapping for the visual overlay
-    const overlayTextMap: Record<ClaimType, string> = {
-        confirmed: premiereDateStr ? `PREMIERES ${formatPremiereDate(premiereDateStr)}` : "OFFICIALLY CONFIRMED",
-        premiered: premiereDateStr ? `PREMIERED ${formatPremiereDate(premiereDateStr)}` : "PREMIERED",
-        now_streaming: "NOW STREAMING",
-        delayed: "PRODUCTION DELAY",
-        trailer: "NEW TRAILER",
-        finale_aired: "FINALE AIRED",
-        new_visual: "NEW VISUAL"
-    };
-
-    const overlayTag = overlayTextMap[claimType] || "LATEST NEWS";
-
-    // IMAGE RELEVANCE PROMPT (LOCKED)
-    // "An anime always has to be chosen. Fallback image should never be used."
-    // IMAGE RELEVANCE PROMPT (LOCKED)
-    // "An anime always has to be chosen. Fallback image should never be used."
-
-    // VISUAL INTELLIGENCE ENGINE (New Strict Logic)
-    const searchTerm = (topItem.imageSearchTerm || topItem.title.split(' Season')[0].split(':')[0].trim())
-        .replace(/[—–]/g, '-');
-
-    // We ignore the low-res RSS image usually, unless we want to verify it. 
-    // But selectBestImage hunts for 4K/Official sources.
-    const imageResult = await selectBestImage(searchTerm, topItem.claimType);
-
-    if (!imageResult || imageResult.url === '/hero-bg-final.png') {
-        console.warn('Visual Intelligence Engine found no valid candidates. Aborting Intel post.');
-        return null;
+    // 2. SEASON LABEL EXTRACTION
+    let seasonLabel = item.season_label || '';
+    if (!seasonLabel) {
+        const title = item.title.toLowerCase();
+        const seasonMatch = title.match(/season\s+(\d+)/i) || title.match(/(\d+)(?:st|nd|rd|th)?\s*season/i);
+        if (seasonMatch) seasonLabel = `Season ${seasonMatch[1]}`;
+        else if (title.includes('part 2')) seasonLabel = 'Part 2';
+        else if (title.includes('cour 2')) seasonLabel = 'Cour 2';
+        // Add more if needed.
     }
 
-    const classification = imageResult.classification;
-    const officialSourceImage = imageResult.url;
+    // 3. TITLE GENERATION (TEMPLATES ONLY)
+    // Extract series name without extra detail
+    const actionVerbs = [' Screens', ' Unveils', ' Casts', ' Announces', ' Teases', ' Reveals', ' Releases', ' Opens', ' Sets', ' Drops', ' Debuts'];
+    let animeTitle = item.title.split(':')[0].split(' Season')[0].split(' –')[0].trim();
 
-    const validTitle = cleanTitle(topItem.fullTitle || topItem.title);
-
-    // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
-    let finalDisplayTitle = validTitle;
-    if (claimType === 'confirmed' && !finalDisplayTitle.toLowerCase().includes('confirmed')) {
-        finalDisplayTitle += ' Confirmed';
-    }
-
-    const validContent = cleanBody(topItem.content, finalDisplayTitle, topItem.trendReason);
-
-    // 3. DYNAMIC PURPLE HIGHLIGHT
-    const titleWords = finalDisplayTitle.split(/\s+/).filter(Boolean);
-    const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
-    const purpleWordIndices: number[] = [];
-
-    titleWords.forEach((word, idx) => {
-        if (targetWords.some(tw => word.toLowerCase().includes(tw))) {
-            purpleWordIndices.push(idx);
-        }
+    actionVerbs.forEach(v => {
+        const idx = animeTitle.indexOf(v);
+        if (idx !== -1) animeTitle = animeTitle.substring(0, idx).trim();
     });
 
-    let finalImage: string | undefined = undefined;
-    if (officialSourceImage) {
-        const result = await generateIntelImage({
-            sourceUrl: officialSourceImage,
-            animeTitle: finalDisplayTitle,
-            headline: overlayTag, // Use the specific tag mapping for the visual
-            purpleWordIndices,
-            slug: topItem.slug || 'intel',
-            classification,
-            applyText: true, // Let the processor decide based on classification
-            applyGradient: true
-        });
+    // Strip common noise
+    const eventNoise = [
+        'TV Anime', 'Original', 'The Movie', 'Anime', 'Film', 'Manga', 'Light Novel', 'Novel',
+        'World Premiere', 'Premiere', 'Restoration', '4K UHD', '4K', 'UHD', 'Screening', 'Special',
+        'Update', 'Announcement', 'Project', 'Review', 'intel', 'Intel', 'Drop', 'Trending',
+        'Official', 'Key Visual', 'Trailer', 'PV', 'CM', 'New', 'Latest'
+    ];
+    eventNoise.forEach(n => {
+        animeTitle = animeTitle.replace(new RegExp(`\\b${n}\\b`, 'gi'), '').trim();
+    });
 
-        if (result && result.processedImage) {
-            finalImage = result.processedImage;
-        } else {
-            console.error('[Generator] ABORT: Image safety check failed or processing error.');
-            return null; // HARD ABORT
+    // Remove brackets
+    animeTitle = animeTitle.replace(/[【】\[\]]/g, '').trim();
+
+    // Final cleanup of "of" and spaces
+    animeTitle = animeTitle.replace(/\bof\b/gi, '').replace(/\s+/g, ' ').trim();
+
+    let finalTitle = "";
+
+    switch (claimType) {
+        case 'NEW_SEASON_CONFIRMED':
+            finalTitle = `${animeTitle}: ${seasonLabel || 'New Season'} Confirmed`;
+            break;
+        case 'DATE_ANNOUNCED':
+            const dateLabel = item.premiereDate ? formatToMonthYear(item.premiereDate) : "TBA";
+            finalTitle = `${animeTitle} Sets Premiere for ${dateLabel}`;
+            break;
+        case 'DELAY':
+            if (item.premiereDate) finalTitle = `${animeTitle} Delayed — Now Set for ${formatToMonthYear(item.premiereDate)}`;
+            else finalTitle = `${animeTitle} Delayed — New Date Pending`;
+            break;
+        case 'NEW_KEY_VISUAL':
+            finalTitle = `${animeTitle} Drops New Key Visual`;
+            break;
+        case 'TRAILER_DROP':
+            finalTitle = `${animeTitle} Releases New Trailer`;
+            break;
+        case 'CAST_ADDITION':
+            finalTitle = `${animeTitle} Reveals New Cast Members`;
+            break;
+        default:
+            finalTitle = `${animeTitle} Update`;
+    }
+
+    // 4. IMAGE SELECTION (Stage A & B)
+    let selectedImage = "";
+    let isAnnouncementTied = false;
+    let classification: 'CLEAN' | 'TEXT_HEAVY' = 'CLEAN';
+
+    // Stage A: Announcement Asset Extraction
+    if (item.announcementAssets && item.announcementAssets.length > 0) {
+        selectedImage = item.announcementAssets[0];
+        isAnnouncementTied = true;
+        // Determine classification for announcement image
+        classification = selectedImage.toLowerCase().includes('visual') || selectedImage.toLowerCase().includes('poster') ? 'TEXT_HEAVY' : 'CLEAN';
+    }
+
+    // Hard Rule for NEW_KEY_VISUAL
+    if (claimType === 'NEW_KEY_VISUAL' && !isAnnouncementTied) {
+        console.error(`[Generator] ABORT: NEW_KEY_VISUAL requires announcement-tied image.`);
+        return null; // Quarantine
+    }
+
+    // Stage B: Visual Recency & Validity Ranking (Fallback)
+    if (!selectedImage) {
+        const imageResult = await selectBestImage(item.imageSearchTerm || animeTitle, claimType);
+        if (imageResult) {
+            selectedImage = imageResult.url;
+            classification = imageResult.classification;
         }
     }
+
+    if (!selectedImage || selectedImage === '/hero-bg-final.png') {
+        console.warn(`[Generator] ABORT: No valid image found for ${finalTitle}`);
+        return null;
+    }
+
+    // 5. IMAGE PROCESSING (Branding/Overlay)
+    let finalImage = selectedImage;
+    if (selectedImage && !selectedImage.startsWith('data:')) {
+        const result = await generateIntelImage({
+            sourceUrl: selectedImage,
+            animeTitle: finalTitle,
+            headline: '', // Template already includes the event type in the title
+            slug: item.slug || `intel-${item.anime_id || 'news'}-${todayStr}-${randomUUID().substring(0, 4)}`,
+            classification: classification,
+            applyText: classification === 'CLEAN',
+            applyGradient: classification === 'CLEAN'
+        });
+        if (result?.processedImage) {
+            finalImage = result.processedImage;
+        }
+    }
+
+    // 6. CONTENT CLEANUP
+    const finalContent = cleanBody(item.content, finalTitle, claimType);
+
     return {
         id: randomUUID(),
-        title: finalDisplayTitle,
-        slug: `${topItem.slug || 'intel'}-${todayStr}`,
+        title: finalTitle,
+        slug: item.slug || `intel-${item.anime_id || 'news'}-${todayStr}`,
         type: 'INTEL',
         claimType,
-        premiereDate: premiereDateStr,
-        content: validContent,
-        image: finalImage || '', // validatePost will reject if this is empty
+        event_fingerprint: item.event_fingerprint,
+        truth_fingerprint: item.truth_fingerprint,
+        anime_id: item.anime_id,
+        season_label: seasonLabel,
+        content: finalContent,
+        image: finalImage,
+        origin_image_url: selectedImage,
+        is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
-        isPublished: true
+        isPublished: true,
+        status: 'published',
+        verification_tier: item.verification_tier,
+        verification_reason: `Factual Match: ${claimType}`,
+        verification_sources: { source_url: item.source_url }
     };
+}
+
+function formatToMonthYear(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 
@@ -224,98 +250,96 @@ function formatPremiereDate(dateStr?: string): string {
 export async function generateTrendingPost(trendingItem: any, date: Date): Promise<BlogPost | null> {
     if (!trendingItem) return null;
 
-    const dateString = date.toISOString().split('T')[0];
+    const todayStr = date.toISOString().split('T')[0];
+    const claimType = trendingItem.claimType as ClaimType;
+    const animeTitle = trendingItem.title.split(':')[0].split(' Season')[0].split(' –')[0].trim();
 
-    // Trending also follows the strict relevance rule
-    // "An anime always has to be chosen. Fallback image should never be used."
-    // Trending also follows the strict relevance rule
-    // "An anime always has to be chosen. Fallback image should never be used."
+    // 1. TITLE GENERATION (TEMPLATES ONLY)
+    let finalTitle = "";
+    switch (claimType) {
+        case 'NEW_SEASON_CONFIRMED':
+            finalTitle = `${animeTitle}: ${trendingItem.season_label || 'New Season'} Confirmed`;
+            break;
+        case 'TRAILER_DROP':
+            finalTitle = `${animeTitle} Releases New Trailer`;
+            break;
+        case 'NEW_KEY_VISUAL':
+            finalTitle = `${animeTitle} Drops New Key Visual`;
+            break;
+        case 'DATE_ANNOUNCED':
+            finalTitle = `${animeTitle} Sets Premiere Date`;
+            break;
+        case 'DELAY':
+            finalTitle = `${animeTitle} Delayed — Now Set for Later`;
+            break;
+        default:
+            finalTitle = `${animeTitle} Trending Now`;
+    }
 
-    const validTitle = cleanTitle(trendingItem.fullTitle || trendingItem.title);
+    // 2. IMAGE SELECTION (Stage A & B)
+    let selectedImage = "";
+    let isAnnouncementTied = false;
+    let classification: 'CLEAN' | 'TEXT_HEAVY' = 'CLEAN';
 
-    // VISUAL INTELLIGENCE ENGINE (New Strict Logic) for Trending
-    const trendingSearchTerm = (trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim())
-        .replace(/[—–]/g, '-');
-    const imageResult = await selectBestImage(
-        trendingSearchTerm,
-        trendingItem.trendReason
-    );
+    if (trendingItem.announcementAssets && trendingItem.announcementAssets.length > 0) {
+        selectedImage = trendingItem.announcementAssets[0];
+        isAnnouncementTied = true;
+        classification = selectedImage.toLowerCase().includes('visual') || selectedImage.toLowerCase().includes('poster') ? 'TEXT_HEAVY' : 'CLEAN';
+    }
 
-    let officialSourceImage = imageResult?.url;
-    let classification = imageResult?.classification;
-
-    if (!officialSourceImage) {
-        // Fallback to the candidate's own image if the engine found nothing new
-        if (trendingItem.image) {
-            officialSourceImage = trendingItem.image;
+    if (!selectedImage) {
+        const imageResult = await selectBestImage(trendingItem.imageSearchTerm || animeTitle, claimType);
+        if (imageResult) {
+            selectedImage = imageResult.url;
+            classification = imageResult.classification;
         }
     }
 
-    // Universal Image Fallback Level 1: Try a simpler search if first one failed
-    if (!officialSourceImage) {
-        const simpleTerm = validTitle.split(' Season')[0].split(':')[0].split(' –')[0].trim();
-        if (simpleTerm !== (trendingItem.imageSearchTerm || validTitle.split(' –')[0].split(':')[0].trim())) {
-            console.log(`[Generator] Retrying image search with simpler term: "${simpleTerm}"`);
-            const retryResult = await selectBestImage(simpleTerm, trendingItem.trendReason);
-            officialSourceImage = retryResult?.url;
-            classification = retryResult?.classification;
-        }
+    if (!selectedImage) {
+        selectedImage = trendingItem.image; // Final fallback to candidate image
     }
 
-    // Universal Image Fallback Level 2: Reject if no image found
-    if (!officialSourceImage || officialSourceImage === '/hero-bg-final.png') {
-        console.warn("Trending post missing image after ALL strategies. Aborting Trend post.");
+    if (!selectedImage || selectedImage === '/hero-bg-final.png') {
+        console.warn(`[Generator] ABORT: No valid image found for ${finalTitle}`);
         return null;
     }
 
-    // ENSURE SIMPLE FORMAT: "Anime Name Season X Confirmed"
-    let finalDisplayTitle = validTitle;
-    if (trendingItem.trendReason === 'SEASON ANNOUNCEMENT' && !finalDisplayTitle.toLowerCase().includes('confirmed')) {
-        finalDisplayTitle += ' Confirmed';
-    }
+    const finalContent = cleanBody(trendingItem.content, finalTitle, claimType);
 
-    const validContent = cleanBody(trendingItem.content, finalDisplayTitle, trendingItem.trendReason);
-
-    let finalImage: string | undefined = undefined;
-    if (officialSourceImage) {
-        // Enforce KumoLab branding for Trending posts as requested by User
-        const titleWords = finalDisplayTitle.split(/\s+/).filter(Boolean);
-        const targetWords = ['debut', 'debuts', 'july', 'confirmed', 'trailer', 'visual'];
-        const purpleWordIndices: number[] = [];
-
-        titleWords.forEach((word, idx) => {
-            if (targetWords.some(tw => word.toLowerCase().includes(tw))) {
-                purpleWordIndices.push(idx);
-            }
-        });
-
+    // 3. IMAGE PROCESSING
+    let finalImage = selectedImage;
+    if (selectedImage && !selectedImage.startsWith('data:')) {
         const result = await generateIntelImage({
-            sourceUrl: officialSourceImage,
-            animeTitle: finalDisplayTitle,
-            headline: trendingItem.trendReason || '', // Use the trend reason as a tag
-            purpleWordIndices,
-            slug: trendingItem.slug || 'trending',
-            classification,
-            applyText: true
+            sourceUrl: selectedImage,
+            animeTitle: finalTitle,
+            headline: '',
+            slug: `trending-${trendingItem.anime_id}`,
+            classification: classification,
+            applyText: classification === 'CLEAN',
+            applyGradient: classification === 'CLEAN'
         });
-
-        if (result && result.processedImage) {
+        if (result?.processedImage) {
             finalImage = result.processedImage;
-        } else {
-            console.error('[Generator] ABORT: Trending image safety check failed or processing error.');
-            return null; // HARD ABORT
         }
     }
 
     return {
         id: randomUUID(),
-        title: finalDisplayTitle,
-        slug: `trending-${trendingItem.slug || 'now'}-${dateString}`,
+        title: finalTitle,
+        slug: `trending-${trendingItem.anime_id || 'now'}-${todayStr}-${randomUUID().substring(0, 4)}`,
         type: 'TRENDING',
-        content: validContent,
-        image: finalImage || '',
+        claimType,
+        event_fingerprint: trendingItem.event_fingerprint,
+        truth_fingerprint: trendingItem.truth_fingerprint,
+        anime_id: trendingItem.anime_id,
+        season_label: trendingItem.season_label,
+        content: finalContent,
+        image: finalImage,
+        origin_image_url: selectedImage,
+        is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
-        isPublished: true
+        isPublished: true,
+        status: 'published'
     };
 }
 
@@ -324,7 +348,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
  */
 export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): boolean {
     // 0. BANNED TOPICS (HARD KILL SWITCH)
-    const BANNED_TOPICS = [/\bMario\b/i, /\bAI\b/i];
+    const BANNED_TOPICS = [/\bMario\b/i, /\bAI\b/];
     const hasBannedTopic = BANNED_TOPICS.some(pattern =>
         pattern.test(post.title) || pattern.test(post.content)
     );
@@ -334,43 +358,46 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
         return false;
     }
 
-    // 1. ADVANCED DEDUPLICATION
-    // Check for duplicates in the last 100 posts regardless of day
+    // 1. TRUTH-BASED DEDUPLICATION (LATEST FACTUAL CLAIM)
+    // ONLY STRICTLY ENFORCED FOR NEW_SEASON_CONFIRMED to prevent re-announcing already settled facts.
+    // Other types (TRAILERS, CAST, DATES) often have multiple legitimate updates that truth-hashing might over-block.
+    if (post.truth_fingerprint && post.claimType === 'NEW_SEASON_CONFIRMED') {
+        const isDuplicateTruth = existingPosts.some(p => p.truth_fingerprint === post.truth_fingerprint);
+        if (isDuplicateTruth && !force) {
+            console.log(`[Validator] REJECTED (Truth): Factual claim "Season Confirmed" already exists for this anime. (Fingerprint: ${post.truth_fingerprint})`);
+            return false;
+        }
+    }
+
+    // 2. CANONICAL DEDUPLICATION (FINGERPRINT/URL BASED)
+    if (post.event_fingerprint) {
+        const isDuplicateFingerprint = existingPosts.some(p => p.event_fingerprint === post.event_fingerprint);
+        if (isDuplicateFingerprint && !force) {
+            console.log(`[Validator] REJECTED (Signal): Update already processed for this specific signal/URL.`);
+            return false;
+        }
+    }
+
+    // Legacy Title/Slug Deduplication (Backup)
     const normalizedNewTitle = post.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
     const isDuplicate = existingPosts.some(p => {
         const normalizedOldTitle = p.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-        const sameTitle = normalizedNewTitle === normalizedOldTitle;
-        const sameSlug = p.slug === post.slug;
-
-        // Content similarity check: 
-        // For Daily Drops, we ignore the common header and check the actual list.
-        // For other posts, we use the standard 50-char slice.
-        let verySimilarContent = false;
-        if (post.type === 'DROP' && p.type === 'DROP') {
-            // Only consider it a content duplicate if the titles match (already covered)
-            // or if the content is EXACTLY the same (unlikely for different days)
-            verySimilarContent = p.content === post.content;
-        } else {
-            verySimilarContent = p.content.slice(0, 50) === post.content.slice(0, 50);
-        }
-
-        return sameTitle || sameSlug || verySimilarContent;
+        return normalizedNewTitle === normalizedOldTitle || p.slug === post.slug;
     });
 
     if (isDuplicate && !force) {
-        console.log(`[Validator] REJECTED: Duplicate content detected for "${post.title}"`);
+        console.log(`[Validator] REJECTED (Legacy): Duplicate title/slug detected for "${post.title}"`);
         return false;
     }
 
     // 2. STRICT IMAGE VALIDATION
-    // "Every automated post must include an image. If a valid image cannot be found, the post should not publish."
     if (!post.image || post.image === '/hero-bg-final.png') {
         console.error(`[Validator] REJECTED: Post "${post.title}" is missing a valid image.`);
         return false;
     }
 
     if (!post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
-        console.warn(`[Validator] REJECTED: Invalid image path detected: ${post.image.substring(0, 50)}...`);
+        console.warn(`[Validator] REJECTED: Invalid image path detected.`);
         return false;
     }
 
@@ -574,7 +601,7 @@ export function cleanBody(content: string, title: string, trendReason?: string):
 import { fetchSmartTrendingCandidates } from './fetchers';
 
 export async function generateTrendingPosts(): Promise<BlogPost[]> {
-    const trendingItems = await fetchSmartTrendingCandidates();
+    const { candidates: trendingItems } = await fetchSmartTrendingCandidates();
     // fetchAniListTrending returns AniListMedia format, needs adaptation to what generateTrendingPost expects.
     // Actually, looking at generateTrendingPost usage, it expects an object with imageSearchTerm, trendReason etc.
     // Let's check fetchers.ts again if needed, but for now we implement the bridge.

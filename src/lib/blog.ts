@@ -54,22 +54,26 @@ export async function getPosts(includeHidden: boolean = false): Promise<BlogPost
                     event_fingerprint: post.event_fingerprint,
                     anime_id: post.anime_id,
                     season_label: post.season_label,
-                    status: post.status,
-                    sourceTier: post.source_tier,
-                    relevanceScore: post.relevance_score,
-                    isDuplicate: post.is_duplicate,
-                    duplicateOf: post.duplicate_of,
-                    scrapedAt: post.scraped_at,
-                    source: post.source
+                    status: post.status || (post.is_published ? 'published' : 'pending'),
+                    sourceTier: post.source_tier || 3,
+                    relevanceScore: post.relevance_score || 0,
+                    isDuplicate: post.is_duplicate || false,
+                    duplicateOf: post.duplicate_of || null,
+                    scrapedAt: post.scraped_at || post.timestamp,
+                    source: post.source || 'KumoLab SmartSync'
                 };
 
                 // RECONSTRUCTION: If truth_fingerprint is missing from DB (legacy), reconstruct it for local deduplication
                 if (!mapped.truth_fingerprint && mapped.anime_id && mapped.claimType) {
-                    const { generateTruthFingerprint } = require('./engine/utils');
-                    mapped.truth_fingerprint = generateTruthFingerprint({
-                        anime_id: mapped.anime_id,
-                        event_type: mapped.claimType,
-                        season_label: mapped.season_label || undefined
+                    // We avoid a top-level import to prevent potential circularities with the engine
+                    import('./engine/utils').then(({ generateTruthFingerprint }) => {
+                        mapped.truth_fingerprint = generateTruthFingerprint({
+                            anime_id: mapped.anime_id!,
+                            event_type: mapped.claimType!,
+                            season_label: mapped.season_label || undefined
+                        });
+                    }).catch(() => {
+                        // Silent fail for reconstruction
                     });
                 }
 

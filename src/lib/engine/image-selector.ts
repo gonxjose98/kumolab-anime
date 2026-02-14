@@ -15,6 +15,8 @@ const PREFERRED_DOMAINS = [
     'bilibili.com', 'disneyplus.com', 'twitter.com', 'x.com', 's4.anilist.co'
 ];
 
+const KUMOLAB_FALLBACK_NEWS = 'https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png';
+
 const BROWSER_UA = () => {
     const uas = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -39,13 +41,14 @@ interface ImageCandidate {
  * Selects the absolute best image for a KumoLab post based on strict editorial rules.
  */
 export async function selectBestImage(animeTitle: string, context: string = 'General'): Promise<{ url: string, hasText: boolean, classification: 'CLEAN' | 'TEXT_HEAVY' } | null> {
-    console.log(`[Image Selector] Hunting for visual assets for: "${animeTitle}"`);
+    const cleanSearchTitle = animeTitle.replace(/[【】\[\]]/g, '').replace(/\s+/g, ' ').trim();
+    console.log(`[Image Selector] Hunting for visual assets for: "${cleanSearchTitle}" (Original: "${animeTitle}")`);
 
     const candidates: ImageCandidate[] = [];
 
     // --- STRATEGY 1: METADATA RESCUE (AniList) ---
     // We use AniList to get the "Official Site" link and "Banner/Cover"
-    const aniListData = await fetchAniListMetadata(animeTitle);
+    const aniListData = await fetchAniListMetadata(cleanSearchTitle);
 
     if (aniListData) {
         // A. Official Database Visuals (Tier 3)
@@ -102,8 +105,21 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
 
     // --- SCORING & SELECTION ---
     if (candidates.length === 0) {
-        console.warn(`[Image Selector] No valid candidates found for "${animeTitle}".`);
-        return null;
+        console.warn(`[Image Selector] No valid candidates found for "${animeTitle}". Re-attempting with lower quality gate...`);
+        // Re-attempt with much lower gate for official sources only
+        if (aniListData) {
+            if (aniListData.bannerImage) await processCandidate(aniListData.bannerImage, 'AniList Banner (Fallback)', 3, candidates, 300);
+            if (aniListData.coverImage?.extraLarge) await processCandidate(aniListData.coverImage.extraLarge, 'AniList Cover (Fallback)', 3, candidates, 300);
+        }
+    }
+
+    if (candidates.length === 0) {
+        console.warn(`[Image Selector] Absolute failure: No visuals for "${animeTitle}". Using branded fallback.`);
+        return {
+            url: KUMOLAB_FALLBACK_NEWS,
+            hasText: false,
+            classification: 'CLEAN'
+        };
     }
 
     // Sort by Score (Desc)
@@ -138,7 +154,7 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
 
 // --- HELPERS ---
 
-async function processCandidate(url: string, source: string, tier: number, list: ImageCandidate[]) {
+async function processCandidate(url: string, source: string, tier: number, list: ImageCandidate[], customMinRes?: number) {
     if (!url) return;
 
     // 1. Check if already processed
@@ -146,7 +162,7 @@ async function processCandidate(url: string, source: string, tier: number, list:
 
     // 2. Technical Validation (Download Header/Buffer)
     try {
-        const metadata = await validateImageQuality(url);
+        const metadata = await validateImageQuality(url, customMinRes);
         if (!metadata) return; // Failed quality gate
 
         const { width, height, buffer } = metadata;
@@ -236,8 +252,9 @@ async function processCandidate(url: string, source: string, tier: number, list:
  * Downloads image buffer to check exact dimensions.
  * Rejects < 700px on shortest side (Relaxed from 1000).
  */
-async function validateImageQuality(url: string): Promise<{ width: number, height: number, buffer: Buffer } | null> {
+async function validateImageQuality(url: string, customMinRes?: number): Promise<{ width: number, height: number, buffer: Buffer } | null> {
     try {
+        const minRes = customMinRes || MIN_RESOLUTION_SHORT;
         const res = await fetch(url, {
             headers: { 'User-Agent': BROWSER_UA() }
         });
@@ -251,10 +268,12 @@ async function validateImageQuality(url: string): Promise<{ width: number, heigh
 
         if (!meta.width || !meta.height) return null;
 
-        const shortest = Math.min(meta.width, meta.height);
+        const shortest = Math.max(meta.width, meta.height); // Use LONGEST side for fallback gate if needed? No, let's keep shortest but lower it.
+        const actualShortest = Math.min(meta.width, meta.height);
 
         // STRICT QUALITY GATE
-        if (shortest < MIN_RESOLUTION_SHORT) {
+        if (actualShortest < minRes) {
+            console.log(`[Image Selector] Asset too small: ${url} (${meta.width}x${meta.height})`);
             return null;
         }
 
@@ -302,6 +321,20 @@ async function fetchAniListMetadata(title: string): Promise<any> {
 
         if (!media) return null;
 
+        // --- VALIDATION PASS ---
+        // Ensure the search result actually relates to our topic
+        const searchNorm = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const engNorm = (media.title.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const romNorm = (media.title.romaji || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const isMatch = engNorm.includes(searchNorm) || romNorm.includes(searchNorm) ||
+            searchNorm.includes(engNorm) || searchNorm.includes(romNorm);
+
+        if (!isMatch && searchNorm.length > 2) {
+            console.warn(`[Image Selector] AniList Title Mismatch: Expected "${title}", got "${media.title.english || media.title.romaji}". rejecting.`);
+            return null;
+        }
+
         // Extract Official Site from external links if available
         const officialLink = media.externalLinks?.find((l: any) => l.site === 'Official Site');
         const siteUrl = officialLink ? officialLink.url : media.siteUrl; // Fallback to AniList page if needed? No, siteUrl on Media object isn't "Official Site", it's the AniList page usually? No, Media.siteUrl is deprecated or specific field? 
@@ -321,7 +354,11 @@ async function searchRedditImages(term: string): Promise<string[]> {
         // Search for "Title + Visual"
         const query = encodeURIComponent(`${term} visual`);
         let res = await fetch(`https://www.reddit.com/r/anime/search.json?q=${query}&restrict_sr=1&sort=relevance&limit=5`, {
-            headers: { 'User-Agent': BROWSER_UA() }
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                'Referer': 'https://www.reddit.com/r/anime/'
+            }
         });
 
         if (res.status === 429) {

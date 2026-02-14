@@ -9,7 +9,8 @@
     "lint": "eslint",
     "engine:08:00": "tsx scripts/run-engine.ts 08:00",
     "engine:12:00": "tsx scripts/run-engine.ts 12:00",
-    "engine:16:00": "tsx scripts/run-engine.ts 16:00"
+    "engine:16:00": "tsx scripts/run-engine.ts 16:00",
+    "engine:hourly": "tsx scripts/run-engine.ts hourly"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.88",

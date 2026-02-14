@@ -7,6 +7,7 @@ export type ClaimType =
     | 'TRAILER_DROP'
     | 'CAST_ADDITION'
     | 'STAFF_UPDATE'
+    | 'TRENDING_UPDATE'
     | 'STALE_CONFIRMATION_ABORT'
     | 'STALE_OR_DUPLICATE_FACT'
     | 'OTHER_ABORT';

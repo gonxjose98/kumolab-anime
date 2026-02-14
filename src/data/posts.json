@@ -1,1 +1,260 @@
-[]
+[
+  {
+    "id": "02edcc82-3ef1-46d9-a196-8aee481f7ebf",
+    "title": "Daily Drops - 2026-02-12",
+    "slug": "daily-drops-2026-02-12",
+    "type": "DROP",
+    "content": "Today’s Drops\n\nNew episodes are now live.\n\nAnyway, I'm Falling in Love with You.\nSeason 2 · Episode 6\n\nChained Soldier\nSeason 2 · Episode 6\n\nThe Invisible Man and His Soon-to-Be Wife\nEpisode 6\n\nThe Holy Grail of Eris\nEpisode 6\n\nROLL OVER AND DIE: I Will Fight for an Ordinary Life with My Love and Cursed Sword!\nEpisode 6\n\nSentenced to Be a Hero\nEpisode 6\n\nMF GHOST\nSeason 3 · Episode 7\n\nChampignon Witch\nEpisode 7\n\nChiikawa\nEpisode 317\n\nJUJUTSU KAISEN : The Culling Game Part 1\nSeason 3 · Episode 7",
+    "image": "/daily-drops-permanent.jpg",
+    "timestamp": "2026-02-12T19:28:36.372Z",
+    "isPublished": true,
+    "verification_tier": "streamer",
+    "verification_reason": "Strict Primary Source Verified",
+    "verification_sources": {
+      "Anyway, I'm Falling in Love with You. Season 2": {
+        "tier": "streamer",
+        "reason": "Anyway, I'm Falling in Love with You. Season 2 | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GJ0H7QGGM/anyway-im-falling-in-love-with-you | 2026-02-12T16:28:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GJ0H7QGGM/anyway-im-falling-in-love-with-you",
+          "raw_time": "2026-02-12T16:28:00.000Z",
+          "ep": 6
+        }
+      },
+      "Chained Soldier Season 2": {
+        "tier": "streamer",
+        "reason": "Chained Soldier Season 2 | Ep 6 | HIDIVE | https://www.hidive.com/season/34350 | 2026-02-12T14:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "HIDIVE",
+          "url": "https://www.hidive.com/season/34350",
+          "raw_time": "2026-02-12T14:00:00.000Z",
+          "ep": 6
+        }
+      },
+      "The Invisible Man and His Soon-to-Be Wife": {
+        "tier": "streamer",
+        "reason": "The Invisible Man and His Soon-to-Be Wife | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00365610/the-invisible-man-and-his-soon-to-be-wife | 2026-02-12T14:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365610/the-invisible-man-and-his-soon-to-be-wife",
+          "raw_time": "2026-02-12T14:30:00.000Z",
+          "ep": 6
+        }
+      },
+      "The Holy Grail of Eris": {
+        "tier": "streamer",
+        "reason": "The Holy Grail of Eris | Ep 6 | Crunchyroll | https://crunchyroll.com/series/GT00365781/the-holy-grail-of-eris | 2026-02-12T14:56:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://crunchyroll.com/series/GT00365781/the-holy-grail-of-eris",
+          "raw_time": "2026-02-12T14:56:00.000Z",
+          "ep": 6
+        }
+      },
+      "ROLL OVER AND DIE: I Will Fight for an Ordinary Life with My Love and Cursed Sword!": {
+        "tier": "streamer",
+        "reason": "ROLL OVER AND DIE: I Will Fight for an Ordinary Life with My Love and Cursed Sword! | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00365592/roll-over-and-die-i-will-fight-for-an-ordinary-life-with-my-love-and-cursed-sword | 2026-02-12T15:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365592/roll-over-and-die-i-will-fight-for-an-ordinary-life-with-my-love-and-cursed-sword",
+          "raw_time": "2026-02-12T15:30:00.000Z",
+          "ep": 6
+        }
+      },
+      "Sentenced to Be a Hero": {
+        "tier": "streamer",
+        "reason": "Sentenced to Be a Hero | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00356809/sentenced-to-be-a-hero | 2026-02-12T13:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00356809/sentenced-to-be-a-hero",
+          "raw_time": "2026-02-12T13:30:00.000Z",
+          "ep": 6
+        }
+      },
+      "MF GHOST Season 3": {
+        "tier": "streamer",
+        "reason": "MF GHOST Season 3 | Ep 7 | Crunchyroll | https://www.crunchyroll.com/series/GEXH3W2W7/mf-ghost | 2026-02-12T14:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GEXH3W2W7/mf-ghost",
+          "raw_time": "2026-02-12T14:30:00.000Z",
+          "ep": 7
+        }
+      },
+      "Champignon Witch": {
+        "tier": "streamer",
+        "reason": "Champignon Witch | Ep 7 | Crunchyroll | https://crunchyroll.com/series/GT00365553/champignon-witch | 2026-02-12T16:58:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://crunchyroll.com/series/GT00365553/champignon-witch",
+          "raw_time": "2026-02-12T16:58:00.000Z",
+          "ep": 7
+        }
+      },
+      "Chiikawa": {
+        "tier": "streamer",
+        "reason": "Chiikawa | Ep 317 | HIDIVE | https://www.hidive.com/tv/chiikawa | 2026-02-12T22:40:00.000Z | America/New_York",
+        "sources": {
+          "source": "HIDIVE",
+          "url": "https://www.hidive.com/tv/chiikawa",
+          "raw_time": "2026-02-12T22:40:00.000Z",
+          "ep": 317
+        }
+      },
+      "JUJUTSU KAISEN Season 3: The Culling Game Part 1": {
+        "tier": "streamer",
+        "reason": "JUJUTSU KAISEN Season 3: The Culling Game Part 1 | Ep 7 | Crunchyroll | https://www.crunchyroll.com/series/GRDV0019R/jujutsu-kaisen | 2026-02-12T15:36:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GRDV0019R/jujutsu-kaisen",
+          "raw_time": "2026-02-12T15:36:00.000Z",
+          "ep": 7
+        }
+      }
+    }
+  },
+  {
+    "id": "052cf65c-c07b-42a2-b6c3-b88e948f3c00",
+    "title": "Daily Drops - 2026-02-08",
+    "slug": "daily-drops-2026-02-08",
+    "type": "DROP",
+    "content": "Today’s Drops\n\nNew episodes are now live.\n\nRenegade Immortal\nEpisode 127\n\nYou and I Are Polar Opposites\nEpisode 5\n\nKaya-chan Isn't Scary\nEpisode 5\n\nThe Villainess Is Adored by the Prince of the Neighbor Kingdom\nEpisode 5\n\nIn the Clear Moonlit Dusk\nEpisode 5\n\nHell’s Paradise\nSeason 2 · Episode 5\n\nThe Daily Life of a Part-time Torturer\nEpisode 6\n\nNoble Reincarnation: Born Blessed, So I'll Obtain Ultimate Power\nEpisode 6\n\nHana-Kimi\nEpisode 7\n\nTheatre of Darkness: Yamishibai 16\nEpisode 5\n\nJournal with Witch\nEpisode 6\n\nOedo Fire Slayer -The Legend of Phoenix-\nEpisode 5\n\nKunon the Sorcerer Can See\nEpisode 7",
+    "image": "/daily-drops-permanent.jpg",
+    "timestamp": "2026-02-08T16:15:03.651Z",
+    "isPublished": true,
+    "verification_tier": "streamer",
+    "verification_reason": "Strict Primary Source Verified",
+    "verification_sources": {
+      "Renegade Immortal": {
+        "tier": "streamer",
+        "reason": "Renegade Immortal | Ep 127 | Crunchyroll | https://www.crunchyroll.com/series/GKEH2G0MN/renegade-immortal | 2026-02-09T02:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GKEH2G0MN/renegade-immortal",
+          "raw_time": "2026-02-09T02:00:00.000Z",
+          "ep": 127
+        }
+      },
+      "You and I Are Polar Opposites": {
+        "tier": "streamer",
+        "reason": "You and I Are Polar Opposites | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GT00365624/you-and-i-are-polar-opposites | 2026-02-08T08:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365624/you-and-i-are-polar-opposites",
+          "raw_time": "2026-02-08T08:00:00.000Z",
+          "ep": 5
+        }
+      },
+      "Kaya-chan Isn't Scary": {
+        "tier": "streamer",
+        "reason": "Kaya-chan Isn't Scary | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GT00365583/kaya-chan-isnt-scary | 2026-02-08T08:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365583/kaya-chan-isnt-scary",
+          "raw_time": "2026-02-08T08:30:00.000Z",
+          "ep": 5
+        }
+      },
+      "The Villainess Is Adored by the Prince of the Neighbor Kingdom": {
+        "tier": "streamer",
+        "reason": "The Villainess Is Adored by the Prince of the Neighbor Kingdom | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GT00365613/the-villainess-is-adored-by-the-prince-of-the-neighbor-kingdom | 2026-02-08T14:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365613/the-villainess-is-adored-by-the-prince-of-the-neighbor-kingdom",
+          "raw_time": "2026-02-08T14:00:00.000Z",
+          "ep": 5
+        }
+      },
+      "In the Clear Moonlit Dusk": {
+        "tier": "streamer",
+        "reason": "In the Clear Moonlit Dusk | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GT00334040/in-the-clear-moonlit-dusk | 2026-02-08T07:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00334040/in-the-clear-moonlit-dusk",
+          "raw_time": "2026-02-08T07:30:00.000Z",
+          "ep": 5
+        }
+      },
+      "Hell’s Paradise Season 2": {
+        "tier": "streamer",
+        "reason": "Hell’s Paradise Season 2 | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GJ0H7Q5ZJ/hells-paradise | 2026-02-08T14:44:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GJ0H7Q5ZJ/hells-paradise",
+          "raw_time": "2026-02-08T14:44:00.000Z",
+          "ep": 5
+        }
+      },
+      "The Daily Life of a Part-time Torturer": {
+        "tier": "streamer",
+        "reason": "The Daily Life of a Part-time Torturer | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00365604/the-daily-life-of-a-part-time-torturer | 2026-02-08T15:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365604/the-daily-life-of-a-part-time-torturer",
+          "raw_time": "2026-02-08T15:30:00.000Z",
+          "ep": 6
+        }
+      },
+      "Noble Reincarnation: Born Blessed, So I'll Obtain Ultimate Power": {
+        "tier": "streamer",
+        "reason": "Noble Reincarnation: Born Blessed, So I'll Obtain Ultimate Power | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00365721/noble-reincarnation-born-blessed-so-ill-obtain-ultimate-power | 2026-02-08T15:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365721/noble-reincarnation-born-blessed-so-ill-obtain-ultimate-power",
+          "raw_time": "2026-02-08T15:00:00.000Z",
+          "ep": 6
+        }
+      },
+      "Hana-Kimi": {
+        "tier": "streamer",
+        "reason": "Hana-Kimi | Ep 7 | Crunchyroll | https://www.crunchyroll.com/series/GT00365568/hana-kimi | 2026-02-08T12:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365568/hana-kimi",
+          "raw_time": "2026-02-08T12:30:00.000Z",
+          "ep": 7
+        }
+      },
+      "Theatre of Darkness: Yamishibai 16": {
+        "tier": "streamer",
+        "reason": "Theatre of Darkness: Yamishibai 16 | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/G6WEM1V36/theatre-of-darkness-yamishibai | 2026-02-08T17:20:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/G6WEM1V36/theatre-of-darkness-yamishibai",
+          "raw_time": "2026-02-08T17:20:00.000Z",
+          "ep": 5
+        }
+      },
+      "Journal with Witch": {
+        "tier": "streamer",
+        "reason": "Journal with Witch | Ep 6 | Crunchyroll | https://www.crunchyroll.com/series/GT00365571/journal-with-witch | 2026-02-08T15:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365571/journal-with-witch",
+          "raw_time": "2026-02-08T15:00:00.000Z",
+          "ep": 6
+        }
+      },
+      "Oedo Fire Slayer -The Legend of Phoenix-": {
+        "tier": "streamer",
+        "reason": "Oedo Fire Slayer -The Legend of Phoenix- | Ep 5 | Crunchyroll | https://www.crunchyroll.com/series/GT00365724/oedo-fire-slayer--the-legend-of-phoenix- | 2026-02-08T14:30:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365724/oedo-fire-slayer--the-legend-of-phoenix-",
+          "raw_time": "2026-02-08T14:30:00.000Z",
+          "ep": 5
+        }
+      },
+      "Kunon the Sorcerer Can See": {
+        "tier": "streamer",
+        "reason": "Kunon the Sorcerer Can See | Ep 7 | Crunchyroll | https://www.crunchyroll.com/series/GT00365586/kunon-the-sorcerer-can-see | 2026-02-08T13:00:00.000Z | America/New_York",
+        "sources": {
+          "source": "Crunchyroll",
+          "url": "https://www.crunchyroll.com/series/GT00365586/kunon-the-sorcerer-can-see",
+          "raw_time": "2026-02-08T13:00:00.000Z",
+          "ep": 7
+        }
+      }
+    }
+  }
+]

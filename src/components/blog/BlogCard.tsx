@@ -22,12 +22,12 @@ const BlogCard = ({ post }: BlogCardProps) => {
             }) : '';
 
             switch (post.claimType) {
-                case 'confirmed': return `PREMIERES ${formattedDate}`;
-                case 'premiered': return `PREMIERED ${formattedDate}`;
-                case 'now_streaming': return "NOW STREAMING";
-                case 'delayed': return "DELAYED";
-                case 'trailer': return "NEW TRAILER";
-                case 'finale_aired': return "FINALE AIRED";
+                case 'NEW_SEASON_CONFIRMED': return "SEASON CONFIRMED";
+                case 'DATE_ANNOUNCED': return `PREMIERES ${formattedDate}`;
+                case 'DELAY': return "PRODUCTION DELAY";
+                case 'TRAILER_DROP': return "NEW TRAILER";
+                case 'NEW_KEY_VISUAL': return "NEW VISUAL";
+                case 'CAST_ADDITION': return "NEW CAST";
             }
         }
 
