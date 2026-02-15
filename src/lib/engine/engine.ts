@@ -137,7 +137,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
             // VALIDATE
             const existingPostsForDup = await getPosts(true);
             // [TEMP] Using force: true to bypass deduplication and populate queue for testing
-            if (validatePost(post, [...existingPostsForDup, ...newPosts], true)) {
+            if (await validatePost(post, [...existingPostsForDup, ...newPosts], true)) {
                 // NEW: Manual Approval Logic
                 if (USE_SUPABASE) {
                     const duplicateResult = await checkForDuplicate(post.title, supabaseAdmin);

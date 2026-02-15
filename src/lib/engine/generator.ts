@@ -145,8 +145,19 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         case 'CAST_ADDITION':
             finalTitle = `${animeTitle} Reveals New Cast Members`;
             break;
+        case 'STAFF_UPDATE':
+            finalTitle = `${animeTitle} Announces Staff Update`;
+            break;
+        case 'DELAY':
+            finalTitle = `${animeTitle} Delayed — New Date Pending`;
+            break;
         default:
-            finalTitle = `${animeTitle} Update`;
+            // Ensure action verbs are stripped from general updates too
+            const cleanTitle = animeTitle
+                .replace(/\b(?:Update|Reveals|Releases|Canceled|Cancelled)\b/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            finalTitle = `${cleanTitle} Update`;
     }
 
     // 4. IMAGE SELECTION (Stage A & B)
@@ -177,8 +188,8 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         }
     }
 
-    if (!selectedImage || selectedImage === '/hero-bg-final.png') {
-        console.warn(`[Generator] ABORT: No valid image found for ${finalTitle}`);
+    if (!selectedImage) {
+        console.warn(`[Generator] ABORT: No image found for ${finalTitle}`);
         return null;
     }
 
@@ -299,8 +310,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         selectedImage = trendingItem.image; // Final fallback to candidate image
     }
 
-    if (!selectedImage || selectedImage === '/hero-bg-final.png') {
-        console.warn(`[Generator] ABORT: No valid image found for ${finalTitle}`);
+    if (!selectedImage) {
+        console.warn(`[Generator] ABORT: No image found for ${finalTitle}`);
         return null;
     }
 
@@ -346,7 +357,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 /**
  * Validates post before publishing (non-duplication, image validation).
  */
-export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): boolean {
+export async function validatePost(post: BlogPost, existingPosts: BlogPost[], force: boolean = false): Promise<boolean> {
     // 0. BANNED TOPICS (HARD KILL SWITCH)
     const BANNED_TOPICS = [/\bMario\b/i, /\bAI\b/];
     const hasBannedTopic = BANNED_TOPICS.some(pattern =>
@@ -399,6 +410,20 @@ export function validatePost(post: BlogPost, existingPosts: BlogPost[], force: b
     if (!post.image.startsWith('http') && !post.image.startsWith('/') && !post.image.startsWith('data:')) {
         console.warn(`[Validator] REJECTED: Invalid image path detected.`);
         return false;
+    }
+
+    // 3. Image Accessibility Verification
+    if (post.image.startsWith('http')) {
+        try {
+            const res = await fetch(post.image, { method: 'HEAD', timeout: 5000 } as any);
+            if (!res.ok) {
+                console.error(`[Validator] REJECTED: Image URL is broken (${res.status}): ${post.image}`);
+                return false;
+            }
+        } catch (e: any) {
+            console.error(`[Validator] REJECTED: Image URL unreachable (${e.message}): ${post.image}`);
+            return false;
+        }
     }
 
     return true;

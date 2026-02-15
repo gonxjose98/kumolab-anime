@@ -15,7 +15,7 @@ const PREFERRED_DOMAINS = [
     'bilibili.com', 'disneyplus.com', 'twitter.com', 'x.com', 's4.anilist.co'
 ];
 
-const KUMOLAB_FALLBACK_NEWS = 'https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png';
+const KUMOLAB_FALLBACK_NEWS = '/hero-bg-final.png';
 
 const BROWSER_UA = () => {
     const uas = [
@@ -41,7 +41,14 @@ interface ImageCandidate {
  * Selects the absolute best image for a KumoLab post based on strict editorial rules.
  */
 export async function selectBestImage(animeTitle: string, context: string = 'General'): Promise<{ url: string, hasText: boolean, classification: 'CLEAN' | 'TEXT_HEAVY' } | null> {
-    const cleanSearchTitle = animeTitle.replace(/[【】\[\]]/g, '').replace(/\s+/g, ' ').trim();
+    // 0. Aggressive Search Term Isolation
+    // If the title contains "Update", "Reveals", "Canceled", etc., we only want the SUBJECT.
+    let cleanSearchTitle = animeTitle
+        .replace(/[【】\[\]]/g, '')
+        .split(/[:\-\u2013\u2014\u2015]|Update|Reveals|Canceled|Cancelled|Releases|Trailer|Visual|Announces/i)[0]
+        .replace(/\s+/g, ' ')
+        .trim();
+
     console.log(`[Image Selector] Hunting for visual assets for: "${cleanSearchTitle}" (Original: "${animeTitle}")`);
 
     const candidates: ImageCandidate[] = [];

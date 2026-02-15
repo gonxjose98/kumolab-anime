@@ -1440,7 +1440,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden relative group-hover:border-purple-300 dark:group-hover:border-white/30 transition-colors">
                                             {post.image ? (
                                                 /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={post.image} alt="" className="w-full h-full object-cover" />
+                                                <img
+                                                    src={post.image}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        console.error(`[PostManager] Image failed to load: ${post.image}. Falling back to /hero-bg-final.png`);
+                                                        target.onerror = null; // Prevent infinite loop
+                                                        target.src = '/hero-bg-final.png';
+                                                    }}
+                                                />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-neutral-800">
                                                     <ImageIcon size={16} />
@@ -1523,7 +1533,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden">
                                         {post.image && (
                                             /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={post.image} alt="" className="w-full h-full object-cover" />
+                                            <img
+                                                src={post.image}
+                                                alt=""
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    console.error(`[PostManager-Mobile] Image failed to load: ${post.image}. Falling back to /hero-bg-final.png`);
+                                                    target.onerror = null;
+                                                    target.src = '/hero-bg-final.png';
+                                                }}
+                                            />
                                         )}
                                     </div>
                                 </div>
@@ -1708,7 +1728,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 return (
                                     <div key={id} className="p-3 bg-white/[0.03] border border-white/5 rounded-xl flex items-center gap-4">
                                         <div className="w-10 h-12 bg-neutral-900 rounded border border-white/5 overflow-hidden flex-shrink-0">
-                                            {post?.image && <img src={post.image} className="w-full h-full object-cover" alt="" />}
+                                            {post?.image && (
+                                                <img
+                                                    src={post.image}
+                                                    className="w-full h-full object-cover"
+                                                    alt=""
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.onerror = null;
+                                                        target.src = '/hero-bg-final.png';
+                                                    }}
+                                                />
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-xs font-bold text-white truncate">{post?.title}</h4>
@@ -2087,6 +2118,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 crossOrigin="anonymous"
                                                                 alt=""
                                                                 className="w-full h-full object-cover pointer-events-none select-none"
+                                                                onError={(e) => {
+                                                                    const target = e.target as HTMLImageElement;
+                                                                    target.onerror = null;
+                                                                    target.src = '/hero-bg-final.png';
+                                                                }}
                                                             />
                                                         </div>
 

@@ -55,6 +55,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                             className={styles.image}
                                             loading="lazy"
                                             onError={(e) => {
+                                                console.error(`[MostRecentFeed] Image failed to load: ${post.image}. Falling back to /hero-bg-final.png`);
                                                 (e.target as HTMLImageElement).src = '/hero-bg-final.png';
                                             }}
                                         />
