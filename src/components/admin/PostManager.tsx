@@ -419,19 +419,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({ topic: queryTerm, page: nextPage })
             });
             const data = await res.json();
-            if (data.success) {
+            if (data.success && data.images && data.images.length > 0) {
                 if (reset) {
                     setSearchedImages(data.images);
                     setSelectedImageIndex(0);
-                    setProcessedImage(null);
                     setIsStageDirty(true);
                 } else {
-                    // Append new unique images
                     setSearchedImages(prev => [...new Set([...prev, ...data.images])]);
                 }
                 setSearchPage(nextPage);
             } else {
-                alert('Image search failed: ' + data.error);
+                alert('Couldn\'t find a better image. Keeping current selection.');
             }
         } catch (e) {
             console.error(e);
@@ -531,7 +529,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     headline: signalText.toUpperCase(),
                     scale: manualScale ?? imageScale,
                     position: manualPos ?? imagePosition,
-                    applyText: payload.applyText,
+                    applyText: forcedApplyText ?? isApplyText,
                     applyGradient: forcedApplyGradient ?? isApplyGradient,
                     textPos: textPosition, // Now always non-null
                     textScale: manualTextScale ?? textScale,
@@ -559,11 +557,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 if (newLayout) {
                     // SYNC FRONTEND SCALE WITH BACKEND APPROVAL
                     setTextScale(newLayout.finalScale);
-                } else {
-                    // Reset text-specific states if layout is gone
-                    setTextScale(1);
                 }
-                setEditorMode('PROCESSED'); // TRANSITION TO PROCESSED MODE
+                // DO NOT TRANSITION TO PROCESSED MODE IN THE MAIN EDITOR
+                // setEditorMode('PROCESSED'); 
                 setIsStageDirty(false);
                 return data.processedImage;
             } else {
@@ -610,10 +606,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 y: prev.y + (deltaY / HEIGHT)
             }));
             setIsStageDirty(true);
-            // STRICT SEPARATION: Image drag NEVER moves text
         } else if (dragTarget === 'text') {
-            // LOCKED: No manual text drift allowed. 
-            // Text position is governed strictly by region-based centering.
+            // Allow vertical shifting of the text block for better framing
+            setLayoutMetadata(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    y: prev.y + deltaY
+                };
+            });
+            setIsStageDirty(true);
         } else if (dragTarget === 'watermark') {
             setWatermarkPosition(prev => {
                 const base = prev || { x: WIDTH / 2, y: HEIGHT - 40 };
@@ -644,7 +646,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const handleZoom = (delta: number, target: 'image' | 'text' = 'image') => {
         if (target === 'image') {
-            if (editorMode === 'PROCESSED') return;
             const newScale = Math.max(0.1, Math.min(5, imageScale + delta));
             setImageScale(newScale);
             setIsStageDirty(true);
@@ -652,10 +653,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const newScale = Math.max(0.1, textScale + delta);
             setTextScale(newScale);
             setIsStageDirty(true);
-
-            if (editorMode === 'PROCESSED') {
-                handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, newScale);
-            }
+            // Debounced sync for layout math if needed, but UI is live
         }
     };
 
@@ -1938,55 +1936,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         <div
                                                             className="absolute inset-0 cursor-move will-change-transform z-0"
                                                             onPointerDown={(e) => handleImagePointerDown(e, 'image')}
-                                                            onPointerMove={handleImagePointerMove} // redundant but safe
                                                             onPointerUp={handleImagePointerUp}
                                                             style={{
-                                                                // PREVENT DOUBLE TRANSFORM: 
-                                                                // If in PROCESSED mode, the backend image has the crop baked in. 
-                                                                // We must disable CSS transforms.
-                                                                transform: (editorMode === 'PROCESSED')
-                                                                    ? 'none'
-                                                                    : `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
+                                                                transform: `scale(${imageScale}) translate(${imagePosition.x * 100}%, ${imagePosition.y * 100}%)`,
                                                                 transition: isDragging && dragTarget === 'image' ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)',
-                                                                pointerEvents: editorMode === 'PROCESSED' ? 'none' : 'auto'
                                                             }}
                                                         >
                                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                                             <img
-                                                                src={editorMode === 'PROCESSED' && processedImage
-                                                                    ? processedImage
-                                                                    : (searchedImages.length > 0 && selectedImageIndex !== null)
-                                                                        ? searchedImages[selectedImageIndex]
-                                                                        : customImagePreview
+                                                                src={(searchedImages.length > 0 && selectedImageIndex !== null)
+                                                                    ? searchedImages[selectedImageIndex]
+                                                                    : customImagePreview || '/hero-bg-final.png'
                                                                 }
                                                                 crossOrigin="anonymous"
                                                                 alt=""
                                                                 className="w-full h-full object-cover pointer-events-none select-none"
-                                                                onError={(e) => {
-                                                                    const target = e.target as HTMLImageElement;
-                                                                    const fallbackUrl = '/hero-bg-final.png';
-                                                                    console.log('PostManager Image Error:', target.src);
-
-                                                                    // Check if already in fallback to prevent loop
-                                                                    if (!target.src.endsWith(fallbackUrl)) {
-                                                                        console.log('Applying fallback:', fallbackUrl);
-                                                                        target.src = fallbackUrl;
-                                                                    }
-                                                                }}
                                                             />
                                                         </div>
 
-                                                        {/* 2. Gradient Layer (Visual Only) - Hide if processed */}
-                                                        {isApplyGradient && editorMode === 'RAW' && (
+                                                        {/* 2. Gradient Layer (Visual Only) */}
+                                                        {isApplyGradient && (
                                                             <div
-                                                                className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
+                                                                className={`absolute inset-x-0 h-1/2 pointer-events-none transition-all duration-500 z-[5] ${gradientPosition === 'top' ? 'top-0 bg-gradient-to-b from-black/95 via-black/40 to-transparent' : 'bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent'}`}
                                                             />
                                                         )}
 
-                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
-                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting */}
-                                                        {/* 3. Text Manipulation Proxy Layer - Hide if processed to avoid ghosting. Only render if content exists. */}
-                                                        {/* 3. Text Manipulation Proxy Layer - Authoritative: Render if enabled and content exists. */}
+                                                        {/* 3. Text Layer - Authoritative & Live */}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
                                                                 <div
@@ -1996,78 +1971,42 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         left: 0,
                                                                         top: 0,
                                                                         transformOrigin: 'top center',
-                                                                        // STRICT PARITY: Horizontal center is always WIDTH / 2. Vertical is top of block (layoutMetadata.y or calculated region start).
-                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 - (135 * textScale / 2) : 1147.5 - (135 * textScale / 2))) * containerScale}px) scale(${containerScale}) translate(-50%, 0)`,
+                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 : 1147.5)) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
                                                                     }}
                                                                 >
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className={`text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300 ${editorMode === 'PROCESSED' ? 'opacity-0' : 'opacity-100'}`}
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300 opacity-100"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * containerScale}px` : `${135 * textScale * containerScale}px`,
-                                                                                lineHeight: layoutMetadata?.lineHeight ? `${layoutMetadata.lineHeight * containerScale}px` : '0.92',
-                                                                                width: `${WIDTH * containerScale}px`,
-                                                                                maxWidth: `${WIDTH * containerScale}px`,
-                                                                                padding: `0 ${54 * containerScale}px`,
+                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${135 * textScale * containerScale}px`,
+                                                                                lineHeight: '0.92',
+                                                                                width: `${WIDTH * (WIDTH / HEIGHT) * containerScale}px`,
+                                                                                maxWidth: `${WIDTH * 0.9 * containerScale}px`,
                                                                                 textAlign: 'center'
                                                                             }}
                                                                         >
-                                                                            {layoutMetadata?.lines ? (
-                                                                                layoutMetadata.lines.map((line, lIdx) => (
-                                                                                    <div key={lIdx} className="w-full flex justify-center gap-x-[0.2em]">
-                                                                                        {line.split(/\s+/).filter(Boolean).map((word, wIdx) => {
-                                                                                            // Calculate global word index
-                                                                                            const wordsBeforeCount = layoutMetadata.lines.slice(0, lIdx).join(' ').split(/\s+/).filter(Boolean).length;
-                                                                                            const globalIdx = wordsBeforeCount + wIdx;
-                                                                                            return (
-                                                                                                <span
-                                                                                                    key={wIdx}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        const newIndices = purpleWordIndices.includes(globalIdx)
-                                                                                                            ? purpleWordIndices.filter(i => i !== globalIdx)
-                                                                                                            : [...purpleWordIndices, globalIdx].sort((a, b) => a - b);
-                                                                                                        setPurpleWordIndices(newIndices);
-                                                                                                        setIsStageDirty(true);
-                                                                                                        handleApplyText(undefined, undefined, undefined, undefined, newIndices);
-                                                                                                    }}
-                                                                                                    className={`${purpleWordIndices.includes(globalIdx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
-                                                                                                >
-                                                                                                    {word}
-                                                                                                </span>
-                                                                                            );
-                                                                                        })}
-                                                                                    </div>
-                                                                                ))
-                                                                            ) : (
-                                                                                // RAW FALLBACK (Authoritative Override Visual Title Only)
-                                                                                `${(overlayTag || '')}`.trim().split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                    <span
-                                                                                        key={idx}
-                                                                                        onPointerDown={(e) => {
-                                                                                            if (isTextLocked) e.stopPropagation();
-                                                                                        }}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            e.preventDefault();
-                                                                                            const newIndices = purpleWordIndices.includes(idx)
-                                                                                                ? purpleWordIndices.filter(i => i !== idx)
-                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                            setPurpleWordIndices(newIndices);
-                                                                                        }}
-                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} ${isTextLocked ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-                                                                                    >
-                                                                                        {word}
-                                                                                    </span>
-                                                                                ))
-                                                                            )}
+                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        const newIndices = purpleWordIndices.includes(idx)
+                                                                                            ? purpleWordIndices.filter(i => i !== idx)
+                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                        setPurpleWordIndices(newIndices);
+                                                                                        setIsStageDirty(true);
+                                                                                    }}
+                                                                                    className={`inline-block mx-[0.1em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                >
+                                                                                    {word}
+                                                                                </span>
+                                                                            ))}
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                                {/* LOCKED: Manual drag disabled to enforce regional centering */}
                                                             </div>
                                                         )}
 
@@ -2124,10 +2063,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         <div className="flex flex-col gap-2 pt-2">
                                                             <button
                                                                 onClick={() => {
-                                                                    const newVal = !isApplyText;
-                                                                    setIsApplyText(newVal);
-                                                                    if (!newVal) setLayoutMetadata(null);
-                                                                    handleApplyText(undefined, undefined, newVal);
+                                                                    setIsApplyText(!isApplyText);
+                                                                    if (isApplyText) setLayoutMetadata(null);
                                                                 }}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyText ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
@@ -2135,22 +2072,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 <span className="text-[8px]">{isApplyText ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => {
-                                                                    const newVal = !isApplyGradient;
-                                                                    setIsApplyGradient(newVal);
-                                                                    handleApplyText(undefined, undefined, undefined, newVal);
-                                                                }}
+                                                                onClick={() => setIsApplyGradient(!isApplyGradient)}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyGradient ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Gradient</span>
                                                                 <span className="text-[8px]">{isApplyGradient ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => {
-                                                                    const newVal = !isApplyWatermark;
-                                                                    setIsApplyWatermark(newVal);
-                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, newVal);
-                                                                }}
+                                                                onClick={() => setIsApplyWatermark(!isApplyWatermark)}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyWatermark ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Watermark</span>
@@ -2159,9 +2088,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         </div>
                                                     </div>
 
-                                                    <button onClick={handleResetAll} className="w-full py-2 text-[10px] font-bold text-neutral-500 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2">
-                                                        <RotateCcw size={14} /> REVERT
-                                                    </button>
+                                                    <div className="flex flex-col gap-2">
+                                                        <button
+                                                            onClick={() => handleSearchImages(true)}
+                                                            disabled={isSearchingImages}
+                                                            className="w-full py-2 bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 text-[10px] font-bold uppercase tracking-widest border border-purple-500/20 rounded-xl transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            {isSearchingImages ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                                            Regenerate Image
+                                                        </button>
+                                                        <button onClick={handleResetAll} className="w-full py-2 text-[10px] font-bold text-neutral-500 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2">
+                                                            <RotateCcw size={14} /> REVERT
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -2271,17 +2210,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             </div>
 
                             {/* Action Footer */}
-                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex gap-4">
+                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex items-center gap-4">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors"
+                                    className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
+                                    onClick={handleCommitToPreview}
+                                    disabled={isProcessingImage || isApplyingEffect}
+                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 flex items-center justify-center gap-3"
+                                >
+                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
+                                    Show Preview
+                                </button>
+                                <button
                                     onClick={() => handleSavePost(true)}
                                     disabled={isGenerating || isApplyingEffect}
-                                    className="flex-[2] py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                    className="flex-[1.5] py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
                                     Save Changes
