@@ -2,13 +2,11 @@ import * as cheerio from 'cheerio';
 import { fetchOfficialAnimeImages } from './fetchers';
 
 // --- CONFIGURATION ---
-const MIN_RESOLUTION_SHORT = 700; // Relaxed from 1000 to allow high-quality AniList covers (~460px)
+const MIN_RESOLUTION_SHORT = 450; // Lowered to allow high-quality AniList/Database covers
 const sharp = require('sharp');
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const TARGET_ASPECT_RATIO = 0.8; // Portrait preferred (Posters), but landscape (Banners) are okay if high res.
-// Actually, for social media posts, 4:5 (1080x1350) is target.
-// A wide banner (1920x1080) needs to be cropped. A tall poster (2000x3000) is better.
+const TARGET_ASPECT_RATIO = 0.8;
 
 const PREFERRED_DOMAINS = [
     'animenewsnetwork.com', 'crunchyroll.com', 'netflix.com',
@@ -45,7 +43,9 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
     // If the title contains "Update", "Reveals", "Canceled", etc., we only want the SUBJECT.
     let cleanSearchTitle = animeTitle
         .replace(/[【】\[\]]/g, '')
-        .split(/[:\-\u2013\u2014\u2015]|Update|Reveals|Canceled|Cancelled|Releases|Trailer|Visual|Announces/i)[0]
+        // Only split on hyphens if they are surrounded by spaces or follow a long string
+        // This prevents breaking "SI-VIS" or "Re:Zero"
+        .split(/[:\u2013\u2014\u2015]|\s\-\s|\s\u2013\s|Update|Reveals|Canceled|Cancelled|Releases|Trailer|Visual|Announces|Reveals|Confirmed|Drop|Teaser|Video/i)[0]
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -314,6 +314,7 @@ async function fetchAniListMetadata(title: string): Promise<any> {
                 coverImage { extraLarge }
                 siteUrl
                 externalLinks { site url }
+                title { english romaji }
             }
         }
     `;
@@ -344,8 +345,6 @@ async function fetchAniListMetadata(title: string): Promise<any> {
 
         // Extract Official Site from external links if available
         const officialLink = media.externalLinks?.find((l: any) => l.site === 'Official Site');
-        const siteUrl = officialLink ? officialLink.url : media.siteUrl; // Fallback to AniList page if needed? No, siteUrl on Media object isn't "Official Site", it's the AniList page usually? No, Media.siteUrl is deprecated or specific field? 
-        // Actually Media.siteUrl is "The url for the media page on the AniList website". We want 'externalLinks'.
 
         return {
             ...media,
@@ -362,18 +361,23 @@ async function searchRedditImages(term: string): Promise<string[]> {
         const query = encodeURIComponent(`${term} visual`);
         let res = await fetch(`https://www.reddit.com/r/anime/search.json?q=${query}&restrict_sr=1&sort=relevance&limit=5`, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': BROWSER_UA(),
                 'Accept': 'application/json',
                 'Referer': 'https://www.reddit.com/r/anime/'
             }
         });
 
         if (res.status === 429) {
-            console.warn(`[Reddit Search] Rate limited (429) for "${term}". Waiting 5s...`);
-            await sleep(5000);
+            console.warn(`[Reddit Search] Rate limited (429) for "${term}". Waiting 8s for backoff...`);
+            await sleep(8000);
             res = await fetch(`https://www.reddit.com/r/anime/search.json?q=${query}&restrict_sr=1&sort=relevance&limit=5`, {
                 headers: { 'User-Agent': BROWSER_UA() }
             });
+
+            if (res.status === 429) {
+                console.warn(`[Reddit Search] Double Rate Limit for "${term}". Skipping Reddit.`);
+                return [];
+            }
         }
 
         if (!res.ok) {

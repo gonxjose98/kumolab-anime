@@ -1735,8 +1735,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     alt=""
                                                     onError={(e) => {
                                                         const target = e.target as HTMLImageElement;
-                                                        target.onerror = null;
-                                                        target.src = '/hero-bg-final.png';
+                                                        const fallbackUrl = '/hero-bg-final.png';
+                                                        console.log('PostManager (Grid) Image Error:', target.src);
+
+                                                        if (!target.src.endsWith(fallbackUrl)) {
+                                                            console.log('Applying fallback:', fallbackUrl);
+                                                            target.src = fallbackUrl;
+                                                        }
                                                     }}
                                                 />
                                             )}
@@ -2120,8 +2125,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 className="w-full h-full object-cover pointer-events-none select-none"
                                                                 onError={(e) => {
                                                                     const target = e.target as HTMLImageElement;
-                                                                    target.onerror = null;
-                                                                    target.src = '/hero-bg-final.png';
+                                                                    const fallbackUrl = '/hero-bg-final.png';
+                                                                    console.log('PostManager Image Error:', target.src);
+
+                                                                    // Check if already in fallback to prevent loop
+                                                                    if (!target.src.endsWith(fallbackUrl)) {
+                                                                        console.log('Applying fallback:', fallbackUrl);
+                                                                        target.src = fallbackUrl;
+                                                                    }
                                                                 }}
                                                             />
                                                         </div>
