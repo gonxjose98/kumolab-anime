@@ -247,7 +247,9 @@ async function publishPost(post: BlogPost) {
                 is_duplicate: (post as any).is_duplicate || false,
                 duplicate_of: (post as any).duplicate_of || null,
                 scraped_at: (post as any).scraped_at || post.timestamp,
-                source: (post as any).source || 'Unknown'
+                source: (post as any).source || 'Unknown',
+                background_image: post.background_image,
+                image_settings: post.image_settings
             }], { onConflict: 'slug' });
 
         if (error) {

@@ -60,7 +60,9 @@ export async function getPosts(includeHidden: boolean = false): Promise<BlogPost
                     isDuplicate: post.is_duplicate || false,
                     duplicateOf: post.duplicate_of || null,
                     scrapedAt: post.scraped_at || post.timestamp,
-                    source: post.source || 'KumoLab SmartSync'
+                    source: post.source || 'KumoLab SmartSync',
+                    background_image: post.background_image,
+                    image_settings: post.image_settings
                 };
 
                 // RECONSTRUCTION: If truth_fingerprint is missing from DB (legacy), reconstruct it for local deduplication
