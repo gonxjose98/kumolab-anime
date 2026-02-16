@@ -53,12 +53,14 @@ export async function getSourceTier(sourceName: string, supabase: any): Promise<
     const sourceLower = sourceName.toLowerCase();
     if (
         sourceLower.includes('animenewsnetwork') ||
+        sourceLower.includes('anime news network') ||
         sourceLower.includes('crunchyroll') ||
         sourceLower.includes('variety') ||
         sourceLower.includes('hollywoodreporter') ||
         sourceLower.includes('deadline') ||
         sourceLower.includes('mainichi') ||
-        sourceLower.includes('mantan-web')
+        sourceLower.includes('mantan-web') ||
+        sourceLower.includes('aniplex')
     ) {
         return 1;
     }

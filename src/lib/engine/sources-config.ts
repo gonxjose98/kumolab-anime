@@ -38,7 +38,7 @@ export const SOURCE_TIERS = {
         'Ufotable', 'Kyoto Animation', 'Production I.G', 'Wit Studio', 'Trigger',
         'Sunrise', 'Bandai Namco Filmworks', 'OLM', 'Pierrot', 'Studio Deen',
         'TMS Entertainment', 'LIDENFILMS', 'David Production', 'Science SARU',
-        'Silver Link', 'Studio Colorido', 'Studio Ghibli'
+        'Silver Link', 'Studio Colorido', 'Studio Ghibli', 'Aniplex'
     ],
     TIER_2_COMMITTEES: [
         'aniplex_exclusive', 'aniplexJB', // Aniplex
@@ -58,7 +58,7 @@ export const SOURCE_TIERS = {
         'TVTOKYO_anime' // TV Tokyo
     ],
     TIER_2_NAMES: [
-        'Aniplex', 'Kadokawa', 'Shueisha', 'Shogakukan', 'Kodansha', 'Bushiroad',
+        'Kadokawa', 'Shueisha', 'Shogakukan', 'Kodansha', 'Bushiroad',
         'Avex', 'Pony Canyon', 'NBCUniversal', 'King Records', 'TOHO Animation',
         'Bandai Namco', 'Square Enix', 'Fuji TV', 'TV Tokyo'
     ],

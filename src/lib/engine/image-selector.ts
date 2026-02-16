@@ -76,12 +76,21 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
     // --- STRATEGY 2: CLEAN VISUAL SEARCH (Tier 1 Priority) ---
     // Specifically look for "clean" or "artwork" to avoid posters.
     // We treat these as Top Tier (1) because they lead to premium clean visuals.
+    const isRanking = animeTitle.toLowerCase().includes('ranking') || animeTitle.toLowerCase().includes('chart') || animeTitle.toLowerCase().includes('viewership') || animeTitle.toLowerCase().includes('top 10');
+
     const cleanSearchTerms = [
-        `${animeTitle} clean artwork scenery`,
-        `${animeTitle} background artwork`,
-        `${animeTitle} anime scenery 4k`,
-        `${animeTitle} production art`
+        `${cleanSearchTitle} anime background art`,
+        `${cleanSearchTitle} clean artwork scenery`,
+        `${cleanSearchTitle} production art 4k`,
     ];
+
+    if (isRanking) {
+        cleanSearchTerms.unshift(
+            `${cleanSearchTitle} rankings chart`,
+            `anime viewership ranking infographic`,
+            `anime chart results`
+        );
+    }
 
     for (const term of cleanSearchTerms) {
         if (candidates.length > 20) break;
