@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
 
         const skipProcessing = formData.get('skipProcessing') === 'true';
         const postId = formData.get('postId') as string;
+        const imageSettings = formData.get('imageSettings') as string;
+        const backgroundImageUrl = formData.get('background_image') as string;
 
         if (!title || (!imageFile && !postId)) {
             return NextResponse.json({ error: 'Title and image are required' }, { status: 400 });
@@ -76,6 +78,18 @@ export async function POST(req: NextRequest) {
 
         if (finalImageUrl) {
             postData.image = finalImageUrl;
+        }
+
+        if (imageSettings) {
+            try {
+                postData.image_settings = JSON.parse(imageSettings);
+            } catch (e) {
+                console.error('Failed to parse imageSettings:', e);
+            }
+        }
+
+        if (backgroundImageUrl) {
+            postData.background_image = backgroundImageUrl;
         }
 
         // Deployment Logic: Alerts are always published immediately

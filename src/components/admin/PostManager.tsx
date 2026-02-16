@@ -373,32 +373,41 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setContent(post.content);
         setOverlayTag(post.headline || '');
         setCustomImage(null);
-        setCustomImagePreview(post.image || '');
-        setPreviewPost(null);
+
+        // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
+        const sourceUrl = post.background_image || post.image || '';
+        setCustomImagePreview(sourceUrl);
+
         // Load existing image into the "Pro Editor" so it's visible immediately
-        if (post.image) {
-            setSearchedImages([post.image]);
+        if (sourceUrl) {
+            setSearchedImages([sourceUrl]);
             setSelectedImageIndex(0);
         } else {
             setSearchedImages([]);
             setSelectedImageIndex(null);
         }
+
+        setPreviewPost(null);
         setProcessedImage(null);
         setSearchPage(1);
-        setImagePosition({ x: 0, y: 0 });
+
+        // LOAD IMAGE SETTINGS
+        const settings = post.image_settings || {};
+        setImageScale(settings.imageScale || 1);
+        setImagePosition(settings.imagePosition || { x: 0, y: 0 });
+        setTextScale(settings.textScale || 1);
+        setTextPosition(settings.textPosition || { x: WIDTH / 2, y: 1113.75 });
+        setIsApplyText(settings.isApplyText ?? !!(post.headline || post.title));
+        setIsApplyGradient(settings.isApplyGradient ?? !!(post.headline || post.title));
+        setIsApplyWatermark(settings.isApplyWatermark ?? true);
+        setPurpleWordIndices(settings.purpleWordIndices || []);
+        setGradientPosition(settings.gradientPosition || 'bottom');
+
         setEditorMode('RAW');
         setIsImageLocked(false);
-        setTextScale(1);
-        setTextPosition({ x: WIDTH / 2, y: 1113.75 });
         setIsTextLocked(false);
-        setGradientPosition('bottom');
-        setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
         setShowExpandedPreview(false);
-
-        setIsApplyGradient(!!(post.headline || post.title));
-        setIsApplyText(!!(post.headline || post.title));
-        setIsApplyWatermark(true); // Default to true for existing posts
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
         setShowModal(true);
@@ -792,6 +801,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             if (editingPostId) {
                 formData.append('postId', editingPostId);
+            }
+
+            // PERSIST LOGIC: Save the raw ingredients for the next edit session
+            const imageSettings = {
+                textScale,
+                textPosition,
+                isApplyText,
+                isApplyGradient,
+                isApplyWatermark,
+                purpleWordIndices,
+                gradientPosition,
+                imageScale,
+                imagePosition
+            };
+            formData.append('imageSettings', JSON.stringify(imageSettings));
+
+            // Ensure we save the original anime image as the background source
+            const backgroundImageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
+                ? searchedImages[selectedImageIndex]
+                : customImagePreview;
+
+            if (backgroundImageUrl) {
+                formData.append('background_image', backgroundImageUrl);
             }
 
             const response = await fetch('/api/admin/custom-post', {

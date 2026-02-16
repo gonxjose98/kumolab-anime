@@ -25,8 +25,19 @@ export interface BlogPost {
     premiereDate?: string; // ISO format: YYYY-MM-DD
     excerpt?: string; // For meta description or preview
     content: string; // Markdown or HTML
-    image?: string;
-    origin_image_url?: string;
+    image?: string; // The final composite image
+    background_image?: string; // The raw background image (anime art)
+    image_settings?: {
+        textScale?: number;
+        textPosition?: { x: number; y: number };
+        isApplyText?: boolean;
+        isApplyGradient?: boolean;
+        isApplyWatermark?: boolean;
+        purpleWordIndices?: number[];
+        gradientPosition?: 'top' | 'bottom';
+        imageScale?: number;
+        imagePosition?: { x: number; y: number };
+    };
     is_announcement_tied?: boolean;
     headline?: string;
     timestamp: string; // ISO string

@@ -188,13 +188,8 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         }
     }
 
-    if (!selectedImage) {
-        console.warn(`[Generator] ABORT: No image found for ${finalTitle}`);
-        return null;
-    }
-
-    // 5. IMAGE PROCESSING (Branding/Overlay)
     let finalImage = selectedImage;
+    let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
         const result = await generateIntelImage({
             sourceUrl: selectedImage,
@@ -207,6 +202,15 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         });
         if (result?.processedImage) {
             finalImage = result.processedImage;
+            imageSettings = {
+                textScale: result.layout?.finalScale || 1,
+                textPosition: { x: 540, y: result.layout?.y || 1113.75 },
+                isApplyText: classification === 'CLEAN',
+                isApplyGradient: classification === 'CLEAN',
+                isApplyWatermark: classification === 'CLEAN',
+                purpleWordIndices: [],
+                gradientPosition: result.layout?.zone === 'HEADER' ? 'top' : 'bottom'
+            };
         }
     }
 
@@ -225,7 +229,8 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         season_label: seasonLabel,
         content: finalContent,
         image: finalImage,
-        origin_image_url: selectedImage,
+        background_image: selectedImage,
+        image_settings: imageSettings,
         is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
         isPublished: true,
@@ -319,6 +324,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     // 3. IMAGE PROCESSING
     let finalImage = selectedImage;
+    let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
         const result = await generateIntelImage({
             sourceUrl: selectedImage,
@@ -331,6 +337,15 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         });
         if (result?.processedImage) {
             finalImage = result.processedImage;
+            imageSettings = {
+                textScale: result.layout?.finalScale || 1,
+                textPosition: { x: 540, y: result.layout?.y || 1113.75 },
+                isApplyText: classification === 'CLEAN',
+                isApplyGradient: classification === 'CLEAN',
+                isApplyWatermark: classification === 'CLEAN',
+                purpleWordIndices: [],
+                gradientPosition: result.layout?.zone === 'HEADER' ? 'top' : 'bottom'
+            };
         }
     }
 
@@ -346,7 +361,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         season_label: trendingItem.season_label,
         content: finalContent,
         image: finalImage,
-        origin_image_url: selectedImage,
+        background_image: selectedImage,
+        image_settings: imageSettings,
         is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
         isPublished: true,
