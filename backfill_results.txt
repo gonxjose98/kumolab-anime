@@ -1,0 +1,12 @@
+[dotenv@17.2.3] injecting env (32) from .env.local -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+--- Recent Publications (Supabase) ---
+1. Hell’s Paradise: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+2. JUJUTSU KAISEN: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+3. Frieren: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+4. Golden Kamuy Final: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+5. Dorohedoro Anime: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+6. You and I Are Polar Opposites Trending Now [OTHER_ABORT] - 2026-02-09T21:52:53.322+00:00
+7. My Hero Academia: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:52:53.322+00:00
+8. Dorohedoro Anime: New Season Confirmed [NEW_SEASON_CONFIRMED] - 2026-02-09T21:49:47.091+00:00
+9. Daily Drops - 2026-02-09 [null] - 2026-02-09T15:14:25.024+00:00
+10. Hana-Kimi Presents 3 More Cast Members With 2nd Visual [null] - 2026-02-08T16:22:56.32+00:00

@@ -1,0 +1,18 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ΓÜÖ∩╕Å  enable debug logging with { debug: true }
+[
+  'anime_id',             'approved_at',
+  'approved_by',          'claim_type',
+  'content',              'created_at',
+  'duplicate_of',         'event_fingerprint',
+  'excerpt',              'id',
+  'image',                'is_duplicate',
+  'is_published',         'premiere_date',
+  'relevance_score',      'scheduled_post_time',
+  'scraped_at',           'season_label',
+  'slug',                 'social_metrics',
+  'source',               'source_tier',
+  'status',               'timestamp',
+  'title',                'truth_fingerprint',
+  'type',                 'verification_reason',
+  'verification_sources', 'verification_tier'
+]

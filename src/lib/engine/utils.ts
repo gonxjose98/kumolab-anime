@@ -49,6 +49,31 @@ export function generateTruthFingerprint(params: {
 export async function getSourceTier(sourceName: string, supabase: any): Promise<number> {
     if (!sourceName) return 3;
 
+    // Hardcoded overrides for common sources if not in DB
+    const sourceLower = sourceName.toLowerCase();
+    if (
+        sourceLower.includes('animenewsnetwork') ||
+        sourceLower.includes('crunchyroll') ||
+        sourceLower.includes('variety') ||
+        sourceLower.includes('hollywoodreporter') ||
+        sourceLower.includes('deadline') ||
+        sourceLower.includes('mainichi') ||
+        sourceLower.includes('mantan-web')
+    ) {
+        return 1;
+    }
+
+    if (
+        sourceLower.includes('anilist') ||
+        sourceLower.includes('myanimelist') ||
+        sourceLower.includes('twitter') ||
+        sourceLower.includes('x.com') ||
+        sourceLower.includes('reddit') ||
+        sourceLower.includes('instagram')
+    ) {
+        return 2;
+    }
+
     try {
         const { data, error } = await supabase
             .from('source_tiers')

@@ -28,13 +28,24 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Normalize posts to ensure isPublished and social stats are present
     const normalizedPosts = initialPosts.map(p => {
         const scheduledTime = (p as any).scheduled_post_time ?? p.scheduledPostTime;
+        const sourceTier = (p as any).source_tier ?? p.sourceTier ?? 3;
+        const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
+        const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
+        const source = (p as any).source ?? p.source ?? 'Unknown';
+
         return {
             ...p,
             isPublished: (p as any).is_published ?? p.isPublished,
             scheduledPostTime: scheduledTime,
-            socialIds: (p as any).social_ids ?? (p.socialIds || {})
+            socialIds: (p as any).social_ids ?? (p.socialIds || {}),
+            sourceTier,
+            relevanceScore,
+            scrapedAt,
+            source
         };
     });
+
+    console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: p.source, score: p.relevanceScore, tier: p.sourceTier })));
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
@@ -1336,19 +1347,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     <td className="p-4 align-top w-[140px]">
                                         {filter === 'PENDING' ? (
                                             <div className="flex flex-col gap-1.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-black tracking-[0.1em] border ${post.sourceTier === 1 ? 'bg-green-500/10 text-green-500 border-green-500/20' : post.sourceTier === 2 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20'}`}>
-                                                        TIER {post.sourceTier || 3}
-                                                    </span>
-                                                    <span className="text-[9px] font-black text-white/40 font-mono">
-                                                        {post.relevanceScore || 0}%
-                                                    </span>
-                                                </div>
-                                                <div className="text-[9px] font-bold text-neutral-500 truncate uppercase tracking-tighter">
-                                                    {post.source || 'Unknown Source'}
+                                                {/* LOUD VERIFICATION LOG */}
+                                                {(() => {
+                                                    const logMsg = `[V3-REFRESH] METADATA RENDERING: Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier} | Time=${new Date().toISOString()}`;
+                                                    console.log(`%c ${logMsg}`, 'background: #222; color: #bada55; font-size: 10px; font-weight: bold;');
+                                                    return null;
+                                                })()}
+                                                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
+                                                    Source: <span className="text-white/60">{post.source || 'Unknown'}</span> | Score: <span className="text-white/60">{post.relevanceScore || 0}</span> | Tier <span className="text-white/60">{post.sourceTier || 3}</span>
                                                 </div>
                                                 <div className="text-[8px] font-mono text-neutral-600">
-                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleTimeString() : 'Manual'}
+                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Manual'}
                                                 </div>
                                             </div>
                                         ) : (
@@ -1497,10 +1506,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
-                                                title="Visual Mission Control"
-                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-purple-500/20 text-slate-400 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all scale-90 hover:scale-100"
+                                                title="Preview & Mission Control"
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-500/10 hover:bg-purple-500 text-purple-500 hover:text-white border border-purple-500/20 transition-all"
                                             >
-                                                <Zap size={14} />
+                                                <Eye size={14} />
                                             </button>
                                             <Link
                                                 href={`/admin/post/${post.id || ''}`}
@@ -1559,12 +1568,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 {post.status === 'approved' ? 'SCHEDULED' : post.isPublished ? 'LIVE' : 'HIDDEN'}
                                             </span>
                                             {filter === 'PENDING' && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[8px] font-black p-0.5 bg-purple-500/10 text-purple-400 rounded">
-                                                        {post.relevanceScore || 0}%
-                                                    </span>
-                                                    <span className="text-[8px] font-bold text-neutral-600 uppercase">
-                                                        T{post.sourceTier || 3}
+                                                <div className="flex flex-col gap-1 border-l border-white/10 pl-2">
+                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">
+                                                        Source: {post.source || 'Unknown'} | Score: {post.relevanceScore || 0} | Tier {post.sourceTier || 3}
                                                     </span>
                                                 </div>
                                             )}
@@ -1580,7 +1586,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 onClick={() => handleEditClick(post)}
                                                 className="text-purple-600 dark:text-purple-400 hover:text-purple-700"
                                             >
-                                                <Zap size={16} />
+                                                <Eye size={16} />
                                             </button>
                                             <Link
                                                 href={`/admin/post/${post.id}`}
@@ -1867,177 +1873,106 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 </div>
                                 {/* Input Fields Container */}
                                 <div className="space-y-4">
-                                    {genType === 'CUSTOM' || genType === 'CONFIRMATION_ALERT' ? (
-                                        <>
-                                            {/* Custom Post Inputs */}
-                                            <div className="space-y-4">
-                                                <div className="group">
-                                                    <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-green-600 dark:group-focus-within:text-green-500 transition-colors">
-                                                        Frequency Title
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder={genType === 'CONFIRMATION_ALERT' ? "JUST CONFIRMED: One Piece Season 2..." : "Enter main headline..."}
-                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
-                                                        value={title}
-                                                        onChange={(e) => setTitle(e.target.value)}
-                                                    />
-                                                    {genType === 'CONFIRMATION_ALERT' && (
-                                                        <p className="mt-1 text-[9px] text-orange-500 font-bold uppercase tracking-tighter">
-                                                            Must start with: JUST CONFIRMED, OFFICIAL, or CONFIRMED
-                                                        </p>
-                                                    )}
-                                                </div>
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                            Public Title
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter the title as it appears on the blog..."
+                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                        />
+                                    </div>
 
-                                                <div className="group">
-                                                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-green-500 transition-colors">
-                                                        Visual Asset
-                                                    </label>
-                                                    {searchedImages.length === 0 && (
-                                                        <div className="relative">
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                onChange={(e) => {
-                                                                    const file = e.target.files?.[0];
-                                                                    if (file) {
-                                                                        setCustomImage(file);
-                                                                        const reader = new FileReader();
-                                                                        reader.onloadend = () => {
-                                                                            const result = reader.result as string;
-                                                                            setCustomImagePreview(result);
-                                                                            // UNIFICATION: Push to searchedImages to trigger PRO EDITOR
-                                                                            setSearchedImages([result]);
-                                                                            setSelectedImageIndex(0);
-                                                                            setImageScale(1);
-                                                                            setImagePosition({ x: 0, y: 0 });
-                                                                            setProcessedImage(null);
-                                                                            setIsStageDirty(true);
-                                                                        };
-                                                                        reader.readAsDataURL(file);
-                                                                    }
-                                                                }}
-                                                                className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-400 dark:text-neutral-400 text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-wide file:bg-green-100 dark:file:bg-green-500/10 file:text-green-600 dark:file:text-green-400 hover:file:bg-green-200 dark:hover:file:bg-green-500/20 cursor-pointer"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    {/* Unified Editor Placeholder - Rendered via shared component below */}
-
-                                                </div>
-
-                                                <div className="group">
-                                                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
-                                                        Overlay Callout
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="e.g. BREAKING • OFFICIAL • REVEAL"
-                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-700"
-                                                        value={overlayTag}
-                                                        onChange={(e) => {
-                                                            setOverlayTag(e.target.value);
-                                                            // Visibility is now derived purely from content length.
-                                                        }}
-                                                    />
-                                                </div>
-
-                                                <div className="group">
-                                                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-neutral-300 transition-colors">
-                                                        Description
-                                                    </label>
-                                                    <textarea
-                                                        placeholder="Enter transmission content..."
-                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-white/30 focus:ring-1 focus:ring-white/20 outline-none h-32 resize-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
-                                                        value={content}
-                                                        onChange={(e) => setContent(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                        </>
-                                    ) : (
-                                        /* AUTO / INTEL Form */
-                                        <div className="space-y-6">
-                                            <div className="group">
-                                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
-                                                    Target Topic / Anime
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. One Piece, Jujutsu Kaisen (Metadata & image lookup only)"
-                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
-                                                    value={topic}
-                                                    onChange={(e) => {
-                                                        setTopic(e.target.value);
-                                                    }}
-                                                />
-                                                <p className="mt-1 text-[9px] text-blue-500/70 font-bold uppercase tracking-tighter">
-                                                    Lookup Only: This text will NEVER appear on the image.
-                                                </p>
-                                            </div>
-
-                                            {/* IMAGE SELECTOR V2 */}
-                                            <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
-                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                        <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                                            Visual Feed Selector (v2)
-                                                        </label>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={async () => {
-                                                                await handleSearchImages(true);
-                                                            }}
-                                                            disabled={isSearchingImages || !topic}
-                                                            className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
-                                                        >
-                                                            {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
-                                                            {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
-                                                        </button>
-                                                        <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-1.5 cursor-pointer">
-                                                            <Upload size={12} />
-                                                            Upload
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                className="hidden"
-                                                                onChange={(e) => {
-                                                                    const file = e.target.files?.[0];
-                                                                    if (file) {
-                                                                        const reader = new FileReader();
-                                                                        reader.onloadend = () => {
-                                                                            const result = reader.result as string;
-                                                                            setSearchedImages([result]);
-                                                                            setSelectedImageIndex(0);
-                                                                            setImageScale(1);
-                                                                            setImagePosition({ x: 0, y: 0 });
-                                                                            setProcessedImage(null);
-                                                                            setIsStageDirty(true);
-                                                                        };
-                                                                        reader.readAsDataURL(file);
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </label>
-                                                        {searchedImages.length > 0 && (
-                                                            <button
-                                                                onClick={async () => {
-                                                                    await handleSearchImages(false);
-                                                                }}
-                                                                disabled={isSearchingImages}
-                                                                className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                                            >
-                                                                {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                                                                More
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    {(genType === 'INTEL' || genType === 'TRENDING') && (
+                                        <div className="group">
+                                            <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
+                                                Search Topic (Intel/Trending)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. One Piece (Used for image/metadata lookup)"
+                                                className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                                                value={topic}
+                                                onChange={(e) => setTopic(e.target.value)}
+                                            />
                                         </div>
                                     )}
+
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                            Editor Content
+                                        </label>
+                                        <textarea
+                                            placeholder="Enter transmission content..."
+                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-32 resize-none transition-all"
+                                            value={content}
+                                            onChange={(e) => setContent(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {/* IMAGE SELECTOR V2 */}
+                                    <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                                <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                                    Visual Feed Selector (v2)
+                                                </label>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={async () => {
+                                                        await handleSearchImages(true);
+                                                    }}
+                                                    disabled={isSearchingImages || !topic}
+                                                    className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
+                                                >
+                                                    {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                                                    {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
+                                                </button>
+                                                <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-1.5 cursor-pointer">
+                                                    <Upload size={12} />
+                                                    Upload
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                const reader = new FileReader();
+                                                                reader.onloadend = () => {
+                                                                    const result = reader.result as string;
+                                                                    setSearchedImages([result]);
+                                                                    setSelectedImageIndex(0);
+                                                                    setImageScale(1);
+                                                                    setImagePosition({ x: 0, y: 0 });
+                                                                    setProcessedImage(null);
+                                                                    setIsStageDirty(true);
+                                                                };
+                                                                reader.readAsDataURL(file);
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                                {searchedImages.length > 0 && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            await handleSearchImages(false);
+                                                        }}
+                                                        disabled={isSearchingImages}
+                                                        className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                                    >
+                                                        {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                                        More
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     {searchedImages.length > 0 ? (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -2565,22 +2500,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     )}
                                 </div>
 
-                                {/* Extra Fields for Manual Override */}
-                                <div className="pt-4 border-t border-white/5">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Editor Notes</label>
-                                        <textarea
-                                            placeholder="Optional content body..."
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white text-xs focus:border-white/20 outline-none h-[64px] resize-none overflow-hidden focus:h-24 transition-all"
-                                            value={content}
-                                            onChange={(e) => setContent(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            </div >
+                            </div>
 
                             {/* Main Generation Action */}
-                            < div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]" >
+                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                                 <button
                                     onClick={() => handleSavePost(editingPostId ? true : false)}
                                     disabled={isGenerating || isApplyingEffect}
@@ -2589,7 +2512,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
                                     {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
                                 </button>
-                            </div >
+                            </div>
 
                             {/* PREVIEW POST CARD (Result) */}
                             {

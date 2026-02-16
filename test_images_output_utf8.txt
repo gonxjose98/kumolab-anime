@@ -1,0 +1,60 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+
+--- Testing image for: Let's Go Karaoke!'s Yama Wayama Plans to Launch New Work in 2027 ---
+[Image Selector] Hunting for visual assets for: "Let's Go Karaoke!'s Yama Wayama Plans to Launch New Work in 2027"
+Result: null
+
+--- Testing image for: Fire Force ---
+[Image Selector] Hunting for visual assets for: "Fire Force"
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/banner/105310-5OEWWnzQOTyW.jpg (1900x550)
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx105310-2PKUvoaA6fTn.jpg (460x690)
+[Image Selector] Crawling Official Site: https://fireforce-anime.jp/season1/
+[Image Selector] Asset too small: https://fireforce-anime.jp/season1/images/ogp6.png (1200x620)
+[Image Selector] REJECT: Aspect ratio 3.45 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: AniList Cover (Fallback) (Aspect: 0.67)
+[Image Selector] Winner: AniList Cover (Fallback) (460x690) Score: 50.0
+[Image Selector] Asset: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx105310-2PKUvoaA6fTn.jpg
+Result: {
+  url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx105310-2PKUvoaA6fTn.jpg',
+  hasText: true,
+  classification: 'TEXT_HEAVY'
+}
+
+--- Testing image for: Chained Soldier ---
+[Image Selector] Hunting for visual assets for: "Chained Soldier"
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/banner/141821-KIRWH28jXINm.jpg (1900x400)
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx141821-lkVTjKqL4BU2.jpg (460x651)
+[Image Selector] Crawling Official Site: https://mabotai.jp/
+[Image Selector] Asset too small: https://mabotai.jp/img/ogp.jpg (1200x630)
+[Image Selector] REJECT: Aspect ratio 4.75 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: AniList Cover (Fallback) (Aspect: 0.71)
+[Image Selector] Winner: AniList Cover (Fallback) (460x651) Score: 50.0
+[Image Selector] Asset: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx141821-lkVTjKqL4BU2.jpg
+Result: {
+  url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx141821-lkVTjKqL4BU2.jpg',
+  hasText: true,
+  classification: 'TEXT_HEAVY'
+}
+
+--- Testing image for: OSHI NO KO ---
+[Image Selector] Hunting for visual assets for: "OSHI NO KO"
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/banner/150672-ISwoA0eS722H.jpg (1900x400)
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx150672-WqmmwZ4nMzAy.png (460x651)
+[Image Selector] Crawling Official Site: https://ichigoproduction.com/Season1/
+[Image Selector] Asset too small: https://ichigoproduction.com/Season1/core_sys/images/others/ogp.jpg (1200x630)
+[Image Selector] REJECT: Aspect ratio 4.75 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: AniList Cover (Fallback) (Aspect: 0.71)
+[Image Selector] Winner: AniList Cover (Fallback) (460x651) Score: 50.0
+[Image Selector] Asset: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx150672-WqmmwZ4nMzAy.png
+Result: {
+  url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx150672-WqmmwZ4nMzAy.png',
+  hasText: true,
+  classification: 'TEXT_HEAVY'
+}
+
+--- Testing image for: SHIBOYUGI ---
+[Image Selector] Hunting for visual assets for: "SHIBOYUGI"
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/banner/180746-AyfiOMkuHegF.jpg (1900x399)
+[Image Selector] Asset too small: https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx180746-eqDiHbzoHMFh.jpg (460x651)
+[Image Selector] Crawling Official Site: https://shiboyugi-anime.com/
+[Image Selector] Asset too small: https://shiboyugi-anime.com/core_sys/images/others/ogp.jpg (1200x630)

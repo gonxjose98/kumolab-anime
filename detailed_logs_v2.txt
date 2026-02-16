@@ -1,0 +1,38 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ≡ƒöæ add access controls to secrets: https://dotenvx.com/ops
+Checking last 20 scheduler logs...
+[2026-02-11T15:15:57.374+00:00] [hourly] [success] Generated: Daily Drops - 2026-02-11
+[2026-02-11T11:33:47.704+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-11T08:05:46.776+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-11T05:19:21.843+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-10T22:07:10.942+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-10T19:44:45.176+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-10T15:47:52.804+00:00] [hourly] [success] Generated: Daily Drops - 2026-02-10
+[2026-02-10T11:39:56.979+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-10T08:08:48.202+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-10T05:49:09.118+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-09T23:55:34.322+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria
+[2026-02-09T22:07:13.484+00:00] [hourly] [skipped] Rate Limit Hit
+[2026-02-09T21:50:28.768+00:00] [hourly] [skipped] Rate Limit Hit
+[2026-02-09T21:50:09.56+00:00] [hourly] [success] Generated: Dorohedoro Anime: New Season Confirmed
+[2026-02-09T21:48:45.343+00:00] [hourly] [error] Engine Crash
+  Error: new row for relation "posts" violates check constraint "posts_claim_type_check"
+[2026-02-09T21:48:45.183+00:00] [hourly] [skipped] Aborted 1 candidates
+  Aborts: 1 items aborted
+    - Dorohedoro Anime Season 2's Visual Reveals Updated Staff, April 1 Global Debut: GENERATOR_ABORT (Likely missing visual or strict rule) (undefined)
+[2026-02-09T21:44:44.385+00:00] [hourly] [error] Engine Crash
+  Error: Could not find the 'anime_id' column of 'posts' in the schema cache
+[2026-02-09T21:44:04.634+00:00] [hourly] [error] Engine Crash
+  Error: Could not find the 'anime_id' column of 'posts' in the schema cache
+[2026-02-09T21:42:33.693+00:00] [hourly] [error] Engine Crash
+  Error: Could not find the 'anime_id' column of 'posts' in the schema cache
+[2026-02-09T21:02:59.51+00:00] [hourly] [skipped] No new content
+  Reason: No candidates met criteria

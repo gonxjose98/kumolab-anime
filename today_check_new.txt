@@ -1,0 +1,103 @@
+--- KumoLab Today Check ---
+[Fetcher] Sourcing Intel from AnimeNewsNetwork...
+[Fetcher] Skipping (Negative/Manga Title): Crunchyroll Manga Adds 30 New Titles from J-Novel Club
+[Fetcher] Skipping (Negative/Manga Title): Abrams ComicArts' Kana Licenses Inio Asano's Before Dawn and The End Of The World Manga
+[Fetcher] Skipping (Negative/Manga Title): Osamu Tezuka's Phoenix Manga Gets Live Manga Performance at MoN Takanawa Museum
+[Fetcher] Skipping (Negative/Manga Title): Mario Tennis Fever Game Unveils Opening Cinematic Video
+[Fetcher] Skipping (Negative/Manga Title): Hana-Kimi Omnibus Volumes 4-6 Manga Review
+[Fetcher] Skipping (Negative/Manga Title): Naver Webtoon Launches 'Flower Scholar' Character Project With Global Merch Push
+[Fetcher] Skipping (Negative/Manga Title): A Joyful Life Webtoon Gets Short-Form Live-Action Series Adaptation
+[Fetcher] Skipping (Negative/Manga Title): Soredemo Kichijoji dake ga Sumitai Machi Desu ka? Manga Gets 2nd Volume After Nearly 5 Years
+[Fetcher] Skipping (Negative/Manga Title): The Stellar Swordmaster Webtoon Gets Mobile RPG Adaptation
+[Fetcher] Skipping (Negative/Manga Title): The Duke's Daughter Drops Her Engagement and Facade Manga Ends
+[Fetcher] Skipping (Negative/Manga Title): Manga Plus Adds Akira Moriguchi's Stop! I'm Falling for You! Manga
+[Fetcher] Skipping (Negative/Manga Title): Kadokawa Releases 'Farewell, My Firsts,' Shino & Ren Manga in English
+[Fetcher] Skipping (Negative/Manga Title): The Super Mario Galaxy Movie Airs Super Bowl Commercial
+[Fetcher] Skipping (Negative/Manga Title): NEJIGANAMETA's Ladies on Top Manga Gets Live-Action Series
+[Fetcher] Skipping (Negative/Manga Title): Viz Media to Release 2018 Captain Tsubasa Anime, 2023 Captain Tsubasa: Junior Youth Arc Anime on DVD in April
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Blue Lock Film Reveals Trailer, More Cast, August 7 Debut
+[Fetcher] Skipping (Negative/Manga Title): Dragon Quest Creator Yuji Horii's Life Story Turned Into New Educational Manga
+[Fetcher] Skipping (Negative/Manga Title): Manga Up! Global Adds Sakamegane's VTuber Shigemi Kusamura: I'm my Oshi's Favorite in English
+[Fetcher] Skipping (Negative/Manga Title): Emaqi Service Releases Out, Kurashi no Izumi, 2 More Manga in English
+[Fetcher] Skipping (Negative/Manga Title): Daikenja Riddle no Jikan Gyakkо̄ Manga Gets Light Anime
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Blue Lock Film Casts Shunya Asano, Yuki Sakurai, Yuki Kura
+[Fetcher] Skipping (Negative/Manga Title): Yakuza/Like a Dragon Franchise's Crossover Live-Action Series With Nihon Tōitsu Debuts on February 10
+[Fetcher] Skipping (Negative/Manga Title): Neon Posts English-Subtitled Trailer for Exit 8 Live-Action Film
+[Fetcher] Skipping (Negative/Manga Title): Welcome to Demon School! Iruma-kun Manga Gets New Spinoff Manga in March
+[Fetcher] Skipping (Negative/Manga Title): Ichi-F: A Worker's Graphic Memoir of the Fukushima Nuclear Power Plant Manga Gets Special 1-Shot After 10 Years
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Yumi's Cells Season 3 Set for April Release, Introducing Yumi's Final Love Interest
+[Fetcher] Skipping (Negative/Manga Title): Fermat no Ryōri Manga Goes on Hiatus
+[Fetcher] Skipping (Negative/Manga Title): World's End Harem: Fantasia Manga Resumes on February 27, Switches to Weekly Release
+[Fetcher] Skipping (Negative/Manga Title): Doko Yori mo Tooi Basho ni Iru Kimi e Novel Gets Anime Film This Fall
+[Fetcher] Skipping (Negative/Manga Title): Blue Exorcist Manga Goes on 4-Month Hiatus to Prepare for Final Chapter
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Side Character's Love Story Film  Unveils Teaser, June 5 Debut
+[Fetcher] Skipping (Negative/Manga Title): Bungo Stray Dogs Manga Ends 1st Part on March 4
+[Fetcher] Skipping (Negative/Manga Title): North American Anime, Manga Releases, February 1-7
+[Fetcher] Skipping (Negative/Manga Title): Higurashi Artist Kei Natsumi Launches New Manga on March 4
+[Fetcher] Skipping (Negative/Manga Title): Mistress Kanan is Devilishly Easy Manga Takes Break
+[Fetcher] Skipping (Negative/Manga Title): Welcome to Demon School! Iruma-kun: IruMafia Edition Manga Gets TV Anime Next January
+[Fetcher] Skipping (Negative/Manga Title): Yuki Ikeda's Thunder 3 Parallel-World Manga Listed With TV Anime
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Sakamoto Days Film's 2nd Teaser Highlights Action, Everyday Life Scenes
+[Fetcher] Skipping (Negative/Manga Title): Ikumi Fukuda's The Blood Blooms in the Barrens Manga Ends in Next Chapter
+[Fetcher] Skipping (Negative/Manga Title): Nyoijizai's Cinderella Athletes Manga Ends
+[Fetcher] Skipping (Negative/Manga Title): My Unique Skill Makes me OP Even at Level 1 Manga Goes on Hiatus for Artist's Health
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Blue Lock Film Casts Raizo Ishikawa, Joey Iwanaga
+[Fetcher] Skipping (Negative/Manga Title): Exit 8 Live-Action Film Opens in N. America on April 10
+[Fetcher] Sourcing Intel from ComicBook...
+[Fetcher] Total unique Intel items found: 34
+[Fetcher] Sourcing: AniList: 10, Reddit: 3, News: 10
+[Fetcher] Ranking 21 candidates...
+[Fetcher] STALE_CONFIRMATION_ABORT (Trending): Hell’s Paradise Season 2 | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[Fetcher] STALE_CONFIRMATION_ABORT (Trending): My Hero Academia: Vigilantes Season 2 | Reason: Anime status is RELEASING with 13 episodes in AniList.
+[Fetcher] STALE_CONFIRMATION_ABORT (Trending): JUJUTSU KAISEN Season 3: The Culling Game Part 1 | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[Fetcher] STALE_CONFIRMATION_ABORT (Trending): Frieren: Beyond Journey’s End Season 2 | Reason: Anime status is RELEASING with 10 episodes in AniList.
+[Fetcher] STALE_CONFIRMATION_ABORT (Trending): Golden Kamuy Final Season | Reason: Anime status is RELEASING with 13 episodes in AniList.
+Found 5 candidates.
+
+Checking: Dorohedoro Anime Season 2's Visual Reveals Updated Staff, April 1 Global Debut (NEW_SEASON_CONFIRMED)
+[Image Selector] Hunting for visual assets for: "Dorohedoro Anime Season 2's Visual Reveals Updated Staff, April 1 Global Debut"
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] REJECT: Aspect ratio 1.79 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 1.56)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.68)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] REJECT: Aspect ratio 1.79 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Winner: Search: Clean Visual (848x1200) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/nixlf66y19uf1.jpeg
+[Image Engine] Fetching: https://i.redd.it/nixlf66y19uf1.jpeg
+[Image Engine] Downloaded 377355 bytes
+  [VALID] Should go up! Fingerprint: 9e4d9a3e6c92fa519475c0ebf3d0510909685afaf0bf06800801f566796a840d
+  Title: Dorohedoro Anime: Season 2 Confirmed
+  Visual: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/trending-dorohedoro-anime-season-2-s-visual-reveals-updated-staff-april-1-global-debut-social.png
+
+Checking: You and I Are Polar Opposites (OTHER_ABORT)
+[Image Selector] Hunting for visual assets for: "You and I Are Polar Opposites"
+[Image Selector] Crawling Official Site: https://sh-anime.shochiku.co.jp/seihantai_anime/
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.75)
+[Image Selector] Winner: Search: Clean Visual (1279x1706) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/jq2sfa186bqf1.jpeg
+[Image Engine] Fetching: https://i.redd.it/jq2sfa186bqf1.jpeg
+[Image Engine] Downloaded 171083 bytes
+  [VALID] Should go up! Fingerprint: a9f9edb9567990a314a97c9b49c340c4cedc36a329d12162bdab6c0c7d938637
+  Title: You and I Are Polar Opposites Trending Now
+  Visual: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/trending-you-and-i-are-polar-opposites-social.png
+
+Checking: The Great Jahy's Wakame Konbu Debuts New Series on February 12 (OTHER_ABORT)
+[Image Selector] Hunting for visual assets for: "The Great Jahy's Wakame Konbu Debuts New Series on February 12"
+[Image Selector] No valid candidates found for "The Great Jahy's Wakame Konbu Debuts New Series on February 12".
+[Generator] ABORT: No valid image found for The Great Jahy's Wakame Konbu Debuts New Series on February 12 Trending Now
+  [SKIP] Generator returned null (Strict rule or missing visual).
+
+Checking: Demon Slayer: The Hinokami Chronicles 2 Game Adds Infinity Castle Tanjiro DLC on February 13 (CAST_ADDITION)
+[Image Selector] Hunting for visual assets for: "Demon Slayer: The Hinokami Chronicles 2 Game Adds Infinity Castle Tanjiro DLC on February 13"
+[Image Selector] No valid candidates found for "Demon Slayer: The Hinokami Chronicles 2 Game Adds Infinity Castle Tanjiro DLC on February 13".
+[Generator] ABORT: No valid image found for Demon Slayer Trending Now
+  [SKIP] Generator returned null (Strict rule or missing visual).
+
+Checking: The Case Book of Arne Anime Casts Yūko Miyamura as Red Riding Hood (CAST_ADDITION)
+[Image Selector] Hunting for visual assets for: "The Case Book of Arne Anime Casts Yūko Miyamura as Red Riding Hood"
+[Image Selector] No valid candidates found for "The Case Book of Arne Anime Casts Yūko Miyamura as Red Riding Hood".
+[Generator] ABORT: No valid image found for The Case Book of Arne Anime Casts Yūko Miyamura as Red Riding Hood Trending Now
+  [SKIP] Generator returned null (Strict rule or missing visual).

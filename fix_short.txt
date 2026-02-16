@@ -1,0 +1,200 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+Fetching pending posts...
+Found 29 pending posts.
+
+Fixing: Trigun Stargaze ΓÇÆ Episode 6 Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Trigun Stargaze ΓÇÆ Episode 6" (Original: "Trigun Stargaze ΓÇÆ Episode 6 Update")
+[Image Selector] REJECT: Aspect ratio 0.60 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.72)
+[Image Selector] REJECT: Aspect ratio 0.60 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.64)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.63)
+[Image Selector] Winner: Search: Clean Visual (1064x1488) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/ivizihp3kppe1.jpeg
+   New Base Image: https://i.redd.it/ivizihp3kppe1.jpeg
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/ivizihp3kppe1.jpeg
+[Image Engine] Downloaded 340213 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: Medalist Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Medalist" (Original: "Medalist Update")
+npx : [Reddit Search] Rate limited (429) for 
+"Medalist Update clean artwork scenery". Waiting 
+5s...
+At line:1 char:1
++ npx tsx fix_pending_images_v2.ts > 
+fix_results_v2.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([Red 
+   dit Search].... Waiting 5s...:String) [], Rem  
+  oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update clean artwork scenery"
+[Reddit Search] Rate limited (429) for "Medalist 
+Update background artwork". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update background artwork"
+[Reddit Search] Rate limited (429) for "Medalist 
+Update anime scenery 4k". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update anime scenery 4k"
+[Reddit Search] Rate limited (429) for "Medalist 
+Update production art". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update production art"
+[Reddit Search] Rate limited (429) for "Medalist 
+Update visual". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update visual"
+[Reddit Search] Rate limited (429) for "Medalist 
+Update official". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Medalist 
+Update official"
+[Image Selector] No valid candidates found for 
+"Medalist Update". Re-attempting with lower 
+quality gate...
+[Image Selector] Absolute failure: No visuals for 
+"Medalist Update". Using branded fallback.
+   New Base Image: /hero-bg-final.png
+   SUCCESS: /hero-bg-final.png...
+---
+Fixing: Roll Over and Die ΓÇÆ Episode 6 Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Roll Over and Die ΓÇÆ Episode 6" (Original: "Roll Over and Die ΓÇÆ Episode 6 Update")
+[Reddit Search] Rate limited (429) for "Roll Over 
+and Die ΓÇÆ Episode 6 Update clean artwork 
+scenery". Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Roll Over and 
+Die ΓÇÆ Episode 6 Update clean artwork scenery"
+[Reddit Search] Rate limited (429) for "Roll Over 
+and Die ΓÇÆ Episode 6 Update background artwork". 
+Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Roll Over and 
+Die ΓÇÆ Episode 6 Update background artwork"
+[Reddit Search] Rate limited (429) for "Roll Over 
+and Die ΓÇÆ Episode 6 Update anime scenery 4k". 
+Waiting 5s...
+[Reddit Search] HTTP Error 429 for "Roll Over and 
+Die ΓÇÆ Episode 6 Update anime scenery 4k"
+[Reddit Search] Rate limited (429) for "Roll Over 
+and Die ΓÇÆ Episode 6 Update production art". 
+Waiting 5s...
+[Reddit Search] HTTP Error 403 for "Roll Over and 
+Die ΓÇÆ Episode 6 Update production art"
+[Image Selector] Asset too small: https://i.redd.it/z8vptg7uq70g1.jpeg (676x1000)
+   New Base Image: /hero-bg-final.png
+[Image Selector] No valid candidates found for 
+"Roll Over and Die ΓÇÆ Episode 6 Update". 
+Re-attempting with lower quality gate...
+[Image Selector] Absolute failure: No visuals for 
+"Roll Over and Die ΓÇÆ Episode 6 Update". Using 
+branded fallback.
+   SUCCESS: /hero-bg-final.png...
+---
+Fixing: Gals Can't Be Kind to Otaku!? 's Video Reveals New Cast Members
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Gals Can't Be Kind to Otaku!? 's Video" (Original: "Gals Can't Be Kind to Otaku!? 's Video Reveals New Cast Members")
+[Image Selector] Winner: Reddit Community (2382x3368) Score: 50.0
+[Image Selector] Asset: https://i.redd.it/u8xmw2efzfjg1.png
+   New Base Image: https://i.redd.it/u8xmw2efzfjg1.png
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/u8xmw2efzfjg1.png
+[Image Engine] Downloaded 2173772 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: Tamon's B-Side ΓÇÆ Episode 7 Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Tamon's B" (Original: "Tamon's B-Side ΓÇÆ Episode 7 Update")
+[Image Selector] REJECT: Aspect ratio 0.60 violates single-frame 4:3 subject-safe rules.
+[Image Selector] REJECT: Aspect ratio 0.60 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.63)
+[Image Selector] REJECT: Aspect ratio 0.38 violates single-frame 4:3 subject-safe rules.
+[Image Selector] REJECT: Aspect ratio 0.38 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Winner: Search: Clean Visual (3600x5678) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/7q5c1uvriosf1.jpeg
+   New Base Image: https://i.redd.it/7q5c1uvriosf1.jpeg
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/7q5c1uvriosf1.jpeg
+[Image Engine] Downloaded 3193098 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: The Irregular at Magic High School Releases New Trailer
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "The Irregular at Magic High School" (Original: "The Irregular at Magic High School Releases New Trailer")
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 1.41)
+[Image Selector] REJECT: Aspect ratio 2.18 violates single-frame 4:3 subject-safe rules.
+[Image Selector] REJECT: Aspect ratio 2.18 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] REJECT: Aspect ratio 2.18 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Winner: Search: Clean Visual (1199x848) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/tfymeux77q9g1.jpeg
+   New Base Image: https://i.redd.it/tfymeux77q9g1.jpeg
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/tfymeux77q9g1.jpeg
+[Image Engine] Downloaded 201978 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: Happy Valentine's Day From Around the World, Part II Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "Happy Valentine's Day From Around the World, Part II" (Original: "Happy Valentine's Day From Around the World, Part II Update")
+[Image Selector] No valid candidates found for 
+"Happy Valentine's Day From Around the World, 
+Part II Update". Re-attempting with lower quality 
+gate...
+[Image Selector] Absolute failure: No visuals for 
+"Happy Valentine's Day From Around the World, 
+Part II Update". Using branded fallback.
+   New Base Image: /hero-bg-final.png
+   SUCCESS: /hero-bg-final.png...
+---
+Fixing: AlphaPolis Acquires Studio NIA Animation Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "AlphaPolis Acquires Studio NIA Animation" (Original: "AlphaPolis Acquires Studio NIA Animation Update")
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Winner: Search: Clean Visual (850x1200) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/x4ck2q84ifp81.png
+   New Base Image: https://i.redd.it/x4ck2q84ifp81.png
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/x4ck2q84ifp81.png
+[Image Engine] Downloaded 1723635 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: 'Tadaima, Ojamasaremasu!' Romantic Comedy Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "'Tadaima, Ojamasaremasu!' Romantic Comedy" (Original: "'Tadaima, Ojamasaremasu!' Romantic Comedy Update")
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 1.41)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Asset too small: https://i.redd.it/5ik69sacfspa1.jpg (750x530)
+[Image Selector] Asset too small: https://i.redd.it/5ik69sacfspa1.jpg (750x530)
+[Image Selector] REJECT: Aspect ratio 1.78 violates single-frame 4:3 subject-safe rules.
+[Image Selector] Asset too small: https://i.redd.it/5ik69sacfspa1.jpg (750x530)
+[Image Selector] Asset too small: https://i.redd.it/5ik69sacfspa1.jpg (750x530)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Asset too small: https://i.redd.it/5ik69sacfspa1.jpg (750x530)
+[Image Selector] Winner: Search: Clean Visual (1600x1131) Score: 70.0
+[Image Selector] Asset: https://i.redd.it/5z6w5cbwijse1.jpeg
+   New Base Image: https://i.redd.it/5z6w5cbwijse1.jpeg
+   Regenerating with KumoLab branding...
+[Image Engine] Fetching: https://i.redd.it/5z6w5cbwijse1.jpeg
+[Image Engine] Downloaded 329511 bytes
+   Premium Version Generated.
+   SUCCESS: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v...
+---
+Fixing: JUJUTSU KAISEN Update
+   Current Image: https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/kumolab-generic-news-v1.png
+[Image Selector] Hunting for visual assets for: "JUJUTSU KAISEN" (Original: "JUJUTSU KAISEN Update")
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)
+[Image Selector] Penalizing poster: Search: Clean Visual (Aspect: 0.71)

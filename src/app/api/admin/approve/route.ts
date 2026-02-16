@@ -54,42 +54,28 @@ export async function POST(req: NextRequest) {
 }
 
 function calculateScheduledTime(baseDate: Date, index: number): Date {
-    const date = new Date(baseDate);
-    const currentHour = date.getHours();
-
-    // slots: 10, 14, 18, 21 (EST/Local?) - Assume Local for now as per "current time"
     const standardSlots = [10, 14, 18, 21];
+    const currentHour = baseDate.getHours();
 
-    // User's rule:
-    // If < 10 AM -> 10 AM
-    // 10-2 -> 2 PM
-    // 2-6 -> 6 PM
-    // > 6 PM -> 10 AM tomorrow
+    // Find the next available slot index today
+    let startSlotIndex = standardSlots.findIndex(h => h > currentHour);
+    let startDayOffset = 0;
 
-    // For bulk approvals, we stagger them.
-    // Let's implement the staggered logic:
-    // We treat the "index" as the sequence in the bulk batch.
+    if (startSlotIndex === -1) {
+        // No more slots today, start tomorrow at 10 AM
+        startSlotIndex = 0;
+        startDayOffset = 1;
+    }
 
-    const dayOffset = Math.floor(index / 4);
-    const slotIndex = index % 4;
+    // Calculate absolute slot position
+    const absoluteSlotPosition = startSlotIndex + index;
+    const dayOffset = startDayOffset + Math.floor(absoluteSlotPosition / 4);
+    const slotIndex = absoluteSlotPosition % 4;
     const slotHour = standardSlots[slotIndex];
 
     const targetDate = new Date(baseDate);
     targetDate.setDate(targetDate.getDate() + dayOffset);
     targetDate.setHours(slotHour, 0, 0, 0);
-
-    // If the calculated slot is in the past, move to next slot or next day
-    if (targetDate <= baseDate) {
-        // Find next available slot today
-        const nextSlot = standardSlots.find(h => h > currentHour);
-        if (nextSlot) {
-            targetDate.setHours(nextSlot, 0, 0, 0);
-        } else {
-            // Tomorrow 10 AM
-            targetDate.setDate(targetDate.getDate() + 1);
-            targetDate.setHours(10, 0, 0, 0);
-        }
-    }
 
     return targetDate;
 }

@@ -1,0 +1,108 @@
+[dotenv@17.2.3] injecting env (32) from .env.local -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+Debugging Candidates...
+[Fetcher] Sourcing Intel from AnimeNewsNetwork...
+[Fetcher] Skipping (Negative/Manga Title): Monika Kaname's Hakoiri Ojō-sama to Shominna Ore no Yaritai 100 no Koto Manga Ends
+[Fetcher] Skipping (Negative/Manga Title): Wataru Midori's Kagami no Kuni no Shitateya Manga Ends
+[Fetcher DEBUG] Found verb "screens" at idx 17 in "Sentai Filmworks Screens World Premiere of 4K Restoration of Ninja Scroll Anime Film at Berlinale"
+[Fetcher] Skipping (Negative/Manga Title): Touring After the Apocalypse Volume 4-6 Manga Review
+[Fetcher] Skipping (Negative/Manga Title): Yonoi Tsukihiko's Happy Hell Manga Ends in Next Volume
+[Fetcher] Skipping (Negative/Manga Title): Usamaru Furuya Launches New Manga on April 11
+[Fetcher] Skipping (Negative/Manga Title): Rewriting the Chivalrous Yakuza: Interview with Stray Manga Writer Ryu Kamio
+[Fetcher DEBUG] Found verb "unveils" at idx 33 in "To You in the Beyond Film Teaser Unveils Staff, October 9 Opening"
+[Fetcher] Skipping (Negative/Manga Title): Killing Bites' Shinya Murata Launches Akujo Ranking Manga on March 9
+[Fetcher] Skipping (Negative/Manga Title): Live-Action The Flowers of Evil Series Reveals More Cast, April 9 Premiere
+[Fetcher DEBUG] No verb found in "Danganronpa 2x2 Game Previews New Scenario, Limited Edition in Pre-Order Trailer"
+[Fetcher] Skipping (Negative/Manga Title): Kodansha Print Club Reveals 8 More Titles Including English Debut of Omega of the Divine Manga
+[Fetcher DEBUG] Found verb "announces" at idx 25 in "Voice Actress Nao Toyama Announces Upcoming Hiatus from Music"
+[Fetcher DEBUG] No verb found in "Let's Go Kaikigumi Horror Comedy Anime's 2 More Cast Members Listed"
+[Fetcher] Skipping (Negative/Manga Title): Live-Action One Piece Series Season 2 Trailer Previews New Characters, Locations
+[Fetcher DEBUG] Found verb "announces" at idx 36 in "Ace of Diamond Act II Second Season Announces 3 More Cast Members"
+[Reality Check DEBUG] Checking match: "diamond no ace act ii: second season" vs "undefined" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=NOT_YET_RELEASED, Eps=null
+[Fetcher DEBUG] Found verb "unveils" at idx 42 in "Needy Streamer Overload Anime's 2nd Video Unveils Cast Member, Opening Song"
+[Fetcher DEBUG] Found verb "casts" at idx 24 in "Digimon Beatbreak Anime Casts VTuber Hakui Koyori"
+[Fetcher] Skipping (Negative/Manga Title): Boston Red Sox Celebrate 3rd Annual One Piece Event on May 12
+[Fetcher DEBUG] Found verb "unveils" at idx 31 in "BlazBlue Entropy Effect X Game Unveils Story Trailer"
+[Fetcher DEBUG] Found verb "debuts" at idx 30 in "The Great Jahy's Wakame Konbu Debuts New Series on February 12"
+[Fetcher] Skipping (Negative/Manga Title): Crunchyroll Manga Adds 30 New Titles from J-Novel Club
+[Fetcher] Skipping (Negative/Manga Title): Abrams ComicArts' Kana Licenses Inio Asano's Before Dawn and The End Of The World Manga
+[Fetcher] Skipping (Negative/Manga Title): Osamu Tezuka's Phoenix Manga Gets Live Manga Performance at MoN Takanawa Museum
+[Fetcher] Skipping (Negative/Manga Title): Mario Tennis Fever Game Unveils Opening Cinematic Video
+[Fetcher] Skipping (Negative/Manga Title): Hana-Kimi Omnibus Volumes 4-6 Manga Review
+[Fetcher] Skipping (Negative/Manga Title): Naver Webtoon Launches 'Flower Scholar' Character Project With Global Merch Push
+[Fetcher] Skipping (Negative/Manga Title): A Joyful Life Webtoon Gets Short-Form Live-Action Series Adaptation
+[Fetcher] Skipping (Negative/Manga Title): Soredemo Kichijoji dake ga Sumitai Machi Desu ka? Manga Gets 2nd Volume After Nearly 5 Years
+[Fetcher] Skipping (Negative/Manga Title): The Stellar Swordmaster Webtoon Gets Mobile RPG Adaptation
+[Fetcher] Skipping (Negative/Manga Title): The Duke's Daughter Drops Her Engagement and Facade Manga Ends
+[Fetcher] Skipping (Negative/Manga Title): Manga Plus Adds Akira Moriguchi's Stop! I'm Falling for You! Manga
+[Fetcher] Skipping (Negative/Manga Title): Kadokawa Releases 'Farewell, My Firsts,' Shino & Ren Manga in English
+[Fetcher DEBUG] Found verb "casts" at idx 28 in "The Case Book of Arne Anime Casts Yūko Miyamura as Red Riding Hood"
+[Fetcher] Skipping (Negative/Manga Title): The Super Mario Galaxy Movie Airs Super Bowl Commercial
+[Fetcher] Skipping (Negative/Manga Title): NEJIGANAMETA's Ladies on Top Manga Gets Live-Action Series
+[Fetcher DEBUG] Found verb "reveals" at idx 52 in "Observation Records of My Fiancée Anime's New Video Reveals 4 Cast Members"
+[Fetcher DEBUG] Found verb "unveils" at idx 36 in "Ichijōma Mankitsu Gurashi! TV Anime Unveils 4 More Characters, New Teaser"
+[Fetcher DEBUG] No verb found in "Hana-Kimi TV Anime Presents 3 More Cast Members With 2nd Visual"
+[Fetcher DEBUG] Found verb "reveals" at idx 35 in "Dorohedoro Anime Season 2's Visual Reveals Updated Staff, April 1 Global Debut"
+[Fetcher DEBUG] Found verb "unveils" at idx 42 in "1st New Made in Abyss Anime Film's Teaser Unveils More Staff, Fall Opening"
+[Fetcher] Skipping (Negative/Manga Title): Viz Media to Release 2018 Captain Tsubasa Anime, 2023 Captain Tsubasa: Junior Youth Arc Anime on DVD in April (Updated)
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Blue Lock Film Reveals Trailer, More Cast, August 7 Debut
+[Fetcher] Skipping (Negative/Manga Title): Dragon Quest Creator Yuji Horii's Life Story Turned Into New Educational Manga
+[Fetcher] Skipping (Negative/Manga Title): Manga Up! Global Adds Sakamegane's VTuber Shigemi Kusamura: I'm my Oshi's Favorite in English
+[Fetcher] Skipping (Negative/Manga Title): Emaqi Service Releases Out, Kurashi no Izumi, 2 More Manga in English
+[Fetcher DEBUG] Found verb "casts" at idx 24 in "Digimon Beatbreak Anime Casts Kōki Uchiyama, Daisuke Sakaguchi"
+[Fetcher] Skipping (Negative/Manga Title): Daikenja Riddle no Jikan Gyakkо̄ Manga Gets Light Anime
+[Fetcher DEBUG] No verb found in "New Magical Girl Lyrical Nanoha Anime Confirms More Cast, Ending Song"
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Blue Lock Film Casts Shunya Asano, Yuki Sakurai, Yuki Kura
+[Fetcher] Skipping (Negative/Manga Title): Yakuza/Like a Dragon Franchise's Crossover Live-Action Series With Nihon Tōitsu Debuts on February 10
+[Fetcher] Skipping (Negative/Manga Title): Neon Posts English-Subtitled Trailer for Exit 8 Live-Action Film
+[Fetcher] Skipping (Negative/Manga Title): Welcome to Demon School! Iruma-kun Manga Gets New Spinoff Manga in March
+[Fetcher DEBUG] Found verb "reveals" at idx 24 in "Pragmata Game's Trailer Reveals Demo Launch, Previews Hacking"
+[Fetcher DEBUG] Found verb "reveals" at idx 37 in "Resident Evil requiem Game's Trailer Reveals Leon Kennedy amiibo for Switch 2"
+[Fetcher DEBUG] Found verb "reveals" at idx 40 in "Monster Hunter Stories 3 Game's Trailer Reveals Demo"
+[Reality Check DEBUG] Checking match: "jujutsu kaisen season 3: the culling game part 1" vs "Season 3 Part 1" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=12
+[Fetcher] STALE_CONFIRMATION_ABORT: Jujutsu Kaisen Season 3: The Culling Game Part 1 Anime Casts Ryōhei Kimura | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[Fetcher DEBUG] Found verb "reveals" at idx 31 in "Chained Soldier Season 2 Anime Reveals New Trailer, Cast for Yokohama Battle Arc"
+[Reality Check DEBUG] Checking match: "chained soldier season 2" vs "Season 2" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=12
+[Fetcher] STALE_CONFIRMATION_ABORT: Chained Soldier Season 2 Anime Reveals New Trailer, Cast for Yokohama Battle Arc | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[Fetcher DEBUG] Found verb "reveals" at idx 57 in "Tokyo-Based Developer Shapefarm's Orbitals Switch 2 Game Reveals Summer Launch in New Trailer"
+[Fetcher] Skipping (Negative/Manga Title): Ichi-F: A Worker's Graphic Memoir of the Fukushima Nuclear Power Plant Manga Gets Special 1-Shot After 10 Years
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Yumi's Cells Season 3 Set for April Release, Introducing Yumi's Final Love Interest
+[Fetcher DEBUG] Found verb "reveals" at idx 26 in "Monster Eater Light Anime Reveals Main Cast Members in 2nd Teaser Video"
+[Fetcher] Skipping (Negative/Manga Title): Fermat no Ryōri Manga Goes on Hiatus
+[Fetcher DEBUG] Found verb "reveals" at idx 37 in "Rent-A-Girlfriend Anime's 5th Season Reveals Teaser Video, Theme Song Artists"
+[Fetcher DEBUG] Found verb "reveals" at idx 34 in "Haibara's Teenage New Game+ Anime Reveals 1st Promo Video, More Cast"
+[Fetcher] Skipping (Negative/Manga Title): World's End Harem: Fantasia Manga Resumes on February 27, Switches to Weekly Release
+[Fetcher] Skipping (Negative/Manga Title): Doko Yori mo Tooi Basho ni Iru Kimi e Novel Gets Anime Film This Fall
+[Fetcher DEBUG] No verb found in "Though I Am an Inept Villainess TV Anime Delayed to July"
+[Fetcher] Skipping (Negative/Manga Title): Blue Exorcist Manga Goes on 4-Month Hiatus to Prepare for Final Chapter
+[Fetcher DEBUG] Found verb "unveils" at idx 34 in "2nd  Baki the Grappler Stage Play Unveils More Cast, Key Visual"
+[Fetcher] Skipping (Negative/Manga Title): Live-Action Side Character's Love Story Film  Unveils Teaser, June 5 Debut
+[Fetcher] Skipping (Negative/Manga Title): Bungo Stray Dogs Manga Ends 1st Part on March 4
+[Fetcher] Skipping (Negative/Manga Title): North American Anime, Manga Releases, February 1-7
+[Fetcher] Sourcing Intel from ComicBook...
+[Fetcher] Total unique Intel items found: 32
+[Fetcher] Sourcing: AniList: 10, Reddit: 0, News: 10
+[Fetcher DEBUG] Negative Skip: "ONE PIECE" due to keyword "Collaboration"
+[Fetcher] Ranking 19 candidates...
+[Reality Check DEBUG] Checking match: "【oshi no ko】season 3" vs "Season 3" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=11
+[Fetcher] STALE_CONFIRMATION_ABORT: 【OSHI NO KO】Season 3 | Reason: Anime status is RELEASING with 11 episodes in AniList.
+[Reality Check DEBUG] Checking match: "hell’s paradise season 2" vs "Season 2" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=12
+[Fetcher] STALE_CONFIRMATION_ABORT: Hell’s Paradise Season 2 | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[Reality Check DEBUG] Checking match: "frieren: beyond journey’s end season 2" vs "Season 2" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=10
+[Fetcher] STALE_CONFIRMATION_ABORT: Frieren: Beyond Journey’s End Season 2 | Reason: Anime status is RELEASING with 10 episodes in AniList.
+[Reality Check DEBUG] Checking match: "jujutsu kaisen season 3: the culling game part 1" vs "Season 3 Part 1" (Matches: true)
+[Reality Check DEBUG] Match Found: Status=RELEASING, Eps=12
+[Fetcher] STALE_CONFIRMATION_ABORT: JUJUTSU KAISEN Season 3: The Culling Game Part 1 | Reason: Anime status is RELEASING with 12 episodes in AniList.
+[CANDIDATE] Title: Sentai Filmworks Screens World Premiere of 4K Restoration of Ninja Scroll Anime Film at Berlinale
+  SearchTerm: Sentai Filmworks Screens World Premiere of 4K Restoration of Ninja Scroll Anime Film at Berlinale
+  AnimeID: sentai-filmworks-screens-world-premiere-of-4k-restoration-of-ninja-scroll-anime-film-at-berlinale
+  Claim: DATE_ANNOUNCED
+[CANDIDATE] Title: Voice Actress Nao Toyama Announces Upcoming Hiatus from Music
+  SearchTerm: Voice Actress Nao Toyama Announces Upcoming Hiatus from Music
+  AnimeID: voice-actress-nao-toyama-announces-upcoming-hiatus-from-music
+  Claim: DELAY

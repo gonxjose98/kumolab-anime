@@ -1,0 +1,48 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+[
+  {
+    "title": "HellΓÇÖs Paradise Update",
+    "slug": "intel-hell-s-paradise-season-2-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-hell-s-paradise-season-2-social.png"
+  },
+  {
+    "title": "Fureru. Review Update",
+    "slug": "intel-fureru-review-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-fureru-review-social.png"
+  },
+  {
+    "title": "'Kujima Reveals New Cast Members",
+    "slug": "intel--kujima-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel--kujima-social.png"
+  },
+  {
+    "title": "SHIBOYUGI Update",
+    "slug": "intel-shiboyugi-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-shiboyugi-social.png"
+  },
+  {
+    "title": "πÇÉOSHI NO KOπÇæSeason 3 Update",
+    "slug": "intel--oshi-no-ko-season-3-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel--oshi-no-ko-season-3-social.png"
+  },
+  {
+    "title": "Chained Soldier Update",
+    "slug": "intel-chained-soldier-season-2-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-chained-soldier-season-2-social.png"
+  },
+  {
+    "title": "in 2025 Update",
+    "slug": "intel-in-2025-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-in-2025-social.png"
+  },
+  {
+    "title": "Fire Force Update",
+    "slug": "intel-fire-force-season-3-part-2-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-fire-force-season-3-part-2-social.png"
+  },
+  {
+    "title": "Let's Go Karaoke!'s Yama Wayama Plans to Launch New Work in 2027 Update",
+    "slug": "intel-let-s-go-karaoke-s-yama-wayama-plans-to-launch-new-work-in-2027-2026-02-13",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-let-s-go-karaoke-s-yama-wayama-plans-to-launch-new-work-in-2027-social.png"
+  }
+]

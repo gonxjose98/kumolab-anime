@@ -1,0 +1,15 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ≡ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+[
+  {
+    "id": "3086b023-302b-49d8-ac00-a71ab33db8a3",
+    "title": "SHIBOYUGI Update",
+    "status": "approved",
+    "scheduled_post_time": "2026-02-14T10:00:00+00:00"
+  },
+  {
+    "id": "d9ff3f12-1104-432e-ab27-a82e282d554c",
+    "title": "Chained Soldier Update",
+    "status": "approved",
+    "scheduled_post_time": "2026-02-14T14:00:00+00:00"
+  }
+]

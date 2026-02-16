@@ -1,0 +1,39 @@
+﻿[dotenv@17.2.3] injecting env (32) from .env.local -- tip: ≡ƒôí add observability to secrets: https://dotenvx.com/ops
+[
+  {
+    "title": "SHIBOYUGI Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-shiboyugi-2026-02-14-4acc-social.png"
+  },
+  {
+    "title": "'Kujima Reveals New Cast Members",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix--kujima-2026-02-14-356a-social.png"
+  },
+  {
+    "title": "πÇÉOSHI NO KOπÇæSeason 3 Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix--oshi-no-ko-season-3-2026-02-14-92f9-social.png"
+  },
+  {
+    "title": "Chained Soldier Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-chained-soldier-season-2-2026-02-14-6a60-social.png"
+  },
+  {
+    "title": "in 2025 Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-in-2025-2026-02-14-4d57-social.png"
+  },
+  {
+    "title": "HellΓÇÖs Paradise Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-hell-s-paradise-season-2-2026-02-14-8c12-social.png"
+  },
+  {
+    "title": "Fire Force Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-fire-force-season-3-part-2-2026-02-14-4939-social.png"
+  },
+  {
+    "title": "Let's Go Karaoke!'s Yama Wayama Plans to Launch New Work in 2027 Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/intel-let-s-go-karaoke-s-yama-wayama-plans-to-launch-new-work-in-2027-social.png"
+  },
+  {
+    "title": "Fureru. Review Update",
+    "image": "https://pytehpdxophkhuxnnqzj.supabase.co/storage/v1/object/public/blog-images/fix-fureru-review-2026-02-14-47b0-social.png"
+  }
+]
