@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-import Link from 'next/link';
 import { Edit2, Plus, Zap, Newspaper, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight, Trash2, Eye, EyeOff, Twitter, Instagram, Facebook, Share2, CheckCircle2, XCircle, Lock, Unlock, RotateCcw, Anchor, Move, MousePointer2, Type, Maximize2, ChevronRightCircle, ChevronLeftCircle, Terminal, RotateCw, Upload, Sparkles, Send, Check, X, Calendar, AlertTriangle } from 'lucide-react';
 
 import { BlogPost } from '@/types';
@@ -408,8 +407,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // New Handlers
     const handleSearchImages = async (reset: boolean = true, searchTermOverride?: string) => {
-        const queryTerm = searchTermOverride || topic;
-        if (!queryTerm) return alert('Please enter a topic first.');
+        const queryTerm = searchTermOverride || title || topic;
+        if (!queryTerm) return alert('Please enter a title or topic first.');
         setIsSearchingImages(true);
         const nextPage = reset ? 1 : searchPage + 1;
 
@@ -937,9 +936,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 isSaved: false
             } as any);
 
+            return true;
         } catch (e: any) {
             console.error("Commit failed:", e);
             alert('Error committing preview: ' + e.message);
+            return false;
         } finally {
             setIsProcessingImage(false);
         }
@@ -1435,12 +1436,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         )}
                                                     </div>
                                                 )}
-                                                <div className="flex items-center justify-center gap-1.5 pt-1">
-                                                    <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
-                                                    <Instagram size={10} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
-                                                    <Facebook size={10} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
-                                                    <Share2 size={10} className={post.socialIds?.threads ? 'text-white' : 'text-neutral-700 opacity-20'} />
-                                                </div>
+                                                {filter === 'LIVE' && (
+                                                    <div className="flex items-center justify-center gap-1.5 pt-1">
+                                                        <Twitter size={10} className={post.socialIds?.twitter ? 'text-blue-400' : 'text-neutral-700 opacity-20'} />
+                                                        <Instagram size={10} className={post.socialIds?.instagram ? 'text-pink-400' : 'text-neutral-700 opacity-20'} />
+                                                        <Facebook size={10} className={post.socialIds?.facebook ? 'text-blue-600' : 'text-neutral-700 opacity-20'} />
+                                                        <Share2 size={10} className={post.socialIds?.threads ? 'text-white' : 'text-neutral-700 opacity-20'} />
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </td>
@@ -1506,18 +1509,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
-                                                title="Preview & Mission Control"
+                                                title="Edit Post"
                                                 className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-500/10 hover:bg-purple-500 text-purple-500 hover:text-white border border-purple-500/20 transition-all"
                                             >
-                                                <Eye size={14} />
-                                            </button>
-                                            <Link
-                                                href={`/admin/post/${post.id || ''}`}
-                                                title="Edit Details"
-                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-slate-400 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all scale-90 hover:scale-100"
-                                            >
                                                 <Edit2 size={14} />
-                                            </Link>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1585,15 +1581,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             <button
                                                 onClick={() => handleEditClick(post)}
                                                 className="text-purple-600 dark:text-purple-400 hover:text-purple-700"
-                                            >
-                                                <Eye size={16} />
-                                            </button>
-                                            <Link
-                                                href={`/admin/post/${post.id}`}
-                                                className="text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white"
+                                                title="Edit Post"
                                             >
                                                 <Edit2 size={16} />
-                                            </Link>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -1802,174 +1793,87 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
 
                             {/* Modal Header */}
-                            <div className="p-5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${genType === 'INTEL' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : genType === 'TRENDING' ? 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400'}`}>
-                                        {genType === 'INTEL' ? <Newspaper size={18} /> : genType === 'TRENDING' ? <Zap size={18} /> : <Plus size={18} />}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none mb-1">
-                                            {genType === 'INTEL' ? 'Initiate Intel Drop' :
-                                                genType === 'TRENDING' ? 'Broadcast Trending' :
-                                                    genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION ALERT' :
-                                                        'Custom Transmission'}
-                                        </h3>
-                                        <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono uppercase">
-                                            Protocol: {genType}
-                                        </p>
-                                    </div>
-                                </div>
+                            <div className="p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                    Edit Post
+                                </h3>
                                 <button
                                     onClick={() => setShowModal(false)}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                                 >
-                                    <span className="sr-only">Close</span>
                                     <Plus size={20} className="rotate-45" />
                                 </button>
                             </div>
 
                             {/* Modal Content */}
                             <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
-                                {/* AI Assistant Interface */}
-                                <div className="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 rounded-xl space-y-3">
-                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
-                                            <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">Editorial Assistant</span>
-                                        </div>
-                                        {isAiLoading && <Loader2 size={12} className="animate-spin text-purple-500" />}
-                                    </div>
-
-                                    {/* History / Status messages */}
-                                    {aiChatHistory.length > 0 && (
-                                        <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium italic border-l-2 border-purple-200 dark:border-purple-800/50 pl-3 py-1 mb-2">
-                                            {aiChatHistory[aiChatHistory.length - 1].content}
-                                        </div>
-                                    )}
-
-                                    <div className="relative">
-                                        <textarea
-                                            value={aiPrompt}
-                                            onChange={(e) => setAiPrompt(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                                    handleAiAssistant();
-                                                }
-                                            }}
-                                            placeholder="Solo Leveling just confirmed a new season..."
-                                            className="w-full bg-white dark:bg-black/50 border border-purple-200 dark:border-purple-500/30 rounded-lg p-3 pr-12 text-xs text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-400 dark:placeholder:text-neutral-600 resize-none h-20 transition-all"
-                                        />
-                                        <button
-                                            onClick={handleAiAssistant}
-                                            disabled={isAiLoading || !aiPrompt.trim()}
-                                            className="absolute bottom-2 right-2 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 transition-colors shadow-lg shadow-purple-500/20"
-                                        >
-                                            <Send size={16} />
-                                        </button>
-                                    </div>
-                                    <p className="text-[9px] text-neutral-500 font-mono tracking-tighter">
-                                        CMD+ENTER TO TRANSMIT
-                                    </p>
-                                </div>
-                                {/* Input Fields Container */}
                                 <div className="space-y-4">
+                                    {/* 1. TITLE */}
                                     <div className="group">
                                         <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
-                                            Public Title
+                                            1. Title
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="Enter the title as it appears on the blog..."
+                                            placeholder="Transmission Title..."
                                             className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all"
                                             value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
+                                            onChange={(e) => {
+                                                setTitle(e.target.value);
+                                                setOverlayTag(e.target.value);
+                                            }}
                                         />
                                     </div>
 
-                                    {(genType === 'INTEL' || genType === 'TRENDING') && (
-                                        <div className="group">
-                                            <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-blue-500 transition-colors">
-                                                Search Topic (Intel/Trending)
-                                            </label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. One Piece (Used for image/metadata lookup)"
-                                                className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
-                                                value={topic}
-                                                onChange={(e) => setTopic(e.target.value)}
-                                            />
-                                        </div>
-                                    )}
-
+                                    {/* 2. CONTENT/BODY */}
                                     <div className="group">
                                         <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
-                                            Editor Content
+                                            2. Content / Body
                                         </label>
                                         <textarea
                                             placeholder="Enter transmission content..."
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-32 resize-none transition-all"
+                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-40 resize-none transition-all"
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                         />
                                     </div>
 
-                                    {/* IMAGE SELECTOR V2 */}
-                                    <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-4 md:p-5">
-                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                <label className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                                    Visual Feed Selector (v2)
-                                                </label>
-                                            </div>
-                                            <div className="flex gap-2">
+                                    {/* 3. IMAGE PREVIEW & CONTROLS */}
+                                    <div className="space-y-4">
+                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-0 group-focus-within:text-purple-500 transition-colors">
+                                            3. Image Preview & Controls
+                                        </label>
+                                        <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-4 space-y-4">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <button
-                                                    onClick={async () => {
-                                                        await handleSearchImages(true);
-                                                    }}
-                                                    disabled={isSearchingImages || !topic}
-                                                    className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-1.5"
+                                                    onClick={() => handleSearchImages(true)}
+                                                    disabled={isSearchingImages || !title}
+                                                    className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-50"
                                                 >
-                                                    {isSearchingImages && searchPage === 1 ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
-                                                    {isSearchingImages && searchPage === 1 ? 'Scanning...' : 'Fetch'}
+                                                    {isSearchingImages ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                                    Regenerate Image
                                                 </button>
-                                                <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg transition-all shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-1.5 cursor-pointer">
+                                                <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 cursor-pointer">
                                                     <Upload size={12} />
                                                     Upload
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (file) {
-                                                                const reader = new FileReader();
-                                                                reader.onloadend = () => {
-                                                                    const result = reader.result as string;
-                                                                    setSearchedImages([result]);
-                                                                    setSelectedImageIndex(0);
-                                                                    setImageScale(1);
-                                                                    setImagePosition({ x: 0, y: 0 });
-                                                                    setProcessedImage(null);
-                                                                    setIsStageDirty(true);
-                                                                };
-                                                                reader.readAsDataURL(file);
-                                                            }
-                                                        }}
-                                                    />
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => {
+                                                                const result = reader.result as string;
+                                                                setSearchedImages([result]);
+                                                                setSelectedImageIndex(0);
+                                                                setImageScale(1);
+                                                                setImagePosition({ x: 0, y: 0 });
+                                                                setProcessedImage(null);
+                                                                setIsStageDirty(true);
+                                                                setEditorMode('RAW');
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    }} />
                                                 </label>
-                                                {searchedImages.length > 0 && (
-                                                    <button
-                                                        onClick={async () => {
-                                                            await handleSearchImages(false);
-                                                        }}
-                                                        disabled={isSearchingImages}
-                                                        className="text-[10px] font-bold bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white px-3 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                                    >
-                                                        {isSearchingImages && searchPage > 1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                                                        More
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -2200,114 +2104,46 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                 {/* Side Control Panel */}
                                                 <div className="w-full lg:w-48 flex flex-col gap-4">
-                                                    {/* Global Tools */}
-                                                    <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl flex flex-wrap lg:flex-col gap-2">
-                                                        <button onClick={handleResetAll} className="flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                                                            <RotateCcw size={14} /> REVERT
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setIsAutoSnap(!isAutoSnap)}
-                                                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold rounded-lg transition-all ${isAutoSnap ? 'text-blue-400 bg-blue-400/10' : 'text-neutral-500 bg-white/5'}`}
-                                                        >
-                                                            <Anchor size={14} /> {isAutoSnap ? 'SNAP: ON' : 'SNAP: OFF'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Image Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
-                                                            <span>Asset Zoom</span>
-                                                            <span className="font-mono text-white/50">{Math.round(imageScale * 100)}%</span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleZoom(-0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
-                                                            <button onClick={() => handleZoom(0.1, 'image')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setIsImageLocked(!isImageLocked)}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isImageLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isImageLocked ? <Lock size={12} /> : <Unlock size={12} />} {isImageLocked ? 'LOCKED' : 'UNLOCK'}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const col = !isApplyGradient;
-                                                                setIsApplyGradient(col);
-                                                                handleApplyText(undefined, undefined, undefined, col);
-                                                            }}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyGradient ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isApplyGradient ? <Zap size={12} /> : <EyeOff size={12} />} {isApplyGradient ? 'GRADIENT: ON' : 'GRADIENT: OFF'}
-                                                        </button>
-                                                    </div>
-
                                                     {/* Text Tools */}
                                                     <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
                                                         <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
-                                                            <span>Text Scale</span>
+                                                            <span>Text Size</span>
                                                             <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">-</button>
-                                                            <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1.5 hover:bg-white/5 text-white rounded-lg border border-white/10">+</button>
+                                                            <button onClick={() => handleZoom(-0.1, 'text')} className="flex-1 py-1 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10">-</button>
+                                                            <button onClick={() => handleZoom(0.1, 'text')} className="flex-1 py-1 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10">+</button>
+                                                            <button
+                                                                onClick={() => setIsTextLocked(!isTextLocked)}
+                                                                className={`p-2 rounded-lg border transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-white/5 text-neutral-500 border-white/10'}`}
+                                                            >
+                                                                {isTextLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                                                            </button>
                                                         </div>
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mt-2">Position</div>
-                                                        <div className="grid grid-cols-2 gap-2">
+
+                                                        <div className="flex flex-col gap-2 pt-2">
                                                             <button
                                                                 onClick={() => {
-                                                                    setGradientPosition('top');
-                                                                    setTextPosition(prev => ({ ...prev, y: 202.5 }));
-                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, 'top');
+                                                                    const newVal = !isApplyText;
+                                                                    setIsApplyText(newVal);
+                                                                    if (!newVal) setLayoutMetadata(null);
+                                                                    handleApplyText(undefined, undefined, newVal);
                                                                 }}
-                                                                className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'top' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                                className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyText ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
-                                                                HEADER
+                                                                <span>Text</span>
+                                                                <span className="text-[8px]">{isApplyText ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    setGradientPosition('bottom');
-                                                                    setTextPosition(prev => ({ ...prev, y: 1147.5 }));
-                                                                    handleApplyText(undefined, undefined, undefined, undefined, undefined, 'bottom');
+                                                                    const newVal = !isApplyGradient;
+                                                                    setIsApplyGradient(newVal);
+                                                                    handleApplyText(undefined, undefined, undefined, newVal);
                                                                 }}
-                                                                className={`py-2 rounded-lg text-[9px] font-bold ${gradientPosition === 'bottom' ? 'bg-purple-600 text-white' : 'bg-white/5 text-neutral-500'}`}
+                                                                className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyGradient ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
-                                                                FOOTER
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setIsTextLocked(!isTextLocked)}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isTextLocked ? <Lock size={12} /> : <Unlock size={12} />} {isTextLocked ? 'FIXED' : 'FREE'}
-                                                        </button>
-
-                                                        <button
-                                                            onClick={() => {
-                                                                const newVal = !isApplyText;
-                                                                setIsApplyText(newVal);
-                                                                if (!newVal) {
-                                                                    // KILL SWITCH: Clear all layout state immediately
-                                                                    setLayoutMetadata(null);
-                                                                }
-                                                                handleApplyText(undefined, undefined, newVal);
-                                                            }}
-                                                            className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyText ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                        >
-                                                            {isApplyText ? <Eye size={12} /> : <EyeOff size={12} />} {isApplyText ? 'TEXT: ON' : 'TEXT: OFF'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Watermark Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
-                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
-                                                            <span>Watermark</span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => setIsWatermarkLocked(!isWatermarkLocked)}
-                                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isWatermarkLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
-                                                            >
-                                                                {isWatermarkLocked ? <Lock size={12} /> : <Unlock size={12} />} {isWatermarkLocked ? 'LOCKED' : 'FREE'}
+                                                                <span>Gradient</span>
+                                                                <span className="text-[8px]">{isApplyGradient ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
                                                                 onClick={() => {
@@ -2315,146 +2151,78 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     setIsApplyWatermark(newVal);
                                                                     handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, newVal);
                                                                 }}
-                                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isApplyWatermark ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-neutral-800 text-neutral-400 border border-white/5'}`}
+                                                                className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyWatermark ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
-                                                                {isApplyWatermark ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {isApplyWatermark ? 'ON' : 'OFF'}
+                                                                <span>Watermark</span>
+                                                                <span className="text-[8px]">{isApplyWatermark ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                         </div>
                                                     </div>
+
+                                                    <button onClick={handleResetAll} className="w-full py-2 text-[10px] font-bold text-neutral-500 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2">
+                                                        <RotateCcw size={14} /> REVERT
+                                                    </button>
                                                 </div>
                                             </div>
 
-                                            {/* --- PURPLE WORD SELECTOR INTEGRATED --- */}
-                                            <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden mt-6">
-                                                <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.03] flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <Type size={14} className="text-purple-400" />
-                                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Override Visual Title (Sole Visual Content)</span>
+                                            {/* --- PURPLE SIGNAL TARGETING --- */}
+                                            <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-5 space-y-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-5 h-5 rounded-full bg-purple-600/20 flex items-center justify-center">
+                                                        <Sparkles size={12} className="text-purple-400" />
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded-md">
-                                                        <Zap size={10} className="text-purple-400" />
-                                                        <span className="text-[8px] font-bold text-purple-400 uppercase tracking-tighter">Engine Parity Active</span>
-                                                    </div>
+                                                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">🟣 Purple Signal Targeting</span>
                                                 </div>
+                                                <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-mono">Select which words to highlight in purple:</p>
 
-                                                <div className="p-5 space-y-4">
-                                                    <div className="relative group">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="ENTER IMAGE TEXT (e.g. MONSTER ANIME CONFIRMED)"
-                                                            className="w-full bg-slate-100 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-sm font-bold focus:border-purple-500 outline-none transition-all uppercase"
-                                                            value={overlayTag}
-                                                            onChange={(e) => {
-                                                                setOverlayTag(e.target.value);
-                                                                // Reset purple indices when text changes to avoid misalignment
-                                                                if (purpleWordIndices.length > 0) setPurpleWordIndices([]);
-                                                                setIsApplyText(true);
+                                                <div className="flex flex-wrap gap-2 p-4 bg-black/40 rounded-xl border border-white/5">
+                                                    {title.split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            onClick={() => {
+                                                                const newIndices = purpleWordIndices.includes(idx)
+                                                                    ? purpleWordIndices.filter(i => i !== idx)
+                                                                    : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                setPurpleWordIndices(newIndices);
                                                                 setIsStageDirty(true);
+                                                                if (editorMode === 'PROCESSED') {
+                                                                    handleApplyText(undefined, undefined, undefined, undefined, newIndices);
+                                                                }
                                                             }}
-                                                        />
-                                                    </div>
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-white/5 text-neutral-500 hover:text-white'}`}
+                                                        >
+                                                            <div className={`w-2 h-2 rounded-full border ${purpleWordIndices.includes(idx) ? 'bg-white border-white' : 'border-neutral-700'}`} />
+                                                            {word}
+                                                        </button>
+                                                    ))}
+                                                </div>
 
-                                                    {/* Tactical Selector - Box inside box */}
-                                                    <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="text-[9px] font-black text-purple-400/50 uppercase tracking-[0.2em]">Purple Signal Targeting</div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const nextVal = !isApplyGradient;
-                                                                    setIsApplyGradient(nextVal);
-                                                                    handleApplyText(undefined, undefined, undefined, nextVal);
-                                                                }}
-                                                                className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${isApplyGradient ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-neutral-800 text-neutral-500 border border-white/5'}`}
-                                                            >
-                                                                {isApplyGradient ? <Eye size={10} /> : <EyeOff size={10} />} Gradient
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                                                            <div className="flex-1 flex items-center gap-4">
-                                                                <div className="flex gap-1">
-                                                                    <button
-                                                                        onClick={() => setPurpleCursorIndex(prev => Math.max(0, prev - 1))}
-                                                                        className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                    >
-                                                                        <ChevronLeftCircle size={20} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setPurpleCursorIndex(prev => {
-                                                                            const wordsCount = overlayTag.split(/\s+/).filter(Boolean).length;
-                                                                            return Math.min(Math.max(0, wordsCount - 1), prev + 1);
-                                                                        })}
-                                                                        className="p-2 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                                    >
-                                                                        <ChevronRightCircle size={20} />
-                                                                    </button>
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-1.5 flex-1 p-2 bg-black/40 rounded-lg border border-white/5 min-h-[36px] items-center">
-                                                                    {overlayTag.split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                        <span
-                                                                            key={idx}
-                                                                            className={`text-[10px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded transition-all ${purpleWordIndices.includes(idx) ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' :
-                                                                                idx === purpleCursorIndex ? 'bg-white/20 text-white ring-1 ring-white/50' : 'text-neutral-600'
-                                                                                }`}
-                                                                        >
-                                                                            {word}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2 w-full sm:w-auto">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (!purpleWordIndices.includes(purpleCursorIndex)) {
-                                                                            const newIndices = [...purpleWordIndices, purpleCursorIndex].sort((a, b) => a - b);
-                                                                            setPurpleWordIndices(newIndices);
-                                                                            // Only trigger backend if in PROCESSED mode to update the burn-in
-                                                                            if (editorMode === 'PROCESSED') {
-                                                                                handleApplyText(undefined, undefined, undefined, undefined, newIndices);
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                    className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white text-[9px] font-black uppercase rounded-lg shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
-                                                                >
-                                                                    APPLY PURPLE
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPurpleWordIndices([]);
-                                                                        if (editorMode === 'PROCESSED') {
-                                                                            handleApplyText(undefined, undefined, undefined, undefined, []);
-                                                                        }
-                                                                    }}
-                                                                    className="flex-1 sm:flex-none px-4 py-2 bg-red-500/20 text-red-400 text-[9px] font-black uppercase rounded-lg border border-red-500/30 active:scale-95 transition-all"
-                                                                >
-                                                                    REMOVE ALL
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setPurpleWordIndices([]);
+                                                            if (editorMode === 'PROCESSED') handleApplyText(undefined, undefined, undefined, undefined, []);
+                                                        }}
+                                                        className="text-[9px] font-black uppercase text-red-400 hover:text-white transition-colors px-2"
+                                                    >
+                                                        Remove All
+                                                    </button>
                                                 </div>
                                             </div>
 
-                                            {/* Action Bar */}
-                                            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                                            {/* Preview Section */}
+                                            <div className="mt-8 pt-8 border-t border-white/5">
                                                 <button
-                                                    onClick={() => handleCommitToPreview()}
+                                                    onClick={async () => {
+                                                        const result = await handleCommitToPreview();
+                                                        if (result) setShowExpandedPreview(true);
+                                                    }}
                                                     disabled={isProcessingImage}
-                                                    className="flex-1 py-4 bg-white dark:bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                                                    className="w-full py-4 bg-neutral-900 border border-white/10 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all hover:bg-neutral-800 active:scale-[0.98] flex items-center justify-center gap-3"
                                                 >
                                                     {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
-                                                    COMMIT CHANGES TO PREVIEW
+                                                    Show Preview
                                                 </button>
-
-                                                {processedImage && (
-                                                    <button
-                                                        onClick={() => setShowExpandedPreview(true)}
-                                                        className="py-4 px-8 bg-neutral-900 text-white border border-white/10 font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        <Maximize2 size={18} />
-                                                        EXPAND
-                                                    </button>
-                                                )}
                                             </div>
 
                                             {/* Fullscreen Preview Modal */}
@@ -2502,15 +2270,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             </div>
 
-                            {/* Main Generation Action */}
-                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                            {/* Action Footer */}
+                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex gap-4">
                                 <button
-                                    onClick={() => handleSavePost(editingPostId ? true : false)}
-                                    disabled={isGenerating || isApplyingEffect}
-                                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] active:scale-[0.99] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors"
                                 >
-                                    {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-                                    {isGenerating ? 'Saving...' : editingPostId ? 'Deploy Update' : genType === 'CONFIRMATION_ALERT' ? 'Broadcast Live' : 'Save As Hidden'}
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleSavePost(true)}
+                                    disabled={isGenerating || isApplyingEffect}
+                                    className="flex-[2] py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                >
+                                    {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+                                    Save Changes
                                 </button>
                             </div>
 
@@ -2566,113 +2340,111 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 {genType === 'CONFIRMATION_ALERT' ? 'Acknowledge' : 'Confirm Transmission'}
                                             </button>
                                         </div>
-
-
                                     </div>
                                 )
                             }
 
-
-                            {/* SCHEDULER LOGS MODAL */}
-                            {
-                                showLogsModal && (
-                                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                                            {/* Header */}
-                                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                                        <Terminal size={20} className="text-blue-400" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                                    <XCircle size={24} />
-                                                </button>
-                                            </div>
-
-                                            {/* Logs Content */}
-                                            <div className="flex-1 overflow-auto p-0 md:p-6">
-                                                {isLoadingLogs ? (
-                                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                                        <Loader2 size={32} className="animate-spin text-blue-500" />
-                                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                                    </div>
-                                                ) : schedulerLogs.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                                        <Terminal size={32} className="opacity-20" />
-                                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
-                                                    </div>
-                                                ) : (
-                                                    <table className="w-full text-left border-collapse">
-                                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                                            <tr>
-                                                                <th className="p-4 border-b border-white/5">Time</th>
-                                                                <th className="p-4 border-b border-white/5">Slot</th>
-                                                                <th className="p-4 border-b border-white/5">Status</th>
-                                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                                            {schedulerLogs.map((log: any) => (
-                                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                                    </td>
-                                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                                    <td className="p-4">
-                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                                            }`}>
-                                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                                            {log.status}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="p-4 text-neutral-300">
-                                                                        {log.message}
-                                                                        {log.details && (
-                                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                                {log.details}
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-4 text-right">
-                                                                        {log.status !== 'success' && (
-                                                                            <button
-                                                                                onClick={() => handleRegenerateSlot(log.slot)}
-                                                                                disabled={isRegenerating === log.slot}
-                                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                                            >
-                                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                                Regenerate
-                                                                            </button>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                )}
-                                            </div>
-                                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                                <span>Logs persist for 7 days</span>
-                                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                                    <RotateCcw size={12} /> Refresh
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            }
 
                         </div>
                     </div>
-                )}
+                )} a
+
+            {/* SCHEDULER LOGS MODAL */}
+            {
+                showLogsModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                            {/* Header */}
+                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                        <Terminal size={20} className="text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
+                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
+                                    <XCircle size={24} />
+                                </button>
+                            </div>
+
+                            {/* Logs Content */}
+                            <div className="flex-1 overflow-auto p-0 md:p-6">
+                                {isLoadingLogs ? (
+                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                        <Loader2 size={32} className="animate-spin text-blue-500" />
+                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
+                                    </div>
+                                ) : schedulerLogs.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
+                                        <Terminal size={32} className="opacity-20" />
+                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
+                                            <tr>
+                                                <th className="p-4 border-b border-white/5">Time</th>
+                                                <th className="p-4 border-b border-white/5">Slot</th>
+                                                <th className="p-4 border-b border-white/5">Status</th>
+                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
+                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
+                                            {schedulerLogs.map((log: any) => (
+                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
+                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                    </td>
+                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
+                                                    <td className="p-4">
+                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                            }`}>
+                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
+                                                            {log.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-neutral-300">
+                                                        {log.message}
+                                                        {log.details && (
+                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
+                                                                {log.details}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        {log.status !== 'success' && (
+                                                            <button
+                                                                onClick={() => handleRegenerateSlot(log.slot)}
+                                                                disabled={isRegenerating === log.slot}
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
+                                                            >
+                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                                                                Regenerate
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                                <span>Logs persist for 7 days</span>
+                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
+                                    <RotateCcw size={12} /> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
                 <span>KumoLab Admin OS v2.2.5 (UPDATED: 01:00 AM EST)</span>
