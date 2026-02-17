@@ -16,6 +16,10 @@ export default function PostEditor() {
     const [type, setType] = useState('');
     const [content, setContent] = useState('');
     const [excerpt, setExcerpt] = useState(''); // headline/tag used on image overlays
+    const [backgroundImage, setBackgroundImage] = useState('');
+    const [imageSettings, setImageSettings] = useState<any>({});
+    const [rendering, setRendering] = useState(false);
+    const [renderedPreview, setRenderedPreview] = useState<string>('');
     const [isPublished, setIsPublished] = useState(false);
 
     // Analytics for this post
@@ -49,6 +53,9 @@ export default function PostEditor() {
             setType(data.type || '');
             setContent(data.content || '');
             setExcerpt(data.excerpt || '');
+            setBackgroundImage(data.background_image || '');
+            setImageSettings(data.image_settings || {});
+            setRenderedPreview(data.image || '');
             setIsPublished(data.is_published);
 
             // 2. Fetch Analytics for this Post
@@ -83,6 +90,8 @@ export default function PostEditor() {
                 type,
                 content,
                 excerpt,
+                background_image: backgroundImage || null,
+                image_settings: imageSettings,
                 is_published: isPublished,
                 claim_type: post.claim_type,
                 premiere_date: post.premiere_date
@@ -167,8 +176,95 @@ export default function PostEditor() {
                     </select>
                 </div>
 
-                {/* 4. Image Preview */}
-                {post.image && (
+                {/* 4. Render + Image Controls */}
+                <div className="bg-black/40 border border-neutral-800 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <div className="text-sm font-semibold text-white">Image + Layout</div>
+                            <div className="text-xs text-neutral-500">Edits persist to <span className="font-mono">background_image</span> and <span className="font-mono">image_settings</span>. Rendering writes <span className="font-mono">image</span>.</div>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                setRendering(true);
+                                try {
+                                    const res = await fetch('/api/admin/render-post-image', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ postId: id })
+                                    });
+                                    const data = await res.json();
+                                    if (!data.success) throw new Error(data.error || 'Render failed');
+
+                                    // Update local state with latest DB snapshot
+                                    setPost(data.post);
+                                    setBackgroundImage(data.post.background_image || '');
+                                    setImageSettings(data.post.image_settings || {});
+                                    if (data.post.image) setRenderedPreview(data.post.image);
+                                } catch (e: any) {
+                                    alert('Render failed: ' + e.message);
+                                } finally {
+                                    setRendering(false);
+                                }
+                            }}
+                            disabled={rendering}
+                            className="px-4 py-2 rounded bg-purple-600 text-white text-sm font-bold hover:bg-purple-500 disabled:opacity-50"
+                        >
+                            {rendering ? 'Rendering...' : 'Render Image'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                                Background Image URL
+                            </label>
+                            <input
+                                type="text"
+                                value={backgroundImage}
+                                onChange={(e) => setBackgroundImage(e.target.value)}
+                                placeholder="https://... (raw art source)"
+                                className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                            />
+                            <p className="mt-2 text-[11px] text-neutral-500">Used as the render source. If empty, renderer falls back to current <span className="font-mono">image</span>.</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                                Image Settings (JSON)
+                            </label>
+                            <textarea
+                                value={JSON.stringify(imageSettings || {}, null, 2)}
+                                onChange={(e) => {
+                                    try {
+                                        const parsed = JSON.parse(e.target.value);
+                                        setImageSettings(parsed);
+                                    } catch {
+                                        // ignore parse errors while typing
+                                    }
+                                }}
+                                rows={8}
+                                className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none font-mono text-xs"
+                            />
+                            <p className="mt-2 text-[11px] text-neutral-500">Temporary UI. Next pass: proper controls for positions, scale, gradient, watermark, purple words.</p>
+                        </div>
+                    </div>
+
+                    {/* Preview */}
+                    {(renderedPreview || post.image) && (
+                        <div>
+                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                                Current Render
+                            </label>
+                            <div className="aspect-[4/5] max-w-sm bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={renderedPreview || post.image} alt={post.title} className="w-full h-full object-cover" />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 5. Legacy Image Preview */}
+                {false && post.image && (
                     <div>
                         <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
                             Post Image
