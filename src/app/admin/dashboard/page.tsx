@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { Eye, Calendar } from 'lucide-react';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import PostManager from '@/components/admin/PostManager';
+import { fromDbPosts } from '@/lib/posts/normalize';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,7 +133,8 @@ async function getPosts(supabase: any) {
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(100);
-    return posts || [];
+
+    return fromDbPosts(posts);
 }
 
 export default async function DashboardPage() {

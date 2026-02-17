@@ -15,6 +15,7 @@ export default function PostEditor() {
     const [title, setTitle] = useState('');
     const [type, setType] = useState('');
     const [content, setContent] = useState('');
+    const [excerpt, setExcerpt] = useState(''); // headline/tag used on image overlays
     const [isPublished, setIsPublished] = useState(false);
 
     // Analytics for this post
@@ -47,6 +48,7 @@ export default function PostEditor() {
             setTitle(data.title || '');
             setType(data.type || '');
             setContent(data.content || '');
+            setExcerpt(data.excerpt || '');
             setIsPublished(data.is_published);
 
             // 2. Fetch Analytics for this Post
@@ -80,6 +82,7 @@ export default function PostEditor() {
                 title,
                 type,
                 content,
+                excerpt,
                 is_published: isPublished,
                 claim_type: post.claim_type,
                 premiere_date: post.premiere_date
@@ -130,7 +133,24 @@ export default function PostEditor() {
                     />
                 </div>
 
-                {/* 2. Type Editor */}
+                {/* 2. Headline / Tag Editor */}
+                <div>
+                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                        Headline / Tag (excerpt)
+                    </label>
+                    <input
+                        type="text"
+                        value={excerpt}
+                        onChange={(e) => setExcerpt(e.target.value)}
+                        placeholder="FEATURED, JUST CONFIRMED, OFFICIAL, etc"
+                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                    />
+                    <p className="mt-2 text-[11px] text-neutral-500">
+                        This controls the short overlay tag stored in <span className="font-mono">posts.excerpt</span> and used by the image renderer.
+                    </p>
+                </div>
+
+                {/* 3. Type Editor */}
                 <div>
                     <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
                         Category (Type)
@@ -173,7 +193,7 @@ export default function PostEditor() {
                     />
                 </div>
 
-                {/* 6. Metadata Editor (for INTEL/DROP posts) */}
+                {/* 7. Metadata Editor (for INTEL/DROP posts) */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-800">
                     <div>
                         <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
@@ -206,7 +226,7 @@ export default function PostEditor() {
                     </div>
                 </div>
 
-                {/* 3. Published Toggle */}
+                {/* 6. Published Toggle */}
                 <div className="flex items-center justify-between bg-black p-4 rounded border border-neutral-800">
                     <div>
                         <div className="text-sm font-medium text-white">Public Visibility</div>
