@@ -356,8 +356,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        // Canonical DB field is `excerpt` but client may present it as `headline`
-        setOverlayTag(((post as any).headline || (post as any).excerpt || '') as string);
+        // Canonical DB field is `excerpt` (overlay tag)
+        setOverlayTag(((post as any).excerpt || '') as string);
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing

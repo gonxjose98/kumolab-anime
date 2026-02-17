@@ -12,8 +12,8 @@ export function fromDbPost(row: any): BlogPost {
   const scrapedAt = row?.scraped_at ?? row?.scrapedAt;
   const source = row?.source ?? 'Unknown';
 
-  // In this codebase, the DB uses `excerpt` for the short headline/tag used on images.
-  const excerpt = row?.excerpt ?? row?.headline ?? '';
+  // Canonical: DB uses `excerpt` (short headline/tag used on images + card excerpt).
+  const excerpt = (row?.excerpt ?? '').toString();
 
   return {
     ...(row as any),
@@ -27,9 +27,7 @@ export function fromDbPost(row: any): BlogPost {
     scrapedAt,
     source,
 
-    // Cross-editor convenience
     excerpt,
-    headline: excerpt,
   } as BlogPost;
 }
 
