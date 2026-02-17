@@ -24,27 +24,12 @@ export interface LayoutMetadata {
 }
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
-    // Normalize posts to ensure isPublished and social stats are present
-    const normalizedPosts = initialPosts.map(p => {
-        const scheduledTime = (p as any).scheduled_post_time ?? p.scheduledPostTime;
-        const sourceTier = (p as any).source_tier ?? p.sourceTier ?? 3;
-        const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
-        const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
-        const source = (p as any).source ?? p.source ?? 'Unknown';
+    // Posts are normalized server-side (admin/dashboard) via lib/posts/normalize.
+    // Keep this lightweight to avoid diverging contracts between the quick editor (modal)
+    // and the full editor (route).
+    const normalizedPosts = initialPosts;
 
-        return {
-            ...p,
-            isPublished: (p as any).is_published ?? p.isPublished,
-            scheduledPostTime: scheduledTime,
-            socialIds: (p as any).social_ids ?? (p.socialIds || {}),
-            sourceTier,
-            relevanceScore,
-            scrapedAt,
-            source
-        };
-    });
-
-    console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: p.source, score: p.relevanceScore, tier: p.sourceTier })));
+    console.log('[PostManager] Posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: (p as any).source, score: (p as any).relevanceScore, tier: (p as any).sourceTier })));
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
@@ -371,7 +356,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        setOverlayTag(post.headline || '');
+        // Canonical DB field is `excerpt` (overlay tag)
+        setOverlayTag(((post as any).excerpt || '') as string);
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
