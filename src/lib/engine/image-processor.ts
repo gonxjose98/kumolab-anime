@@ -199,8 +199,10 @@ export async function generateIntelImage({
             finalApplyText = true;
         }
 
-        // HARD CONTRACT: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
-        if (derivedClassification === 'TEXT_HEAVY') {
+        // Default behavior: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
+        // But the Admin editor must be able to force overlays back ON.
+        // If the caller explicitly requests applyText=true, allow it even for TEXT_HEAVY sources.
+        if (derivedClassification === 'TEXT_HEAVY' && applyText !== true) {
             finalApplyText = false;
             finalApplyGradient = false;
             finalApplyWatermark = false;
@@ -381,7 +383,8 @@ export async function generateIntelImage({
 
                 ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.92;
+                // Keep draw step consistent with computed layout/metadata
+                currentY += currentLineSpacing;
             }
         }
 
