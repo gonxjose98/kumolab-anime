@@ -32,15 +32,20 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
         const source = (p as any).source ?? p.source ?? 'Unknown';
 
+        const headline = (p as any).headline ?? (p as any).excerpt ?? p.headline ?? p.excerpt;
+
         return {
             ...p,
+            // Normalize common DB snake_case -> client expectations
             isPublished: (p as any).is_published ?? p.isPublished,
             scheduledPostTime: scheduledTime,
             socialIds: (p as any).social_ids ?? (p.socialIds || {}),
             sourceTier,
             relevanceScore,
             scrapedAt,
-            source
+            source,
+            // In this codebase, the DB uses `excerpt` to store the short headline/tag used on images.
+            headline: headline ?? ''
         };
     });
 
@@ -371,7 +376,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        setOverlayTag(post.headline || '');
+        // DB stores this value as `excerpt` for many posts. Normalize to avoid blank overlay on edit.
+        setOverlayTag((post.headline || post.excerpt || '') as string);
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
