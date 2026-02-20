@@ -2068,44 +2068,46 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* 3. Text Layer - Bounded Rectangle Layout */}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
-                                                                {/* TEXT CONTAINER: Fixed position within 35% zone, respects 30px margins */}
+                                                                {/* TEXT CONTAINER: Strict bounded box 30px margins */}
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
                                                                         left: `${30 * containerScale}px`,
-                                                                        right: `${30 * containerScale}px`,
                                                                         top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
-                                                                        transformOrigin: 'center top',
+                                                                        transformOrigin: 'left center',
                                                                         transform: `translateY(-50%) scale(${containerScale})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
-                                                                        width: `${(WIDTH - 60) * containerScale}px`,
+                                                                        // HARD BOUNDED WIDTH - 1020px max (1080 - 30 - 30)
+                                                                        width: `${WIDTH - 60}px`,
+                                                                        maxWidth: `${WIDTH - 60}px`,
+                                                                        overflow: 'visible',
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
                                                                     <div 
-                                                                        className="text-center w-full" 
                                                                         style={{ 
                                                                             filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))',
                                                                         }}
                                                                     >
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-black uppercase tracking-tight"
+                                                                            className="text-white font-black uppercase"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
+                                                                                // Font size: large enough to fill width, small enough to wrap
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale}px` 
-                                                                                    : `${Math.min(120, Math.max(48, (WIDTH - 60) / 10)) * textScale}px`,
-                                                                                lineHeight: '1.05',
+                                                                                    : `${Math.min(90, Math.max(56, (WIDTH - 60) / 14)) * textScale}px`,
+                                                                                lineHeight: '1.1',
                                                                                 textAlign: 'center',
-                                                                                // EXPLICIT WRAPPING - this is critical
+                                                                                // FORCE WRAPPING
                                                                                 whiteSpace: 'normal',
-                                                                                wordWrap: 'break-word',
                                                                                 overflowWrap: 'break-word',
+                                                                                wordBreak: 'break-word',
                                                                             }}
                                                                         >
-                                                                            {/* Render as single text string with spaces for natural wrapping */}
+                                                                            {/* Words with regular spaces so browser wraps naturally */}
                                                                             {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx, arr) => (
                                                                                 <span
                                                                                     key={idx}
@@ -2120,7 +2122,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                     className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
                                                                                     style={{ cursor: 'pointer' }}
                                                                                 >
-                                                                                    {word}{idx < arr.length - 1 ? '\u00A0' : ''}
+                                                                                    {word}{idx < arr.length - 1 ? ' ' : ''}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
