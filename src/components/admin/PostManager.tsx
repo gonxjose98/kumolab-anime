@@ -2051,57 +2051,104 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         {/* DEBUG: Text layer visibility conditions */}
                                                         {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale, verticalOffset }); return null; })()}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
-                                                            <div className="absolute inset-0 pointer-events-none z-10">
+                                                            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        left: 0,
-                                                                        top: 0,
-                                                                        transformOrigin: 'top center',
-                                                                        // FIX: Apply verticalOffset to live preview positioning
-                                                                        // Zone calculation: Footer = HEIGHT - (ZONE_HEIGHT/2), Header = ZONE_HEIGHT/2
-                                                                        // ZONE_HEIGHT = HEIGHT * 0.35 = 472.5, so Footer center = 1113.75, Header center = 236.25
-                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
+                                                                        // FIX: Proper center positioning using left:50% and transform
+                                                                        left: '50%',
+                                                                        top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
+                                                                        transformOrigin: 'center center',
+                                                                        transform: `translate(-50%, -50%) scale(${containerScale})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
                                                                         opacity: 1,
-                                                                        visibility: 'visible'
+                                                                        visibility: 'visible',
+                                                                        width: '100%',
+                                                                        display: 'flex',
+                                                                        justifyContent: 'center',
+                                                                        alignItems: 'center'
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
-                                                                    <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                                                                    <div className="text-center" style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))' }}>
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
+                                                                            className="text-white font-black uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
-                                                                                fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                // FIX: Align base font size with backend (120px base)
-                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${120 * textScale * containerScale}px`,
+                                                                                fontFamily: 'Outfit, sans-serif',
+                                                                                // Use layoutMetadata fontSize if available, otherwise calculate proportionally
+                                                                                fontSize: layoutMetadata?.fontSize 
+                                                                                    ? `${layoutMetadata.fontSize * textScale * containerScale}px` 
+                                                                                    : `${Math.min(120, Math.max(40, 300 / Math.sqrt((overlayTag || '').length || 1))) * textScale * containerScale}px`,
                                                                                 lineHeight: '0.92',
-                                                                                width: `${WIDTH * (WIDTH / HEIGHT) * containerScale}px`,
+                                                                                // FIX: Proper width calculation - 90% of canvas width
+                                                                                width: `${WIDTH * 0.9 * containerScale}px`,
                                                                                 maxWidth: `${WIDTH * 0.9 * containerScale}px`,
                                                                                 textAlign: 'center',
+                                                                                margin: '0 auto',
                                                                                 opacity: 1,
-                                                                                visibility: 'visible'
+                                                                                visibility: 'visible',
+                                                                                display: 'flex',
+                                                                                flexDirection: 'column',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center'
                                                                             }}
                                                                         >
-                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                <span
-                                                                                    key={idx}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        const newIndices = purpleWordIndices.includes(idx)
-                                                                                            ? purpleWordIndices.filter(i => i !== idx)
-                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                        setPurpleWordIndices(newIndices);
-                                                                                        setIsStageDirty(true);
-                                                                                    }}
-                                                                                    className={`inline-block mx-[0.1em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
-                                                                                    style={{ opacity: 1, visibility: 'visible' }}
-                                                                                >
-                                                                                    {word}
-                                                                                </span>
-                                                                            ))}
+                                                                            {/* FIX: Wrap words into lines for better layout */}
+                                                                            {(() => {
+                                                                                const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
+                                                                                const lines: string[][] = [];
+                                                                                let currentLine: string[] = [];
+                                                                                const maxWordsPerLine = 3; // Limit words per line for better layout
+                                                                                
+                                                                                words.forEach((word, idx) => {
+                                                                                    if (currentLine.length < maxWordsPerLine) {
+                                                                                        currentLine.push(word);
+                                                                                    } else {
+                                                                                        lines.push([...currentLine]);
+                                                                                        currentLine = [word];
+                                                                                    }
+                                                                                });
+                                                                                if (currentLine.length > 0) lines.push(currentLine);
+                                                                                
+                                                                                let wordIndex = 0;
+                                                                                return lines.map((line, lineIdx) => (
+                                                                                    <div 
+                                                                                        key={lineIdx} 
+                                                                                        className="flex justify-center items-center flex-wrap"
+                                                                                        style={{ 
+                                                                                            lineHeight: '0.95',
+                                                                                            marginBottom: lineIdx < lines.length - 1 ? '0.1em' : 0 
+                                                                                        }}
+                                                                                    >
+                                                                                        {line.map((word) => {
+                                                                                            const idx = wordIndex++;
+                                                                                            return (
+                                                                                                <span
+                                                                                                    key={idx}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        const newIndices = purpleWordIndices.includes(idx)
+                                                                                                            ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                                        setPurpleWordIndices(newIndices);
+                                                                                                        setIsStageDirty(true);
+                                                                                                    }}
+                                                                                                    className={`inline-block mx-[0.15em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                                    style={{ 
+                                                                                                        opacity: 1, 
+                                                                                                        visibility: 'visible',
+                                                                                                        display: 'inline-block'
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {word}
+                                                                                                </span>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                ));
+                                                                            })()}
                                                                         </div>
                                                                     </div>
                                                                 </div>
