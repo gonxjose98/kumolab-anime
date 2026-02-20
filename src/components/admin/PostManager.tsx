@@ -2066,62 +2066,47 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         )}
 
                                                         {/* 3. Text Layer - Bounded Rectangle Layout */}
-                                                        {/* DEBUG: Text layer visibility conditions */}
-                                                        {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale, verticalOffset }); return null; })()}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
-                                                                {/* BOUNDED TEXT CONTAINER: Invisible rectangle with hard margin constraints */}
+                                                                {/* TEXT CONTAINER: Fixed position within 35% zone, respects 30px margins */}
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        // TIGHT MARGINS: 30px on left/right (reference style ~5-7%)
                                                                         left: `${30 * containerScale}px`,
                                                                         right: `${30 * containerScale}px`,
-                                                                        // Position within the 35% zone with vertical offset
                                                                         top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
                                                                         transformOrigin: 'center top',
                                                                         transform: `translateY(-50%) scale(${containerScale})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
-                                                                        opacity: 1,
-                                                                        visibility: 'visible',
-                                                                        // The bounded box dimensions: 1080 - 30 - 30 = 1020px usable
                                                                         width: `${(WIDTH - 60) * containerScale}px`,
-                                                                        maxWidth: `${(WIDTH - 60) * containerScale}px`,
-                                                                        display: 'flex',
-                                                                        justifyContent: 'center',
-                                                                        alignItems: 'center',
-                                                                        // Constrain to zone height (35% = 472.5px) minus vertical margins
-                                                                        maxHeight: `${(HEIGHT * 0.35 - 60) * containerScale}px`,
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
                                                                     <div 
                                                                         className="text-center w-full" 
-                                                                        style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))' }}
+                                                                        style={{ 
+                                                                            filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))',
+                                                                        }}
                                                                     >
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-black uppercase tracking-tight transition-all duration-300"
+                                                                            className="text-white font-black uppercase tracking-tight"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
-                                                                                // Use layoutMetadata fontSize or calculate to fill width
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale}px` 
-                                                                                    : `${Math.min(140, Math.max(56, (WIDTH - 60) / Math.max(8, (overlayTag || '').length / 12))) * textScale}px`,
-                                                                                lineHeight: '1.0', // Tight line height for stacked lines
-                                                                                // CRITICAL: Fill the bounded width
-                                                                                width: '100%',
+                                                                                    : `${Math.min(120, Math.max(48, (WIDTH - 60) / 10)) * textScale}px`,
+                                                                                lineHeight: '1.05',
                                                                                 textAlign: 'center',
-                                                                                opacity: 1,
-                                                                                visibility: 'visible',
-                                                                                // Natural wrapping behavior
+                                                                                // EXPLICIT WRAPPING - this is critical
+                                                                                whiteSpace: 'normal',
                                                                                 wordWrap: 'break-word',
                                                                                 overflowWrap: 'break-word',
                                                                             }}
                                                                         >
-                                                                            {/* NATURAL TEXT FLOW: Browser handles wrapping within bounded box */}
-                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                            {/* Render as single text string with spaces for natural wrapping */}
+                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx, arr) => (
                                                                                 <span
                                                                                     key={idx}
                                                                                     onClick={(e) => {
@@ -2133,14 +2118,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                         setIsStageDirty(true);
                                                                                     }}
                                                                                     className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
-                                                                                    style={{ 
-                                                                                        display: 'inline',
-                                                                                        margin: '0 0.12em',
-                                                                                        cursor: 'pointer',
-                                                                                        // Allow natural wrapping - no whiteSpace: nowrap
-                                                                                    }}
+                                                                                    style={{ cursor: 'pointer' }}
                                                                                 >
-                                                                                    {word}
+                                                                                    {word}{idx < arr.length - 1 ? '\u00A0' : ''}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
