@@ -2092,76 +2092,47 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     <div className="text-center" style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))' }}>
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-black uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
+                                                                            className="text-white font-black uppercase tracking-tighter transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
-                                                                                // SMART AUTO-SCALE: Fill both width AND height of 35% zone
+                                                                                // Use layoutMetadata fontSize or calculate proportionally
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale * containerScale}px` 
-                                                                                    : `${(() => {
-                                                                                        // Calculate font size to fit text in 2-3 lines with full width
-                                                                                        const text = (overlayTag || '').trim();
-                                                                                        const words = text.split(/\s+/).filter(Boolean).length;
-                                                                                        // Target: 2-3 lines, fill width aggressively
-                                                                                        const targetLines = Math.min(3, Math.max(2, Math.ceil(words / 4)));
-                                                                                        const zoneHeight = HEIGHT * 0.35;
-                                                                                        // Calculate size to fill zone height with target lines
-                                                                                        const targetSize = (zoneHeight * 0.9) / (targetLines * 0.9);
-                                                                                        return Math.min(180, Math.max(48, Math.round(targetSize * textScale * containerScale)));
-                                                                                    })()}px`,
-                                                                                lineHeight: '0.88', // Tighter for dense look
-                                                                                // FULL WIDTH minus 15px margins each side
-                                                                                width: `${(WIDTH - 30) * containerScale}px`,
-                                                                                maxWidth: `${(WIDTH - 30) * containerScale}px`,
+                                                                                    : `${Math.min(160, Math.max(48, 1000 / Math.sqrt((overlayTag || '').length || 1))) * textScale * containerScale}px`,
+                                                                                lineHeight: '0.90',
+                                                                                // FULL WIDTH with tight margins
+                                                                                width: '100%',
+                                                                                maxWidth: `${WIDTH * 0.97}px`,
+                                                                                padding: '0 15px',
                                                                                 textAlign: 'center',
-                                                                                margin: '0 auto',
                                                                                 opacity: 1,
-                                                                                visibility: 'visible',
-                                                                                display: 'block'
+                                                                                visibility: 'visible'
                                                                             }}
                                                                         >
-                                                                            {/* NATURAL LINE FLOW: No forced word limits, let browser handle wrapping */}
-                                                                            {(() => {
-                                                                                const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
-                                                                                
-                                                                                // Simply render all words with natural wrapping
-                                                                                // The container width and font size will determine line breaks
-                                                                                return (
-                                                                                    <div 
-                                                                                        className="flex justify-center items-center flex-wrap"
+                                                                            {/* NATURAL TEXT FLOW: Simple span-based rendering with browser wrapping */}
+                                                                            <div style={{ lineHeight: '0.90' }}>
+                                                                                {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                    <span
+                                                                                        key={idx}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            const newIndices = purpleWordIndices.includes(idx)
+                                                                                                ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                            setPurpleWordIndices(newIndices);
+                                                                                            setIsStageDirty(true);
+                                                                                        }}
+                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
                                                                                         style={{ 
-                                                                                            lineHeight: '0.90',
-                                                                                            maxWidth: '100%',
-                                                                                            wordWrap: 'break-word',
-                                                                                            overflowWrap: 'break-word'
+                                                                                            display: 'inline',
+                                                                                            margin: '0 0.12em',
+                                                                                            cursor: 'pointer'
                                                                                         }}
                                                                                     >
-                                                                                        {words.map((word, idx) => (
-                                                                                            <span
-                                                                                                key={idx}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    const newIndices = purpleWordIndices.includes(idx)
-                                                                                                        ? purpleWordIndices.filter(i => i !== idx)
-                                                                                                        : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                                    setPurpleWordIndices(newIndices);
-                                                                                                    setIsStageDirty(true);
-                                                                                                }}
-                                                                                                className={`inline-block mx-[0.15em] my-[0.05em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
-                                                                                                style={{ 
-                                                                                                    opacity: 1, 
-                                                                                                    visibility: 'visible',
-                                                                                                    display: 'inline-block',
-                                                                                                    whiteSpace: 'nowrap'
-                                                                                                }}
-                                                                                            >
-                                                                                                {word}
-                                                                                            </span>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                );
-                                                                            })()}
-                                                                        </div>
+                                                                                        {word}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
