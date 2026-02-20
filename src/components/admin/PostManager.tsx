@@ -2075,9 +2075,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        // HARD MARGINS: 40px on left, right, and vertical
-                                                                        left: `${40 * containerScale}px`,
-                                                                        right: `${40 * containerScale}px`,
+                                                                        // TIGHT MARGINS: 30px on left/right (reference style ~5-7%)
+                                                                        left: `${30 * containerScale}px`,
+                                                                        right: `${30 * containerScale}px`,
                                                                         // Position within the 35% zone with vertical offset
                                                                         top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
                                                                         transformOrigin: 'center top',
@@ -2085,14 +2085,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
                                                                         opacity: 1,
                                                                         visibility: 'visible',
-                                                                        // The bounded box dimensions
-                                                                        width: `${(WIDTH - 80) * containerScale}px`, // 1080 - 40 - 40 = 1000px usable
-                                                                        maxWidth: `${(WIDTH - 80) * containerScale}px`,
+                                                                        // The bounded box dimensions: 1080 - 30 - 30 = 1020px usable
+                                                                        width: `${(WIDTH - 60) * containerScale}px`,
+                                                                        maxWidth: `${(WIDTH - 60) * containerScale}px`,
                                                                         display: 'flex',
                                                                         justifyContent: 'center',
                                                                         alignItems: 'center',
-                                                                        // Constrain to zone height (35% = 472.5px) minus margins
-                                                                        maxHeight: `${(HEIGHT * 0.35 - 80) * containerScale}px`,
+                                                                        // Constrain to zone height (35% = 472.5px) minus vertical margins
+                                                                        maxHeight: `${(HEIGHT * 0.35 - 60) * containerScale}px`,
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
@@ -2102,23 +2102,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                     >
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-black uppercase tracking-tighter transition-all duration-300"
+                                                                            className="text-white font-black uppercase tracking-tight transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
-                                                                                // Use layoutMetadata fontSize or calculate proportionally
+                                                                                // Use layoutMetadata fontSize or calculate to fill width
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale}px` 
-                                                                                    : `${Math.min(160, Math.max(48, 1000 / Math.sqrt((overlayTag || '').length || 1))) * textScale}px`,
-                                                                                lineHeight: '0.95',
-                                                                                // CRITICAL: Fill the bounded width, no max-width restriction
+                                                                                    : `${Math.min(140, Math.max(56, (WIDTH - 60) / Math.max(8, (overlayTag || '').length / 12))) * textScale}px`,
+                                                                                lineHeight: '1.0', // Tight line height for stacked lines
+                                                                                // CRITICAL: Fill the bounded width
                                                                                 width: '100%',
                                                                                 textAlign: 'center',
                                                                                 opacity: 1,
                                                                                 visibility: 'visible',
-                                                                                // Allow wrapping within the bounded box
+                                                                                // Natural wrapping behavior
                                                                                 wordWrap: 'break-word',
                                                                                 overflowWrap: 'break-word',
-                                                                                hyphens: 'auto',
                                                                             }}
                                                                         >
                                                                             {/* NATURAL TEXT FLOW: Browser handles wrapping within bounded box */}
@@ -2136,9 +2135,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                     className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
                                                                                     style={{ 
                                                                                         display: 'inline',
-                                                                                        margin: '0 0.15em',
+                                                                                        margin: '0 0.12em',
                                                                                         cursor: 'pointer',
-                                                                                        whiteSpace: 'nowrap',
+                                                                                        // Allow natural wrapping - no whiteSpace: nowrap
                                                                                     }}
                                                                                 >
                                                                                     {word}
