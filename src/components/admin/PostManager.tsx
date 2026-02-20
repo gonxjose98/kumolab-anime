@@ -103,13 +103,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const stageContainerRef = useCallback((node: HTMLDivElement | null) => {
         if (node !== null) {
             const updateScale = () => {
-                const width = node.getBoundingClientRect().width;
-                const newScale = width / 1080;
-                setContainerScale(newScale > 0 ? newScale : 1);
+                try {
+                    const rect = node.getBoundingClientRect();
+                    const width = rect.width;
+                    const newScale = width / WIDTH; // Use WIDTH constant (1080)
+                    const finalScale = newScale > 0 ? newScale : 1;
+                    console.log('[DEBUG] Container scale updated:', finalScale, 'width:', width);
+                    setContainerScale(finalScale);
+                } catch (err) {
+                    console.error('[DEBUG] Error calculating container scale:', err);
+                    setContainerScale(1); // Fallback to 1
+                }
             };
-            updateScale();
-            const observer = new ResizeObserver(updateScale);
+            
+            // Initial calculation with slight delay to ensure layout is complete
+            setTimeout(updateScale, 0);
+            
+            const observer = new ResizeObserver(() => {
+                updateScale();
+            });
             observer.observe(node);
+            
+            // Cleanup
+            return () => {
+                observer.disconnect();
+            };
         }
     }, []);
 
@@ -371,7 +389,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        setOverlayTag(post.headline || '');
+        
+        // FIX: Use title as fallback for overlayTag if headline is empty
+        // This ensures text is always visible by default when editing
+        const headlineText = post.headline || post.title || '';
+        setOverlayTag(headlineText);
+        console.log('[DEBUG] Edit modal opening - overlayTag set to:', headlineText);
+        
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
@@ -397,7 +421,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setImagePosition(settings.imagePosition || { x: 0, y: 0 });
         setTextScale(settings.textScale || 1);
         setTextPosition(settings.textPosition || { x: WIDTH / 2, y: 1113.75 });
-        setIsApplyText(settings.isApplyText ?? !!(post.headline || post.title));
+        
+        // FIX: Default isApplyText to true if there's a headline or title
+        const shouldApplyText = settings.isApplyText ?? !!(post.headline || post.title);
+        setIsApplyText(shouldApplyText);
+        console.log('[DEBUG] isApplyText set to:', shouldApplyText);
+        
         setIsApplyGradient(settings.isApplyGradient ?? !!(post.headline || post.title));
         setIsApplyWatermark(settings.isApplyWatermark ?? true);
         setPurpleWordIndices(settings.purpleWordIndices || []);
@@ -410,7 +439,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setShowExpandedPreview(false);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        
+        // FIX: Reset layoutMetadata to ensure fresh text positioning calculation
+        setLayoutMetadata(null);
+        
         setShowModal(true);
+        
+        console.log('[DEBUG] Modal opened - Text should be visible:', {
+            overlayTag: headlineText,
+            isApplyText: shouldApplyText,
+            hasHeadline: !!post.headline,
+            hasTitle: !!post.title
+        });
     };
 
 
@@ -690,9 +730,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsStageDirty(true);
         if (type === 'text') {
             const newVal = !isApplyText;
+            console.log('[DEBUG] Text toggle clicked, new value:', newVal);
             setIsApplyText(newVal);
-            // In strict mode, we do NOT trigger backend. We rely on content length mostly, 
-            // but if we keep this toggle for UI, it should just be local.
+            
+            // FIX: When turning text ON, ensure we have layoutMetadata for positioning
+            // When turning text OFF, clear layoutMetadata
+            if (!newVal) {
+                setLayoutMetadata(null);
+            } else if (newVal && !layoutMetadata && overlayTag.trim().length > 0) {
+                // If turning text on and no layout, trigger text application
+                console.log('[DEBUG] Text turned ON, triggering handleApplyText');
+                handleApplyText();
+            }
         } else {
             const newVal = !isApplyGradient;
             setIsApplyGradient(newVal);
@@ -1994,6 +2043,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         )}
 
                                                         {/* 3. Text Layer - Authoritative & Live */}
+                                                        {/* DEBUG: Text layer visibility conditions */}
+                                                        {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale }); return null; })()}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
                                                                 <div
@@ -2004,20 +2055,25 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         top: 0,
                                                                         transformOrigin: 'top center',
                                                                         transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 : 1147.5)) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
-                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
+                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
+                                                                        opacity: 1, // FIX: Ensure opacity is always 1
+                                                                        visibility: 'visible' // FIX: Ensure visibility is always visible
                                                                     }}
+                                                                    data-text-layer="true"
                                                                 >
                                                                     <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300 opacity-100"
+                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
                                                                                 fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${135 * textScale * containerScale}px`,
                                                                                 lineHeight: '0.92',
                                                                                 width: `${WIDTH * (WIDTH / HEIGHT) * containerScale}px`,
                                                                                 maxWidth: `${WIDTH * 0.9 * containerScale}px`,
-                                                                                textAlign: 'center'
+                                                                                textAlign: 'center',
+                                                                                opacity: 1, // FIX: Explicit opacity
+                                                                                visibility: 'visible' // FIX: Explicit visibility
                                                                             }}
                                                                         >
                                                                             {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
@@ -2032,6 +2088,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                         setIsStageDirty(true);
                                                                                     }}
                                                                                     className={`inline-block mx-[0.1em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                    style={{ opacity: 1, visibility: 'visible' }}
                                                                                 >
                                                                                     {word}
                                                                                 </span>
@@ -2094,17 +2151,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         <div className="flex flex-col gap-2 pt-2">
                                                             <button
-                                                                onClick={() => {
-                                                                    setIsApplyText(!isApplyText);
-                                                                    if (isApplyText) setLayoutMetadata(null);
-                                                                }}
+                                                                onClick={() => toggleFX('text')}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyText ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Text</span>
                                                                 <span className="text-[8px]">{isApplyText ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => setIsApplyGradient(!isApplyGradient)}
+                                                                onClick={() => toggleFX('gradient')}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyGradient ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Gradient</span>
