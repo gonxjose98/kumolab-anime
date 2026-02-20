@@ -2077,14 +2077,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             className="text-white font-black uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
-                                                                                // Use layoutMetadata fontSize if available, otherwise calculate proportionally
+                                                                                // AGGRESSIVE AUTO-SCALE: Match backend logic
+                                                                                // Estimate lines based on character count, calculate font size to fill ~95% of zone
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale * containerScale}px` 
-                                                                                    : `${Math.min(120, Math.max(40, 300 / Math.sqrt((overlayTag || '').length || 1))) * textScale * containerScale}px`,
-                                                                                lineHeight: '0.92',
-                                                                                // FIX: Proper width calculation - 90% of canvas width
-                                                                                width: `${WIDTH * 0.9 * containerScale}px`,
-                                                                                maxWidth: `${WIDTH * 0.9 * containerScale}px`,
+                                                                                    : `${(() => {
+                                                                                        const text = (overlayTag || '').trim();
+                                                                                        const charCount = text.length;
+                                                                                        const zoneHeight = HEIGHT * 0.35; // 35% zone
+                                                                                        const estimatedLines = Math.max(2, Math.ceil(charCount / 22));
+                                                                                        const targetSize = Math.min(180, Math.max(32, (zoneHeight * 0.95) / (estimatedLines * 0.9)));
+                                                                                        return Math.round(targetSize * textScale * containerScale);
+                                                                                    })()}px`,
+                                                                                lineHeight: '0.90', // Tighter line height
+                                                                                // TIGHT margins: 15px on each side = 97.2% width
+                                                                                width: `${WIDTH * 0.972 * containerScale}px`,
+                                                                                maxWidth: `${WIDTH * 0.972 * containerScale}px`,
                                                                                 textAlign: 'center',
                                                                                 margin: '0 auto',
                                                                                 opacity: 1,
@@ -2095,14 +2103,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 justifyContent: 'center'
                                                                             }}
                                                                         >
-                                                                            {/* FIX: Wrap words into lines for better layout */}
+                                                                            {/* AGGRESSIVE LINE WRAPPING: Max 4 words per line for large text look */}
                                                                             {(() => {
                                                                                 const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
                                                                                 const lines: string[][] = [];
                                                                                 let currentLine: string[] = [];
-                                                                                const maxWordsPerLine = 3; // Limit words per line for better layout
+                                                                                const maxWordsPerLine = 4; // Slightly more words per line for tighter layout
                                                                                 
-                                                                                words.forEach((word, idx) => {
+                                                                                words.forEach((word) => {
                                                                                     if (currentLine.length < maxWordsPerLine) {
                                                                                         currentLine.push(word);
                                                                                     } else {
@@ -2118,8 +2126,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                         key={lineIdx} 
                                                                                         className="flex justify-center items-center flex-wrap"
                                                                                         style={{ 
-                                                                                            lineHeight: '0.95',
-                                                                                            marginBottom: lineIdx < lines.length - 1 ? '0.1em' : 0 
+                                                                                            lineHeight: '0.90',
+                                                                                            marginBottom: lineIdx < lines.length - 1 ? '0.08em' : 0 
                                                                                         }}
                                                                                     >
                                                                                         {line.map((word) => {
@@ -2135,7 +2143,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                                         setPurpleWordIndices(newIndices);
                                                                                                         setIsStageDirty(true);
                                                                                                     }}
-                                                                                                    className={`inline-block mx-[0.15em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                                    className={`inline-block mx-[0.12em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
                                                                                                     style={{ 
                                                                                                         opacity: 1, 
                                                                                                         visibility: 'visible',
