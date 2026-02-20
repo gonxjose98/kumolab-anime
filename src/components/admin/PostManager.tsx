@@ -2049,7 +2049,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         {/* 3. Text Layer - Authoritative & Live */}
                                                         {/* DEBUG: Text layer visibility conditions */}
-                                                        {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale }); return null; })()}
+                                                        {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale, verticalOffset }); return null; })()}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
                                                                 <div
@@ -2059,10 +2059,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                         left: 0,
                                                                         top: 0,
                                                                         transformOrigin: 'top center',
-                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 : 1147.5)) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
+                                                                        // FIX: Apply verticalOffset to live preview positioning
+                                                                        // Zone calculation: Footer = HEIGHT - (ZONE_HEIGHT/2), Header = ZONE_HEIGHT/2
+                                                                        // ZONE_HEIGHT = HEIGHT * 0.35 = 472.5, so Footer center = 1113.75, Header center = 236.25
+                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
-                                                                        opacity: 1, // FIX: Ensure opacity is always 1
-                                                                        visibility: 'visible' // FIX: Ensure visibility is always visible
+                                                                        opacity: 1,
+                                                                        visibility: 'visible'
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
@@ -2072,13 +2075,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${135 * textScale * containerScale}px`,
+                                                                                // FIX: Align base font size with backend (120px base)
+                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${120 * textScale * containerScale}px`,
                                                                                 lineHeight: '0.92',
                                                                                 width: `${WIDTH * (WIDTH / HEIGHT) * containerScale}px`,
                                                                                 maxWidth: `${WIDTH * 0.9 * containerScale}px`,
                                                                                 textAlign: 'center',
-                                                                                opacity: 1, // FIX: Explicit opacity
-                                                                                visibility: 'visible' // FIX: Explicit visibility
+                                                                                opacity: 1,
+                                                                                visibility: 'visible'
                                                                             }}
                                                                         >
                                                                             {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
