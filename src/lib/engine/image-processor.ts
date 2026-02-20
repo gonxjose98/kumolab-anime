@@ -69,7 +69,8 @@ export interface ImageProcessingResult {
 }
 
 /**
- * Wraps text into lines based on max width and max lines
+ * Wraps text into lines using natural flow, maximizing horizontal fill
+ * Targets 2-3 lines total with full width utilization
  */
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
@@ -92,7 +93,8 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
         // Hard fallback if measureText returns 0 or fails
         if (width === 0) width = (currentLine.length + word.length + 1) * (currentFS * 0.5);
 
-        if (width < maxWidth) {
+        // ONLY break line if adding word would exceed width
+        if (width < maxWidth * 0.98) { // Allow 98% width utilization (tight!)
             currentLine += " " + word;
         } else {
             lines.push(currentLine);
@@ -100,12 +102,20 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
         }
     }
     lines.push(currentLine);
+    
+    // FORCE COMPACTION: If we have more than 3 lines, recalculate with larger font
+    // This encourages fewer, fuller lines
+    if (lines.length > 3 && maxLines > 0) {
+        // Return as-is but let caller know to try larger font
+        return lines.slice(0, maxLines);
+    }
+    
     return lines.slice(0, maxLines || 10);
 }
 
 /**
- * Calculates optimal font size to FILL the layout zone aggressively
- * Target: Large, prominent text that fills available space like editorial design
+ * Calculates optimal font size for 2-3 lines that FILL horizontal width
+ * Target: Editorial look with maximum width utilization
  */
 function calculateOptimalFontSize(
     ctx: any,
@@ -118,55 +128,65 @@ function calculateOptimalFontSize(
 ): { fontSize: number; lineHeight: number; titleLines: string[]; headlineLines: string[]; allLines: string[]; totalHeight: number } {
     
     const combinedText = (title + ' ' + headline).trim();
-    const charCount = combinedText.length;
+    const words = combinedText.split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
     
-    // AGGRESSIVE INITIAL SIZE: Estimate based on character density
-    // More characters = smaller starting size, but aim to fill space
-    // Target: ~20-25 chars per line at optimal size
-    const estimatedLines = Math.max(2, Math.ceil(charCount / 22));
-    const targetFontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, 
-        (zoneHeight * 0.95) / (estimatedLines * LINE_HEIGHT_FACTOR)
+    // TARGET: 2-3 lines maximum with full horizontal width
+    // Calculate font size to achieve this
+    const targetLines = Math.min(3, Math.max(2, Math.ceil(wordCount / 5))); // ~5 words per line
+    
+    // Start with a font size that should give us 2-3 lines
+    let fontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, 
+        (zoneHeight * 0.9) / (targetLines * LINE_HEIGHT_FACTOR)
     ));
+    fontSize = Math.round(fontSize * requestedScale);
     
-    let fontSize = Math.round(targetFontSize * requestedScale);
-    fontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fontSize));
     let lineHeight = fontSize * LINE_HEIGHT_FACTOR;
     
-    // Initial text wrapping
+    // Test wrapping at this size
     ctx.font = `900 ${fontSize}px "Outfit"`;
-    let titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, fontSize) : [];
-    let headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, fontSize) : [];
+    let titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, fontSize) : [];
+    let headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 3, fontSize) : [];
     let allLines = [...titleLines, ...headlineLines];
     let totalHeight = allLines.length * lineHeight;
     
-    // PHASE 1: Shrink if overflowing (must fit in zone)
     if (!disableAutoScaling && allLines.length > 0) {
-        while (totalHeight > zoneHeight && fontSize > MIN_FONT_SIZE) {
-            fontSize = Math.max(MIN_FONT_SIZE, fontSize - 3);
+        // PHASE 1: If we have MORE than 3 lines, grow font to force compaction
+        let iterations = 0;
+        while (allLines.length > 3 && fontSize < MAX_FONT_SIZE && iterations < 30) {
+            fontSize += 4; // Aggressive growth
             lineHeight = fontSize * LINE_HEIGHT_FACTOR;
             ctx.font = `900 ${fontSize}px "Outfit"`;
-            titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, fontSize) : [];
-            headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, fontSize) : [];
+            titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, fontSize) : [];
+            headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 3, fontSize) : [];
+            allLines = [...titleLines, ...headlineLines];
+            totalHeight = allLines.length * lineHeight;
+            iterations++;
+        }
+        
+        // PHASE 2: If overflowing zone height, shrink
+        while (totalHeight > zoneHeight * 0.95 && fontSize > MIN_FONT_SIZE) {
+            fontSize = Math.max(MIN_FONT_SIZE, fontSize - 2);
+            lineHeight = fontSize * LINE_HEIGHT_FACTOR;
+            ctx.font = `900 ${fontSize}px "Outfit"`;
+            titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, fontSize) : [];
+            headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 3, fontSize) : [];
             allLines = [...titleLines, ...headlineLines];
             totalHeight = allLines.length * lineHeight;
         }
         
-        // PHASE 2: AGGRESSIVELY grow to fill space (target 95% utilization)
-        // Keep growing as long as we have room and hit max size
-        let iterations = 0;
-        const maxIterations = 50; // Prevent infinite loops
-        
-        while (totalHeight < zoneHeight * 0.95 && fontSize < MAX_FONT_SIZE && iterations < maxIterations) {
-            const testFontSize = Math.min(MAX_FONT_SIZE, fontSize + 3);
+        // PHASE 3: Grow to fill available space (up to max)
+        iterations = 0;
+        while (totalHeight < zoneHeight * 0.9 && allLines.length <= 3 && fontSize < MAX_FONT_SIZE && iterations < 30) {
+            const testFontSize = fontSize + 2;
             const testLineHeight = testFontSize * LINE_HEIGHT_FACTOR;
             ctx.font = `900 ${testFontSize}px "Outfit"`;
-            const testTitleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, testFontSize) : [];
-            const testHeadlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, testFontSize) : [];
+            const testTitleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, testFontSize) : [];
+            const testHeadlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 3, testFontSize) : [];
             const testAllLines = [...testTitleLines, ...testHeadlineLines];
             const testTotalHeight = testAllLines.length * testLineHeight;
             
-            // Accept if it fits with tight margin
-            if (testTotalHeight <= zoneHeight * 0.98) {
+            if (testTotalHeight <= zoneHeight * 0.95 && testAllLines.length <= 3) {
                 fontSize = testFontSize;
                 lineHeight = testLineHeight;
                 titleLines = testTitleLines;
@@ -179,7 +199,7 @@ function calculateOptimalFontSize(
             }
         }
         
-        console.log(`[Image Engine] Auto-scale result: ${fontSize}px, ${allLines.length} lines, ${(totalHeight/zoneHeight*100).toFixed(1)}% zone fill`);
+        console.log(`[Image Engine] Result: ${fontSize}px, ${allLines.length} lines, ${words.length} words, ${(totalHeight/zoneHeight*100).toFixed(1)}% fill`);
     }
     
     return { fontSize, lineHeight, titleLines, headlineLines, allLines, totalHeight };

@@ -702,10 +702,28 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
-            const newScale = Math.max(0.1, textScale + delta);
-            setTextScale(newScale);
-            setIsStageDirty(true);
-            // Debounced sync for layout math if needed, but UI is live
+            // HARD CONSTRAINT: Text scale cannot exceed zone boundaries
+            // Calculate max scale based on current text content and zone height
+            const zoneHeight = HEIGHT * 0.35; // 35% zone
+            const lineHeightFactor = 0.88;
+            const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
+            // Estimate lines needed at current scale
+            const charsPerLine = 25; // Approximate at base scale
+            const estimatedLines = Math.max(2, Math.ceil(words.length / 4));
+            const currentFontSize = 120 * textScale; // Base 120px
+            const textHeight = estimatedLines * currentFontSize * lineHeightFactor;
+            
+            // Only allow zoom if it won't overflow zone (with 5% buffer)
+            const proposedNewScale = textScale + delta;
+            const proposedTextHeight = estimatedLines * (120 * proposedNewScale) * lineHeightFactor;
+            
+            if (proposedTextHeight <= zoneHeight * 0.95 || delta < 0) {
+                const newScale = Math.max(0.5, Math.min(3, proposedNewScale)); // Constrain between 0.5x and 3x
+                setTextScale(newScale);
+                setIsStageDirty(true);
+            } else {
+                console.log('[DEBUG] Text zoom blocked: would exceed zone height');
+            }
         }
     };
 
@@ -2077,85 +2095,71 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                             className="text-white font-black uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300"
                                                                             style={{
                                                                                 fontFamily: 'Outfit, sans-serif',
-                                                                                // AGGRESSIVE AUTO-SCALE: Match backend logic
-                                                                                // Estimate lines based on character count, calculate font size to fill ~95% of zone
+                                                                                // SMART AUTO-SCALE: Fill both width AND height of 35% zone
                                                                                 fontSize: layoutMetadata?.fontSize 
                                                                                     ? `${layoutMetadata.fontSize * textScale * containerScale}px` 
                                                                                     : `${(() => {
+                                                                                        // Calculate font size to fit text in 2-3 lines with full width
                                                                                         const text = (overlayTag || '').trim();
-                                                                                        const charCount = text.length;
-                                                                                        const zoneHeight = HEIGHT * 0.35; // 35% zone
-                                                                                        const estimatedLines = Math.max(2, Math.ceil(charCount / 22));
-                                                                                        const targetSize = Math.min(180, Math.max(32, (zoneHeight * 0.95) / (estimatedLines * 0.9)));
-                                                                                        return Math.round(targetSize * textScale * containerScale);
+                                                                                        const words = text.split(/\s+/).filter(Boolean).length;
+                                                                                        // Target: 2-3 lines, fill width aggressively
+                                                                                        const targetLines = Math.min(3, Math.max(2, Math.ceil(words / 4)));
+                                                                                        const zoneHeight = HEIGHT * 0.35;
+                                                                                        // Calculate size to fill zone height with target lines
+                                                                                        const targetSize = (zoneHeight * 0.9) / (targetLines * 0.9);
+                                                                                        return Math.min(180, Math.max(48, Math.round(targetSize * textScale * containerScale)));
                                                                                     })()}px`,
-                                                                                lineHeight: '0.90', // Tighter line height
-                                                                                // TIGHT margins: 15px on each side = 97.2% width
-                                                                                width: `${WIDTH * 0.972 * containerScale}px`,
-                                                                                maxWidth: `${WIDTH * 0.972 * containerScale}px`,
+                                                                                lineHeight: '0.88', // Tighter for dense look
+                                                                                // FULL WIDTH minus 15px margins each side
+                                                                                width: `${(WIDTH - 30) * containerScale}px`,
+                                                                                maxWidth: `${(WIDTH - 30) * containerScale}px`,
                                                                                 textAlign: 'center',
                                                                                 margin: '0 auto',
                                                                                 opacity: 1,
                                                                                 visibility: 'visible',
-                                                                                display: 'flex',
-                                                                                flexDirection: 'column',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center'
+                                                                                display: 'block'
                                                                             }}
                                                                         >
-                                                                            {/* AGGRESSIVE LINE WRAPPING: Max 4 words per line for large text look */}
+                                                                            {/* NATURAL LINE FLOW: No forced word limits, let browser handle wrapping */}
                                                                             {(() => {
                                                                                 const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
-                                                                                const lines: string[][] = [];
-                                                                                let currentLine: string[] = [];
-                                                                                const maxWordsPerLine = 4; // Slightly more words per line for tighter layout
                                                                                 
-                                                                                words.forEach((word) => {
-                                                                                    if (currentLine.length < maxWordsPerLine) {
-                                                                                        currentLine.push(word);
-                                                                                    } else {
-                                                                                        lines.push([...currentLine]);
-                                                                                        currentLine = [word];
-                                                                                    }
-                                                                                });
-                                                                                if (currentLine.length > 0) lines.push(currentLine);
-                                                                                
-                                                                                let wordIndex = 0;
-                                                                                return lines.map((line, lineIdx) => (
+                                                                                // Simply render all words with natural wrapping
+                                                                                // The container width and font size will determine line breaks
+                                                                                return (
                                                                                     <div 
-                                                                                        key={lineIdx} 
                                                                                         className="flex justify-center items-center flex-wrap"
                                                                                         style={{ 
                                                                                             lineHeight: '0.90',
-                                                                                            marginBottom: lineIdx < lines.length - 1 ? '0.08em' : 0 
+                                                                                            maxWidth: '100%',
+                                                                                            wordWrap: 'break-word',
+                                                                                            overflowWrap: 'break-word'
                                                                                         }}
                                                                                     >
-                                                                                        {line.map((word) => {
-                                                                                            const idx = wordIndex++;
-                                                                                            return (
-                                                                                                <span
-                                                                                                    key={idx}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        const newIndices = purpleWordIndices.includes(idx)
-                                                                                                            ? purpleWordIndices.filter(i => i !== idx)
-                                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                                        setPurpleWordIndices(newIndices);
-                                                                                                        setIsStageDirty(true);
-                                                                                                    }}
-                                                                                                    className={`inline-block mx-[0.12em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
-                                                                                                    style={{ 
-                                                                                                        opacity: 1, 
-                                                                                                        visibility: 'visible',
-                                                                                                        display: 'inline-block'
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {word}
-                                                                                                </span>
-                                                                                            );
-                                                                                        })}
+                                                                                        {words.map((word, idx) => (
+                                                                                            <span
+                                                                                                key={idx}
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    const newIndices = purpleWordIndices.includes(idx)
+                                                                                                        ? purpleWordIndices.filter(i => i !== idx)
+                                                                                                        : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                                    setPurpleWordIndices(newIndices);
+                                                                                                    setIsStageDirty(true);
+                                                                                                }}
+                                                                                                className={`inline-block mx-[0.15em] my-[0.05em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                                style={{ 
+                                                                                                    opacity: 1, 
+                                                                                                    visibility: 'visible',
+                                                                                                    display: 'inline-block',
+                                                                                                    whiteSpace: 'nowrap'
+                                                                                                }}
+                                                                                            >
+                                                                                                {word}
+                                                                                            </span>
+                                                                                        ))}
                                                                                     </div>
-                                                                                ));
+                                                                                );
                                                                             })()}
                                                                         </div>
                                                                     </div>
@@ -2213,7 +2217,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             </button>
                                                         </div>
 
-                                                        {/* NEW: Vertical Position Adjustment */}
+                                                        {/* NEW: Vertical Position Adjustment - HARD CONSTRAINED TO ZONE */}
                                                         <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center pt-2">
                                                             <span>Vertical Position</span>
                                                             <span className="font-mono text-white/50">{verticalOffset}px</span>
@@ -2221,31 +2225,41 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         <div className="flex gap-2">
                                                             <button 
                                                                 onClick={() => {
-                                                                    const newOffset = verticalOffset - 10;
+                                                                    // HARD CONSTRAINT: Calculate max allowed offset to stay in zone
+                                                                    const zoneHeight = HEIGHT * 0.35;
+                                                                    const zoneCenter = gradientPosition === 'top' ? 236.25 : 1113.75;
+                                                                    const textHeight = layoutMetadata?.totalHeight || (zoneHeight * 0.5); // Estimate if unknown
+                                                                    const maxOffsetUp = -(zoneHeight / 2) + (textHeight / 2) + 15; // 15px margin
+                                                                    
+                                                                    const newOffset = Math.max(maxOffsetUp, verticalOffset - 10);
                                                                     setVerticalOffset(newOffset);
                                                                     setIsStageDirty(true);
-                                                                    // Trigger re-render with new offset
                                                                     if (isApplyText && overlayTag.trim().length > 0) {
                                                                         handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
                                                                     }
                                                                 }} 
                                                                 className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
-                                                                title="Move text up"
+                                                                title="Move text up (constrained to zone)"
                                                             >
                                                                 ▲
                                                             </button>
                                                             <button 
                                                                 onClick={() => {
-                                                                    const newOffset = verticalOffset + 10;
+                                                                    // HARD CONSTRAINT: Calculate max allowed offset to stay in zone
+                                                                    const zoneHeight = HEIGHT * 0.35;
+                                                                    const zoneCenter = gradientPosition === 'top' ? 236.25 : 1113.75;
+                                                                    const textHeight = layoutMetadata?.totalHeight || (zoneHeight * 0.5);
+                                                                    const maxOffsetDown = (zoneHeight / 2) - (textHeight / 2) - 15; // 15px margin
+                                                                    
+                                                                    const newOffset = Math.min(maxOffsetDown, verticalOffset + 10);
                                                                     setVerticalOffset(newOffset);
                                                                     setIsStageDirty(true);
-                                                                    // Trigger re-render with new offset
                                                                     if (isApplyText && overlayTag.trim().length > 0) {
                                                                         handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
                                                                     }
                                                                 }} 
                                                                 className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
-                                                                title="Move text down"
+                                                                title="Move text down (constrained to zone)"
                                                             >
                                                                 ▼
                                                             </button>
