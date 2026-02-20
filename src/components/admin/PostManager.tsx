@@ -2133,6 +2133,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                     </span>
                                                                                 ))}
                                                                             </div>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
