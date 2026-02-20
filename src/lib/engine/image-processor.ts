@@ -2,6 +2,14 @@
  * image-processor.ts
  * Implements the premium social-first aesthetic for KumoLab.
  * Format: 4:5 Portrait (1080x1350)
+ * 
+ * LAYOUT RULES (Hard Standards):
+ * - Text center-aligned horizontally ✓
+ * - Text confined to 35% zones (bottom default, optional top)
+ * - Auto-scaling based on text length and available space
+ * - Safe margins: 40px from edges
+ * - Balanced, dense text blocks
+ * - Manual vertical offset supported
  */
 
 import sharp from 'sharp';
@@ -12,9 +20,15 @@ import path from 'path';
 const KUMOLAB_PURPLE = '#9D7BFF'; // Vibrant Lavender/Purple from reference
 const HANDLE_TEXT = '@KumoLabAnime';
 
-// Ensure font availability
-// Image-only imports
-// (GlobalFonts imported dynamically)
+// LAYOUT CONSTANTS (Hard Rules)
+const WIDTH = 1080;
+const HEIGHT = 1350;
+const LAYOUT_ZONE_PERCENT = 0.35; // 35% of image height
+const SAFE_MARGIN = 40; // Pixels from edges
+const BASE_FONT_SIZE = 120;
+const MIN_FONT_SIZE = 24;
+const MAX_FONT_SIZE = 160;
+const LINE_HEIGHT_FACTOR = 0.92;
 
 export interface LayoutMetadata {
     fontSize: number;
@@ -25,6 +39,7 @@ export interface LayoutMetadata {
     zone: 'HEADER' | 'FOOTER';
     numLines: number;
     totalHeight: number;
+    verticalOffset: number; // NEW: Track manual adjustment
 }
 
 interface IntelImageOptions {
@@ -45,6 +60,7 @@ interface IntelImageOptions {
     disableAutoScaling?: boolean;
     classification?: 'CLEAN' | 'TEXT_HEAVY';
     bypassSafety?: boolean;
+    verticalOffset?: number; // NEW: Manual vertical adjustment (pixels)
 }
 
 export interface ImageProcessingResult {
@@ -53,10 +69,8 @@ export interface ImageProcessingResult {
 }
 
 /**
- * Processes an image for the Intel Feed and Social Media.
+ * Wraps text into lines based on max width and max lines
  */
-
-
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
     const words = text.split(/\s+/).filter(Boolean);
@@ -89,6 +103,77 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
     return lines.slice(0, maxLines || 10);
 }
 
+/**
+ * Calculates optimal font size to fill the layout zone efficiently
+ * without leaving dead space or overflowing
+ */
+function calculateOptimalFontSize(
+    ctx: any,
+    title: string,
+    headline: string,
+    availableWidth: number,
+    zoneHeight: number,
+    requestedScale: number,
+    disableAutoScaling: boolean
+): { fontSize: number; lineHeight: number; titleLines: string[]; headlineLines: string[]; allLines: string[]; totalHeight: number } {
+    
+    let fontSize = Math.min(MAX_FONT_SIZE, BASE_FONT_SIZE * requestedScale);
+    let lineHeight = fontSize * LINE_HEIGHT_FACTOR;
+    
+    // Initial text wrapping
+    ctx.font = `900 ${fontSize}px "Outfit"`;
+    let titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, fontSize) : [];
+    let headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, fontSize) : [];
+    let allLines = [...titleLines, ...headlineLines];
+    let totalHeight = allLines.length * lineHeight;
+    
+    // AUTO-SCALING: Adjust font size to optimally fill the zone
+    if (!disableAutoScaling && allLines.length > 0) {
+        // If text is too big for the zone, shrink it
+        while (totalHeight > zoneHeight && fontSize > MIN_FONT_SIZE) {
+            fontSize -= 2;
+            lineHeight = fontSize * LINE_HEIGHT_FACTOR;
+            ctx.font = `900 ${fontSize}px "Outfit"`;
+            titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, fontSize) : [];
+            headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, fontSize) : [];
+            allLines = [...titleLines, ...headlineLines];
+            totalHeight = allLines.length * lineHeight;
+        }
+        
+        // If text is too small and leaves dead space, grow it (up to max)
+        // Only grow if we have room and aren't at max size
+        const spaceUtilization = totalHeight / zoneHeight;
+        if (spaceUtilization < 0.7 && fontSize < MAX_FONT_SIZE) {
+            while (totalHeight < zoneHeight * 0.9 && fontSize < MAX_FONT_SIZE) {
+                const testFontSize = fontSize + 2;
+                const testLineHeight = testFontSize * LINE_HEIGHT_FACTOR;
+                ctx.font = `900 ${testFontSize}px "Outfit"`;
+                const testTitleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 20, testFontSize) : [];
+                const testHeadlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 10, testFontSize) : [];
+                const testAllLines = [...testTitleLines, ...testHeadlineLines];
+                const testTotalHeight = testAllLines.length * testLineHeight;
+                
+                // Only accept if it still fits
+                if (testTotalHeight <= zoneHeight) {
+                    fontSize = testFontSize;
+                    lineHeight = testLineHeight;
+                    titleLines = testTitleLines;
+                    headlineLines = testHeadlineLines;
+                    allLines = testAllLines;
+                    totalHeight = testTotalHeight;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    
+    return { fontSize, lineHeight, titleLines, headlineLines, allLines, totalHeight };
+}
+
+/**
+ * Processes an image for the Intel Feed and Social Media.
+ */
 export async function generateIntelImage({
     sourceUrl,
     animeTitle,
@@ -108,6 +193,7 @@ export async function generateIntelImage({
     disableAutoScaling = false,
     classification,
     bypassSafety = false,
+    verticalOffset = 0, // NEW: Manual vertical adjustment
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -116,9 +202,6 @@ export async function generateIntelImage({
     }
 
     const outputFileName = `${slug}-social.png`;
-
-    const WIDTH = 1080;
-    const HEIGHT = 1350;
 
     try {
         // 1. Dynamic Import
@@ -177,8 +260,6 @@ export async function generateIntelImage({
         const imgRatio = img.width / img.height;
 
         // --- 4:5 SUBJECT-SAFE ABORT RULE ---
-        // Rule: If an image is extremely wide (panorama) or extremely tall (long-strip composite), it's unsafe.
-        // Rule: Abort if aspect ratio is outside 0.6 to 2.0 range (Allows 16:9 banners), UNLESS bypassed.
         if (!bypassSafety && (imgRatio > 2.0 || imgRatio < 0.5)) {
             console.error(`[Image Engine] ABORT: Source aspect ratio (${imgRatio.toFixed(2)}) violates subject-safe rule for 4:5 crop.`);
             return null;
@@ -259,23 +340,44 @@ export async function generateIntelImage({
         ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
 
         const isTop = finalGradientPosition === 'top';
-        const availableWidth = WIDTH * 0.90;
+        const availableWidth = WIDTH - (SAFE_MARGIN * 2); // Safe margins on both sides
 
-        let titleLines: string[] = [];
-        let headlineLines: string[] = [];
-        let totalBlockHeight = 0;
+        // --- LAYOUT CALCULATION (Hard Rules Implementation) ---
+        let layoutResult: {
+            fontSize: number;
+            lineHeight: number;
+            titleLines: string[];
+            headlineLines: string[];
+            allLines: string[];
+            totalHeight: number;
+        } | null = null;
 
         if (finalApplyText) {
-            ctx.font = `900 135px "Outfit"`;
-            titleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, 135) : [];
-            headlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, 135) : [];
-            totalBlockHeight = (titleLines.length + headlineLines.length) * (135 * 0.92);
+            // Calculate zone boundaries
+            const zoneHeight = HEIGHT * LAYOUT_ZONE_PERCENT;
+            
+            layoutResult = calculateOptimalFontSize(
+                ctx,
+                upperTitle,
+                cleanedHeadline,
+                availableWidth,
+                zoneHeight,
+                textScale,
+                disableAutoScaling
+            );
+
+            console.log(`[Image Engine] Layout calculated:`, {
+                fontSize: layoutResult.fontSize,
+                lines: layoutResult.allLines.length,
+                totalHeight: layoutResult.totalHeight,
+                zoneHeight,
+                zone: isTop ? 'HEADER' : 'FOOTER'
+            });
         }
 
         // --- GRADIENT LOGIC (Strictly dependent on Rendering) ---
-        if (finalApplyGradient && finalApplyText && totalBlockHeight > 0) {
-            const minGradH = 800;
-            const gradientHeight = Math.max(totalBlockHeight + 500, minGradH);
+        if (finalApplyGradient && finalApplyText && layoutResult) {
+            const gradientHeight = Math.max(layoutResult.totalHeight + 400, HEIGHT * 0.4);
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
 
@@ -297,69 +399,63 @@ export async function generateIntelImage({
             ctx.restore();
         }
 
-        // --- DRAW TEXT ---
-        if (finalApplyText && totalBlockHeight > 0) {
-            const margin = 100; // Hard safety margin from canvas edges
-            const zoneHeight = (HEIGHT * 0.35) - 40; // Reduced zone height for better padding
-            const lineSpacingFactor = 1.05; // Less cramped spacing
-            const requestedScale = Math.max(0.1, textScale);
-            let finalFontSize = 120 * requestedScale; // Reduced base size to prevent 'oversized' feel
-            let currentLineSpacing = finalFontSize * lineSpacingFactor;
-
-            ctx.font = `900 ${finalFontSize}px "Outfit"`;
-            let currentTitleLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
-            let currentHeadlineLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
-            let allLines = [...currentTitleLines, ...currentHeadlineLines];
-            let titleLinesCount = currentTitleLines.length;
-            let totalH = allLines.length * currentLineSpacing;
-
-            if (allLines.length > 0 && (totalH > zoneHeight || titleLinesCount > 3) && !disableAutoScaling) {
-                while ((totalH > zoneHeight || titleLinesCount > 3) && finalFontSize > 15) {
-                    finalFontSize -= 2;
-                    currentLineSpacing = finalFontSize * lineSpacingFactor;
-                    ctx.font = `900 ${finalFontSize}px "Outfit"`;
-                    const tLines = upperTitle.length > 0 ? wrapText(ctx, upperTitle, availableWidth, 20, finalFontSize) : [];
-                    const hLines = cleanedHeadline.length > 0 ? wrapText(ctx, cleanedHeadline, availableWidth, 10, finalFontSize) : [];
-                    allLines = [...tLines, ...hLines];
-                    titleLinesCount = tLines.length;
-                    totalH = allLines.length * currentLineSpacing;
-                }
+        // --- DRAW TEXT (Hard Layout Rules Implementation) ---
+        if (finalApplyText && layoutResult) {
+            const { fontSize, lineHeight, titleLines, headlineLines, allLines, totalHeight } = layoutResult;
+            
+            // Calculate zone center Y position
+            const zoneHeight = HEIGHT * LAYOUT_ZONE_PERCENT;
+            let zoneCenterY: number;
+            
+            if (isTop) {
+                // Header zone: top 35%
+                zoneCenterY = (zoneHeight / 2);
+            } else {
+                // Footer zone: bottom 35%
+                zoneCenterY = HEIGHT - (zoneHeight / 2);
             }
-
-            const zoneY = isTop ? (HEIGHT * 0.175) + 30 : HEIGHT - (HEIGHT * 0.175) - 30;
-            const startX = WIDTH / 2;
-            let centerCenterY = textPosition ? textPosition.y : zoneY;
-
-            // Strict Margin Enforcement
-            const minY = margin + (totalH / 2);
-            const maxY = HEIGHT - margin - (totalH / 2);
-            centerCenterY = Math.max(minY, Math.min(maxY, centerCenterY));
-
-            const startY = centerCenterY - (totalH / 2);
-            let currentY = startY + (finalFontSize * 0.85);
-
+            
+            // Apply manual vertical offset
+            const adjustedZoneCenterY = zoneCenterY + verticalOffset;
+            
+            // Constrain to safe margins
+            const minY = SAFE_MARGIN + (totalHeight / 2);
+            const maxY = HEIGHT - SAFE_MARGIN - (totalHeight / 2);
+            const constrainedCenterY = Math.max(minY, Math.min(maxY, adjustedZoneCenterY));
+            
+            // Calculate start Y to vertically center the text block
+            const startY = constrainedCenterY - (totalHeight / 2);
+            const startX = WIDTH / 2; // Always center horizontally
+            
+            // Store layout metadata for client
             (ctx as any)._layoutMetadata = {
-                fontSize: finalFontSize,
-                lineHeight: currentLineSpacing,
+                fontSize: fontSize,
+                lineHeight: lineHeight,
                 y: startY,
                 lines: allLines,
-                finalScale: finalFontSize / 135,
+                finalScale: fontSize / BASE_FONT_SIZE,
                 zone: isTop ? 'HEADER' : 'FOOTER',
                 numLines: allLines.length,
-                totalHeight: totalH
+                totalHeight: totalHeight,
+                verticalOffset: verticalOffset
             };
 
+            // Draw each line
+            let currentY = startY + (fontSize * 0.85);
             let wordCursor = 0;
+            
             for (const line of allLines) {
                 const words = line.split(/\s+/).filter(Boolean);
                 ctx.save();
-                ctx.font = `900 ${finalFontSize}px "Outfit"`;
+                ctx.font = `900 ${fontSize}px "Outfit"`;
                 ctx.textAlign = 'center';
 
+                // Text shadow for readability
                 ctx.shadowColor = 'rgba(0,0,0,0.8)';
                 ctx.shadowBlur = 15;
                 ctx.shadowOffsetY = 4;
 
+                // Calculate line width for centering
                 let lineTotalWidth = 0;
                 const metrics = words.map((w, i) => {
                     const m = ctx.measureText(w);
@@ -370,6 +466,7 @@ export async function generateIntelImage({
 
                 let currentLineX = startX - (lineTotalWidth / 2);
 
+                // Draw each word
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
                     ctx.save();
@@ -381,7 +478,7 @@ export async function generateIntelImage({
 
                 ctx.restore();
                 wordCursor += words.length;
-                currentY += finalFontSize * 0.92;
+                currentY += lineHeight;
             }
         }
 

@@ -80,6 +80,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
     const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: 1113.75 }); // Regional Control Center (35% zone center)
+    const [verticalOffset, setVerticalOffset] = useState(0); // NEW: Manual vertical adjustment in pixels
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
@@ -421,6 +422,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setImagePosition(settings.imagePosition || { x: 0, y: 0 });
         setTextScale(settings.textScale || 1);
         setTextPosition(settings.textPosition || { x: WIDTH / 2, y: 1113.75 });
+        setVerticalOffset(settings.verticalOffset || 0); // NEW: Load vertical offset
         
         // FIX: Default isApplyText to true if there's a headline or title
         const shouldApplyText = settings.isApplyText ?? !!(post.headline || post.title);
@@ -541,7 +543,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean, manualTextScale?: number): Promise<string | null> => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean, manualTextScale?: number, manualVerticalOffset?: number): Promise<string | null> => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -586,7 +588,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
                     applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
+                    disableAutoScaling: false, // ALLOW ENGINE TO SCALE
+                    verticalOffset: manualVerticalOffset ?? verticalOffset // NEW: Pass vertical offset
                 })
             });
             const data = await res.json();
@@ -715,6 +718,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsStageDirty(true);
         setTextScale(1);
         setTextPosition({ x: WIDTH / 2, y: 1113.75 });
+        setVerticalOffset(0); // Reset vertical offset
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -856,6 +860,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const imageSettings = {
                 textScale,
                 textPosition,
+                verticalOffset, // NEW: Save vertical offset
                 isApplyText,
                 isApplyGradient,
                 isApplyWatermark,
@@ -977,13 +982,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     applyText: isApplyText,
                     applyGradient: isApplyGradient,
                     textPos: textPosition,
-
                     textScale,
                     gradientPos: gradientPosition,
                     purpleIndex: purpleWordIndices,
                     applyWatermark: isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
+                    disableAutoScaling: false, // ALLOW ENGINE TO SCALE
+                    verticalOffset // NEW: Include vertical offset
                 })
             });
 
@@ -2146,6 +2151,57 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                 className={`p-2 rounded-lg border transition-all ${isTextLocked ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-white/5 text-neutral-500 border-white/10'}`}
                                                             >
                                                                 {isTextLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                                                            </button>
+                                                        </div>
+
+                                                        {/* NEW: Vertical Position Adjustment */}
+                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center pt-2">
+                                                            <span>Vertical Position</span>
+                                                            <span className="font-mono text-white/50">{verticalOffset}px</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newOffset = verticalOffset - 10;
+                                                                    setVerticalOffset(newOffset);
+                                                                    setIsStageDirty(true);
+                                                                    // Trigger re-render with new offset
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
+                                                                    }
+                                                                }} 
+                                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
+                                                                title="Move text up"
+                                                            >
+                                                                ▲
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newOffset = verticalOffset + 10;
+                                                                    setVerticalOffset(newOffset);
+                                                                    setIsStageDirty(true);
+                                                                    // Trigger re-render with new offset
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
+                                                                    }
+                                                                }} 
+                                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
+                                                                title="Move text down"
+                                                            >
+                                                                ▼
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setVerticalOffset(0);
+                                                                    setIsStageDirty(true);
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0);
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-2 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg border border-white/10 text-[10px]"
+                                                                title="Reset position"
+                                                            >
+                                                                ↺
                                                             </button>
                                                         </div>
 
