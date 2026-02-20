@@ -2065,31 +2065,41 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             />
                                                         )}
 
-                                                        {/* 3. Text Layer - Authoritative & Live */}
+                                                        {/* 3. Text Layer - Bounded Rectangle Layout */}
                                                         {/* DEBUG: Text layer visibility conditions */}
                                                         {(() => { console.log('[DEBUG] Text Layer Check:', { isApplyText, overlayTag: overlayTag?.substring(0, 30), hasContent: overlayTag?.trim().length > 0, shouldRender: isApplyText && overlayTag && overlayTag.trim().length > 0, containerScale, verticalOffset }); return null; })()}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
-                                                            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+                                                            <div className="absolute inset-0 pointer-events-none z-10">
+                                                                {/* BOUNDED TEXT CONTAINER: Invisible rectangle with hard margin constraints */}
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        // FIX: Proper center positioning using left:50% and transform
-                                                                        left: '50%',
+                                                                        // HARD MARGINS: 40px on left, right, and vertical
+                                                                        left: `${40 * containerScale}px`,
+                                                                        right: `${40 * containerScale}px`,
+                                                                        // Position within the 35% zone with vertical offset
                                                                         top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
-                                                                        transformOrigin: 'center center',
-                                                                        transform: `translate(-50%, -50%) scale(${containerScale})`,
+                                                                        transformOrigin: 'center top',
+                                                                        transform: `translateY(-50%) scale(${containerScale})`,
                                                                         transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
                                                                         opacity: 1,
                                                                         visibility: 'visible',
-                                                                        width: '100%',
+                                                                        // The bounded box dimensions
+                                                                        width: `${(WIDTH - 80) * containerScale}px`, // 1080 - 40 - 40 = 1000px usable
+                                                                        maxWidth: `${(WIDTH - 80) * containerScale}px`,
                                                                         display: 'flex',
                                                                         justifyContent: 'center',
-                                                                        alignItems: 'center'
+                                                                        alignItems: 'center',
+                                                                        // Constrain to zone height (35% = 472.5px) minus margins
+                                                                        maxHeight: `${(HEIGHT * 0.35 - 80) * containerScale}px`,
                                                                     }}
                                                                     data-text-layer="true"
                                                                 >
-                                                                    <div className="text-center" style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))' }}>
+                                                                    <div 
+                                                                        className="text-center w-full" 
+                                                                        style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))' }}
+                                                                    >
                                                                         <div
                                                                             ref={textContainerRef}
                                                                             className="text-white font-black uppercase tracking-tighter transition-all duration-300"
@@ -2097,42 +2107,43 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                 fontFamily: 'Outfit, sans-serif',
                                                                                 // Use layoutMetadata fontSize or calculate proportionally
                                                                                 fontSize: layoutMetadata?.fontSize 
-                                                                                    ? `${layoutMetadata.fontSize * textScale * containerScale}px` 
-                                                                                    : `${Math.min(160, Math.max(48, 1000 / Math.sqrt((overlayTag || '').length || 1))) * textScale * containerScale}px`,
-                                                                                lineHeight: '0.90',
-                                                                                // FULL WIDTH with tight margins
+                                                                                    ? `${layoutMetadata.fontSize * textScale}px` 
+                                                                                    : `${Math.min(160, Math.max(48, 1000 / Math.sqrt((overlayTag || '').length || 1))) * textScale}px`,
+                                                                                lineHeight: '0.95',
+                                                                                // CRITICAL: Fill the bounded width, no max-width restriction
                                                                                 width: '100%',
-                                                                                maxWidth: `${WIDTH * 0.97}px`,
-                                                                                padding: '0 15px',
                                                                                 textAlign: 'center',
                                                                                 opacity: 1,
-                                                                                visibility: 'visible'
+                                                                                visibility: 'visible',
+                                                                                // Allow wrapping within the bounded box
+                                                                                wordWrap: 'break-word',
+                                                                                overflowWrap: 'break-word',
+                                                                                hyphens: 'auto',
                                                                             }}
                                                                         >
-                                                                            {/* NATURAL TEXT FLOW: Simple span-based rendering with browser wrapping */}
-                                                                            <div style={{ lineHeight: '0.90' }}>
-                                                                                {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
-                                                                                    <span
-                                                                                        key={idx}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            const newIndices = purpleWordIndices.includes(idx)
-                                                                                                ? purpleWordIndices.filter(i => i !== idx)
-                                                                                                : [...purpleWordIndices, idx].sort((a, b) => a - b);
-                                                                                            setPurpleWordIndices(newIndices);
-                                                                                            setIsStageDirty(true);
-                                                                                        }}
-                                                                                        className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
-                                                                                        style={{ 
-                                                                                            display: 'inline',
-                                                                                            margin: '0 0.12em',
-                                                                                            cursor: 'pointer'
-                                                                                        }}
-                                                                                    >
-                                                                                        {word}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
+                                                                            {/* NATURAL TEXT FLOW: Browser handles wrapping within bounded box */}
+                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        const newIndices = purpleWordIndices.includes(idx)
+                                                                                            ? purpleWordIndices.filter(i => i !== idx)
+                                                                                            : [...purpleWordIndices, idx].sort((a, b) => a - b);
+                                                                                        setPurpleWordIndices(newIndices);
+                                                                                        setIsStageDirty(true);
+                                                                                    }}
+                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
+                                                                                    style={{ 
+                                                                                        display: 'inline',
+                                                                                        margin: '0 0.15em',
+                                                                                        cursor: 'pointer',
+                                                                                        whiteSpace: 'nowrap',
+                                                                                    }}
+                                                                                >
+                                                                                    {word}
+                                                                                </span>
+                                                                            ))}
                                                                         </div>
                                                                     </div>
                                                                 </div>
