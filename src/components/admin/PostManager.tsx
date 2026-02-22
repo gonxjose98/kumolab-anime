@@ -1447,21 +1447,64 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-4 align-top w-[140px]">
+                                    <td className="p-4 align-top w-[180px]">
                                         {filter === 'PENDING' ? (
-                                            <div className="flex flex-col gap-1.5">
+                                            <div className="flex flex-col gap-2">
                                                 {/* LOUD VERIFICATION LOG */}
                                                 {(() => {
-                                                    const logMsg = `[V3-REFRESH] METADATA RENDERING: Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier} | Time=${new Date().toISOString()}`;
+                                                    const logMsg = `[V3-REFRESH] METADATA RENDERING: Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier} | ClaimType=${post.claimType} | Time=${new Date().toISOString()}`;
                                                     console.log(`%c ${logMsg}`, 'background: #222; color: #bada55; font-size: 10px; font-weight: bold;');
                                                     return null;
                                                 })()}
-                                                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
-                                                    Source: <span className="text-white/60">{post.source || 'Unknown'}</span> | Score: <span className="text-white/60">{post.relevanceScore || 0}</span> | Tier <span className="text-white/60">{post.sourceTier || 3}</span>
+                                                
+                                                {/* Source & Tier */}
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
+                                                        {post.source || 'Unknown'}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
+                                                        T{post.sourceTier || 3}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400 font-mono">
+                                                        {post.relevanceScore || 0}
+                                                    </span>
                                                 </div>
+                                                
+                                                {/* Claim Type Badge */}
+                                                {post.claimType && (
+                                                    <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded border w-fit ${
+                                                        post.claimType === 'NEW_SEASON_CONFIRMED' ? 'bg-green-900/30 text-green-400 border-green-500/30' :
+                                                        post.claimType === 'DELAY' ? 'bg-red-900/30 text-red-400 border-red-500/30' :
+                                                        post.claimType === 'TRAILER_DROP' ? 'bg-blue-900/30 text-blue-400 border-blue-500/30' :
+                                                        post.claimType === 'NEW_KEY_VISUAL' ? 'bg-pink-900/30 text-pink-400 border-pink-500/30' :
+                                                        post.claimType === 'DATE_ANNOUNCED' ? 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30' :
+                                                        'bg-neutral-800 text-neutral-400 border-neutral-700'
+                                                    }`}>
+                                                        {post.claimType.replace(/_/g, ' ')}
+                                                    </span>
+                                                )}
+                                                
+                                                {/* Timestamp */}
                                                 <div className="text-[8px] font-mono text-neutral-600">
-                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Manual'}
+                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Manual'}
                                                 </div>
+                                                
+                                                {/* Source URL Link */}
+                                                {(post as any).verification_sources?.source_url && (
+                                                    <a 
+                                                        href={(post as any).verification_sources.source_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-[9px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider mt-1 group/link"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover/link:animate-pulse"></span>
+                                                        Verify Signal
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
@@ -1583,10 +1626,24 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide">
+                                        
+                                        {/* Content Preview for Pending */}
+                                        {filter === 'PENDING' && post.content && (
+                                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2 max-w-[400px]">
+                                                {post.content.replace(/\n/g, ' ').substring(0, 150)}{post.content.length > 150 ? '...' : ''}
+                                            </p>
+                                        )}
+                                        
+                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide mt-1.5">
                                             <span>{new Date(post.timestamp).toLocaleDateString()}</span>
                                             <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
                                             <span className="truncate max-w-[200px]">{post.slug}</span>
+                                            {post.anime_id && (
+                                                <>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
+                                                    <span className="text-neutral-600">{post.anime_id}</span>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
@@ -1666,10 +1723,37 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 {post.status === 'approved' ? 'SCHEDULED' : post.isPublished ? 'LIVE' : 'HIDDEN'}
                                             </span>
                                             {filter === 'PENDING' && (
-                                                <div className="flex flex-col gap-1 border-l border-white/10 pl-2">
-                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">
-                                                        Source: {post.source || 'Unknown'} | Score: {post.relevanceScore || 0} | Tier {post.sourceTier || 3}
-                                                    </span>
+                                                <div className="flex flex-col gap-1.5 border-l border-white/10 pl-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[8px] font-bold text-neutral-500 uppercase">
+                                                            {post.source || 'Unknown'}
+                                                        </span>
+                                                        <span className="text-[7px] px-1 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
+                                                            T{post.sourceTier || 3} | {post.relevanceScore || 0}
+                                                        </span>
+                                                        {post.claimType && (
+                                                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                                post.claimType === 'NEW_SEASON_CONFIRMED' ? 'bg-green-900/30 text-green-400' :
+                                                                post.claimType === 'DELAY' ? 'bg-red-900/30 text-red-400' :
+                                                                post.claimType === 'TRAILER_DROP' ? 'bg-blue-900/30 text-blue-400' :
+                                                                'bg-neutral-800 text-neutral-400'
+                                                            }`}>
+                                                                {post.claimType.replace(/_/g, ' ')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {(post as any).verification_sources?.source_url && (
+                                                        <a 
+                                                            href={(post as any).verification_sources.source_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[8px] font-bold text-blue-400 uppercase"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <span className="w-1 h-1 rounded-full bg-blue-400"></span>
+                                                            Verify Signal →
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1690,9 +1774,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-1 line-clamp-2">
                                         {post.title}
                                     </h3>
+                                    
+                                    {/* Content Preview for Pending Mobile */}
+                                    {filter === 'PENDING' && post.content && (
+                                        <p className="text-[9px] text-neutral-500 dark:text-neutral-400 mb-2 line-clamp-2">
+                                            {post.content.replace(/\n/g, ' ').substring(0, 100)}{post.content.length > 100 ? '...' : ''}
+                                        </p>
+                                    )}
+                                    
                                     <div className="flex items-center justify-between">
                                         <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
                                             {new Date(post.timestamp).toLocaleDateString()}
