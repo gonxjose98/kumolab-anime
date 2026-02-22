@@ -237,7 +237,10 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         status: 'published',
         verification_tier: item.verification_tier,
         verification_reason: `Factual Match: ${claimType}`,
-        verification_sources: { source_url: item.source_url }
+        verification_sources: { 
+            source_url: item.source_url,
+            source_name: item.source || 'Unknown'
+        }
     };
 }
 
@@ -366,7 +369,13 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
         isPublished: true,
-        status: 'published'
+        status: 'published',
+        verification_tier: trendingItem.verification_tier,
+        verification_reason: `Trending Signal: ${trendingItem.sources?.join(', ')}`,
+        verification_sources: {
+            source_url: trendingItem.source_url,
+            source_name: trendingItem.source || 'Unknown'
+        }
     };
 }
 
