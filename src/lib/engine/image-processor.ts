@@ -24,11 +24,12 @@ const HANDLE_TEXT = '@KumoLabAnime';
 const WIDTH = 1080;
 const HEIGHT = 1350;
 const LAYOUT_ZONE_PERCENT = 0.35; // 35% of image height
-const SAFE_MARGIN = 15; // Pixels from edges - TIGHT margins for content-focused look
+const SAFE_MARGIN = 30; // Pixels from edges - MUST MATCH UI (30px = 60px total margins)
 const BASE_FONT_SIZE = 120;
 const MIN_FONT_SIZE = 32; // Increased minimum for better readability
-const MAX_FONT_SIZE = 180; // Increased maximum for large text
-const LINE_HEIGHT_FACTOR = 0.90; // Tighter line height for dense look
+const MAX_FONT_SIZE = 160; // Cap to prevent overflow
+const LINE_HEIGHT_FACTOR = 0.88; // Tighter line height for dense look
+const MAX_LINE_WIDTH_PERCENT = 0.95; // 95% of available width max (5% safety buffer)
 
 export interface LayoutMetadata {
     fontSize: number;
@@ -71,6 +72,7 @@ export interface ImageProcessingResult {
 /**
  * Wraps text into lines using natural flow, maximizing horizontal fill
  * Targets 2-3 lines total with full width utilization
+ * STRICT: Enforces maxWidth with safety buffer to prevent overflow
  */
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
@@ -79,6 +81,9 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
 
     const lines: string[] = [];
     let currentLine = words[0];
+    
+    // Strict max width with safety buffer
+    const strictMaxWidth = maxWidth * MAX_LINE_WIDTH_PERCENT;
 
     for (let i = 1; i < words.length; i++) {
         const word = words[i];
@@ -90,11 +95,14 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
             width = 0;
         }
 
-        // Hard fallback if measureText returns 0 or fails
-        if (width === 0) width = (currentLine.length + word.length + 1) * (currentFS * 0.5);
+        // Hard fallback if measureText returns 0 or fails (estimation)
+        if (width === 0) {
+            // Conservative estimate: avg char width ~0.55x font size for bold uppercase
+            width = (currentLine.length + word.length + 1) * (currentFS * 0.55);
+        }
 
-        // ONLY break line if adding word would exceed width
-        if (width < maxWidth * 0.98) { // Allow 98% width utilization (tight!)
+        // STRICT: Break line if adding word would exceed max width
+        if (width <= strictMaxWidth) {
             currentLine += " " + word;
         } else {
             lines.push(currentLine);
@@ -103,10 +111,8 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
     }
     lines.push(currentLine);
     
-    // FORCE COMPACTION: If we have more than 3 lines, recalculate with larger font
-    // This encourages fewer, fuller lines
-    if (lines.length > 3 && maxLines > 0) {
-        // Return as-is but let caller know to try larger font
+    // FORCE COMPACTION: If we have more than maxLines, truncate
+    if (lines.length > maxLines && maxLines > 0) {
         return lines.slice(0, maxLines);
     }
     
@@ -114,8 +120,20 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
 }
 
 /**
+ * Measures the actual width of a line of text
+ */
+function measureLineWidth(ctx: any, line: string): number {
+    try {
+        return ctx.measureText(line).width;
+    } catch {
+        return 0;
+    }
+}
+
+/**
  * Calculates optimal font size for 2-3 lines that FILL horizontal width
  * Target: Editorial look with maximum width utilization
+ * STRICT: Ensures text NEVER exceeds available width or zone height
  */
 function calculateOptimalFontSize(
     ctx: any,
@@ -132,12 +150,11 @@ function calculateOptimalFontSize(
     const wordCount = words.length;
     
     // TARGET: 2-3 lines maximum with full horizontal width
-    // Calculate font size to achieve this
     const targetLines = Math.min(3, Math.max(2, Math.ceil(wordCount / 5))); // ~5 words per line
     
-    // Start with a font size that should give us 2-3 lines
+    // Start with a conservative font size
     let fontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, 
-        (zoneHeight * 0.9) / (targetLines * LINE_HEIGHT_FACTOR)
+        (zoneHeight * 0.85) / (targetLines * LINE_HEIGHT_FACTOR)
     ));
     fontSize = Math.round(fontSize * requestedScale);
     
@@ -151,10 +168,17 @@ function calculateOptimalFontSize(
     let totalHeight = allLines.length * lineHeight;
     
     if (!disableAutoScaling && allLines.length > 0) {
-        // PHASE 1: If we have MORE than 3 lines, grow font to force compaction
+        // Helper to check if any line overflows the available width
+        const hasOverflow = (lines: string[], fs: number): boolean => {
+            ctx.font = `900 ${fs}px "Outfit"`;
+            const strictWidth = availableWidth * MAX_LINE_WIDTH_PERCENT;
+            return lines.some(line => measureLineWidth(ctx, line) > strictWidth);
+        };
+        
+        // PHASE 1: Shrink if more than 3 lines
         let iterations = 0;
-        while (allLines.length > 3 && fontSize < MAX_FONT_SIZE && iterations < 30) {
-            fontSize += 4; // Aggressive growth
+        while (allLines.length > 3 && fontSize > MIN_FONT_SIZE && iterations < 50) {
+            fontSize = Math.max(MIN_FONT_SIZE, fontSize - 3);
             lineHeight = fontSize * LINE_HEIGHT_FACTOR;
             ctx.font = `900 ${fontSize}px "Outfit"`;
             titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, fontSize) : [];
@@ -164,20 +188,22 @@ function calculateOptimalFontSize(
             iterations++;
         }
         
-        // PHASE 2: If overflowing zone height, shrink
-        while (totalHeight > zoneHeight * 0.95 && fontSize > MIN_FONT_SIZE) {
-            fontSize = Math.max(MIN_FONT_SIZE, fontSize - 2);
+        // PHASE 2: Shrink if overflowing zone height OR any line overflows width
+        iterations = 0;
+        while ((totalHeight > zoneHeight * 0.9 || hasOverflow(allLines, fontSize)) && fontSize > MIN_FONT_SIZE && iterations < 50) {
+            fontSize = Math.max(MIN_FONT_SIZE, fontSize - 3);
             lineHeight = fontSize * LINE_HEIGHT_FACTOR;
             ctx.font = `900 ${fontSize}px "Outfit"`;
             titleLines = title.length > 0 ? wrapText(ctx, title, availableWidth, 3, fontSize) : [];
             headlineLines = headline.length > 0 ? wrapText(ctx, headline, availableWidth, 3, fontSize) : [];
             allLines = [...titleLines, ...headlineLines];
             totalHeight = allLines.length * lineHeight;
+            iterations++;
         }
         
-        // PHASE 3: Grow to fill available space (up to max)
+        // PHASE 3: Grow to fill available space (only if no overflow)
         iterations = 0;
-        while (totalHeight < zoneHeight * 0.9 && allLines.length <= 3 && fontSize < MAX_FONT_SIZE && iterations < 30) {
+        while (totalHeight < zoneHeight * 0.85 && allLines.length <= 3 && fontSize < MAX_FONT_SIZE && iterations < 50) {
             const testFontSize = fontSize + 2;
             const testLineHeight = testFontSize * LINE_HEIGHT_FACTOR;
             ctx.font = `900 ${testFontSize}px "Outfit"`;
@@ -186,7 +212,12 @@ function calculateOptimalFontSize(
             const testAllLines = [...testTitleLines, ...testHeadlineLines];
             const testTotalHeight = testAllLines.length * testLineHeight;
             
-            if (testTotalHeight <= zoneHeight * 0.95 && testAllLines.length <= 3) {
+            // Only accept if it fits height, line count, AND has no width overflow
+            const fitsHeight = testTotalHeight <= zoneHeight * 0.9;
+            const fitsLines = testAllLines.length <= 3;
+            const fitsWidth = !hasOverflow(testAllLines, testFontSize);
+            
+            if (fitsHeight && fitsLines && fitsWidth) {
                 fontSize = testFontSize;
                 lineHeight = testLineHeight;
                 titleLines = testTitleLines;
@@ -199,7 +230,7 @@ function calculateOptimalFontSize(
             }
         }
         
-        console.log(`[Image Engine] Result: ${fontSize}px, ${allLines.length} lines, ${words.length} words, ${(totalHeight/zoneHeight*100).toFixed(1)}% fill`);
+        console.log(`[Image Engine] Final: ${fontSize}px, ${allLines.length} lines, ${words.length} words, ${(totalHeight/zoneHeight*100).toFixed(1)}% zone fill`);
     }
     
     return { fontSize, lineHeight, titleLines, headlineLines, allLines, totalHeight };
@@ -461,6 +492,9 @@ export async function generateIntelImage({
             const startY = constrainedCenterY - (totalHeight / 2);
             const startX = WIDTH / 2; // Always center horizontally
             
+            // STRICT: Calculate maximum allowed line width
+            const maxAllowedLineWidth = WIDTH - (SAFE_MARGIN * 2);
+            
             // Store layout metadata for client
             (ctx as any)._layoutMetadata = {
                 fontSize: fontSize,
@@ -498,19 +532,34 @@ export async function generateIntelImage({
                     return { wordW: m.width, spaceW };
                 });
 
-                let currentLineX = startX - (lineTotalWidth / 2);
+                // STRICT: If line exceeds max width, scale it down
+                let scaleFactor = 1;
+                if (lineTotalWidth > maxAllowedLineWidth) {
+                    scaleFactor = maxAllowedLineWidth / lineTotalWidth;
+                    console.log(`[Image Engine] Line overflow detected, scaling by ${scaleFactor.toFixed(3)}`);
+                }
+
+                let currentLineX = startX - (lineTotalWidth * scaleFactor / 2);
 
                 // Draw each word
+                ctx.save();
+                if (scaleFactor < 1) {
+                    ctx.scale(scaleFactor, 1); // Scale horizontally to fit
+                }
+                
                 words.forEach((word, wordIdx) => {
                     const isPurple = purpleWordIndices?.includes(wordCursor + wordIdx);
-                    ctx.save();
                     ctx.fillStyle = isPurple ? KUMOLAB_PURPLE : '#FFFFFF';
-                    ctx.fillText(word, currentLineX + (metrics[wordIdx].wordW / 2), currentY);
-                    ctx.restore();
-                    currentLineX += metrics[wordIdx].wordW + metrics[wordIdx].spaceW;
+                    // Adjust X position for scaling
+                    const adjustedX = scaleFactor < 1 
+                        ? (currentLineX / scaleFactor) + (metrics[wordIdx].wordW / 2)
+                        : currentLineX + (metrics[wordIdx].wordW / 2);
+                    ctx.fillText(word, adjustedX, currentY);
+                    currentLineX += (metrics[wordIdx].wordW + metrics[wordIdx].spaceW);
                 });
-
-                ctx.restore();
+                
+                ctx.restore(); // Restore scale
+                ctx.restore(); // Restore shadow settings
                 wordCursor += words.length;
                 currentY += lineHeight;
             }
