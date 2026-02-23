@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const slug = searchParams.get('slug');
 
     if (id) {
         const { data, error } = await supabaseAdmin
@@ -14,6 +15,18 @@ export async function GET(req: NextRequest) {
             .single();
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(data);
+    }
+
+    if (slug) {
+        const { data, error } = await supabaseAdmin
+            .from('posts')
+            .select('*')
+            .eq('slug', slug)
+            .eq('is_published', true)
+            .single();
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 404 });
         return NextResponse.json(data);
     }
 

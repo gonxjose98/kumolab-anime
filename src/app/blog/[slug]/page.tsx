@@ -1,168 +1,115 @@
-import { getPostBySlug } from '@/lib/blog';
-import { notFound } from 'next/navigation';
-import { Metadata } from 'next';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { BlogPost } from '@/types';
 import styles from './post.module.css';
 
-interface BlogPostPageProps {
-    params: Promise<{ slug: string }>;
-}
+export default function BlogPostPage() {
+    const params = useParams();
+    const slug = params?.slug as string;
+    const [post, setPost] = useState<BlogPost | null>(null);
+    const [loading, setLoading] = useState(true);
 
-// Force dynamic rendering - no static generation at build time
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-// Dynamic SEO metadata generation
-export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
-    try {
-        const { slug } = await params;
-        const post = await getPostBySlug(slug);
-
-        if (!post) {
-            return {
-                title: 'Post Not Found | KumoLab',
-                description: 'The requested post could not be found.'
-            };
-        }
-
-        const title = post.seoTitle || `${post.title} | KumoLab`;
-        const description = post.metaDescription || `Latest anime news: ${post.title}. Verified and accurate updates from KumoLab.`;
-        const url = `https://kumolab-anime.com/blog/${post.slug}`;
-        const image = post.image || 'https://kumolab-anime.com/og-image.png';
-
-        return {
-            title,
-            description,
-            openGraph: {
-                title,
-                description,
-                url,
-                siteName: 'KumoLab',
-                images: [
-                    {
-                        url: image,
-                        width: 1080,
-                        height: 1350,
-                        alt: post.title
-                    }
-                ],
-                locale: 'en_US',
-                type: 'article',
-                publishedTime: post.timestamp,
-                modifiedTime: post.timestamp,
-                authors: ['KumoLab']
-            },
-            twitter: {
-                card: 'summary_large_image',
-                title,
-                description,
-                images: [image],
-                creator: '@KumoLabAnime'
-            },
-            alternates: {
-                canonical: url
-            }
-        };
-    } catch (error) {
-        console.error('[generateMetadata] Error:', error);
-        return {
-            title: 'KumoLab | Anime Intelligence',
-            description: 'Daily anime updates, verified news, and industry intel.'
-        };
-    }
-}
-
-export default async function BlogPostPage({ params }: BlogPostPageProps) {
-    try {
-        const { slug } = await params;
-        const post = await getPostBySlug(slug);
-
-        if (!post) {
-            notFound();
-        }
-
-        // NewsArticle structured data for SEO
-        const structuredData = {
-            '@context': 'https://schema.org',
-            '@type': 'NewsArticle',
-            headline: post.seoTitle || post.title,
-            description: post.metaDescription || post.content.substring(0, 160),
-            image: post.image,
-            datePublished: post.timestamp,
-            dateModified: post.timestamp,
-            author: {
-                '@type': 'Organization',
-                name: 'KumoLab'
-            },
-            publisher: {
-                '@type': 'Organization',
-                name: 'KumoLab',
-                logo: {
-                    '@type': 'ImageObject',
-                    url: 'https://kumolab-anime.com/logo.png'
+    useEffect(() => {
+        if (!slug) return;
+        
+        async function fetchPost() {
+            try {
+                // Use public API endpoint instead of admin client
+                const response = await fetch(`/api/posts?slug=${encodeURIComponent(slug)}`);
+                
+                if (!response.ok) {
+                    throw new Error('Post not found');
                 }
-            },
-            mainEntityOfPage: {
-                '@type': 'WebPage',
-                '@id': `https://kumolab-anime.com/blog/${post.slug}`
+                
+                const data = await response.json();
+                
+                if (!data || !data.is_published) {
+                    setPost(null);
+                } else {
+                    setPost(data);
+                    // Update page title
+                    document.title = data.seoTitle || `${data.title} | KumoLab`;
+                }
+            } catch (e) {
+                console.error('Error fetching post:', e);
+                setPost(null);
+            } finally {
+                setLoading(false);
             }
-        };
+        }
+        
+        fetchPost();
+    }, [slug]);
 
+    if (loading) {
         return (
-            <>
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-                />
-                <article className={styles.container}>
-                    {post.image && (
-                        <div className={styles.heroImage}>
-                            <img 
-                                src={post.image} 
-                                alt={`${post.title} - ${post.claimType ? post.claimType.replace(/_/g, ' ') : 'Anime News'} | KumoLab`}
-                            />
-                        </div>
-                    )}
-
-                    <div className={styles.header}>
-                        <div className={styles.meta}>
-                            <time className={styles.date}>
-                                {new Date(post.timestamp).toLocaleDateString(undefined, {
-                                    weekday: 'long',
-                                    year: 'numeric',
-                                    day: 'numeric'
-                                })}
-                            </time>
-                        </div>
-                        <h1 className={styles.title}>
-                            {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
-                        </h1>
-                    </div>
-
-                    <div className={`${styles.content} ${post.type === 'DROP' ? styles.dropContent : ''}`}>
-                        {post.type === 'DROP' ? (
-                            post.content.split('\n\n').map((block, index) => {
-                                const lines = block.split('\n');
-                                if (lines.length === 2 && index > 1) {
-                                    return (
-                                        <div key={index} className={styles.dropItem}>
-                                            <h3 className={styles.dropTitle}>{lines[0]}</h3>
-                                            <p className={styles.dropSubline}>{lines[1]}</p>
-                                        </div>
-                                    );
-                                }
-                                return <p key={index} className={styles.paragraph}>{block}</p>;
-                            })
-                        ) : (
-                            post.content.split('\n').map((paragraph, index) => (
-                                <p key={index} className={styles.paragraph}>{paragraph}</p>
-                            ))
-                        )}
-                    </div>
-                </article>
-            </>
+            <div className={styles.container}>
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                </div>
+            </div>
         );
-    } catch (error) {
-        console.error('[BlogPostPage] Error:', error);
-        notFound();
     }
+
+    if (!post) {
+        return (
+            <div className={styles.container}>
+                <div className="text-center py-20">
+                    <h1 className="text-2xl font-bold mb-4">Post Not Found</h1>
+                    <p className="text-neutral-500">The requested post could not be found.</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <article className={styles.container}>
+            {post.image && (
+                <div className={styles.heroImage}>
+                    <img 
+                        src={post.image} 
+                        alt={`${post.title} - ${post.claimType ? post.claimType.replace(/_/g, ' ') : 'Anime News'} | KumoLab`}
+                    />
+                </div>
+            )}
+
+            <div className={styles.header}>
+                <div className={styles.meta}>
+                    <time className={styles.date}>
+                        {new Date(post.timestamp).toLocaleDateString(undefined, {
+                            weekday: 'long',
+                            year: 'numeric',
+                            day: 'numeric'
+                        })}
+                    </time>
+                </div>
+                <h1 className={styles.title}>
+                    {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
+                </h1>
+            </div>
+
+            <div className={`${styles.content} ${post.type === 'DROP' ? styles.dropContent : ''}`}>
+                {post.type === 'DROP' ? (
+                    post.content.split('\n\n').map((block: string, index: number) => {
+                        const lines = block.split('\n');
+                        if (lines.length === 2 && index > 1) {
+                            return (
+                                <div key={index} className={styles.dropItem}>
+                                    <h3 className={styles.dropTitle}>{lines[0]}</h3>
+                                    <p className={styles.dropSubline}>{lines[1]}</p>
+                                </div>
+                            );
+                        }
+                        return <p key={index} className={styles.paragraph}>{block}</p>;
+                    })
+                ) : (
+                    post.content.split('\n').map((paragraph: string, index: number) => (
+                        <p key={index} className={styles.paragraph}>{paragraph}</p>
+                    ))
+                )}
+            </div>
+        </article>
+    );
 }
