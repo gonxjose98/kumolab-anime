@@ -2,6 +2,7 @@ import { getPosts } from '@/lib/blog';
 import Hero from '@/components/home/Hero';
 import StatsBar from '@/components/home/StatsBar';
 import ConfirmationAlert from '@/components/home/ConfirmationAlert';
+import TodaysDrops from '@/components/home/TodaysDrops';
 import MostRecentFeed from '@/components/home/MostRecentFeed';
 import Manifesto from '@/components/home/Manifesto';
 
@@ -24,6 +25,7 @@ export default async function Home() {
       <Hero />
       <StatsBar />
       <ConfirmationAlert posts={posts} />
+      <TodaysDrops posts={posts} />
       <MostRecentFeed posts={posts} />
       <Manifesto />
     </>
