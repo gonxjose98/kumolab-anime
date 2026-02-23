@@ -1,12 +1,12 @@
 import { getPosts } from '@/lib/blog';
 
+// Revalidate every hour
+export const revalidate = 3600;
+
 export default async function sitemap() {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolab-anime.vercel.app';
     
-    // Get all posts
-    const posts = await getPosts();
-    
-    // Static pages
+    // Static pages (always included)
     const staticPages = [
         {
             url: baseUrl,
@@ -28,13 +28,22 @@ export default async function sitemap() {
         }
     ];
     
-    // Dynamic blog post pages with lastmod
-    const postPages = posts.map((post) => ({
-        url: `${baseUrl}/blog/${post.slug}`,
-        lastModified: new Date(post.timestamp).toISOString(),
-        changeFrequency: 'weekly',
-        priority: post.type === 'INTEL' ? 0.8 : 0.7
-    }));
-    
-    return [...staticPages, ...postPages];
+    // Try to get posts, but don't fail build if Supabase is unavailable
+    try {
+        const posts = await getPosts();
+        
+        // Dynamic blog post pages with lastmod
+        const postPages = posts.map((post) => ({
+            url: `${baseUrl}/blog/${post.slug}`,
+            lastModified: new Date(post.timestamp).toISOString(),
+            changeFrequency: 'weekly',
+            priority: post.type === 'INTEL' ? 0.8 : 0.7
+        }));
+        
+        return [...staticPages, ...postPages];
+    } catch (error) {
+        console.error('[Sitemap] Failed to fetch posts:', error);
+        // Return only static pages if posts fetch fails
+        return staticPages;
+    }
 }

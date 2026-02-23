@@ -8,12 +8,19 @@ interface BlogPostPageProps {
 }
 
 export async function generateStaticParams() {
-    const posts = await getPosts();
-    return posts.map((post) => ({
-        slug: post.slug,
-    }));
+    try {
+        const posts = await getPosts();
+        return posts.map((post) => ({
+            slug: post.slug,
+        }));
+    } catch (error) {
+        console.error('[generateStaticParams] Failed to fetch posts:', error);
+        // Return empty array - pages will be generated on-demand
+        return [];
+    }
 }
 
+export const dynamicParams = true; // Allow dynamic generation of pages not in static params
 export const revalidate = 60;
 
 // Dynamic SEO metadata generation
