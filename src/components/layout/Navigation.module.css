@@ -42,7 +42,7 @@
 }
 
 :global(.dark) .logoImg {
-    filter: invert(1) brightness(100);
+    filter: invert(1) brightness(1);
     /* Invert black logo for dark theme */
 }
 

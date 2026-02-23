@@ -2,13 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* MOBILE-FIRST ROOT VARIABLES */
 :root {
   /* Dark Mode (Default) */
   --bg-color: #0b0f19;
   --surface-color: #111827;
   --surface-hover: #1f2937;
   --accent-primary: #7c3aed;
-  /* DeepAgent Purple */
   --accent-glow: rgba(124, 58, 237, 0.3);
   --text-primary: #ffffff;
   --text-secondary: #cbd5e1;
@@ -16,8 +16,54 @@
   --border-subtle: rgba(255, 255, 255, 0.08);
   --font-main: var(--font-inter), sans-serif;
   --font-display: var(--font-jakarta), sans-serif;
-  --container-width: 1200px;
-  --header-height: 80px;
+  
+  /* MOBILE-FIRST SIZING */
+  --container-width: 100%;
+  --header-height: 56px;
+  --section-padding: 1rem;
+  --touch-target: 44px;
+  --button-height: 48px;
+  
+  /* MOBILE-FIRST FONTS */
+  --font-hero: 2.5rem;
+  --font-h1: 1.75rem;
+  --font-h2: 1.5rem;
+  --font-h3: 1.25rem;
+  --font-body: 1rem;
+  --font-small: 0.875rem;
+  
+  /* SPACING */
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+}
+
+/* TABLET */
+@media (min-width: 640px) {
+  :root {
+    --container-width: 100%;
+    --header-height: 64px;
+    --section-padding: 1.5rem;
+    --font-hero: 4rem;
+    --font-h1: 2.25rem;
+    --font-h2: 1.875rem;
+    --font-h3: 1.5rem;
+  }
+}
+
+/* DESKTOP */
+@media (min-width: 1024px) {
+  :root {
+    --container-width: 1200px;
+    --header-height: 72px;
+    --section-padding: 2rem;
+    --font-hero: 5rem;
+    --font-h1: 3rem;
+    --font-h2: 2.25rem;
+    --font-h3: 1.75rem;
+  }
 }
 
 .light {
@@ -68,7 +114,46 @@ img {
 .container {
   max-width: var(--container-width);
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 var(--space-md);
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 2rem;
+  }
+}
+
+/* MOBILE-FIRST UTILITIES */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.touch-target {
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-center {
+  scroll-snap-align: center;
 }
 
 .flex-center {

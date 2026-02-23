@@ -1,0 +1,48 @@
+/** MOBILE-FIRST CSS VARIABLES **/
+:root {
+  /* Mobile-first sizing */
+  --header-height: 56px;
+  --container-width: 100%;
+  --section-padding: 1rem;
+  
+  /* Mobile touch targets */
+  --touch-target: 44px;
+  --button-height: 48px;
+  
+  /* Mobile font sizes */
+  --font-hero: 2.5rem;
+  --font-h1: 1.75rem;
+  --font-h2: 1.5rem;
+  --font-body: 1rem;
+  --font-small: 0.875rem;
+  
+  /* Mobile spacing */
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+}
+
+/* Tablet */
+@media (min-width: 640px) {
+  :root {
+    --header-height: 64px;
+    --section-padding: 1.5rem;
+    --font-hero: 4rem;
+    --font-h1: 2.25rem;
+    --font-h2: 1.875rem;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  :root {
+    --header-height: 72px;
+    --container-width: 1200px;
+    --section-padding: 2rem;
+    --font-hero: 5rem;
+    --font-h1: 3rem;
+    --font-h2: 2.25rem;
+  }
+}

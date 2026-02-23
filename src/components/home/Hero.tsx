@@ -1,32 +1,44 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import styles from './Hero.module.css';
 
 const Hero = () => {
     const [offset, setOffset] = useState(0);
-    const [hasAnimated, setHasAnimated] = useState(true); // Default to stable (skip anim)
+    const [isAnimating, setIsAnimating] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
-        // Initial Page Load Check: Only play once per session
+        // Check mobile
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+
+        // Initial Page Load Check
         const played = sessionStorage.getItem('hero_animated');
         if (!played) {
-            setHasAnimated(false); // Trigger the one-time entrance sequence
+            setIsAnimating(true);
             sessionStorage.setItem('hero_animated', 'true');
+            // End animation after sequence completes
+            setTimeout(() => setIsAnimating(false), 2000);
+        } else {
+            setIsAnimating(false);
         }
 
         const handleScroll = () => {
             setOffset(window.scrollY);
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', checkMobile);
+        };
     }, []);
 
-
-
-    // Very subtle parallax: 1.5% of scroll
-    const parallaxTranslate = offset * 0.015;
+    // Subtle parallax - reduced on mobile
+    const parallaxTranslate = offset * (isMobile ? 0.008 : 0.015);
 
     return (
         <section className={styles.hero}>
@@ -36,24 +48,34 @@ const Hero = () => {
             />
             <div className={styles.heroOverlay}></div>
 
-            <div className={`${styles.heroContent} ${hasAnimated ? styles.hasAnimated : ''}`}>
-                <h1 className={styles.headline}>
-
+            <div className={`${styles.heroContent} ${isAnimating ? styles.animating : ''}`}>
+                {/* Animated Logo */}
+                <div className={styles.logoContainer}>
                     <span className={styles.accentText}>KUMOLAB</span>
-                </h1>
+                    <div className={styles.underline}></div>
+                </div>
+                
+                {/* Tagline with staggered animation */}
                 <p className={styles.subheadline}>
-                    Anime Updates. Episodes. News. Trends. What’s next? Without the noise.
+                    <span className={styles.line1}>Anime Updates. Episodes. News.</span>
+                    <span className={styles.line2}>What&apos;s next? Without the noise.</span>
                 </p>
 
+                {/* CTA Button */}
                 <div className={styles.buttons}>
                     <Link href="/latest-daily-drop" className={styles.primaryBtn}>
-                        View Today&apos;s Drops <span className={styles.arrow}><ArrowRight size={20} /></span>
+                        <span>View Today&apos;s Drops</span>
+                        <ArrowRight size={isMobile ? 18 : 20} className={styles.arrow} />
                     </Link>
                 </div>
             </div>
 
+            {/* Scroll Indicator */}
             <div className={styles.scrollIndicator}>
-                <div className={styles.mouse}></div>
+                <div className={styles.scrollContent}>
+                    <span className={styles.scrollText}>Scroll</span>
+                    <ChevronDown size={20} className={styles.scrollIcon} />
+                </div>
             </div>
         </section>
     );
