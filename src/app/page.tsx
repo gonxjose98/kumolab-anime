@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
-  let posts = [];
+  let posts: any[] = [];
   
   try {
     posts = await getPosts();

@@ -129,7 +129,10 @@ async function getAnalytics(supabase: any) {
         console.error('[Admin Dashboard] Failed to fetch analytics:', error);
         return {
             website: { views: 0, chart: [] },
-            social: { views: 0, likes: 0, comments: 0, breakdown: {} }
+            social: {
+                views: 0, likes: 0, comments: 0,
+                breakdown: { twitter: { views: 0, likes: 0, comments: 0 }, instagram: { views: 0, likes: 0, comments: 0 }, facebook: { views: 0, likes: 0, comments: 0 } }
+            }
         };
     }
 }

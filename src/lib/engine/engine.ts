@@ -14,6 +14,7 @@ import path from 'path';
 import { supabaseAdmin } from '../supabase/admin';
 import { publishToSocials } from '../social/publisher';
 import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
+import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -136,12 +137,29 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
             // VALIDATE
             const existingPostsForDup = await getPosts(true);
-            // [TEMP] Using force: true to bypass deduplication and populate queue for testing
-            if (await validatePost(post, [...existingPostsForDup, ...newPosts], true)) {
+            
+            // ENHANCED DUPLICATE DETECTION - Pre-filter before pending approval
+            const duplicateCheck = await detectDuplicate(post, { checkWindow: 30 });
+            
+            if (duplicateCheck.action === 'BLOCK') {
+                console.log(`[Engine] BLOCKED DUPLICATE: "${post.title}" - ${duplicateCheck.reason}`);
+                abortLogs.push({
+                    anime: post.title,
+                    event_type: post.claimType,
+                    source: item.source || 'KumoLab SmartSync',
+                    reason: `DUPLICATE_BLOCKED: ${duplicateCheck.reason}`,
+                    duplicate_of: duplicateCheck.duplicateOf
+                });
+                continue;
+            }
+            
+            // Validate post (image check, etc)
+            if (await validatePost(post, [...existingPostsForDup, ...newPosts], false)) {
                 // NEW: Manual Approval Logic
                 if (USE_SUPABASE) {
-                    const duplicateResult = await checkForDuplicate(post.title, supabaseAdmin);
-                    if (duplicateResult === 'DECLINED') {
+                    // Skip if declined before
+                    const declinedCheck = await checkForDuplicate(post.title, supabaseAdmin);
+                    if (declinedCheck === 'DECLINED') {
                         console.log(`[Engine] Skipping "${post.title}" - Already in declined_posts.`);
                         continue;
                     }
@@ -153,10 +171,19 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
                     post.isPublished = false;
                     (post as any).source_tier = sourceTier;
                     (post as any).relevance_score = relevanceScore;
-                    (post as any).is_duplicate = duplicateResult !== null;
-                    (post as any).duplicate_of = typeof duplicateResult === 'number' ? duplicateResult : null;
+                    (post as any).is_duplicate = duplicateCheck.isDuplicate;
+                    (post as any).duplicate_of = duplicateCheck.duplicateOf;
+                    (post as any).duplicate_confidence = duplicateCheck.confidence;
+                    (post as any).duplicate_reason = duplicateCheck.reason;
                     (post as any).scraped_at = new Date().toISOString();
                     (post as any).source = item.source || 'Unknown';
+                    
+                    // Flag for review if similar but not exact duplicate
+                    if (duplicateCheck.action === 'REVIEW') {
+                        (post as any).requires_review = true;
+                        (post as any).review_reason = duplicateCheck.reason;
+                        console.log(`[Engine] FLAGGED FOR REVIEW: "${post.title}" - ${duplicateCheck.reason}`);
+                    }
                 }
 
                 newPosts.push(post);
@@ -171,7 +198,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
                     anime: post.title,
                     event_type: post.claimType,
                     source: item.source || 'KumoLab SmartSync',
-                    reason: 'VALIDATION_REJECT (Duplicate or Image Check)',
+                    reason: 'VALIDATION_REJECT (Image Check)',
                     fingerprint: post.event_fingerprint
                 });
             }

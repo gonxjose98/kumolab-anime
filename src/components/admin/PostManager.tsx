@@ -1469,6 +1469,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     </div>
                                                 )}
                                                 
+                                                {/* Duplicate Warning */}
+                                                {((post as any).is_duplicate || (post as any).duplicate_of) && (
+                                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-900/30 border border-red-500/30">
+                                                        <span className="text-[8px] text-red-400 font-black uppercase">⚠ DUPLICATE</span>
+                                                        {(post as any).duplicate_confidence && (
+                                                            <span className="text-[7px] text-red-400/70 font-mono">
+                                                                {Math.round((post as any).duplicate_confidence)}%
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {(post as any).requires_review && (
+                                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-900/30 border border-amber-500/30">
+                                                        <span className="text-[8px] text-amber-400 font-black uppercase">⚡ REVIEW</span>
+                                                        <span className="text-[7px] text-amber-400/70 truncate max-w-[100px]">
+                                                            {(post as any).review_reason || 'Similar post exists'}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                
                                                 {/* Classification & Priority */}
                                                 {(post as any).verification_classification && (
                                                     <div className="flex items-center gap-2 flex-wrap">

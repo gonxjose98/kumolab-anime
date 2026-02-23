@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function BlogPage() {
-    let posts = [];
+    let posts: any[] = [];
     
     try {
         posts = await getPosts();

@@ -42,6 +42,7 @@ export function AnalyticsTracker() {
 
         // FIRE AND FORGET
         async function track() {
+            if (!supabase) return;
             try {
                 await supabase.from('page_views').insert({
                     path: pathname,
