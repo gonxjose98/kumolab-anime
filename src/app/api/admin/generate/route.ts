@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
                 signalItem.premiereDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
                 signalItem.claimType = 'confirmed';
             }
-            post = await generateIntelPost([signalItem], new Date(), true);
+            post = await generateIntelPost([signalItem], new Date());
         } else {
             post = await generateTrendingPost(signalItem, new Date());
         }

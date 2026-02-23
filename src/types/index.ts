@@ -37,6 +37,7 @@ export interface BlogPost {
         gradientPosition?: 'top' | 'bottom';
         imageScale?: number;
         imagePosition?: { x: number; y: number };
+        verticalOffset?: number;
     };
     is_announcement_tied?: boolean;
     headline?: string;

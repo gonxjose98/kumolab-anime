@@ -233,15 +233,6 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
     // 6. CONTENT CLEANUP
     const finalContent = cleanBody(item.content, finalTitle, claimType);
 
-    // 7. CALCULATE VERIFICATION STATUS
-    const verification = calculateVerification(
-        claimType,
-        item.verification_tier || 3,
-        item.source || 'Unknown',
-        [], // cross-references would be added here in future
-        false
-    );
-
     return {
         id: randomUUID(),
         title: finalTitle,

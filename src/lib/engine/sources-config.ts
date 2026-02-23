@@ -291,13 +291,24 @@ export const CONTENT_CLASSIFICATION = {
 export function classifyContent(claimType: string, sourceTier: number, hasStreamerLink: boolean = false) {
     // Check each classification rule
     for (const [key, rule] of Object.entries(CONTENT_CLASSIFICATION)) {
-        if (rule.claimTypes?.includes(claimType as any)) {
-            if (sourceTier >= rule.minTier && sourceTier <= (rule.maxTier || 6)) {
-                return { classification: key, ...rule };
+        // Check claim type rules
+        if ('claimTypes' in rule && rule.claimTypes?.includes(claimType as any)) {
+            if (sourceTier >= rule.minTier) {
+                const maxTier = 'maxTier' in rule ? rule.maxTier : 6;
+                if (sourceTier <= (maxTier || 6)) {
+                    return { classification: key, ...rule };
+                }
             }
         }
-        if (rule.type === 'DROP' && claimType === 'DROP') {
-            if (hasStreamerLink || !rule.requiresStreamerLink) {
+        // Check special rules (BREAKING with keywords)
+        if ('requiredKeywords' in rule && rule.requiredKeywords) {
+            // BREAKING classification handled separately
+            continue;
+        }
+        // Check Daily Drops
+        if ('type' in rule && rule.type === 'DROP' && claimType === 'DROP') {
+            const requiresLink = 'requiresStreamerLink' in rule ? rule.requiresStreamerLink : false;
+            if (hasStreamerLink || !requiresLink) {
                 return { classification: key, ...rule };
             }
         }

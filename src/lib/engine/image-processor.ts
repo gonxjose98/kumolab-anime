@@ -265,6 +265,12 @@ export async function generateIntelImage({
     classification,
     bypassSafety = false,
     verticalOffset = 0, // NEW: Manual vertical adjustment
+    // Visual Authority System
+    verificationBadge,
+    verificationScore,
+    sourceName,
+    claimType,
+    showAuthorityBar = true,
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -572,7 +578,7 @@ export async function generateIntelImage({
         }
 
         // --- VISUAL AUTHORITY BAR (Source Credibility) ---
-        if (options.showAuthorityBar !== false && (options.verificationBadge || options.sourceName)) {
+        if (showAuthorityBar !== false && (verificationBadge || sourceName)) {
             const barHeight = 50;
             const barY = HEIGHT - barHeight - 10;
             const barPadding = 20;
@@ -583,8 +589,8 @@ export async function generateIntelImage({
             ctx.fillRect(SAFE_MARGIN, barY, WIDTH - (SAFE_MARGIN * 2), barHeight);
             
             // Left side: Verification badge
-            if (options.verificationBadge) {
-                const badgeParts = options.verificationBadge.split(' ');
+            if (verificationBadge) {
+                const badgeParts = verificationBadge.split(' ');
                 const emoji = badgeParts[0];
                 const text = badgeParts.slice(1).join(' ');
                 
@@ -601,14 +607,14 @@ export async function generateIntelImage({
                 ctx.fillText(text, SAFE_MARGIN + barPadding + 25, barY + 32);
                 
                 // Score pill
-                if (options.verificationScore) {
-                    const scoreText = `${options.verificationScore}`;
+                if (verificationScore) {
+                    const scoreText = `${verificationScore}`;
                     ctx.font = 'bold 12px monospace';
                     const scoreWidth = ctx.measureText(scoreText).width;
                     
                     // Pill background
-                    ctx.fillStyle = options.verificationScore >= 80 ? '#22c55e' : 
-                                   options.verificationScore >= 60 ? '#eab308' : '#9ca3af';
+                    ctx.fillStyle = verificationScore >= 80 ? '#22c55e' : 
+                                   verificationScore >= 60 ? '#eab308' : '#9ca3af';
                     ctx.beginPath();
                     ctx.roundRect(SAFE_MARGIN + barPadding + 25 + ctx.measureText(text).width + 10, barY + 18, scoreWidth + 12, 20, 10);
                     ctx.fill();
@@ -625,9 +631,9 @@ export async function generateIntelImage({
             ctx.textAlign = 'right';
             
             let rightText = '';
-            if (options.sourceName) rightText = options.sourceName;
-            if (options.claimType) {
-                rightText = rightText ? `${rightText} • ${options.claimType.replace(/_/g, ' ')}` : options.claimType.replace(/_/g, ' ');
+            if (sourceName) rightText = sourceName;
+            if (claimType) {
+                rightText = rightText ? `${rightText} • ${claimType.replace(/_/g, ' ')}` : claimType.replace(/_/g, ' ');
             }
             
             if (rightText) {
@@ -640,7 +646,7 @@ export async function generateIntelImage({
         // --- WATERMARK (Strictly dependent on text) ---
         if (finalApplyWatermark && finalApplyText) {
             // Position watermark above authority bar if present
-            const barOffset = (options.showAuthorityBar !== false && (options.verificationBadge || options.sourceName)) ? 70 : 0;
+            const barOffset = (showAuthorityBar !== false && (verificationBadge || sourceName)) ? 70 : 0;
             ctx.font = 'bold 24px Arial, sans-serif';
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.textAlign = 'center';
