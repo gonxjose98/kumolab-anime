@@ -12,6 +12,7 @@ function formatDate(dateString: string) {
 }
 
 async function getAnalytics(supabase: any) {
+    try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -124,15 +125,27 @@ async function getAnalytics(supabase: any) {
         },
         social: socialStats
     };
+    } catch (error) {
+        console.error('[Admin Dashboard] Failed to fetch analytics:', error);
+        return {
+            website: { views: 0, chart: [] },
+            social: { views: 0, likes: 0, comments: 0, breakdown: {} }
+        };
+    }
 }
 
 async function getPosts(supabase: any) {
-    const { data: posts } = await supabase
-        .from('posts')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-    return posts || [];
+    try {
+        const { data: posts } = await supabase
+            .from('posts')
+            .select('*')
+            .order('timestamp', { ascending: false })
+            .limit(100);
+        return posts || [];
+    } catch (error) {
+        console.error('[Admin Dashboard] Failed to fetch posts:', error);
+        return [];
+    }
 }
 
 export default async function DashboardPage() {

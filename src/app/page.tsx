@@ -8,7 +8,15 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
-  const posts = await getPosts();
+  let posts = [];
+  
+  try {
+    posts = await getPosts();
+  } catch (error) {
+    console.error('[Home] Failed to fetch posts:', error);
+    // Return empty array - components will handle empty state
+    posts = [];
+  }
 
   return (
     <>
@@ -19,5 +27,3 @@ export default async function Home() {
     </>
   );
 }
-
-

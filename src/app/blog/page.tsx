@@ -5,7 +5,15 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function BlogPage() {
-    const posts = await getPosts();
+    let posts = [];
+    
+    try {
+        posts = await getPosts();
+    } catch (error) {
+        console.error('[BlogPage] Failed to fetch posts:', error);
+        // Return empty array - component will handle empty state
+        posts = [];
+    }
 
     return (
         <div className="container" style={{ paddingTop: 'calc(var(--header-height) + 2rem)', paddingBottom: '4rem' }}>
