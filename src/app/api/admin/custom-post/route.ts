@@ -55,7 +55,26 @@ export async function POST(req: NextRequest) {
             const slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
 
             if (skipProcessing) {
-                finalImageUrl = publicUrl;
+                // Move temp file to permanent location with proper filename
+                const permanentFileName = `${slug}-${Date.now()}.png`;
+                const { error: moveError } = await supabaseAdmin
+                    .storage
+                    .from('blog-images')
+                    .move(tempFileName, permanentFileName);
+                
+                if (moveError) {
+                    console.error('Move error:', moveError);
+                    // Fall back to temp URL if move fails
+                    finalImageUrl = publicUrl;
+                } else {
+                    // Get URL for permanent file
+                    const { data: { publicUrl: permanentUrl } } = supabaseAdmin
+                        .storage
+                        .from('blog-images')
+                        .getPublicUrl(permanentFileName);
+                    finalImageUrl = permanentUrl;
+                    tempFileName = null; // Don't delete the permanent file
+                }
             } else {
                 const result = await generateIntelImage({
                     sourceUrl: publicUrl,
