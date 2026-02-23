@@ -2,13 +2,79 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TwitterApi } from 'twitter-api-v2';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
-// Helper for X (existing logic)
+// Helper for X (Accuracy Brand Format)
 async function publishToX(post: any, client: TwitterApi, mediaId?: string) {
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
 
+    // Build verification line
+    let verificationLine = '';
+    if (post.verification_badge) {
+        const badgeParts = post.verification_badge.split(' ');
+        const emoji = badgeParts[0];
+        const tier = badgeParts.slice(1).join(' ');
+        
+        // Source attribution
+        const sourceName = post.verification_sources?.source_name || post.source || 'Industry Source';
+        verificationLine = `${emoji} ${tier} via ${sourceName}`;
+    }
+
+    // Build metadata lines based on claim type
+    const metaLines: string[] = [];
+    
+    if (post.premiereDate) {
+        const date = new Date(post.premiereDate);
+        const formattedDate = date.toLocaleDateString('en-US', { 
+            month: 'long', 
+            year: 'numeric' 
+        });
+        metaLines.push(`📅 Premiere: ${formattedDate}`);
+    } else if (post.season_label) {
+        metaLines.push(`📅 ${post.season_label}`);
+    }
+
+    // Always add link
+    metaLines.push(`🔗 ${postUrl}`);
+
+    // Build hashtag section - specific to post content
+    const hashtags: string[] = ['#AnimeNews'];
+    
+    // Add anime-specific hashtag if available
+    if (post.anime_id) {
+        // Convert anime_id to camelCase hashtag (e.g., "attack-on-titan" -> "#AttackOnTitan")
+        const cleanId = post.anime_id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).replace(/\s/g, '');
+        if (cleanId && cleanId.length < 20) { // Keep reasonable length
+            hashtags.unshift(`#${cleanId}`);
+        }
+    }
+    
+    // Add claim-type specific hashtag
+    if (post.claimType) {
+        const claimHashtags: Record<string, string> = {
+            'NEW_SEASON_CONFIRMED': '#NewSeason',
+            'TRAILER_DROP': '#Trailer',
+            'NEW_KEY_VISUAL': '#KeyVisual',
+            'DATE_ANNOUNCED': '#ReleaseDate',
+            'DELAY': '#AnimeDelay',
+            'TRENDING_UPDATE': '#Trending'
+        };
+        if (claimHashtags[post.claimType]) {
+            hashtags.push(claimHashtags[post.claimType]);
+        }
+    }
+
+    // Assemble tweet in Accuracy Brand format
     let tweetText = `${post.title}\n\n`;
-    tweetText += `Read more at KumoLabAnime.com\n${postUrl}\n\n#Anime #KumoLab`;
+    
+    if (verificationLine) {
+        tweetText += `${verificationLine}\n`;
+    }
+    
+    metaLines.forEach(line => {
+        tweetText += `${line}\n`;
+    });
+    
+    tweetText += `\n${hashtags.join(' ')}`;
 
     return await client.v2.tweet({
         text: tweetText,
