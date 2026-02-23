@@ -1,0 +1,45 @@
+.container {
+    position: relative;
+    min-height: 100vh;
+}
+
+.indicator {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-color);
+    border-radius: 50%;
+    color: var(--accent-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.indicatorText {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--surface-color);
+    padding: 4px 12px;
+    border-radius: 99px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.content {
+    will-change: transform;
+}
