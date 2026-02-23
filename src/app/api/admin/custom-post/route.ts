@@ -104,7 +104,6 @@ export async function POST(req: NextRequest) {
             // When editing, preserve the existing publication status
             // Don't overwrite is_published or status
             postData.status = 'published'; // Edited posts are approved/published
-            postData.updated_at = new Date().toISOString(); // Update timestamp for cache-busting
         }
         
         postData.source_tier = 1; // Admin is Tier 1
@@ -152,12 +151,16 @@ export async function POST(req: NextRequest) {
             console.warn('Revalidation failed:', e);
         }
 
+        // Add cache-busting timestamp to image URL for immediate refresh
+        const cacheBustedPost = {
+            ...data,
+            isPublished: data.is_published,
+            image: data.image ? `${data.image}?v=${Date.now()}` : data.image
+        };
+
         return NextResponse.json({
             success: true,
-            post: {
-                ...data,
-                isPublished: data.is_published
-            }
+            post: cacheBustedPost
         });
 
     } catch (error: any) {
