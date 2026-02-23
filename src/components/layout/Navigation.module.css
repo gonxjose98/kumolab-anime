@@ -50,9 +50,9 @@
 }
 
 .logoImg {
-    height: 48px;
+    height: 72px;
     width: auto;
-    max-width: 160px;
+    max-width: 240px;
     object-fit: contain;
     transition: filter 0.3s ease;
     display: block;
@@ -111,56 +111,64 @@
     border: 2px solid var(--bg-color);
 }
 
-/* Mobile Menu */
+/* Mobile Menu - Compact Luxury Style */
 .mobileMenu {
     position: fixed;
-    top: 0;
-    right: 0;
-    width: 100%;
-    max-width: 320px;
-    height: 100vh;
-    background: var(--surface-color);
+    top: calc(var(--header-height) + 8px);
+    right: 8px;
+    width: 280px;
+    max-width: calc(100vw - 16px);
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
     z-index: 1002;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.96);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    padding: calc(var(--header-height) + var(--space-lg)) var(--space-lg) var(--space-lg);
+    padding: var(--space-md);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .mobileMenu.open {
-    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
 }
 
 .menuNav {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-    flex: 1;
+    gap: 4px;
 }
 
 .menuLink {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-md);
+    justify-content: space-between;
+    padding: 14px 16px;
     text-decoration: none;
     color: var(--text-primary);
-    font-size: var(--font-h3);
-    font-weight: 700;
+    font-size: var(--font-body);
+    font-weight: 600;
     border-radius: 12px;
-    transition: background 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .menuLink:hover,
 .menuLink:active {
-    background: var(--surface-hover);
+    background: rgba(124, 58, 237, 0.1);
 }
 
 .linkNum {
-    font-size: var(--font-small);
+    font-size: 11px;
     color: var(--accent-primary);
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
 }
 
 .linkText {
@@ -170,21 +178,23 @@
 .cartLink {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-sm);
-    padding: var(--space-md);
-    background: var(--surface-hover);
+    padding: 12px;
+    background: var(--accent-primary);
     border-radius: 12px;
     text-decoration: none;
-    color: var(--text-primary);
+    color: white;
     font-weight: 600;
-    margin-top: auto;
+    font-size: var(--font-small);
+    margin-top: var(--space-sm);
 }
 
 .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
     z-index: 1001;
 }
 
@@ -196,8 +206,8 @@
     }
     
     .logoImg {
-        height: 40px;
-        max-width: 140px;
+        height: 60px;
+        max-width: 200px;
     }
     
     .actions {
@@ -208,17 +218,13 @@
         width: 40px;
         height: 40px;
     }
-    
-    .mobileMenu {
-        max-width: 100%;
-    }
 }
 
 /* TABLET AND UP */
 @media (min-width: 641px) {
     .logoImg {
-        height: 52px;
-        max-width: 180px;
+        height: 78px;
+        max-width: 260px;
     }
     
     .actions {
