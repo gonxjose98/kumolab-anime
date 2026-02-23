@@ -62,6 +62,12 @@ interface IntelImageOptions {
     classification?: 'CLEAN' | 'TEXT_HEAVY';
     bypassSafety?: boolean;
     verticalOffset?: number; // NEW: Manual vertical adjustment (pixels)
+    // Visual Authority System
+    verificationBadge?: string;
+    verificationScore?: number;
+    sourceName?: string;
+    claimType?: string;
+    showAuthorityBar?: boolean;
 }
 
 export interface ImageProcessingResult {
@@ -565,15 +571,83 @@ export async function generateIntelImage({
             }
         }
 
+        // --- VISUAL AUTHORITY BAR (Source Credibility) ---
+        if (options.showAuthorityBar !== false && (options.verificationBadge || options.sourceName)) {
+            const barHeight = 50;
+            const barY = HEIGHT - barHeight - 10;
+            const barPadding = 20;
+            
+            // Semi-transparent background bar
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.75)';
+            ctx.fillRect(SAFE_MARGIN, barY, WIDTH - (SAFE_MARGIN * 2), barHeight);
+            
+            // Left side: Verification badge
+            if (options.verificationBadge) {
+                const badgeParts = options.verificationBadge.split(' ');
+                const emoji = badgeParts[0];
+                const text = badgeParts.slice(1).join(' ');
+                
+                // Emoji
+                ctx.font = 'bold 20px Arial, sans-serif';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'left';
+                ctx.shadowBlur = 0;
+                ctx.fillText(emoji, SAFE_MARGIN + barPadding, barY + 32);
+                
+                // Badge text
+                ctx.font = 'bold 14px Arial, sans-serif';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText(text, SAFE_MARGIN + barPadding + 25, barY + 32);
+                
+                // Score pill
+                if (options.verificationScore) {
+                    const scoreText = `${options.verificationScore}`;
+                    ctx.font = 'bold 12px monospace';
+                    const scoreWidth = ctx.measureText(scoreText).width;
+                    
+                    // Pill background
+                    ctx.fillStyle = options.verificationScore >= 80 ? '#22c55e' : 
+                                   options.verificationScore >= 60 ? '#eab308' : '#9ca3af';
+                    ctx.beginPath();
+                    ctx.roundRect(SAFE_MARGIN + barPadding + 25 + ctx.measureText(text).width + 10, barY + 18, scoreWidth + 12, 20, 10);
+                    ctx.fill();
+                    
+                    // Score text
+                    ctx.fillStyle = '#000000';
+                    ctx.fillText(scoreText, SAFE_MARGIN + barPadding + 25 + ctx.measureText(text).width + 16, barY + 32);
+                }
+            }
+            
+            // Right side: Source name + Claim type
+            ctx.font = '12px Arial, sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.textAlign = 'right';
+            
+            let rightText = '';
+            if (options.sourceName) rightText = options.sourceName;
+            if (options.claimType) {
+                rightText = rightText ? `${rightText} • ${options.claimType.replace(/_/g, ' ')}` : options.claimType.replace(/_/g, ' ');
+            }
+            
+            if (rightText) {
+                ctx.fillText(rightText, WIDTH - SAFE_MARGIN - barPadding, barY + 32);
+            }
+            
+            ctx.restore();
+        }
+
         // --- WATERMARK (Strictly dependent on text) ---
         if (finalApplyWatermark && finalApplyText) {
+            // Position watermark above authority bar if present
+            const barOffset = (options.showAuthorityBar !== false && (options.verificationBadge || options.sourceName)) ? 70 : 0;
             ctx.font = 'bold 24px Arial, sans-serif';
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.textAlign = 'center';
             ctx.shadowBlur = 4;
             ctx.shadowColor = "rgba(0,0,0,0.8)";
             const wx = watermarkPosition ? watermarkPosition.x : WIDTH / 2;
-            const wy = watermarkPosition ? watermarkPosition.y : HEIGHT - 40;
+            const wy = watermarkPosition ? watermarkPosition.y : HEIGHT - 40 - barOffset;
             ctx.fillText('@KumoLabAnime', wx, wy);
         }
 

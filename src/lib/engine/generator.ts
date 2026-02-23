@@ -189,6 +189,15 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         }
     }
 
+    // 5. CALCULATE VERIFICATION STATUS (before image generation)
+    const verification = calculateVerification(
+        claimType,
+        item.verification_tier || 3,
+        item.source || 'Unknown',
+        [], // cross-references would be added here in future
+        false
+    );
+
     let finalImage = selectedImage;
     let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
@@ -199,7 +208,13 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
             slug: item.slug || `intel-${item.anime_id || 'news'}-${todayStr}-${randomUUID().substring(0, 4)}`,
             classification: classification,
             applyText: classification === 'CLEAN',
-            applyGradient: classification === 'CLEAN'
+            applyGradient: classification === 'CLEAN',
+            // Visual Authority System
+            verificationBadge: verification.badge,
+            verificationScore: verification.score,
+            sourceName: item.source || 'Unknown',
+            claimType: claimType,
+            showAuthorityBar: true
         });
         if (result?.processedImage) {
             finalImage = result.processedImage;
@@ -342,7 +357,16 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
 
     const finalContent = cleanBody(trendingItem.content, finalTitle, claimType);
 
-    // 3. IMAGE PROCESSING
+    // 3. CALCULATE VERIFICATION STATUS
+    const verification = calculateVerification(
+        claimType,
+        trendingItem.verification_tier || 4,
+        trendingItem.source || 'Unknown',
+        [],
+        false
+    );
+
+    // 4. IMAGE PROCESSING
     let finalImage = selectedImage;
     let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
@@ -353,7 +377,13 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
             slug: `trending-${trendingItem.anime_id}`,
             classification: classification,
             applyText: classification === 'CLEAN',
-            applyGradient: classification === 'CLEAN'
+            applyGradient: classification === 'CLEAN',
+            // Visual Authority System
+            verificationBadge: verification.badge,
+            verificationScore: verification.score,
+            sourceName: trendingItem.source || 'Unknown',
+            claimType: claimType,
+            showAuthorityBar: true
         });
         if (result?.processedImage) {
             finalImage = result.processedImage;
