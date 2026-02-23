@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 export default function AdminLogin() {
     const [email, setEmail] = useState('');
@@ -11,15 +11,23 @@ export default function AdminLogin() {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    // Create client-side supabase client
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Create client-side supabase client lazily
+    const supabase = useMemo(() => {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) return null;
+        return createBrowserClient(url, key);
+    }, []);
 
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!supabase) {
+            setError('Authentication service unavailable');
+            return;
+        }
+        
         setLoading(true);
         setError(null);
 

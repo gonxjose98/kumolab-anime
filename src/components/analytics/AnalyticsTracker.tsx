@@ -1,23 +1,30 @@
 'use client';
 
 import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-function getSupabase() {
-    return createClient(supabaseUrl, supabaseAnonKey);
-}
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 
+function getSupabase() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+        return null;
+    }
+    
+    return createClient(supabaseUrl, supabaseAnonKey);
+}
+
 export function AnalyticsTracker() {
-    const supabase = getSupabase();
+    const supabase = useMemo(() => getSupabase(), []);
     const pathname = usePathname();
     const isFirstRun = useRef(true);
     const lastTrackedPath = useRef<string | null>(null);
 
     useEffect(() => {
+        // Skip if Supabase is not configured
+        if (!supabase) return;
+        
         // 1. SILENT: Detect Bots
         const userAgent = navigator.userAgent;
         const botRegex = /bot|google|baidu|bing|msn|teoma|slurp|yandex/i;
