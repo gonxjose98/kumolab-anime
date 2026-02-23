@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronDown } from 'lucide-react';
+import { ArrowRight, ChevronDown, Shield, Clock, Ban } from 'lucide-react';
 import styles from './Hero.module.css';
 
 const Hero = () => {
@@ -20,7 +20,6 @@ const Hero = () => {
         if (!played) {
             setIsAnimating(true);
             sessionStorage.setItem('hero_animated', 'true');
-            // End animation after sequence completes
             setTimeout(() => setIsAnimating(false), 2000);
         } else {
             setIsAnimating(false);
@@ -49,17 +48,13 @@ const Hero = () => {
             <div className={styles.heroOverlay}></div>
 
             <div className={`${styles.heroContent} ${isAnimating ? styles.animating : ''}`}>
-                {/* Animated Logo */}
-                <div className={styles.logoContainer}>
-                    <span className={styles.accentText}>KUMOLAB</span>
-                    <div className={styles.underline}></div>
+                {/* Main Headline */}
+                <div className={styles.headlineContainer}>
+                    <h1 className={styles.mainHeadline}>Daily Anime Intelligence</h1>
+                    <p className={styles.subtitle}>
+                        Confirmed release dates, trailers, and news — verified by KumoLab
+                    </p>
                 </div>
-                
-                {/* Tagline with staggered animation */}
-                <p className={styles.subheadline}>
-                    <span className={styles.line1}>Anime Updates. Episodes. News.</span>
-                    <span className={styles.line2}>What&apos;s next? Without the noise.</span>
-                </p>
 
                 {/* CTA Button */}
                 <div className={styles.buttons}>
@@ -67,6 +62,22 @@ const Hero = () => {
                         <span>View Today&apos;s Drops</span>
                         <ArrowRight size={isMobile ? 18 : 20} className={styles.arrow} />
                     </Link>
+                </div>
+
+                {/* Trust Badges */}
+                <div className={styles.trustBadges}>
+                    <div className={styles.badge}>
+                        <Shield size={14} className={styles.badgeIcon} />
+                        <span>Verified Sources</span>
+                    </div>
+                    <div className={styles.badge}>
+                        <Clock size={14} className={styles.badgeIcon} />
+                        <span>Daily Updates</span>
+                    </div>
+                    <div className={styles.badge}>
+                        <Ban size={14} className={styles.badgeIcon} />
+                        <span>Zero Spam</span>
+                    </div>
                 </div>
             </div>
 
