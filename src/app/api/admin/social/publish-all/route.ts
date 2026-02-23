@@ -42,7 +42,7 @@ async function publishToX(post: any, client: TwitterApi, mediaId?: string) {
     // Add anime-specific hashtag if available
     if (post.anime_id) {
         // Convert anime_id to camelCase hashtag (e.g., "attack-on-titan" -> "#AttackOnTitan")
-        const cleanId = post.anime_id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).replace(/\s/g, '');
+        const cleanId = post.anime_id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()).replace(/\s/g, '');
         if (cleanId && cleanId.length < 20) { // Keep reasonable length
             hashtags.unshift(`#${cleanId}`);
         }
