@@ -187,7 +187,7 @@
 }
 
 .mainHeadline {
-    font-family: var(--font-display-bold), var(--font-display);
+    font-family: 'Rubik Mono One', 'Impact', 'Arial Black', sans-serif;
     font-size: calc(var(--font-hero) * 1.1);
     font-weight: 400;
     background: linear-gradient(135deg, #E9A8FF 0%, #7DD3FC 50%, #E9A8FF 100%);
@@ -202,6 +202,7 @@
     line-height: 1.1;
     margin: 0;
     animation: pulse-glow 3s ease-in-out infinite;
+    text-transform: uppercase;
 }
 
 .subtitle {
