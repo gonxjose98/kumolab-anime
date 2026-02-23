@@ -46,6 +46,16 @@ const Hero = () => {
                 style={{ transform: `translateY(${parallaxTranslate}px)` }}
             />
             <div className={styles.heroOverlay}></div>
+            
+            {/* Atmospheric Effects */}
+            <div className={styles.petalsContainer}>
+                {[...Array(10)].map((_, i) => (
+                    <div key={i} className={styles.petal} />
+                ))}
+            </div>
+            <div className={styles.orb} />
+            <div className={styles.orb} />
+            <div className={styles.orb} />
 
             <div className={`${styles.heroContent} ${isAnimating ? styles.animating : ''}`}>
                 {/* Main Headline */}
