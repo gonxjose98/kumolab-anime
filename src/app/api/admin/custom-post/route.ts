@@ -92,20 +92,24 @@ export async function POST(req: NextRequest) {
             postData.background_image = backgroundImageUrl;
         }
 
-        // Deployment Logic: Alerts are always published immediately
-        postData.is_published = type === 'CONFIRMATION_ALERT';
-        postData.status = 'published'; // Manual posts bypass pending status
+        // Deployment Logic: For NEW posts, alerts are always published immediately
+        // For EXISTING posts, preserve their publication status
+        if (!postId) {
+            postData.is_published = type === 'CONFIRMATION_ALERT';
+            postData.status = type === 'CONFIRMATION_ALERT' ? 'published' : 'pending';
+            postData.id = randomUUID();
+            postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
+            postData.timestamp = new Date().toISOString();
+        } else {
+            // When editing, preserve the existing publication status
+            // Don't overwrite is_published or status
+            postData.status = 'published'; // Edited posts are approved/published
+        }
+        
         postData.source_tier = 1; // Admin is Tier 1
         postData.relevance_score = 100;
         postData.source = 'Admin Dashboard';
         postData.scraped_at = new Date().toISOString();
-
-        // Only generate id/slug/timestamp for NEW posts
-        if (!postId) {
-            postData.id = randomUUID();
-            postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
-            postData.timestamp = new Date().toISOString();
-        }
 
         let query;
         if (postId) {

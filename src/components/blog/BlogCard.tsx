@@ -39,7 +39,11 @@ const BlogCard = ({ post }: BlogCardProps) => {
         <Link href={`/blog/${post.slug}`} className={styles.card}>
             <div className={styles.imageWrapper}>
                 {post.image ? (
-                    <img src={post.image} alt={post.title} className={styles.image} />
+                    <img 
+                        src={`${post.image}${post.updated_at ? `?v=${new Date(post.updated_at).getTime()}` : ''}`} 
+                        alt={post.title} 
+                        className={styles.image} 
+                    />
                 ) : (
                     <div className={styles.placeholder} />
                 )}

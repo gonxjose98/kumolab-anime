@@ -50,7 +50,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     <div className={styles.imageAspectRatio}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
-                                            src={post.image}
+                                            src={`${post.image}${post.updated_at ? `?v=${new Date(post.updated_at).getTime()}` : ''}`}
                                             alt={post.title}
                                             className={styles.image}
                                             loading="lazy"

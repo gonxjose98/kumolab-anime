@@ -69,7 +69,7 @@ export default function BlogPostPage() {
             {post.image && (
                 <div className={styles.heroImage}>
                     <img 
-                        src={post.image} 
+                        src={`${post.image}${post.updated_at ? `?v=${new Date(post.updated_at).getTime()}` : ''}`}
                         alt={`${post.title} - ${post.claimType ? post.claimType.replace(/_/g, ' ') : 'Anime News'} | KumoLab`}
                     />
                 </div>

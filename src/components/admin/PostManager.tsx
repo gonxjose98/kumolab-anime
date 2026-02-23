@@ -914,7 +914,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 if (autoClose) {
                     setShowModal(false);
                     setPreviewPost(null);
-                    setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+                    // Smart filter switching: stay on current view for edits, switch for new posts
+                    if (!editingPostId) {
+                        // New post - switch to appropriate filter
+                        setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'PENDING');
+                    }
+                    // For edits, stay on current filter so user sees the updated post
                     alert(`Transmission ${editingPostId ? 'updated' : 'deployed'} successfully.`);
                 } else {
                     // CRITICAL: Ensure we use the processed image for the preview if we saved one
