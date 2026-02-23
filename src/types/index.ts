@@ -14,7 +14,9 @@ export type ClaimType =
 
 export interface BlogPost {
     id?: string;
-    title: string;
+    title: string; // Display title (used on images - keep short/punchy)
+    seoTitle?: string; // SEO-optimized title (HTML <title> tag)
+    metaDescription?: string; // SEO meta description
     slug: string;
     type: PostType;
     claimType?: ClaimType;

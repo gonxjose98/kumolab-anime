@@ -1,5 +1,6 @@
 import { getPostBySlug, getPosts } from '@/lib/blog';
 import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 import styles from './post.module.css';
 
 interface BlogPostPageProps {
@@ -15,6 +16,58 @@ export async function generateStaticParams() {
 
 export const revalidate = 60;
 
+// Dynamic SEO metadata generation
+export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
+    const { slug } = await params;
+    const post = await getPostBySlug(slug);
+
+    if (!post) {
+        return {
+            title: 'Post Not Found | KumoLab',
+            description: 'The requested post could not be found.'
+        };
+    }
+
+    const title = post.seoTitle || `${post.title} | KumoLab`;
+    const description = post.metaDescription || `Latest anime news: ${post.title}. Verified and accurate updates from KumoLab.`;
+    const url = `https://kumolab-anime.com/blog/${post.slug}`;
+    const image = post.image || 'https://kumolab-anime.com/og-image.png';
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            url,
+            siteName: 'KumoLab',
+            images: [
+                {
+                    url: image,
+                    width: 1080,
+                    height: 1350,
+                    alt: post.title
+                }
+            ],
+            locale: 'en_US',
+            type: 'article',
+            publishedTime: post.timestamp,
+            modifiedTime: post.timestamp,
+            authors: ['KumoLab']
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+            images: [image],
+            creator: '@KumoLabAnime'
+        },
+        alternates: {
+            canonical: url
+        }
+    };
+}
+
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const { slug } = await params;
     const post = await getPostBySlug(slug);
@@ -23,13 +76,48 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         notFound();
     }
 
+    // NewsArticle structured data for SEO
+    const structuredData = {
+        '@context': 'https://schema.org',
+        '@type': 'NewsArticle',
+        headline: post.seoTitle || post.title,
+        description: post.metaDescription || post.content.substring(0, 160),
+        image: post.image,
+        datePublished: post.timestamp,
+        dateModified: post.timestamp,
+        author: {
+            '@type': 'Organization',
+            name: 'KumoLab'
+        },
+        publisher: {
+            '@type': 'Organization',
+            name: 'KumoLab',
+            logo: {
+                '@type': 'ImageObject',
+                url: 'https://kumolab-anime.com/logo.png'
+            }
+        },
+        mainEntityOfPage: {
+            '@type': 'WebPage',
+            '@id': `https://kumolab-anime.com/blog/${post.slug}`
+        }
+    };
+
     return (
-        <article className={styles.container}>
-            {post.image && (
-                <div className={styles.heroImage}>
-                    <img src={post.image} alt={post.title} />
-                </div>
-            )}
+        <>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+            />
+            <article className={styles.container}>
+                {post.image && (
+                    <div className={styles.heroImage}>
+                        <img 
+                            src={post.image} 
+                            alt={`${post.title} - ${post.claimType ? post.claimType.replace(/_/g, ' ') : 'Anime News'} | KumoLab`}
+                        />
+                    </div>
+                )}
 
             <div className={styles.header}>
                 <div className={styles.meta}>
@@ -72,6 +160,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 )}
             </div>
 
-        </article>
+            </article>
+        </>
     );
 }

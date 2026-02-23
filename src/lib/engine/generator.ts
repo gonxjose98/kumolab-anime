@@ -233,9 +233,14 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
     // 6. CONTENT CLEANUP
     const finalContent = cleanBody(item.content, finalTitle, claimType);
 
+    // 7. GENERATE SEO FIELDS
+    const { seoTitle, metaDescription } = generateSEOMeta(finalTitle, claimType, item.source, seasonLabel, animeTitle);
+
     return {
         id: randomUUID(),
         title: finalTitle,
+        seoTitle,
+        metaDescription,
         slug: item.slug || `intel-${item.anime_id || 'news'}-${todayStr}`,
         type: 'INTEL',
         claimType,
@@ -357,7 +362,10 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         false
     );
 
-    // 4. IMAGE PROCESSING
+    // 4. GENERATE SEO FIELDS
+    const { seoTitle, metaDescription } = generateSEOMeta(finalTitle, claimType, trendingItem.source, trendingItem.season_label, animeTitle);
+
+    // 5. IMAGE PROCESSING
     let finalImage = selectedImage;
     let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
@@ -393,6 +401,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     return {
         id: randomUUID(),
         title: finalTitle,
+        seoTitle,
+        metaDescription,
         slug: `trending-${trendingItem.anime_id || 'now'}-${todayStr}-${randomUUID().substring(0, 4)}`,
         type: 'TRENDING',
         claimType,
@@ -680,6 +690,88 @@ export function cleanBody(content: string, title: string, trendReason?: string):
 
     return base + closer;
 }
+
+/**
+ * Generate SEO-optimized title and meta description
+ * Keeps display title short (for images) while creating keyword-rich SEO fields
+ */
+export function generateSEOMeta(
+    title: string,
+    claimType?: string,
+    source?: string,
+    seasonLabel?: string,
+    animeTitle?: string
+): { seoTitle: string; metaDescription: string } {
+    const series = animeTitle || title.split(' Season')[0].split(':')[0].trim();
+    
+    // Build SEO title (max 60 chars for Google display)
+    let seoTitle = title;
+    
+    // Add season/premiere info if available
+    if (seasonLabel && !title.toLowerCase().includes(seasonLabel.toLowerCase())) {
+        seoTitle += ` | ${seasonLabel}`;
+    }
+    
+    // Add claim type keyword if not in title
+    const claimKeywords: Record<string, string> = {
+        'NEW_SEASON_CONFIRMED': 'New Season',
+        'TRAILER_DROP': 'Trailer',
+        'NEW_KEY_VISUAL': 'Key Visual',
+        'DATE_ANNOUNCED': 'Release Date',
+        'DELAY': 'Delayed',
+        'TRENDING_UPDATE': 'Trending'
+    };
+    
+    if (claimType && claimKeywords[claimType] && !title.toLowerCase().includes(claimKeywords[claimType].toLowerCase())) {
+        seoTitle += ` | ${claimKeywords[claimType]}`;
+    }
+    
+    // Add KumoLab brand (keep under 60 chars total)
+    if (seoTitle.length < 50) {
+        seoTitle += ' | KumoLab';
+    } else if (seoTitle.length > 60) {
+        // Truncate if too long
+        seoTitle = seoTitle.substring(0, 57).trim() + '...';
+    }
+    
+    // Build meta description (max 160 chars)
+    let metaDescription = '';
+    
+    if (claimType === 'NEW_SEASON_CONFIRMED') {
+        metaDescription = `${series} new season confirmed. `;
+    } else if (claimType === 'TRAILER_DROP') {
+        metaDescription = `${series} trailer released. `;
+    } else if (claimType === 'NEW_KEY_VISUAL') {
+        metaDescription = `${series} key visual revealed. `;
+    } else if (claimType === 'DATE_ANNOUNCED') {
+        metaDescription = `${series} release date announced. `;
+    } else if (claimType === 'DELAY') {
+        metaDescription = `${series} release delayed. `;
+    } else {
+        metaDescription = `${series} update. `;
+    }
+    
+    // Add verification mention
+    if (source) {
+        metaDescription += `Verified via ${source}. `;
+    }
+    
+    // Add season info if available
+    if (seasonLabel) {
+        metaDescription += `${seasonLabel}. `;
+    }
+    
+    // Close with brand
+    metaDescription += 'Get accurate anime news at KumoLab.';
+    
+    // Ensure under 160 chars
+    if (metaDescription.length > 160) {
+        metaDescription = metaDescription.substring(0, 157).trim() + '...';
+    }
+    
+    return { seoTitle, metaDescription };
+}
+
 /**
  * Generates Trending Posts (plural) - Wrapper for engine usage
  * Fetches data from external source (e.g. AniList trending) and generates posts.
