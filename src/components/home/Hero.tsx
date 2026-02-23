@@ -51,9 +51,10 @@ const Hero = () => {
                 {/* Main Headline */}
                 <div className={styles.headlineContainer}>
                     <h1 className={styles.mainHeadline}>Daily Anime Intelligence</h1>
-                    <p className={styles.subtitle}>
-                        Confirmed release dates, trailers, and news — verified by KumoLab
-                    </p>
+                    <div className={styles.subtitle}>
+                        <span className={styles.subtitleLine}>Confirmed release dates, trailers, and news</span>
+                        <span className={styles.subtitleLine}>— verified by <strong className={styles.kumolabText}>KumoLab</strong></span>
+                    </div>
                 </div>
 
                 {/* CTA Button */}
