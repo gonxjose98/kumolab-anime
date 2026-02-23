@@ -236,12 +236,15 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
     // 7. GENERATE SEO FIELDS
     const { seoTitle, metaDescription } = generateSEOMeta(finalTitle, claimType, item.source, seasonLabel, animeTitle);
 
+    // 8. GENERATE SEO-FRIENDLY SLUG
+    const seoSlug = generateSEOSlug(animeTitle, claimType, todayStr, item.anime_id);
+
     return {
         id: randomUUID(),
         title: finalTitle,
         seoTitle,
         metaDescription,
-        slug: item.slug || `intel-${item.anime_id || 'news'}-${todayStr}`,
+        slug: item.slug || seoSlug,
         type: 'INTEL',
         claimType,
         event_fingerprint: item.event_fingerprint,
@@ -365,7 +368,10 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
     // 4. GENERATE SEO FIELDS
     const { seoTitle, metaDescription } = generateSEOMeta(finalTitle, claimType, trendingItem.source, trendingItem.season_label, animeTitle);
 
-    // 5. IMAGE PROCESSING
+    // 5. GENERATE SEO-FRIENDLY SLUG
+    const seoSlug = generateSEOSlug(animeTitle, claimType, todayStr, trendingItem.anime_id);
+
+    // 6. IMAGE PROCESSING
     let finalImage = selectedImage;
     let imageSettings = {};
     if (selectedImage && !selectedImage.startsWith('data:')) {
@@ -403,7 +409,7 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         title: finalTitle,
         seoTitle,
         metaDescription,
-        slug: `trending-${trendingItem.anime_id || 'now'}-${todayStr}-${randomUUID().substring(0, 4)}`,
+        slug: seoSlug,
         type: 'TRENDING',
         claimType,
         event_fingerprint: trendingItem.event_fingerprint,
@@ -770,6 +776,49 @@ export function generateSEOMeta(
     }
     
     return { seoTitle, metaDescription };
+}
+
+/**
+ * Generate SEO-friendly URL slug
+ * Format: anime-name-claim-type-date (under 60 chars)
+ */
+export function generateSEOSlug(
+    animeTitle: string,
+    claimType?: string,
+    dateStr?: string,
+    animeId?: string
+): string {
+    // Start with anime name
+    let slug = animeTitle.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric with hyphens
+        .replace(/^-+|-+$/g, '');      // Remove leading/trailing hyphens
+    
+    // Add claim type if available
+    const claimSlugs: Record<string, string> = {
+        'NEW_SEASON_CONFIRMED': 'season-confirmed',
+        'TRAILER_DROP': 'trailer',
+        'NEW_KEY_VISUAL': 'key-visual',
+        'DATE_ANNOUNCED': 'release-date',
+        'DELAY': 'delayed',
+        'TRENDING_UPDATE': 'trending'
+    };
+    
+    if (claimType && claimSlugs[claimType]) {
+        slug += `-${claimSlugs[claimType]}`;
+    }
+    
+    // Add short date (MM-DD) if provided
+    if (dateStr) {
+        const shortDate = dateStr.replace(/-/g, '').substring(4); // MMDD from YYYY-MM-DD
+        slug += `-${shortDate}`;
+    }
+    
+    // Keep under 60 chars
+    if (slug.length > 60) {
+        slug = slug.substring(0, 57).replace(/-+$/, '') + '--';
+    }
+    
+    return slug;
 }
 
 /**
