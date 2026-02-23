@@ -8,14 +8,6 @@ interface BlogCardProps {
 }
 
 const BlogCard = ({ post }: BlogCardProps) => {
-    // Force re-render when post.image changes
-    const [imageKey, setImageKey] = React.useState(Date.now());
-    
-    React.useEffect(() => {
-        // Update key when image URL changes to force refresh
-        setImageKey(Date.now());
-    }, [post.image, post.id]);
-    
     // Rule 4: Card overlay text mapping
     const getOverlayText = () => {
         // Priority 1: User-defined headline (from Mission Control)
@@ -49,8 +41,7 @@ const BlogCard = ({ post }: BlogCardProps) => {
             <div className={styles.imageWrapper}>
                 {post.image ? (
                     <img 
-                        key={imageKey}
-                        src={`${post.image}?v=${imageKey}`} 
+                        src={post.image} 
                         alt={post.title} 
                         className={styles.image} 
                     />
