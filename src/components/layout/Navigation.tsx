@@ -47,13 +47,13 @@ const Navigation = () => {
         <nav className={`${styles.nav} ${isScrolled ? styles.scrolled : ''}`}>
             <div className={styles.navContainer}>
                 {/* Logo */}
-                <Link href="/" className={styles.logo} onClick={closeMenu}>
+                <Link href="/" className={styles.logo} onClick={closeMenu} aria-label="KumoLab Home">
                     <img 
                         src="/logo.png" 
-                        alt="KumoLab" 
+                        alt="" 
                         className={styles.logoImg}
-                        width="140"
-                        height="56"
+                        width="160"
+                        height="64"
                     />
                 </Link>
 
