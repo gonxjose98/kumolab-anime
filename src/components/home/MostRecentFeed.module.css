@@ -1,18 +1,20 @@
+/* MOBILE-FIRST MostRecentFeed */
 .section {
-    padding: 4rem 0;
+    padding: var(--space-xl) 0;
     background: var(--bg-color);
 }
 
 .sectionTitle {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--font-small);
     font-weight: 800;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.15em;
     color: var(--text-secondary);
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-lg);
     text-align: left;
     position: relative;
     padding-left: 12px;
+    text-transform: uppercase;
 }
 
 .sectionTitle::before {
@@ -22,7 +24,7 @@
     top: 50%;
     transform: translateY(-50%);
     width: 4px;
-    height: 16px;
+    height: 14px;
     background: var(--accent-primary);
     border-radius: 2px;
 }
@@ -30,23 +32,26 @@
 .feed {
     display: flex;
     flex-direction: column;
-    gap: 3rem;
-    /* Spaced out for mobile scrolling */
-    max-width: 800px;
-    /* Centered feed column */
+    gap: var(--space-xl);
+    max-width: 100%;
     margin: 0 auto;
 }
 
 .card {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: var(--space-sm);
     text-decoration: none;
-    transition: transform 0.3s ease;
+    transition: transform 0.2s ease;
+    /* Large touch target for mobile */
+    padding: var(--space-xs);
+    margin: calc(var(--space-xs) * -1);
+    border-radius: 12px;
 }
 
-.card:hover {
-    transform: translateY(-4px);
+.card:active {
+    transform: scale(0.98);
+    background: var(--surface-hover);
 }
 
 .imageWrapper {
@@ -55,9 +60,8 @@
     background: var(--surface-color);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    aspect-ratio: 4 / 5;
-    /* Unified aspect ratio for cards */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    aspect-ratio: 1 / 1;
 }
 
 .imageAspectRatio {
@@ -73,72 +77,107 @@
     height: 100%;
     display: block;
     object-fit: cover;
-    /* Center crop for full-bleed look */
     object-position: center;
+    transition: transform 0.3s ease;
+}
+
+.card:hover .image,
+.card:active .image {
+    transform: scale(1.03);
 }
 
 .placeholder {
     width: 100%;
-    height: 300px;
+    height: 100%;
     background: linear-gradient(135deg, var(--surface-color), var(--bg-color));
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .badge {
     position: absolute;
-    top: 1rem;
-    left: 1rem;
-    background: rgba(124, 58, 237, 0.9);
+    top: var(--space-sm);
+    left: var(--space-sm);
+    background: rgba(124, 58, 237, 0.95);
     color: #fff;
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 800;
     letter-spacing: 0.05em;
+    text-transform: uppercase;
     backdrop-filter: blur(8px);
     z-index: 2;
 }
 
 .content {
-    padding: 0 4px;
+    padding: var(--space-xs) 0;
 }
 
 .meta {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-xs);
 }
 
 .date {
-    font-size: 0.8rem;
+    font-size: var(--font-small);
     color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    font-weight: 500;
 }
 
 .title {
     font-family: var(--font-display);
-    font-size: 1.75rem;
+    font-size: var(--font-h3);
     font-weight: 800;
     color: var(--text-primary);
-    line-height: 1.25;
+    line-height: 1.3;
+    /* Limit to 3 lines on mobile */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-    .section {
-        padding: 2rem 0;
-    }
-
+/* TABLET */
+@media (min-width: 640px) {
     .feed {
-        gap: 2.5rem;
+        max-width: 600px;
+        gap: 3rem;
     }
-
-    .title {
-        font-size: 1.4rem;
-    }
-
+    
     .imageWrapper {
-        border-radius: 8px;
+        aspect-ratio: 4 / 5;
+    }
+}
+
+/* DESKTOP */
+@media (min-width: 1024px) {
+    .section {
+        padding: 5rem 0;
+    }
+    
+    .feed {
+        max-width: 800px;
+    }
+    
+    .card:hover {
+        transform: translateY(-4px);
+    }
+    
+    .title {
+        font-size: var(--font-h2);
+        -webkit-line-clamp: 4;
+    }
+}
+
+/* REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+    .card,
+    .image {
+        transition: none;
+    }
+    
+    .card:hover,
+    .card:active {
+        transform: none;
     }
 }
