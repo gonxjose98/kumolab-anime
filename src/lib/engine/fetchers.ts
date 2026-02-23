@@ -327,17 +327,15 @@ export async function verifyAnimeReality(animeTitle: string, seasonLabel?: strin
 import { generateEventFingerprint, generateTruthFingerprint } from './utils';
 
 /**
- * Fetches real Anime News from ANN/Crunchyroll RSS
+ * Fetches real Anime News from RSS feeds (Free sources)
+ * Enhanced with category filtering and multiple tier-2/3 sources
  */
 export async function fetchAnimeIntel(telemetry?: any): Promise<any[]> {
     let items: any[] = [];
-    const { CONTENT_RULES, SOURCE_TIERS } = await import('./sources-config');
+    const { CONTENT_RULES, ALL_RSS_SOURCES } = await import('./sources-config');
 
-    // 1. Try to fetch from RSS Feeds
-    const feeds = [
-        { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 1 },
-        { name: 'ComicBook', url: 'https://comicbook.com/anime/rss', tier: 2 }
-    ];
+    // 1. Fetch from all configured RSS feeds (free tier)
+    const feeds = ALL_RSS_SOURCES;
 
     for (const feed of feeds) {
         try {
@@ -378,7 +376,7 @@ export async function fetchAnimeIntel(telemetry?: any): Promise<any[]> {
 
                     if (!rawTitle) continue;
 
-                    // --- NEW STRICT FILTERING LOGIC ---
+                    // --- ENHANCED STRICT FILTERING LOGIC ---
                     const lowerTitleRaw = rawTitle.toLowerCase();
                     const lowerDescRaw = cleanDesc.toLowerCase();
 
@@ -391,6 +389,18 @@ export async function fetchAnimeIntel(telemetry?: any): Promise<any[]> {
 
                     if (titleNegative) {
                         console.log(`[Fetcher] Skipping (Negative/Manga Title): ${rawTitle}`);
+                        if (telemetry) telemetry.negativeKeywordsSkipped++;
+                        continue;
+                    }
+
+                    // Check for excluded categories in description
+                    const categoryExcluded = CONTENT_RULES.EXCLUDE_CATEGORIES.some(cat => {
+                        const regex = new RegExp(`\\b${cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                        return regex.test(lowerDescRaw);
+                    });
+
+                    if (categoryExcluded) {
+                        console.log(`[Fetcher] Skipping (Excluded Category): ${rawTitle}`);
                         if (telemetry) telemetry.negativeKeywordsSkipped++;
                         continue;
                     }
@@ -613,6 +623,127 @@ export async function fetchTrendingSignals(telemetry?: any): Promise<any[]> {
 }
 
 /**
+ * Fetches latest videos from Studio YouTube channels (Free RSS)
+ * Monitors for trailer drops, PVs, and announcements
+ */
+export async function fetchYouTubeStudioVideos(telemetry?: any): Promise<any[]> {
+    const { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } = await import('./sources-config');
+    const allChannels = [...YOUTUBE_STUDIO_CHANNELS.TIER_1, ...YOUTUBE_STUDIO_CHANNELS.TIER_2];
+    
+    const videoItems: any[] = [];
+    
+    for (const channel of allChannels) {
+        try {
+            // YouTube RSS feed (free, no API key required)
+            const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.channelId}`;
+            
+            const response = await fetch(rssUrl, {
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/rss+xml, application/xml, text/xml'
+                }
+            });
+            
+            if (!response.ok) {
+                console.log(`[YouTube] Skipping ${channel.name}: Feed unavailable`);
+                continue;
+            }
+            
+            const xmlText = await response.text();
+            
+            // Parse RSS for video entries
+            const entryRegex = /<entry[\s\S]*?<\/entry>/g;
+            const titleRegex = /<title>(.*?)<\/title>/;
+            const linkRegex = /<link rel="alternate" href="(.*?)"\/>/;
+            const publishedRegex = /<published>(.*?)<\/published>/;
+            const mediaThumbRegex = /<media:thumbnail url="(.*?)"\/>/;
+            
+            let match;
+            while ((match = entryRegex.exec(xmlText)) !== null) {
+                try {
+                    const entry = match[0];
+                    const titleMatch = titleRegex.exec(entry);
+                    const linkMatch = linkRegex.exec(entry);
+                    const publishedMatch = publishedRegex.exec(entry);
+                    const thumbMatch = mediaThumbRegex.exec(entry);
+                    
+                    if (!titleMatch || !linkMatch) continue;
+                    
+                    const title = titleMatch[1].replace('&#39;', "'").replace('&quot;', '"').trim();
+                    const videoUrl = linkMatch[1];
+                    const publishedAt = publishedMatch ? new Date(publishedMatch[1]) : new Date();
+                    const thumbnail = thumbMatch ? thumbMatch[1] : '';
+                    
+                    // Only interested in anime-related content (not behind-the-scenes, interviews, etc.)
+                    const lowerTitle = title.toLowerCase();
+                    const animeKeywords = ['trailer', 'pv', 'promotional video', 'announcement', 'teaser', 'preview', 'opening', 'ending'];
+                    const isAnimeContent = animeKeywords.some(k => lowerTitle.includes(k));
+                    
+                    if (!isAnimeContent) continue;
+                    
+                    // Skip if negative keywords
+                    const hasNegative = CONTENT_RULES.NEGATIVE_KEYWORDS.some(k => {
+                        if (k === 'AI') return /\bAI\b/.test(title);
+                        return title.toLowerCase().includes(k.toLowerCase());
+                    });
+                    
+                    if (hasNegative) continue;
+                    
+                    // Determine claim type from title
+                    let claimType: ClaimType = 'OTHER_ABORT';
+                    if (lowerTitle.includes('trailer') || lowerTitle.includes('pv') || lowerTitle.includes('promotional')) {
+                        claimType = 'TRAILER_DROP';
+                    } else if (lowerTitle.includes('announcement') || lowerTitle.includes('announced')) {
+                        claimType = 'NEW_SEASON_CONFIRMED';
+                    } else if (lowerTitle.includes('opening') || lowerTitle.includes('ending')) {
+                        claimType = 'NEW_KEY_VISUAL';
+                    }
+                    
+                    // Extract anime title (best effort)
+                    let animeTitle = title
+                        .replace(/(official|trailer|pv|teaser|announcement|video|opening|ending)/gi, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    videoItems.push({
+                        title: `${animeTitle} — ${title}`,
+                        claimType,
+                        content: `New video from ${channel.name}: ${title}. Watch at ${videoUrl}`,
+                        source: `YouTube: ${channel.name}`,
+                        source_url: videoUrl,
+                        imageSearchTerm: animeTitle,
+                        verification_tier: channel.tier,
+                        publishedAt: publishedAt.toISOString(),
+                        announcementAssets: thumbnail ? [thumbnail] : [],
+                        slug: `video-${channel.name.toLowerCase()}-${publishedAt.getTime()}`,
+                        anime_id: animeTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                        event_fingerprint: `youtube-${channel.channelId}-${publishedAt.toISOString().split('T')[0]}`,
+                        truth_fingerprint: `video-${animeTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+                    });
+                    
+                } catch (err) {
+                    console.error(`[YouTube] Error parsing entry for ${channel.name}:`, err);
+                }
+            }
+            
+            console.log(`[YouTube] Fetched ${videoItems.filter(v => v.source.includes(channel.name)).length} videos from ${channel.name}`);
+            
+        } catch (e) {
+            console.error(`[YouTube] Failed to fetch ${channel.name}:`, e);
+        }
+    }
+    
+    // Return only videos from last 48 hours to avoid stale content
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - 48);
+    
+    const recentVideos = videoItems.filter(v => new Date(v.publishedAt) > cutoffTime);
+    console.log(`[YouTube] Total recent videos: ${recentVideos.length}`);
+    
+    return recentVideos.slice(0, 10);
+}
+
+/**
  * SUPERIOR TRENDING ALGORITHM (User Requested)
  * Sources: AniList (Trending), Reddit (Hot), News (ANN/Crunchyroll Proxy)
  * Logic: Priority = 3 Matches > 2 Matches > News Only
@@ -705,11 +836,12 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         candidatesFound: 0
     };
 
-    // 1. Fetch All Sources in Parallel
-    const [aniList, reddit, news] = await Promise.all([
+    // 1. Fetch All Sources in Parallel (including YouTube studio channels)
+    const [aniList, reddit, news, youtubeVideos] = await Promise.all([
         fetchAniListTrendingRaw(telemetry),
         fetchTrendingSignals(telemetry),
-        fetchAnimeIntel(telemetry)
+        fetchAnimeIntel(telemetry),
+        fetchYouTubeStudioVideos(telemetry)
     ]);
 
     const candidates: Record<string, TrendingCandidate> = {};
@@ -804,7 +936,7 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
     };
 
     // 2. Process Sources
-    console.log(`[Fetcher] Sourcing: AniList: ${aniList.length}, Reddit: ${reddit.length}, News: ${news.length}`);
+    console.log(`[Fetcher] Sourcing: AniList: ${aniList.length}, Reddit: ${reddit.length}, News: ${news.length}, YouTube: ${youtubeVideos.length}`);
 
     // AniList (Visuals & Popularity) - Baseline
     aniList.forEach((item: any) => {
@@ -819,7 +951,7 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
         addVote(item.title, 'Reddit', undefined, item.content, undefined, 0.5);
     });
 
-    // News (Crunchyroll/ANN - "Official" updates)
+    // News (Crunchyroll/ANN/MAL - "Official" updates)
     news.forEach((item: any) => {
         const boost = item.tier_match ? 5 : 3;
         addVote(item.title, item.source || 'Crunchyroll/News', undefined, item.content, undefined, boost, {
@@ -832,6 +964,22 @@ export async function fetchSmartTrendingCandidates(excludeTitles: string[] = [])
             announcementAssets: item.announcementAssets,
             source_url: item.source_url,
             verification_tier: item.verification_tier
+        });
+    });
+
+    // YouTube Studio Videos (Tier 1-2 direct from studios)
+    // High priority boost since these are official studio releases
+    youtubeVideos.forEach((video: any) => {
+        const tierBoost = video.verification_tier === 1 ? 6 : 4;
+        addVote(video.title, video.source, video.announcementAssets?.[0], video.content, undefined, tierBoost, {
+            anime_id: video.anime_id,
+            imageSearchTerm: video.imageSearchTerm,
+            claimType: video.claimType,
+            event_fingerprint: video.event_fingerprint,
+            truth_fingerprint: video.truth_fingerprint,
+            announcementAssets: video.announcementAssets,
+            source_url: video.source_url,
+            verification_tier: video.verification_tier
         });
     });
 

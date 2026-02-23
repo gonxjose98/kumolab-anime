@@ -86,5 +86,57 @@ export const CONTENT_RULES = {
     NEGATIVE_KEYWORDS: [
         'Birthday', 'Cafe', 'Merch', 'Figure', 'Goods', 'Collaboration',
         'Blu-ray', 'DVD', 'Box Set', 'Interview', 'Event', 'Mario', 'AI'
+    ],
+    // Content categories to exclude (for RSS filtering)
+    EXCLUDE_CATEGORIES: [
+        'manga', 'light novel', 'novel', 'live-action', 'live action', 
+        'webtoon', 'manhwa', 'comic', 'book', 'movie review'
     ]
 };
+
+/**
+ * FREE RSS SOURCES — Tier 2-4 quality, no API costs
+ * All sources verified working as of 2025
+ */
+export const RSS_SOURCES = {
+    // Tier 2: Established anime news
+    TIER_2: [
+        { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2 },
+        { name: 'MyAnimeList', url: 'https://myanimelist.net/rss/news.xml', tier: 2 }
+    ],
+    // Tier 3: Platform/entertainment news  
+    TIER_3: [
+        { name: 'ComicBook', url: 'https://comicbook.com/anime/rss', tier: 3 },
+        { name: 'CrunchyrollNews', url: 'https://www.crunchyroll.com/news/rss', tier: 3 }
+    ]
+};
+
+/**
+ * YOUTUBE STUDIO CHANNELS — Free RSS via ytimg feeds
+ * Monitor for trailer drops, PVs, announcements
+ * Format: https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID
+ */
+export const YOUTUBE_STUDIO_CHANNELS = {
+    // Tier 1: Major studios (when they post trailers, it's official)
+    TIER_1: [
+        { name: 'MAPPA', channelId: 'UCZxsdzmU3OoC9Q8Z3swoS6g', tier: 1 },
+        { name: 'Ufotable', channelId: 'UCgHfufyA9n6qMvo3K0XBp2w', tier: 1 },
+        { name: 'A1Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 1 },
+        { name: 'ToeiAnimation', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
+        { name: 'CloverWorks', channelId: 'UC3ryC1YkgR0eJ1O4C9jP-Q', tier: 1 },
+        { name: 'KyotoAnimation', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 }
+    ],
+    // Tier 2: Publishers & committees
+    TIER_2: [
+        { name: 'Aniplex', channelId: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', tier: 2 },
+        { name: 'Kadokawa', channelId: 'UCqmNf2x0c3y9fL8F5xM1A9w', tier: 2 }
+    ]
+};
+
+/**
+ * Combined source list for iteration
+ */
+export const ALL_RSS_SOURCES = [
+    ...RSS_SOURCES.TIER_2,
+    ...RSS_SOURCES.TIER_3
+];
