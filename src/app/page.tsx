@@ -1,20 +1,14 @@
-import { Suspense } from 'react';
 import { getPosts } from '@/lib/blog';
 import Hero from '@/components/home/Hero';
 import StatsBar from '@/components/home/StatsBar';
 import ConfirmationAlert from '@/components/home/ConfirmationAlert';
 import TodaysDrops from '@/components/home/TodaysDrops';
 import MostRecentFeed from '@/components/home/MostRecentFeed';
-import Manifesto from '@/components/home/Manifesto';
-import { 
-  HomePageSkeleton, 
-  BlogListSkeleton 
-} from '@/components/shared/SkeletonLoader';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-async function PostsContent() {
+export default async function Home() {
   let posts: any[] = [];
   
   try {
@@ -26,22 +20,11 @@ async function PostsContent() {
 
   return (
     <>
-      <ConfirmationAlert posts={posts} />
-      <TodaysDrops posts={posts} />
-      <Manifesto />
-      <MostRecentFeed posts={posts} />
-    </>
-  );
-}
-
-export default function Home() {
-  return (
-    <>
       <Hero />
       <StatsBar />
-      <Suspense fallback={<HomePageSkeleton />}>
-        <PostsContent />
-      </Suspense>
+      <ConfirmationAlert posts={posts} />
+      <TodaysDrops posts={posts} />
+      <MostRecentFeed posts={posts} />
     </>
   );
 }
