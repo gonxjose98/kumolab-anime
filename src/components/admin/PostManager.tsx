@@ -794,6 +794,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // 7. forcedApplyWatermark: TRUE (Always force watermark on save)
             console.log(`[Admin] Generating FINAL save image (Text: ${isApplyText ? 'ON' : 'OFF'})...`);
             finalImageToSave = await handleApplyText(undefined, undefined, isApplyText, undefined, undefined, undefined, true);
+            console.log(`[Admin] Image generation result:`, finalImageToSave ? `Base64 length: ${finalImageToSave.length}` : 'NULL');
         } else {
             console.warn('[Admin] No image found to process for save.');
         }
@@ -829,8 +830,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // 2. Use the cached "Preview" image (Next best)
             // 3. ERROR if strictly needed.
             const targetImageString = finalImageToSave || processedImage;
+            console.log(`[Admin] Target image string:`, targetImageString ? `Length: ${targetImageString.length}, starts with: ${targetImageString.substring(0, 50)}...` : 'NULL');
 
             if (targetImageString && targetImageString.startsWith('data:')) {
+                console.log(`[Admin] Converting base64 to blob...`);
                 const parts = targetImageString.split(',');
                 const byteString = atob(parts[1]);
                 const mimeString = parts[0].split(':')[1].split(';')[0];
@@ -841,14 +844,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 }
                 const blob = new Blob([ab], { type: mimeString });
                 imageFileToUpload = blob;
+                console.log(`[Admin] Blob created, size: ${blob.size} bytes`);
             } else if (customImage && (genType === null || !isApplyText)) {
                 // ONLY fall back to raw custom image if we are NOT applying text
                 // or if it's a simple Community post.
                 imageFileToUpload = customImage;
                 imageFileName = customImage.name;
-            } else if (!editingPostId) {
-                // If new post and no processed image...
-                alert('CRITICAL: Visual processing failed. Text overlay was not generated. Retrying...');
+            } else {
+                // If we have an image source but processing failed, show error
+                alert('CRITICAL: Visual processing failed. Text overlay was not generated. Please try again.');
                 setIsGenerating(false);
                 return;
             }
@@ -862,8 +866,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             if (imageFileToUpload) {
                 formData.append('image', imageFileToUpload, imageFileName);
                 formData.append('skipProcessing', 'true');
-            } else if (editingPostId) {
-                formData.append('skipProcessing', 'true');
+            } else if (editingPostId && !imageFileToUpload) {
+                // Editing but no new image generated - this is an error
+                alert('ERROR: Image processing failed. Changes were NOT saved. Please try again or check console for errors.');
+                setIsGenerating(false);
+                return;
             } else {
                 alert('Visual asset is required for new transmissions.');
                 setIsGenerating(false);
@@ -904,8 +911,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
 
             const data = await response.json();
+            console.log(`[Admin] Save response:`, data.success ? 'SUCCESS' : 'FAILED', data.post ? `Post image: ${data.post.image?.substring(0, 100)}...` : 'No post data');
             if (data.success && data.post) {
                 if (editingPostId) {
+                    console.log(`[Admin] Updating post ${editingPostId} in local state`);
                     setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
                 } else {
                     setPosts(current => [data.post, ...current]);
