@@ -10,9 +10,56 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakart
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com'),
-  title: 'KumoLab | Anime Intelligence',
-  description: 'Daily anime updates, drops, and intel - without the noise.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://kumolab-anime.com'),
+  title: {
+    default: 'KumoLab | Anime Intelligence & Verified News',
+    template: '%s | KumoLab'
+  },
+  description: 'Daily anime updates, verified news, release dates, trailers, and industry intel - without the noise. Trusted by 10,000+ anime fans.',
+  keywords: ['anime news', 'anime updates', 'anime release dates', 'anime trailers', 'anime intel'],
+  authors: [{ name: 'KumoLab' }],
+  creator: 'KumoLab',
+  publisher: 'KumoLab',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://kumolab-anime.com',
+    siteName: 'KumoLab',
+    title: 'KumoLab | Anime Intelligence & Verified News',
+    description: 'Daily anime updates, verified news, release dates, trailers, and industry intel - without the noise.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1080,
+        height: 1350,
+        alt: 'KumoLab - Anime Intelligence'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'KumoLab | Anime Intelligence',
+    description: 'Daily anime updates, verified news, release dates, and trailers - without the noise.',
+    images: ['/og-image.png'],
+    creator: '@KumoLabAnime'
+  },
+  verification: {
+    google: 'your-google-verification-code', // Add when available
+  },
+  alternates: {
+    canonical: 'https://kumolab-anime.com'
+  }
 };
 
 export const viewport = {
