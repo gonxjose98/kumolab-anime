@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import React from 'react';
 import { BlogPost } from '@/types';
 import styles from './BlogCard.module.css';
 
@@ -7,6 +8,14 @@ interface BlogCardProps {
 }
 
 const BlogCard = ({ post }: BlogCardProps) => {
+    // Force re-render when post.image changes
+    const [imageKey, setImageKey] = React.useState(Date.now());
+    
+    React.useEffect(() => {
+        // Update key when image URL changes to force refresh
+        setImageKey(Date.now());
+    }, [post.image, post.id]);
+    
     // Rule 4: Card overlay text mapping
     const getOverlayText = () => {
         // Priority 1: User-defined headline (from Mission Control)
@@ -40,7 +49,8 @@ const BlogCard = ({ post }: BlogCardProps) => {
             <div className={styles.imageWrapper}>
                 {post.image ? (
                     <img 
-                        src={`${post.image}${post.updated_at ? `?v=${new Date(post.updated_at).getTime()}` : ''}`} 
+                        key={imageKey}
+                        src={`${post.image}?v=${imageKey}`} 
                         alt={post.title} 
                         className={styles.image} 
                     />
