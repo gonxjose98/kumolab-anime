@@ -2019,25 +2019,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
             {
                 showModal && (
-                    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 sm:p-6">
-                        <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
-                        <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
+                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="absolute inset-0 bg-slate-900/80 dark:bg-black/95 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
+                        <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
 
-                            {/* Modal Header */}
-                            <div className="p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
-                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                            {/* Modal Header - Mobile Optimized */}
+                            <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02] flex-shrink-0">
+                                <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
                                     Edit Post
                                 </h3>
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors touch-manipulation"
+                                    aria-label="Close"
                                 >
                                     <Plus size={20} className="rotate-45" />
                                 </button>
                             </div>
 
-                            {/* Modal Content */}
-                            <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                            {/* Modal Content - Mobile Optimized */}
+                            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6">
                                 <div className="space-y-4">
                                     {/* 1. TITLE */}
                                     <div className="group">
@@ -2110,14 +2111,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </div>
 
                                     {searchedImages.length > 0 ? (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                             {/* --- THE PRO EDITOR STAGE --- */}
-                                            <div className="flex flex-col lg:flex-row gap-6">
+                                            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                                                 <div
                                                     ref={stageContainerRef}
                                                     onPointerMove={handleImagePointerMove}
                                                     onPointerUp={handleImagePointerUp}
-                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none z-0"
+                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none z-0 max-h-[50vh] sm:max-h-none"
                                                 >
                                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
@@ -2291,10 +2292,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     </div>
                                                 </div>
 
-                                                {/* Side Control Panel */}
-                                                <div className="w-full lg:w-48 flex flex-col gap-4">
+                                                {/* Side Control Panel - Mobile Optimized */}
+                                                <div className="w-full lg:w-48 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
                                                     {/* Text Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                    <div className="p-3 sm:p-4 bg-white/[0.03] border border-white/5 rounded-xl sm:rounded-2xl space-y-3 min-w-[140px] lg:min-w-0 flex-1 lg:flex-none">
                                                         <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
                                                             <span>Text Size</span>
                                                             <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
@@ -2457,36 +2458,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </div>
                                             </div>
 
-                                            {/* Preview Section */}
-                                            <div className="mt-8 pt-8 border-t border-white/5">
-                                                <button
-                                                    onClick={async () => {
-                                                        const result = await handleCommitToPreview();
-                                                        if (result) setShowExpandedPreview(true);
-                                                    }}
-                                                    disabled={isProcessingImage}
-                                                    className="w-full py-4 bg-neutral-900 border border-white/10 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all hover:bg-neutral-800 active:scale-[0.98] flex items-center justify-center gap-3"
-                                                >
-                                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
-                                                    Show Preview
-                                                </button>
-                                            </div>
-
-                                            {/* Fullscreen Preview Modal */}
+                                            {/* Fullscreen Preview Modal - Mobile Optimized */}
                                             {showExpandedPreview && processedImage && (
-                                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+                                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
                                                     <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setShowExpandedPreview(false)} />
-                                                    <div className="relative w-full max-w-4xl aspect-[4/5] bg-neutral-900 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(157,123,255,0.2)] border border-white/10">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
+                                                    <div className="relative w-full max-w-[calc(100vh*0.8)] max-h-[90vh] aspect-[4/5] bg-neutral-900 rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(157,123,255,0.15)] border border-white/10 flex flex-col">
+                                                        {/* Close Button - Larger for mobile */}
                                                         <button
                                                             onClick={() => setShowExpandedPreview(false)}
-                                                            className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/10 transition-all shadow-2xl z-[201]"
+                                                            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-3 bg-black/70 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl z-[201] touch-manipulation"
+                                                            aria-label="Close preview"
                                                         >
-                                                            <XCircle size={28} />
+                                                            <XCircle size={24} className="sm:w-7 sm:h-7" />
                                                         </button>
-                                                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
-                                                            MASTER VISUAL INSPECTION
+                                                        
+                                                        {/* Image Container */}
+                                                        <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img 
+                                                                src={processedImage} 
+                                                                alt="Preview" 
+                                                                className="w-full h-full object-contain max-h-[calc(90vh-80px)]" 
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Footer */}
+                                                        <div className="p-3 sm:p-4 bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-center">
+                                                            <span className="text-[9px] sm:text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">
+                                                                PREVIEW MODE
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2517,28 +2517,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             </div>
 
-                            {/* Action Footer */}
-                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex items-center gap-4">
+                            {/* Action Footer - Mobile Optimized */}
+                            <div className="p-3 sm:p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 flex-shrink-0">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors"
+                                    className="px-4 sm:px-6 py-3 sm:py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors order-3 sm:order-1"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleCommitToPreview}
                                     disabled={isProcessingImage || isApplyingEffect}
-                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 flex items-center justify-center gap-3"
+                                    className="flex-1 py-3 sm:py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 sm:gap-3 order-2"
                                 >
-                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
-                                    Show Preview
+                                    {isProcessingImage ? <Loader2 className="animate-spin" size={16} /> : <Eye size={16} />}
+                                    <span className="hidden sm:inline">Show Preview</span>
+                                    <span className="sm:hidden">Preview</span>
                                 </button>
                                 <button
                                     onClick={() => handleSavePost(true)}
                                     disabled={isGenerating || isApplyingEffect}
-                                    className="flex-[1.5] py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                    className="flex-[1.5] py-3 sm:py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 sm:gap-3 order-1 sm:order-3"
                                 >
-                                    {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+                                    {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
                                     Save Changes
                                 </button>
                             </div>
