@@ -779,22 +779,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleSavePost = async (autoClose: boolean = false) => {
         setIsGenerating(true);
 
-        // FORCE REGENERATION: To ensure the latest text (Topic/Title) is applied
-        // We cannot rely solely on cached 'processedImage' because the user might have just typed 
-        // in the Topic box without triggering 'isStageDirty' if onBlur didn't fire yet.
-        // So we ALWAYS regenerate if we have a source image.
-        let finalImageToSave: string | null = null;
+        // USE EXISTING PROCESSED IMAGE: If user clicked "Show Preview", we already have the processed image.
+        // Only regenerate if we don't have a processed image yet.
+        let finalImageToSave: string | null = processedImage;
 
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
 
-        if (imageUrl) {
-            // 3. forcedApplyText: Respect isApplyText (Do NOT force true)
-            // 7. forcedApplyWatermark: TRUE (Always force watermark on save)
-            console.log(`[Admin] Generating FINAL save image (Text: ${isApplyText ? 'ON' : 'OFF'})...`);
+        if (!finalImageToSave && imageUrl) {
+            // No processed image yet - generate it now
+            console.log(`[Admin] No processed image exists, generating... (Text: ${isApplyText ? 'ON' : 'OFF'})`);
             finalImageToSave = await handleApplyText(undefined, undefined, isApplyText, undefined, undefined, undefined, true);
             console.log(`[Admin] Image generation result:`, finalImageToSave ? `Base64 length: ${finalImageToSave.length}` : 'NULL');
+        } else if (finalImageToSave) {
+            console.log(`[Admin] Using existing processed image, length: ${finalImageToSave.length}`);
         } else {
             console.warn('[Admin] No image found to process for save.');
         }
