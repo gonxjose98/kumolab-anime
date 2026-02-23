@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 import { AntigravityAI } from './ai';
 import { selectBestImage } from './image-selector';
 import { generateEventFingerprint } from './utils';
+import { calculateVerification } from './verification';
 
 /**
  * Generates a Daily Drops (DROP) post from a list of airing episodes.
@@ -217,6 +218,15 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
     // 6. CONTENT CLEANUP
     const finalContent = cleanBody(item.content, finalTitle, claimType);
 
+    // 7. CALCULATE VERIFICATION STATUS
+    const verification = calculateVerification(
+        claimType,
+        item.verification_tier || 3,
+        item.source || 'Unknown',
+        [], // cross-references would be added here in future
+        false
+    );
+
     return {
         id: randomUUID(),
         title: finalTitle,
@@ -240,7 +250,14 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         verification_sources: { 
             source_url: item.source_url,
             source_name: item.source || 'Unknown'
-        }
+        },
+        // NEW: Accuracy-first tier data
+        verification_badge: verification.badge,
+        verification_score: verification.score,
+        verification_classification: verification.classification,
+        requires_review: verification.humanReview,
+        auto_post_eligible: verification.autoPost,
+        priority_level: verification.priority
     };
 }
 

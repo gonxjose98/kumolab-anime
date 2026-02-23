@@ -55,6 +55,13 @@ export interface BlogPost {
     verification_tier?: 'streamer' | 'popularity' | 'format_exception' | number;
     verification_reason?: string;
     verification_sources?: any;
+    // Accuracy-First Verification System
+    verification_badge?: string;
+    verification_score?: number;
+    verification_classification?: string;
+    requires_review?: boolean;
+    auto_post_eligible?: boolean;
+    priority_level?: string;
     // Social IDs & Cache
     socialIds?: {
         twitter?: string;

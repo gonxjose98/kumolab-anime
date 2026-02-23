@@ -1457,6 +1457,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     return null;
                                                 })()}
                                                 
+                                                {/* Verification Badge */}
+                                                {(post as any).verification_badge && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-wide" style={{ color: (post as any).verification_color || '#9ca3af' }}>
+                                                            {(post as any).verification_badge}
+                                                        </span>
+                                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
+                                                            {(post as any).verification_score || 0}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Classification & Priority */}
+                                                {(post as any).verification_classification && (
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                            (post as any).auto_post_eligible ? 'bg-green-900/30 text-green-400' : 'bg-amber-900/30 text-amber-400'
+                                                        }`}>
+                                                            {(post as any).auto_post_eligible ? '✓ Auto-Post' : '⚠ Review Required'}
+                                                        </span>
+                                                        <span className="text-[8px] text-neutral-500 uppercase">
+                                                            {(post as any).priority_level}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                
                                                 {/* Source & Tier */}
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
@@ -1724,6 +1750,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </span>
                                             {filter === 'PENDING' && (
                                                 <div className="flex flex-col gap-1.5 border-l border-white/10 pl-2">
+                                                    {/* Verification Badge Mobile */}
+                                                    {(post as any).verification_badge && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[8px] font-black uppercase" style={{ color: (post as any).verification_color || '#9ca3af' }}>
+                                                                {(post as any).verification_badge}
+                                                            </span>
+                                                            <span className={`text-[7px] px-1 py-0.5 rounded ${(post as any).auto_post_eligible ? 'bg-green-900/30 text-green-400' : 'bg-amber-900/30 text-amber-400'}`}>
+                                                                {(post as any).auto_post_eligible ? '✓ Auto' : '⚠ Review'}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="text-[8px] font-bold text-neutral-500 uppercase">
                                                             {post.source || 'Unknown'}

@@ -140,3 +140,174 @@ export const ALL_RSS_SOURCES = [
     ...RSS_SOURCES.TIER_2,
     ...RSS_SOURCES.TIER_3
 ];
+
+// ============================================================
+// ACCURACY-FIRST CONTENT TIER SYSTEM
+// ============================================================
+
+/**
+ * VERIFICATION TIERS — Authority Score 0-100
+ * Visual trust indicators for content
+ */
+export const VERIFICATION_TIERS = {
+    /** 95-100: Studio/Publisher confirmed via multiple sources */
+    VERIFIED_PRIMARY: {
+        score: 95,
+        badge: '🔴 VERIFIED PRIMARY',
+        color: '#ef4444', // red-500
+        description: 'Studio/Publisher confirmed via multiple sources'
+    },
+    /** 80-94: Two+ independent T2+ sources align */
+    CONFIRMED: {
+        score: 85,
+        badge: '🟡 CONFIRMED',
+        color: '#eab308', // yellow-500
+        description: 'Two+ independent sources confirm'
+    },
+    /** 65-79: Official website or single T1 source */
+    OFFICIAL: {
+        score: 75,
+        badge: '🟠 OFFICIAL',
+        color: '#f97316', // orange-500
+        description: 'Official source or single T1 confirmation'
+    },
+    /** 50-64: Licensed platform or T2 source */
+    PLATFORM_VERIFIED: {
+        score: 60,
+        badge: '🟢 PLATFORM',
+        color: '#22c55e', // green-500
+        description: 'Licensed platform or publisher source'
+    },
+    /** 30-49: Database/community trending */
+    TRENDING: {
+        score: 40,
+        badge: '🔵 TRENDING',
+        color: '#3b82f6', // blue-500
+        description: 'Community buzz, verification in progress'
+    },
+    /** <30: Single source, awaiting confirmation */
+    REPORTED: {
+        score: 20,
+        badge: '⚪ REPORTED',
+        color: '#9ca3af', // gray-400
+        description: 'Single source, awaiting confirmation'
+    }
+};
+
+/**
+ * Get verification tier based on source tier and cross-reference count
+ */
+export function getVerificationTier(sourceTier: number, crossRefCount: number = 0): keyof typeof VERIFICATION_TIERS {
+    if (sourceTier === 1 && crossRefCount >= 1) return 'VERIFIED_PRIMARY';
+    if (sourceTier <= 2 && crossRefCount >= 2) return 'CONFIRMED';
+    if (sourceTier === 1 || crossRefCount >= 1) return 'OFFICIAL';
+    if (sourceTier <= 3) return 'PLATFORM_VERIFIED';
+    if (sourceTier <= 4) return 'TRENDING';
+    return 'REPORTED';
+}
+
+/**
+ * CONTENT TYPE CLASSIFICATION
+ * What gets auto-posted vs what needs review
+ */
+export const CONTENT_CLASSIFICATION = {
+    /** Breaking: Studio/Publisher Direct — Auto-post with verification badge */
+    BREAKING: {
+        minTier: 1,
+        maxTier: 2,
+        requiredKeywords: ['confirmed', 'announces', 'reveals', 'trailer', 'pv'],
+        autoPost: true,
+        humanReview: false,
+        priority: 'immediate'
+    },
+    /** Season Confirmations — Must have T1-T2 source */
+    SEASON_CONFIRMATION: {
+        claimTypes: ['NEW_SEASON_CONFIRMED'],
+        minTier: 1,
+        maxTier: 2,
+        autoPost: false,
+        humanReview: true,
+        priority: 'high'
+    },
+    /** Release Dates — T2+ required, 24hr review window */
+    RELEASE_DATE: {
+        claimTypes: ['DATE_ANNOUNCED'],
+        minTier: 2,
+        maxTier: 4,
+        autoPost: false,
+        humanReview: true,
+        priority: 'medium'
+    },
+    /** Delays/Postponements — T1-T4 allowed, immediate */
+    DELAY: {
+        claimTypes: ['DELAY'],
+        minTier: 1,
+        maxTier: 4,
+        autoPost: true,
+        humanReview: false,
+        priority: 'immediate'
+    },
+    /** Trailers/PVs — T2+ required, check if official */
+    TRAILER: {
+        claimTypes: ['TRAILER_DROP'],
+        minTier: 2,
+        maxTier: 3,
+        autoPost: false,
+        humanReview: true,
+        priority: 'high'
+    },
+    /** Visual Reveals — T2+ required */
+    VISUAL: {
+        claimTypes: ['NEW_KEY_VISUAL'],
+        minTier: 2,
+        maxTier: 3,
+        autoPost: false,
+        humanReview: true,
+        priority: 'medium'
+    },
+    /** Daily Drops — T4 verified, auto at 8am */
+    DAILY_DROPS: {
+        type: 'DROP',
+        minTier: 4,
+        requiresStreamerLink: true,
+        autoPost: true,
+        humanReview: false,
+        priority: 'scheduled'
+    },
+    /** Trending — T5+ allowed, daily digest only */
+    TRENDING: {
+        claimTypes: ['TRENDING_UPDATE'],
+        minTier: 5,
+        autoPost: false,
+        humanReview: true,
+        priority: 'low',
+        digestOnly: true
+    }
+};
+
+/**
+ * Calculate content classification for a post
+ */
+export function classifyContent(claimType: string, sourceTier: number, hasStreamerLink: boolean = false) {
+    // Check each classification rule
+    for (const [key, rule] of Object.entries(CONTENT_CLASSIFICATION)) {
+        if (rule.claimTypes?.includes(claimType as any)) {
+            if (sourceTier >= rule.minTier && sourceTier <= (rule.maxTier || 6)) {
+                return { classification: key, ...rule };
+            }
+        }
+        if (rule.type === 'DROP' && claimType === 'DROP') {
+            if (hasStreamerLink || !rule.requiresStreamerLink) {
+                return { classification: key, ...rule };
+            }
+        }
+    }
+    
+    // Default: needs human review
+    return {
+        classification: 'STANDARD',
+        autoPost: false,
+        humanReview: true,
+        priority: 'low'
+    };
+}
