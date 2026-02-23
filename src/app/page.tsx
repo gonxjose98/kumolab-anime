@@ -26,8 +26,8 @@ export default async function Home() {
       <StatsBar />
       <ConfirmationAlert posts={posts} />
       <TodaysDrops posts={posts} />
-      <MostRecentFeed posts={posts} />
       <Manifesto />
+      <MostRecentFeed posts={posts} />
     </>
   );
 }
