@@ -1,0 +1,110 @@
+.statsBar {
+    background: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-md) 0;
+    position: relative;
+    z-index: 10;
+}
+
+.container {
+    max-width: var(--container-width);
+    margin: 0 auto;
+    padding: 0 var(--space-md);
+}
+
+.statsScroll {
+    display: flex;
+    gap: var(--space-md);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: var(--space-xs);
+}
+
+.statsScroll::-webkit-scrollbar {
+    display: none;
+}
+
+.statItem {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    min-width: 160px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.statItem:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--stat-color);
+    transform: translateY(-2px);
+}
+
+.statIcon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    color: var(--stat-color);
+}
+
+.statContent {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.statValue {
+    font-size: var(--font-h2);
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.statLabel {
+    font-size: var(--font-small);
+    color: var(--text-tertiary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* TABLET */
+@media (min-width: 640px) {
+    .statsBar {
+        padding: var(--space-lg) 0;
+    }
+    
+    .statsScroll {
+        justify-content: center;
+        gap: var(--space-lg);
+    }
+    
+    .statItem {
+        min-width: 180px;
+        padding: var(--space-md) var(--space-lg);
+    }
+    
+    .statValue {
+        font-size: 2rem;
+    }
+}
+
+/* DESKTOP */
+@media (min-width: 1024px) {
+    .statItem {
+        min-width: 200px;
+    }
+    
+    .statValue {
+        font-size: 2.25rem;
+    }
+}
