@@ -228,10 +228,11 @@
 .kumolabText {
     font-size: calc(var(--font-body) * 1.3);
     font-weight: 900;
-    color: #7c3aed;
+    color: #E9D5FF;
     text-shadow: 
         0 2px 4px rgba(0, 0, 0, 0.9),
-        0 0 20px rgba(124, 58, 237, 0.6);
+        0 0 30px rgba(233, 213, 255, 0.8),
+        0 0 60px rgba(124, 58, 237, 0.5);
 }
 
 /* ANIMATION STATE */

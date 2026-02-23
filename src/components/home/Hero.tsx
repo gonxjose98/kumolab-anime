@@ -60,10 +60,10 @@ const Hero = () => {
             <div className={`${styles.heroContent} ${isAnimating ? styles.animating : ''}`}>
                 {/* Main Headline */}
                 <div className={styles.headlineContainer}>
-                    <h1 className={styles.mainHeadline}>Daily Anime Intelligence</h1>
+                    <h1 className={styles.mainHeadline}>DAILY ANIME INTELLIGENCE</h1>
                     <div className={styles.subtitle}>
                         <span className={styles.subtitleLine}>Confirmed release dates, trailers, and news</span>
-                        <span className={styles.subtitleLine}>— verified by <strong className={styles.kumolabText}>KumoLab</strong></span>
+                        <span className={styles.subtitleLine}>verified by <strong className={styles.kumolabText}>KumoLab</strong></span>
                     </div>
                 </div>
 
