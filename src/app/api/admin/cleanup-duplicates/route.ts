@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         // Fetch all pending posts
         const { data: pendingPosts, error } = await supabaseAdmin
             .from('posts')
-            .select('id, title, slug, type, claimType, anime_id, timestamp, source, sourceTier, relevance_score')
+            .select('id, title, slug, type, claim_type, anime_id, timestamp, source, source_tier, relevance_score')
             .eq('status', 'pending')
             .order('timestamp', { ascending: false });
         
@@ -48,12 +48,12 @@ export async function POST(req: NextRequest) {
         const processed = new Set<string>();
         const deletionLog: any[] = [];
         
-        // Group by anime_id + claimType (exact duplicates)
+        // Group by anime_id + claim_type (exact duplicates)
         const claimGroups = new Map<string, any[]>();
         
         pendingPosts.forEach(post => {
-            if (post.anime_id && post.claimType) {
-                const key = `${post.anime_id}:${post.claimType}`;
+            if (post.anime_id && post.claim_type) {
+                const key = `${post.anime_id}:${post.claim_type}`;
                 if (!claimGroups.has(key)) {
                     claimGroups.set(key, []);
                 }
@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
             if (group.length > 1) {
                 // Sort by tier (ascending) then by relevance score (descending)
                 const sorted = group.sort((a, b) => {
-                    if (a.sourceTier !== b.sourceTier) {
-                        return a.sourceTier - b.sourceTier;
+                    if (a.source_tier !== b.source_tier) {
+                        return a.source_tier - b.source_tier;
                     }
                     return b.relevance_score - a.relevance_score;
                 });
@@ -99,8 +99,8 @@ export async function POST(req: NextRequest) {
                 const similarity = calculateSimilarity(post.title, other.title);
                 
                 if (similarity >= 0.75) {
-                    const keepPost = (post.sourceTier < other.sourceTier) || 
-                        (post.sourceTier === other.sourceTier && post.relevance_score >= other.relevance_score)
+                    const keepPost = (post.source_tier < other.source_tier) || 
+                        (post.source_tier === other.source_tier && post.relevance_score >= other.relevance_score)
                         ? post : other;
                     const deletePost = keepPost === post ? other : post;
                     
