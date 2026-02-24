@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+// Simple GET to test route is working
+export async function GET() {
+    return NextResponse.json({ status: 'ok', message: 'Cleanup API is running' });
+}
+
 // Use lazy initialization to avoid build-time errors
 async function getSupabaseAdmin() {
     const { supabaseAdmin } = await import('@/lib/supabase/admin');
@@ -154,7 +159,11 @@ export async function POST(req: NextRequest) {
         
     } catch (error: any) {
         console.error('[Cleanup API] Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('[Cleanup API] Stack:', error.stack);
+        return NextResponse.json({ 
+            error: error.message || 'Unknown error',
+            stack: error.stack
+        }, { status: 500 });
     }
 }
 
