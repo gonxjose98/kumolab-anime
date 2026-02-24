@@ -54,37 +54,78 @@ export async function POST(req: NextRequest) {
 
             const slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
 
-            if (skipProcessing) {
-                // Move temp file to permanent location with proper filename
-                const permanentFileName = `${slug}-${Date.now()}.png`;
-                const { error: moveError } = await supabaseAdmin
+            // Check if user has text overlays enabled in imageSettings
+        let parsedImageSettings: any = null;
+        if (imageSettings) {
+            try {
+                parsedImageSettings = JSON.parse(imageSettings);
+            } catch (e) {
+                console.error('Failed to parse imageSettings:', e);
+            }
+        }
+        
+        // Force processing if text/gradient/watermark is enabled - ignore skipProcessing flag
+        const needsProcessing = parsedImageSettings && (
+            parsedImageSettings.isApplyText === true ||
+            parsedImageSettings.isApplyGradient === true ||
+            parsedImageSettings.isApplyWatermark === true
+        );
+        
+        // Process the image if needed (overlays enabled) OR if skipProcessing is false
+        if (needsProcessing || !skipProcessing) {
+            console.log(`[Admin API] Processing image with settings:`, {
+                needsProcessing,
+                isApplyText: parsedImageSettings?.isApplyText,
+                isApplyGradient: parsedImageSettings?.isApplyGradient,
+                isApplyWatermark: parsedImageSettings?.isApplyWatermark,
+                headline: headline
+            });
+            
+            const result = await generateIntelImage({
+                sourceUrl: publicUrl,
+                animeTitle: title,
+                headline: headline,
+                slug: slug,
+                gradientPosition: parsedImageSettings?.gradientPosition || 'bottom',
+                applyText: parsedImageSettings?.isApplyText ?? true,
+                applyGradient: parsedImageSettings?.isApplyGradient ?? true,
+                applyWatermark: parsedImageSettings?.isApplyWatermark ?? true,
+                textScale: parsedImageSettings?.textScale ?? 1,
+                textPosition: parsedImageSettings?.textPosition,
+                purpleWordIndices: parsedImageSettings?.purpleWordIndices,
+                verticalOffset: parsedImageSettings?.verticalOffset ?? 0
+            });
+            
+            if (result?.processedImage) {
+                finalImageUrl = result.processedImage;
+                console.log(`[Admin API] Image processed successfully, length:`, finalImageUrl.length);
+            } else {
+                console.error('[Admin API] Image processing returned null, falling back to raw image');
+                finalImageUrl = publicUrl;
+            }
+        } else {
+            // No overlays needed - move temp file to permanent location
+            console.log(`[Admin API] No overlays needed, using raw image`);
+            const permanentFileName = `${slug}-${Date.now()}.png`;
+            const { error: moveError } = await supabaseAdmin
+                .storage
+                .from('blog-images')
+                .move(tempFileName, permanentFileName);
+            
+            if (moveError) {
+                console.error('Move error:', moveError);
+                // Fall back to temp URL if move fails
+                finalImageUrl = publicUrl;
+            } else {
+                // Get URL for permanent file
+                const { data: { publicUrl: permanentUrl } } = supabaseAdmin
                     .storage
                     .from('blog-images')
-                    .move(tempFileName, permanentFileName);
-                
-                if (moveError) {
-                    console.error('Move error:', moveError);
-                    // Fall back to temp URL if move fails
-                    finalImageUrl = publicUrl;
-                } else {
-                    // Get URL for permanent file
-                    const { data: { publicUrl: permanentUrl } } = supabaseAdmin
-                        .storage
-                        .from('blog-images')
-                        .getPublicUrl(permanentFileName);
-                    finalImageUrl = permanentUrl;
-                    tempFileName = null; // Don't delete the permanent file
-                }
-            } else {
-                const result = await generateIntelImage({
-                    sourceUrl: publicUrl,
-                    animeTitle: title,
-                    headline: headline,
-                    slug: slug,
-                    gradientPosition: 'bottom'
-                });
-                finalImageUrl = result?.processedImage || null;
+                    .getPublicUrl(permanentFileName);
+                finalImageUrl = permanentUrl;
+                tempFileName = null; // Don't delete the permanent file
             }
+        }
         }
 
         // Create or Update post in database

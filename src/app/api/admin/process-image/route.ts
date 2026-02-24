@@ -20,18 +20,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Image URL is required' }, { status: 400 });
         }
 
-        console.log(`[Admin] Generating preview for: ${title}`);
+        console.log(`[Admin] Generating preview for: ${title || headline}`);
 
         // Generate valid slug for filename generation logic (even if mocked)
         const mockSlug = `preview-${Date.now()}`;
 
-        console.log(`[Admin API] Calling generateIntelImage with applyText=${applyText}`);
+        console.log(`[Admin API] Calling generateIntelImage with applyText=${applyText}, headline=${headline}`);
         
         let processedImage;
         try {
             processedImage = await generateIntelImage({
                 sourceUrl: imageUrl,
-                animeTitle: title,
+                animeTitle: title || headline || '',
                 headline: headline || '',
                 slug: mockSlug,
                 skipUpload: true, // Force Base64 return

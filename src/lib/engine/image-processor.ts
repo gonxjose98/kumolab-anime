@@ -343,22 +343,9 @@ export async function generateIntelImage({
         }
 
         // USER'S CHOICE TAKES PRIORITY - Respect the toggle settings from UI
-        let finalApplyText = applyText !== false; // Default true unless explicitly false
-        let finalApplyGradient = applyGradient !== false;
-        let finalApplyWatermark = applyWatermark !== false;
-
-        // HARD CONTRACT: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
-        if (derivedClassification === 'TEXT_HEAVY') {
-            finalApplyText = false;
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
-        }
-
-        // REVALIDATION: If hasText is false (either derived or forced), all overlays MUST BE ZERO
-        if (!finalApplyText) {
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
-        }
+        let finalApplyText = applyText === true; // Only true if explicitly set
+        let finalApplyGradient = applyGradient === true;
+        let finalApplyWatermark = applyWatermark === true;
 
         // --- CLEAN TEXT PRE-VALIDATION ---
         let cleanedHeadline = (headline || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
@@ -366,15 +353,12 @@ export async function generateIntelImage({
 
         // Deduplication
         if (cleanedHeadline === upperTitle && upperTitle.length > 0) cleanedHeadline = '';
-        if (cleanedHeadline.includes('TRENDING')) cleanedHeadline = '';
 
         const hasActualText = (upperTitle.length > 0 || cleanedHeadline.length > 0);
 
-        // HARD CONTRACT: No text = No visual treatments.
-        if (!finalApplyText || !hasActualText) {
+        // If user wants text but there's no text content, disable text but keep other settings
+        if (finalApplyText && !hasActualText) {
             finalApplyText = false;
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
         }
 
         // --- SAFE ZONE DETECTION ---
@@ -676,16 +660,7 @@ export async function generateIntelImage({
 
     } catch (e: any) {
         console.error("Image Engine Fatal:", e);
-        // Return the original image as base64 instead of null to prevent failures
-        try {
-            const finalBuffer = await canvas.toBuffer('image/png');
-            const processedImageBase64 = `data:image/png;base64,${finalBuffer.toString('base64')}`;
-            return {
-                processedImage: processedImageBase64,
-                layout: (ctx as any)._layoutMetadata
-            };
-        } catch (fallbackError) {
-            return null;
-        }
+        // Return null on fatal error - the caller should handle this
+        return null;
     }
 }
