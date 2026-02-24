@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
+
+// Use lazy initialization to avoid build-time errors
+async function getSupabaseAdmin() {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin');
+    return supabaseAdmin;
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,6 +18,8 @@ export async function POST(req: NextRequest) {
         
         console.log('🧹 Cleaning up duplicate posts from pending approvals...\n');
         
+        const supabaseAdmin = await getSupabaseAdmin();
+        
         // Fetch all pending posts
         const { data: pendingPosts, error } = await supabaseAdmin
             .from('posts')
@@ -20,9 +27,14 @@ export async function POST(req: NextRequest) {
             .eq('status', 'pending')
             .order('timestamp', { ascending: false });
         
-        if (error || !pendingPosts) {
+        if (error) {
             console.error('Failed to fetch pending posts:', error);
-            return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 });
+            return NextResponse.json({ error: `Failed to fetch posts: ${error.message}` }, { status: 500 });
+        }
+        
+        if (!pendingPosts) {
+            console.error('No pending posts data returned');
+            return NextResponse.json({ error: 'No data returned from database' }, { status: 500 });
         }
         
         console.log(`📊 Found ${pendingPosts.length} pending posts\n`);
@@ -115,8 +127,10 @@ export async function POST(req: NextRequest) {
         let deletedCount = 0;
         let failedCount = 0;
         
+        const supabaseClient = await getSupabaseAdmin();
+        
         for (const id of duplicatesToDelete) {
-            const { error: deleteError } = await supabaseAdmin
+            const { error: deleteError } = await supabaseClient
                 .from('posts')
                 .delete()
                 .eq('id', id);
