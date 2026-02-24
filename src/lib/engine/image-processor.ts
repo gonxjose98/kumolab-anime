@@ -78,7 +78,7 @@ export interface ImageProcessingResult {
 /**
  * Wraps text into lines using natural flow, maximizing horizontal fill
  * Targets 2-3 lines total with full width utilization
- * STRICT: Enforces maxWidth with safety buffer to prevent overflow
+ * PERMISSIVE: Allows slight overflow to prevent aggressive word breaking
  */
 function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, currentFS: number): string[] {
     if (!text || !text.trim()) return [];
@@ -88,8 +88,8 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
     const lines: string[] = [];
     let currentLine = words[0];
     
-    // Strict max width with safety buffer
-    const strictMaxWidth = maxWidth * MAX_LINE_WIDTH_PERCENT;
+    // Allow 10% overflow for better text flow (was too strict at 95%)
+    const strictMaxWidth = maxWidth * 1.05;
 
     for (let i = 1; i < words.length; i++) {
         const word = words[i];
@@ -101,14 +101,14 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
             width = 0;
         }
 
-        // Hard fallback if measureText returns 0 or fails (estimation)
+        // Fallback estimation if measureText fails
         if (width === 0) {
-            // Conservative estimate: avg char width ~0.55x font size for bold uppercase
-            width = (currentLine.length + word.length + 1) * (currentFS * 0.55);
+            // More generous estimate: avg char width ~0.6x font size for bold uppercase
+            width = (currentLine.length + word.length + 1) * (currentFS * 0.6);
         }
 
-        // STRICT: Break line if adding word would exceed max width
-        if (width <= strictMaxWidth) {
+        // PERMISSIVE: Add word if it fits or if line is still short
+        if (width <= strictMaxWidth || currentLine.split(/\s+/).length < 2) {
             currentLine += " " + word;
         } else {
             lines.push(currentLine);
@@ -117,9 +117,13 @@ function wrapText(ctx: any, text: string, maxWidth: number, maxLines: number, cu
     }
     lines.push(currentLine);
     
-    // FORCE COMPACTION: If we have more than maxLines, truncate
+    // Only truncate if severely over limit
     if (lines.length > maxLines && maxLines > 0) {
-        return lines.slice(0, maxLines);
+        // Join excess lines into the last allowed line
+        const truncated = lines.slice(0, maxLines - 1);
+        const remaining = lines.slice(maxLines - 1).join(' ');
+        truncated.push(remaining);
+        return truncated;
     }
     
     return lines.slice(0, maxLines || 10);
@@ -175,9 +179,10 @@ function calculateOptimalFontSize(
     
     if (!disableAutoScaling && allLines.length > 0) {
         // Helper to check if any line overflows the available width
+        // PERMISSIVE: Allow 5% overflow before considering it an error
         const hasOverflow = (lines: string[], fs: number): boolean => {
             ctx.font = `900 ${fs}px "Outfit"`;
-            const strictWidth = availableWidth * MAX_LINE_WIDTH_PERCENT;
+            const strictWidth = availableWidth * 1.05; // 5% overflow allowed
             return lines.some(line => measureLineWidth(ctx, line) > strictWidth);
         };
         
@@ -518,10 +523,10 @@ export async function generateIntelImage({
                     return { wordW: m.width, spaceW };
                 });
 
-                // STRICT: If line exceeds max width, scale it down
+                // PERMISSIVE: Only scale down if significantly over width (more than 10%)
                 let scaleFactor = 1;
-                if (lineTotalWidth > maxAllowedLineWidth) {
-                    scaleFactor = maxAllowedLineWidth / lineTotalWidth;
+                if (lineTotalWidth > maxAllowedLineWidth * 1.1) {
+                    scaleFactor = (maxAllowedLineWidth * 1.05) / lineTotalWidth;
                     console.log(`[Image Engine] Line overflow detected, scaling by ${scaleFactor.toFixed(3)}`);
                 }
 
