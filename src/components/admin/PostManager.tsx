@@ -1369,6 +1369,43 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </button>
 
+                {filter === 'PENDING' && (
+                    <button
+                        onClick={async () => {
+                            if (!confirm('🧹 This will delete duplicate posts from pending approvals.\n\nKeep: Highest tier/source post from each duplicate group\nDelete: Lower tier duplicates and similar titles (75%+ match)\n\nProceed?')) return;
+                            
+                            setIsPublishing(true);
+                            try {
+                                const res = await fetch('/api/admin/cleanup-duplicates', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'cleanup-pending' })
+                                });
+                                const data = await res.json();
+                                
+                                if (data.success) {
+                                    alert(`✅ Cleanup complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} posts`);
+                                    // Refresh posts
+                                    window.location.reload();
+                                } else {
+                                    alert('❌ Cleanup failed: ' + (data.error || 'Unknown error'));
+                                }
+                            } catch (e: any) {
+                                alert('❌ Error: ' + e.message);
+                            } finally {
+                                setIsPublishing(false);
+                            }
+                        }}
+                        disabled={isPublishing}
+                        className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                    >
+                        <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
+                            {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            <span className="text-[10px] font-black uppercase tracking-widest">Clean Dups</span>
+                        </div>
+                    </button>
+                )}
+
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
                         <button
