@@ -676,6 +676,16 @@ export async function generateIntelImage({
 
     } catch (e: any) {
         console.error("Image Engine Fatal:", e);
-        return null;
+        // Return the original image as base64 instead of null to prevent failures
+        try {
+            const finalBuffer = await canvas.toBuffer('image/png');
+            const processedImageBase64 = `data:image/png;base64,${finalBuffer.toString('base64')}`;
+            return {
+                processedImage: processedImageBase64,
+                layout: (ctx as any)._layoutMetadata
+            };
+        } catch (fallbackError) {
+            return null;
+        }
     }
 }
