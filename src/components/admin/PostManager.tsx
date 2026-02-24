@@ -851,7 +851,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 imageFileName = customImage.name;
             } else {
                 // If we have an image source but processing failed, show error
-                alert('CRITICAL: Visual processing failed. Text overlay was not generated. Please try again.');
+                console.error('[Admin] Save failed: No valid processed image');
+                console.error('[Admin] finalImageToSave:', finalImageToSave ? `Length ${finalImageToSave.length}, starts with: ${finalImageToSave.substring(0, 30)}` : 'null');
+                console.error('[Admin] processedImage:', processedImage ? `Length ${processedImage.length}, starts with: ${processedImage.substring(0, 30)}` : 'null');
+                alert('ERROR: No processed image available. Click "Show Preview" first to generate the image, then save.');
                 setIsGenerating(false);
                 return;
             }

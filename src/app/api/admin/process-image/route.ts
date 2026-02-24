@@ -25,29 +25,37 @@ export async function POST(request: NextRequest) {
         // Generate valid slug for filename generation logic (even if mocked)
         const mockSlug = `preview-${Date.now()}`;
 
-        const processedImage = await generateIntelImage({
-            sourceUrl: imageUrl,
-            animeTitle: title,
-            headline: headline || '',
-            slug: mockSlug,
-            skipUpload: true, // Force Base64 return
-            scale,
-            position,
-            applyText,
-            applyGradient,
-            textPosition: textPos,
-            textScale,
-            gradientPosition: gradientPos,
-            purpleWordIndices: purpleIndex, // Accepts array from client
-            applyWatermark,
-            watermarkPosition,
-            disableAutoScaling,
-            verticalOffset: verticalOffset || 0 // NEW: Manual vertical adjustment
-        });
-
+        console.log(`[Admin API] Calling generateIntelImage with applyText=${applyText}`);
+        
+        let processedImage;
+        try {
+            processedImage = await generateIntelImage({
+                sourceUrl: imageUrl,
+                animeTitle: title,
+                headline: headline || '',
+                slug: mockSlug,
+                skipUpload: true, // Force Base64 return
+                scale,
+                position,
+                applyText,
+                applyGradient,
+                textPosition: textPos,
+                textScale,
+                gradientPosition: gradientPos,
+                purpleWordIndices: purpleIndex, // Accepts array from client
+                applyWatermark,
+                watermarkPosition,
+                disableAutoScaling,
+                verticalOffset: verticalOffset || 0 // NEW: Manual vertical adjustment
+            });
+        } catch (genError: any) {
+            console.error(`[Admin API] Image generation threw error:`, genError);
+            throw new Error(`Image generation failed: ${genError.message}`);
+        }
 
         if (!processedImage) {
-            throw new Error('Image generation returned null');
+            console.error(`[Admin API] Image generation returned null`);
+            throw new Error('Image generation returned null - check server logs for details');
         }
 
         return NextResponse.json({
