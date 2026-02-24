@@ -342,20 +342,10 @@ export async function generateIntelImage({
             return null;
         }
 
-        // --- BUCKET-BASED DECISION LOGIC (RAW IMAGE MODE) ---
-        const isPortraitPoster = imgRatio < 0.85;
-        const derivedClassification = classification || (isPortraitPoster ? 'TEXT_HEAVY' : 'CLEAN');
-
-        let finalApplyText = derivedClassification === 'CLEAN';
-        let finalApplyGradient = derivedClassification === 'CLEAN';
-        let finalApplyWatermark = derivedClassification === 'CLEAN';
-
-        // USER MANUAL OVERRIDE
-        if (applyText === false) {
-            finalApplyText = false;
-        } else if (applyText === true && derivedClassification === 'CLEAN') {
-            finalApplyText = true;
-        }
+        // USER'S CHOICE TAKES PRIORITY - Respect the toggle settings from UI
+        let finalApplyText = applyText !== false; // Default true unless explicitly false
+        let finalApplyGradient = applyGradient !== false;
+        let finalApplyWatermark = applyWatermark !== false;
 
         // HARD CONTRACT: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
         if (derivedClassification === 'TEXT_HEAVY') {
