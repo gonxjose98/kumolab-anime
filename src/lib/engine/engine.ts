@@ -16,6 +16,8 @@ import { publishToSocials } from '../social/publisher';
 import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
 import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
 import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
+import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
+import { scanRSSFeeds, generateRSSPost } from './expanded-rss';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -130,9 +132,80 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         }
     }
 
+    // --- 3. TWITTER/X SCAN (Every Hour) ---
+    if (!newPost) {
+        console.log('[Engine] Scanning Twitter/X for announcements...');
+        
+        try {
+            const twitterCandidates = await scanTwitterAccounts(6); // Check last 6 hours
+            
+            if (twitterCandidates.length > 0) {
+                // Process Twitter announcements (go to pending for approval)
+                for (const candidate of twitterCandidates.slice(0, 3)) { // Max 3 per run
+                    const post = generateTwitterPost(candidate, now);
+                    
+                    const { error: insertError } = await supabaseAdmin
+                        .from('posts')
+                        .insert([post]);
+                    
+                    if (!insertError) {
+                        console.log(`[Engine] Added Twitter post to pending: ${post.title}`);
+                        await logSchedulerRun(slot, 'success', `Twitter announcement: ${post.title}`, {
+                            handle: candidate.authorHandle,
+                            tweetId: candidate.id
+                        });
+                    }
+                }
+            } else {
+                console.log('[Engine] No new Twitter announcements');
+            }
+        } catch (twError) {
+            console.error('[Engine] Twitter scan error:', twError);
+        }
+    }
+
+    // --- 4. EXPANDED RSS SCAN (Every Hour) ---
+    if (!newPost) {
+        console.log('[Engine] Scanning expanded RSS feeds...');
+        
+        try {
+            const rssCandidates = await scanRSSFeeds(6); // Check last 6 hours
+            
+            if (rssCandidates.length > 0) {
+                // Process RSS articles (go to pending for approval)
+                for (const candidate of rssCandidates.slice(0, 5)) { // Max 5 per run
+                    const post = generateRSSPost(candidate, now);
+                    
+                    // Check for duplicates
+                    const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
+                    if (dupCheck.action === 'BLOCK') {
+                        console.log(`[Engine] BLOCKED duplicate RSS: ${post.title}`);
+                        continue;
+                    }
+                    
+                    const { error: insertError } = await supabaseAdmin
+                        .from('posts')
+                        .insert([post]);
+                    
+                    if (!insertError) {
+                        console.log(`[Engine] Added RSS post to pending: ${post.title}`);
+                        await logSchedulerRun(slot, 'success', `RSS article: ${post.title}`, {
+                            source: candidate.sourceName,
+                            language: candidate.language
+                        });
+                    }
+                }
+            } else {
+                console.log('[Engine] No new RSS articles');
+            }
+        } catch (rssError) {
+            console.error('[Engine] RSS scan error:', rssError);
+        }
+    }
+
     // Only run Dynamic Newsroom if we didn't just generate a Daily Drops or Trailer post
     if (!newPost) {
-        // --- 3. DYNAMIC NEWSROOM ---
+        // --- 5. DYNAMIC NEWSROOM (Original Sources) ---
         console.log('[Engine] Running Dynamic Newsroom Logic...');
 
         // RATE LIMIT CHECK:

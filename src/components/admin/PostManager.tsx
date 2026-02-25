@@ -1401,6 +1401,70 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </button>
 
+                <button
+                    onClick={async () => {
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/twitter', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'scan-twitter', hoursBack: 6 })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                alert(`✅ Twitter Scan Complete!\n\nFound: ${data.found}\nAdded: ${data.added}\n\n${data.tweets.map((t: any) => `• @${t.author}: ${t.text.substring(0, 50)}...`).join('\n')}`);
+                                window.location.reload();
+                            } else {
+                                alert('❌ Scan failed: ' + (data.error || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('❌ Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>}
+                        <span className="text-[10px] font-black uppercase tracking-widest">Scan X</span>
+                    </div>
+                </button>
+
+                <button
+                    onClick={async () => {
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/rss', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'scan-rss', hoursBack: 6 })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                alert(`✅ RSS Scan Complete!\n\nFound: ${data.found}\nAdded: ${data.added}\n\n${data.articles.map((a: any) => `• [${a.language}] ${a.source}: ${a.title.substring(0, 40)}...`).join('\n')}`);
+                                window.location.reload();
+                            } else {
+                                alert('❌ Scan failed: ' + (data.error || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('❌ Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
+                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>}
+                        <span className="text-[10px] font-black uppercase tracking-widest">Scan RSS</span>
+                    </div>
+                </button>
+
                 {filter === 'PENDING' && (
                     <button
                         onClick={async () => {
