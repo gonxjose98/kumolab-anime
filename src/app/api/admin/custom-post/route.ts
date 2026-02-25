@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
         const postId = formData.get('postId') as string;
         const imageSettings = formData.get('imageSettings') as string;
         const backgroundImageUrl = formData.get('background_image') as string;
+        const isWebsitePublished = formData.get('isWebsitePublished') === 'true';
 
         if (!title || (!imageFile && !postId)) {
             return NextResponse.json({ error: 'Title and image are required' }, { status: 400 });
@@ -152,18 +153,19 @@ export async function POST(req: NextRequest) {
             postData.background_image = backgroundImageUrl;
         }
 
-        // Deployment Logic: For NEW posts, alerts are always published immediately
-        // For EXISTING posts, preserve their publication status
+        // Deployment Logic: Use user's choice for website publication
+        // For NEW posts, use the toggle value (default false unless Confirmation Alert)
+        // For EXISTING posts, update with user's choice
         if (!postId) {
-            postData.is_published = type === 'CONFIRMATION_ALERT';
-            postData.status = type === 'CONFIRMATION_ALERT' ? 'published' : 'pending';
+            postData.is_published = isWebsitePublished || type === 'CONFIRMATION_ALERT';
+            postData.status = (isWebsitePublished || type === 'CONFIRMATION_ALERT') ? 'published' : 'pending';
             postData.id = randomUUID();
             postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
             postData.timestamp = new Date().toISOString();
         } else {
-            // When editing, preserve the existing publication status
-            // Don't overwrite is_published or status
-            postData.status = 'published'; // Edited posts are approved/published
+            // When editing, use the user's choice
+            postData.is_published = isWebsitePublished;
+            postData.status = isWebsitePublished ? 'published' : 'hidden';
         }
         
         postData.source_tier = 1; // Admin is Tier 1

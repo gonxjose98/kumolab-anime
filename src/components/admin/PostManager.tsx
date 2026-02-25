@@ -92,6 +92,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [watermarkPosition, setWatermarkPosition] = useState<{ x: number, y: number } | null>(null);
     const [isWatermarkLocked, setIsWatermarkLocked] = useState(false);
 
+    // Website Publication State
+    const [isWebsitePublished, setIsWebsitePublished] = useState(false);
+
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(false);
     const [containerScale, setContainerScale] = useState(1);
@@ -378,6 +381,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(true);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        
+        // Reset website publication state for new posts (default to not published)
+        setIsWebsitePublished(false);
+        
         // AI Reset
         setAiPrompt('');
         setAiChatHistory([]);
@@ -431,6 +438,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         
         setIsApplyGradient(settings.isApplyGradient ?? !!(post.headline || post.title));
         setIsApplyWatermark(settings.isApplyWatermark ?? true);
+        
+        // Load website publication status
+        setIsWebsitePublished(post.is_published ?? false);
         setPurpleWordIndices(settings.purpleWordIndices || []);
         setGradientPosition(settings.gradientPosition || 'bottom');
 
@@ -864,6 +874,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             formData.append('content', content || `Transmission for ${finalTitle}.`);
             formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
             formData.append('headline', (overlayTag || 'FEATURED').toUpperCase());
+            formData.append('isWebsitePublished', isWebsitePublished ? 'true' : 'false');
 
             if (imageFileToUpload) {
                 formData.append('image', imageFileToUpload, imageFileName);
@@ -965,7 +976,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         } else {
             setShowModal(false);
             setPreviewPost(null);
-            setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+            // FIX: Don't switch filter on edit - stay on current view
+            // Only new posts should potentially switch filters
+            if (!editingPostId) {
+                setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+            }
         }
     };
 
@@ -2688,9 +2703,29 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             {/* Action Footer - Mobile Optimized */}
                             <div className="p-3 sm:p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 flex-shrink-0">
+                                {/* Website Publication Toggle */}
+                                <div className="flex items-center gap-3 order-1 sm:order-1 px-2 py-2 bg-white/5 rounded-lg border border-white/10">
+                                    <button
+                                        onClick={() => setIsWebsitePublished(!isWebsitePublished)}
+                                        className={`relative w-12 h-6 rounded-full transition-colors ${isWebsitePublished ? 'bg-green-500' : 'bg-neutral-700'}`}
+                                    >
+                                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${isWebsitePublished ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </button>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                                            {isWebsitePublished ? 'Published' : 'Hidden'}
+                                        </span>
+                                        <span className="text-[9px] text-neutral-500">
+                                            {isWebsitePublished ? 'Live on website' : 'Not visible on site'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 order-2 sm:order-2" />
+
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 sm:px-6 py-3 sm:py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors order-3 sm:order-1"
+                                    className="px-4 sm:px-6 py-3 sm:py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors order-3 sm:order-3"
                                 >
                                     Cancel
                                 </button>
