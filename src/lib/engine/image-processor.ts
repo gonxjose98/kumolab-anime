@@ -353,13 +353,12 @@ export async function generateIntelImage({
         let finalApplyWatermark = applyWatermark === true;
 
         // --- CLEAN TEXT PRE-VALIDATION ---
+        // FIX: Only use headline for rendering, ignore title to prevent duplication
+        // The headline field is what users edit in the UI (overlayTag)
         let cleanedHeadline = (headline || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
-        const upperTitle = (animeTitle || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
+        const upperTitle = ''; // DISABLED: Prevent dual text rendering
 
-        // Deduplication
-        if (cleanedHeadline === upperTitle && upperTitle.length > 0) cleanedHeadline = '';
-
-        const hasActualText = (upperTitle.length > 0 || cleanedHeadline.length > 0);
+        const hasActualText = cleanedHeadline.length > 0;
 
         // If user wants text but there's no text content, disable text but keep other settings
         if (finalApplyText && !hasActualText) {
