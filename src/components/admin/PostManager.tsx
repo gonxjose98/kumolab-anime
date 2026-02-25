@@ -1369,6 +1369,38 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </button>
 
+                <button
+                    onClick={async () => {
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/youtube', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'scan-trailers', hoursBack: 6 })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                alert(`✅ YouTube Scan Complete!\n\nFound: ${data.found}\nPublished: ${data.published}\n\n${data.trailers.map((t: any) => `• ${t.title}`).join('\n')}`);
+                                window.location.reload();
+                            } else {
+                                alert('❌ Scan failed: ' + (data.error || data.message || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('❌ Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
+                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>}
+                        <span className="text-[10px] font-black uppercase tracking-widest">Scan YT</span>
+                    </div>
+                </button>
+
                 {filter === 'PENDING' && (
                     <button
                         onClick={async () => {

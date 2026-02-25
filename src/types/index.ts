@@ -1,4 +1,4 @@
-export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT';
+export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT' | 'TRAILER' | 'TEASER';
 export type ClaimType =
     | 'NEW_SEASON_CONFIRMED'
     | 'DATE_ANNOUNCED'
@@ -65,6 +65,10 @@ export interface BlogPost {
     requires_review?: boolean;
     auto_post_eligible?: boolean;
     priority_level?: string;
+    // YouTube Integration
+    youtube_video_id?: string;
+    youtube_url?: string;
+    
     // Social IDs & Cache
     socialIds?: {
         twitter?: string;

@@ -15,6 +15,7 @@ import { supabaseAdmin } from '../supabase/admin';
 import { publishToSocials } from '../social/publisher';
 import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
 import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
+import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -80,9 +81,58 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
     }
 
-    // Only run Dynamic Newsroom if we didn't just generate a Daily Drops post
+    // --- 2. YOUTUBE TRAILER SCAN (Every Hour) ---
     if (!newPost) {
-        // --- 2. DYNAMIC NEWSROOM ---
+        console.log('[Engine] Scanning YouTube for new trailers...');
+        
+        const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+        if (youtubeApiKey) {
+            try {
+                const trailerCandidates = await scanYouTubeChannels(youtubeApiKey, 2); // Check last 2 hours
+                
+                if (trailerCandidates.length > 0) {
+                    // Process the first (most recent) trailer
+                    const candidate = trailerCandidates[0];
+                    const trailerPost = generateTrailerPost(candidate, now);
+                    
+                    // Auto-publish trailers - no approval needed
+                    console.log(`[Engine] AUTO-PUBLISHING TRAILER: ${trailerPost.title}`);
+                    
+                    const { error: insertError } = await supabaseAdmin
+                        .from('posts')
+                        .insert([{
+                            ...trailerPost,
+                            timestamp: now.toISOString(),
+                            is_published: true,
+                            status: 'published'
+                        }]);
+                    
+                    if (!insertError) {
+                        await logSchedulerRun(slot, 'success', `Auto-published trailer: ${trailerPost.title}`, {
+                            videoId: candidate.videoId,
+                            channel: candidate.channelName,
+                            type: candidate.contentType
+                        });
+                        
+                        // Return the trailer post
+                        return trailerPost;
+                    } else {
+                        console.error('[Engine] Failed to insert trailer:', insertError);
+                    }
+                } else {
+                    console.log('[Engine] No new trailers found');
+                }
+            } catch (ytError) {
+                console.error('[Engine] YouTube scan error:', ytError);
+            }
+        } else {
+            console.log('[Engine] YouTube API key not configured, skipping trailer scan');
+        }
+    }
+
+    // Only run Dynamic Newsroom if we didn't just generate a Daily Drops or Trailer post
+    if (!newPost) {
+        // --- 3. DYNAMIC NEWSROOM ---
         console.log('[Engine] Running Dynamic Newsroom Logic...');
 
         // RATE LIMIT CHECK:
