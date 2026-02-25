@@ -12,7 +12,7 @@
 
 ## API Key (Paste Here)
 ```
-AIzaSyBzTRwK6r-5I4p2Q5c7x8y9z0a1b2c3d4e5f6g7h8
+AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g
 ```
 
 ## Monitored Channels (Add channel IDs here)

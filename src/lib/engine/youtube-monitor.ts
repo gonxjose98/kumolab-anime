@@ -7,6 +7,9 @@ import { supabaseAdmin } from '../supabase/admin';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
+// Fallback API key (also set in env vars)
+const FALLBACK_API_KEY = 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
+
 // Default monitored channels - official anime sources
 const DEFAULT_CHANNELS = [
     { id: 'UC6pGDc4luvCq5w1C9lt0v0g', name: 'Crunchyroll', tier: 1 },
@@ -161,9 +164,10 @@ async function isVideoProcessed(videoId: string): Promise<boolean> {
  * Main function to scan all monitored channels for new trailers
  */
 export async function scanYouTubeChannels(
-    apiKey: string,
+    apiKey?: string,
     hoursBack: number = 24
 ): Promise<TrailerCandidate[]> {
+    const key = apiKey || FALLBACK_API_KEY || process.env.YOUTUBE_API_KEY;
     console.log(`[YouTube] Scanning channels for trailers from last ${hoursBack} hours...`);
     
     const candidates: TrailerCandidate[] = [];
@@ -172,7 +176,7 @@ export async function scanYouTubeChannels(
     for (const channel of DEFAULT_CHANNELS) {
         console.log(`[YouTube] Checking ${channel.name}...`);
         
-        const videos = await fetchChannelVideos(channel.id, apiKey, 15);
+        const videos = await fetchChannelVideos(channel.id, key, 15);
         
         for (const video of videos) {
             const publishedAt = new Date(video.publishedAt);

@@ -9,14 +9,8 @@ export async function POST(req: NextRequest) {
         const { action, hoursBack = 24 } = await req.json();
         
         if (action === 'scan-trailers') {
-            const apiKey = process.env.YOUTUBE_API_KEY;
-            
-            if (!apiKey) {
-                return NextResponse.json({ 
-                    error: 'YouTube API key not configured',
-                    message: 'Add YOUTUBE_API_KEY to environment variables'
-                }, { status: 500 });
-            }
+            // Try env var first, fallback to hardcoded key
+            const apiKey = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
             
             console.log(`[API] Manual YouTube scan triggered for last ${hoursBack} hours...`);
             
@@ -70,14 +64,7 @@ export async function POST(req: NextRequest) {
         }
         
         if (action === 'test-connection') {
-            const apiKey = process.env.YOUTUBE_API_KEY;
-            
-            if (!apiKey) {
-                return NextResponse.json({ 
-                    connected: false,
-                    error: 'YouTube API key not configured'
-                });
-            }
+            const apiKey = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
             
             // Test API connection
             try {
@@ -113,7 +100,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
     // Status endpoint
-    const apiKey = process.env.YOUTUBE_API_KEY;
+    const apiKey = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
     
     return NextResponse.json({
         configured: !!apiKey,
