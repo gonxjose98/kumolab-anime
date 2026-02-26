@@ -42,35 +42,54 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
+    try {
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get('id');
 
-    if (!id) {
-        return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+        if (!id) {
+            return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+        }
+
+        console.log(`[API] Deleting post: ${id}`);
+
+        const { data: post, error: fetchError } = await supabaseAdmin
+            .from('posts')
+            .select('slug')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            console.error('[API] Fetch error:', fetchError);
+        }
+
+        const { error } = await supabaseAdmin
+            .from('posts')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('[API] Delete error:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        console.log(`[API] Deleted post: ${id}`);
+
+        // Revalidate paths (wrapped in try-catch to prevent errors)
+        try {
+            if (post?.slug) {
+                revalidatePath('/');
+                revalidatePath('/blog');
+                revalidatePath(`/blog/${post.slug}`);
+            }
+        } catch (revError) {
+            console.error('[API] Revalidation error:', revError);
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        console.error('[API] DELETE error:', err);
+        return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 });
     }
-
-    const { data: post } = await supabaseAdmin
-        .from('posts')
-        .select('slug')
-        .eq('id', id)
-        .single();
-
-    const { error } = await supabaseAdmin
-        .from('posts')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (post?.slug) {
-        revalidatePath('/');
-        revalidatePath('/blog');
-        revalidatePath(`/blog/${post.slug}`);
-    }
-
-    return NextResponse.json({ success: true });
 }
 
 export async function PUT(req: NextRequest) {
