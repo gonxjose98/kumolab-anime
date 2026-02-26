@@ -238,7 +238,7 @@ export function generateRSSPost(candidate: NewsCandidate, now: Date): any {
         slug: slug.substring(0, 50),
         content: `${candidate.description}\n\nRead more: ${candidate.link}`,
         type: postType,
-        claimType: claimType,
+        claim_type: claimType,
         status: 'pending',
         is_published: false,
         headline: claimType.replace(/_/g, ' '),
