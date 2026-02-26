@@ -68,6 +68,8 @@ export interface BlogPost {
     // YouTube Integration
     youtube_video_id?: string;
     youtube_url?: string;
+    youtube_embed_url?: string;
+    studio_name?: string;
     
     // Social IDs & Cache
     socialIds?: {

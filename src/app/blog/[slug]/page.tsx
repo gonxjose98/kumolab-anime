@@ -90,6 +90,22 @@ export default function BlogPostPage() {
                 </h1>
             </div>
 
+            {/* YouTube Video Embed for Trailers */}
+            {(post.type === 'TRAILER' || post.type === 'TEASER') && post.youtube_video_id && (
+                <div className={styles.videoSection}>
+                    <div className={styles.videoWrapper}>
+                        <iframe
+                            src={`https://www.youtube.com/embed/${post.youtube_video_id}?rel=0`}
+                            title={post.title}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className={styles.videoIframe}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className={`${styles.content} ${post.type === 'DROP' ? styles.dropContent : ''}`}>
                 {post.type === 'DROP' ? (
                     post.content.split('\n\n').map((block: string, index: number) => {
@@ -105,9 +121,29 @@ export default function BlogPostPage() {
                         return <p key={index} className={styles.paragraph}>{block}</p>;
                     })
                 ) : (
-                    post.content.split('\n').map((paragraph: string, index: number) => (
-                        <p key={index} className={styles.paragraph}>{paragraph}</p>
-                    ))
+                    <div className={styles.formattedContent}>
+                        {post.content.split('\n\n').map((block: string, index: number) => {
+                            // Check if it's a video embed line
+                            if (block.includes('youtube.com/embed')) {
+                                return null; // Already shown above
+                            }
+                            // Check if it's a YouTube link
+                            if (block.includes('youtube.com/watch')) {
+                                return (
+                                    <div key={index} className={styles.youtubeLink}>
+                                        <a href={block.trim()} target="_blank" rel="noopener noreferrer" className={styles.watchButton}>
+                                            ▶️ Watch on YouTube
+                                        </a>
+                                    </div>
+                                );
+                            }
+                            // Render as paragraph or markdown
+                            if (block.startsWith('🎬') || block.startsWith('#')) {
+                                return <p key={index} className={styles.highlightBlock}>{block}</p>;
+                            }
+                            return <p key={index} className={styles.paragraph}>{block}</p>;
+                        })}
+                    </div>
                 )}
             </div>
         </article>

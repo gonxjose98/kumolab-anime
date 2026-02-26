@@ -38,13 +38,16 @@ interface TrailerCandidate {
     videoId: string;
     title: string;
     description: string;
+    fullDescription: string;
     publishedAt: string;
     channelName: string;
     channelTier: number;
     thumbnailUrl: string;
     videoUrl: string;
+    embedUrl: string;
     animeName: string;
     contentType: 'TRAILER' | 'TEASER' | 'PV' | 'CM' | 'OTHER';
+    studioName: string;
 }
 
 /**
@@ -148,6 +151,50 @@ function detectTrailerType(title: string, description: string): { isTrailer: boo
 }
 
 /**
+ * Extract studio name from video title or channel name
+ */
+function extractStudioName(title: string, channelName: string): string {
+    const lowerTitle = title.toLowerCase();
+    
+    // Known studios in title
+    const studioPatterns = [
+        /\b(mappa)\b/i,
+        /\b(ufotable)\b/i,
+        /\b(kyoto animation|kyoani)\b/i,
+        /\b(wit studio)\b/i,
+        /\b(a-1 pictures)\b/i,
+        /\b(madhouse)\b/i,
+        /\b(production i\.g|production ig)\b/i,
+        /\b(bones)\b/i,
+        /\b(trigger)\b/i,
+        /\b(cloverworks)\b/i,
+        /\b(pierrot)\b/i,
+        /\b(silver link)\b/i,
+        /\b(doga kobo)\b/i,
+        /\b(white fox)\b/i,
+        /\b(tms entertainment)\b/i,
+        /\b(p\.a\. works)\b/i,
+    ];
+    
+    for (const pattern of studioPatterns) {
+        const match = title.match(pattern);
+        if (match) return match[1] || match[0];
+    }
+    
+    // Check if channel name is a studio
+    const studioChannels = ['mappa', 'ufotable', 'kyoto animation', 'wit studio', 'a-1 pictures'];
+    const lowerChannel = channelName.toLowerCase();
+    
+    for (const studio of studioChannels) {
+        if (lowerChannel.includes(studio)) {
+            return studio.replace(/\b\w/g, l => l.toUpperCase());
+        }
+    }
+    
+    return channelName;
+}
+
+/**
  * Check if a video has already been processed
  */
 async function isVideoProcessed(videoId: string): Promise<boolean> {
@@ -197,26 +244,97 @@ export async function scanYouTubeChannels(
             const detection = detectTrailerType(video.title, video.description);
             
             if (detection.isTrailer) {
+                // Extract studio name from channel or title
+                const studioName = extractStudioName(video.title, channel.name);
+                
                 candidates.push({
                     videoId: video.id,
                     title: video.title,
-                    description: video.description,
+                    description: video.description.substring(0, 150),
+                    fullDescription: video.description,
                     publishedAt: video.publishedAt,
                     channelName: channel.name,
                     channelTier: channel.tier,
                     thumbnailUrl: video.thumbnails.high?.url || video.thumbnails.medium?.url || video.thumbnails.default?.url,
                     videoUrl: `https://youtube.com/watch?v=${video.id}`,
+                    embedUrl: `https://www.youtube.com/embed/${video.id}`,
                     animeName: detection.animeName,
                     contentType: detection.type as any,
+                    studioName: studioName,
                 });
                 
-                console.log(`[YouTube] Found ${detection.type}: ${video.title}`);
+                console.log(`[YouTube] Found ${detection.type}: ${video.title} (${studioName})`);
             }
         }
     }
     
     console.log(`[YouTube] Found ${candidates.length} new trailers`);
     return candidates;
+}
+
+/**
+ * Generate enhanced content for trailer posts
+ */
+function generateTrailerContent(candidate: TrailerCandidate): string {
+    const { animeName, contentType, channelName, videoUrl, embedUrl, studioName } = candidate;
+    
+    // Extract season info from title if present
+    const seasonMatch = candidate.title.match(/season\s*(\d+|\w+)/i);
+    const season = seasonMatch ? seasonMatch[0] : '';
+    
+    // Build hashtags
+    const hashtags = [
+        '#Anime',
+        '#Trailer',
+        `#${animeName.replace(/[^a-zA-Z0-9]/g, '')}`,
+        season ? `#${season.replace(/\s/g, '')}` : '',
+        `#${studioName || channelName}`,
+        '#KumoLab'
+    ].filter(Boolean).join(' ');
+    
+    // Generate content
+    const content = `🎬 **${contentType === 'TRAILER' ? 'OFFICIAL TRAILER DROP' : contentType + ' RELEASE'}**
+
+${studioName || channelName} just released the ${season || 'new'} ${contentType.toLowerCase()} for **${animeName}**!
+
+▶️ **Watch the full trailer:**
+${videoUrl}
+
+${candidate.fullDescription ? extractKeyInfo(candidate.fullDescription) : 'The anticipation is building for this upcoming release!'}
+
+What are your thoughts on this trailer? Drop your reactions below! 👇
+
+${hashtags}
+
+---
+
+🎥 **Video Embed:**
+${embedUrl}`;
+
+    return content;
+}
+
+/**
+ * Extract key information from video description
+ */
+function extractKeyInfo(description: string): string {
+    if (!description || description.length < 10) {
+        return 'Exciting new content has been revealed. Check out the trailer above!';
+    }
+    
+    // Clean up description - remove timestamps, links, excessive formatting
+    let cleaned = description
+        .replace(/\d{1,2}:\d{2}(?::\d{2})?/g, '') // Remove timestamps
+        .replace(/https?:\/\/\S+/g, '') // Remove URLs
+        .replace(/[#*]/g, '') // Remove markdown
+        .replace(/\n{3,}/g, '\n\n') // Normalize line breaks
+        .trim();
+    
+    // Take first 2-3 sentences or first 300 chars
+    const sentences = cleaned.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    const keyInfo = sentences.slice(0, 3).join('. ') || cleaned.substring(0, 300);
+    
+    return keyInfo + (cleaned.length > 300 ? '...' : '');
 }
 
 /**
@@ -233,11 +351,13 @@ export function generateTrailerPost(candidate: TrailerCandidate, now: Date): any
     
     const slug = `${candidate.animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${candidate.contentType.toLowerCase()}-${candidate.videoId.substring(0, 8)}`;
     
+    const enhancedContent = generateTrailerContent(candidate);
+    
     return {
         id: crypto.randomUUID(),
         title: candidate.title,
         slug: slug,
-        content: `Official ${candidate.contentType} released by ${candidate.channelName}.\n\nWatch: ${candidate.videoUrl}\n\n${candidate.description.substring(0, 200)}...`,
+        content: enhancedContent,
         type: contentType,
         status: 'published', // Auto-publish trailers
         is_published: true,
@@ -245,8 +365,10 @@ export function generateTrailerPost(candidate: TrailerCandidate, now: Date): any
         image: candidate.thumbnailUrl,
         youtube_video_id: candidate.videoId,
         youtube_url: candidate.videoUrl,
+        youtube_embed_url: candidate.embedUrl,
         source: candidate.channelName,
         source_tier: candidate.channelTier,
+        studio_name: candidate.studioName,
         verification_badge: `${candidate.channelName} Official`,
         verification_score: candidate.channelTier === 1 ? 95 : 85,
         timestamp: now.toISOString(),
