@@ -179,7 +179,7 @@ function extractStudioName(title: string, channelName: string): string {
     
     for (const pattern of studioPatterns) {
         const match = title.match(pattern);
-        if (match) return match[1] || match[0];
+        if (match && match[0]) return match[1] || match[0];
     }
     
     // Check if channel name is a studio

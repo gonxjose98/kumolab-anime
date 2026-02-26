@@ -92,15 +92,15 @@ export default function BlogPostPage() {
 
             {/* YouTube Video Embed for Trailers */}
             {(post.type === 'TRAILER' || post.type === 'TEASER') && post.youtube_video_id && (
-                <div className={styles.videoSection}>
-                    <div className={styles.videoWrapper}>
+                <div className="videoSection">
+                    <div className="videoWrapper">
                         <iframe
                             src={`https://www.youtube.com/embed/${post.youtube_video_id}?rel=0`}
                             title={post.title}
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
-                            className={styles.videoIframe}
+                            className="videoIframe"
                         />
                     </div>
                 </div>
@@ -130,8 +130,8 @@ export default function BlogPostPage() {
                             // Check if it's a YouTube link
                             if (block.includes('youtube.com/watch')) {
                                 return (
-                                    <div key={index} className={styles.youtubeLink}>
-                                        <a href={block.trim()} target="_blank" rel="noopener noreferrer" className={styles.watchButton}>
+                                    <div key={index} className="youtubeLink">
+                                        <a href={block.trim()} target="_blank" rel="noopener noreferrer" className="watchButton">
                                             ▶️ Watch on YouTube
                                         </a>
                                     </div>
@@ -139,7 +139,7 @@ export default function BlogPostPage() {
                             }
                             // Render as paragraph or markdown
                             if (block.startsWith('🎬') || block.startsWith('#')) {
-                                return <p key={index} className={styles.highlightBlock}>{block}</p>;
+                                return <p key={index} className="highlightBlock">{block}</p>;
                             }
                             return <p key={index} className={styles.paragraph}>{block}</p>;
                         })}
