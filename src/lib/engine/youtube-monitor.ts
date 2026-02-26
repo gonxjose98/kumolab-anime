@@ -4,6 +4,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/admin';
+import { randomUUID } from 'crypto';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
@@ -354,7 +355,7 @@ export function generateTrailerPost(candidate: TrailerCandidate, now: Date): any
     const enhancedContent = generateTrailerContent(candidate);
     
     return {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         title: candidate.title,
         slug: slug,
         content: enhancedContent,
