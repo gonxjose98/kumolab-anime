@@ -43,6 +43,12 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
+        // Check env vars
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            console.error('[API] Missing Supabase env vars');
+            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+        }
+
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
 
