@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
 
         // Deployment Logic: Use user's choice for website publication
         // For NEW posts, use the toggle value (default false unless Confirmation Alert)
-        // For EXISTING posts, update with user's choice
+        // For EXISTING posts, PRESERVE status unless explicitly publishing
         if (!postId) {
             postData.is_published = isWebsitePublished || type === 'CONFIRMATION_ALERT';
             postData.status = (isWebsitePublished || type === 'CONFIRMATION_ALERT') ? 'published' : 'pending';
@@ -163,9 +163,44 @@ export async function POST(req: NextRequest) {
             postData.slug = `custom-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}`;
             postData.timestamp = new Date().toISOString();
         } else {
-            // When editing, use the user's choice
-            postData.is_published = isWebsitePublished;
-            postData.status = isWebsitePublished ? 'published' : 'hidden';
+            // CRITICAL FIX: Fetch existing post to preserve approval status
+            // Editing should NEVER move an approved post to hidden
+            const { data: existingPost } = await supabaseAdmin
+                .from('posts')
+                .select('status, is_published')
+                .eq('id', postId)
+                .single();
+            
+            if (existingPost) {
+                const currentStatus = existingPost.status;
+                
+                // Only update is_published if explicitly toggling ON (publishing)
+                // Never auto-hide an approved post just because toggle is off
+                if (isWebsitePublished) {
+                    // User is explicitly publishing
+                    postData.is_published = true;
+                    postData.status = 'published';
+                } else if (currentStatus === 'approved') {
+                    // Approved post stays approved (scheduled), regardless of toggle
+                    postData.is_published = false;
+                    postData.status = 'approved';
+                } else if (currentStatus === 'published' && !isWebsitePublished) {
+                    // Only hide if explicitly unpublishing a live post
+                    postData.is_published = false;
+                    postData.status = 'hidden';
+                } else {
+                    // Pending or other statuses - keep as-is, only update is_published if needed
+                    postData.is_published = false;
+                    // Don't overwrite status - let it stay pending/declined/etc
+                }
+            } else {
+                // Fallback: if can't fetch existing, only update if publishing
+                if (isWebsitePublished) {
+                    postData.is_published = true;
+                    postData.status = 'published';
+                }
+                // If not publishing, don't touch status/is_published fields
+            }
         }
         
         postData.source_tier = 1; // Admin is Tier 1
