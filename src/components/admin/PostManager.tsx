@@ -175,6 +175,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
+    const [showAiPromptModal, setShowAiPromptModal] = useState(false);
+    const [aiGeneratedDraft, setAiGeneratedDraft] = useState<any>(null);
     const lastRequestTimestamp = useRef<number>(0);
 
     const handleFetchLogs = async () => {
@@ -1334,7 +1336,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             {/* Action Bar - Modern Aesthetic Compact */}
             <div className="flex flex-wrap gap-3 items-center">
                 <button
-                    onClick={() => handleGenerateClick('CUSTOM' as any)}
+                    onClick={() => setShowAiPromptModal(true)}
                     className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 border border-purple-400 backdrop-blur-xl shadow-lg shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 min-w-[120px]"
                 >
                     <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
@@ -2291,6 +2293,149 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             >
                                 {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>}
                                 {isPublishing ? 'Scanning...' : 'Start Scan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI PROMPT MODAL */}
+            {showAiPromptModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isAiLoading && setShowAiPromptModal(false)} />
+                    <div className="relative bg-[#0a0a0a]/90 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+                        
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase tracking-tighter">AI Assist</h3>
+                            <p className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase mt-1">Describe what you want to create</p>
+                        </div>
+
+                        {/* Prompt Input */}
+                        <div className="p-6 space-y-4">
+                            <div className="group">
+                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">
+                                    Your Prompt
+                                </label>
+                                <textarea
+                                    placeholder="e.g., Write a post about the new Jujutsu Kaisen season announcement..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-32 resize-none transition-all"
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    disabled={isAiLoading}
+                                />
+                            </div>
+
+                            {/* Example Prompts */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Examples</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        "Jujutsu Kaisen Season 3 announcement",
+                                        "Top trending anime this week",
+                                        "New trailer for Demon Slayer",
+                                        "Solo Leveling premiere date"
+                                    ].map((example) => (
+                                        <button
+                                            key={example}
+                                            onClick={() => setAiPrompt(example)}
+                                            disabled={isAiLoading}
+                                            className="text-[10px] px-3 py-1.5 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-full border border-white/10 transition-all"
+                                        >
+                                            {example}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Loading State */}
+                            {isAiLoading && (
+                                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center gap-3">
+                                    <Loader2 size={20} className="text-purple-400 animate-spin" />
+                                    <div>
+                                        <div className="text-purple-400 text-xs font-bold">Generating...</div>
+                                        <div className="text-[10px] text-neutral-500">AI is crafting your post</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-4">
+                            <button
+                                onClick={() => setShowAiPromptModal(false)}
+                                disabled={isAiLoading}
+                                className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!aiPrompt.trim()) return;
+                                    setIsAiLoading(true);
+                                    try {
+                                        const res = await fetch('/api/admin/ai-assistant', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                prompt: aiPrompt,
+                                                history: aiChatHistory
+                                            })
+                                        });
+                                        const data = await res.json();
+                                        
+                                        if (data.success && data.draft) {
+                                            setAiGeneratedDraft(data.draft);
+                                            setAiChatHistory(prev => [...prev, 
+                                                { role: 'user', content: aiPrompt },
+                                                { role: 'assistant', content: data.draft }
+                                            ]);
+                                            
+                                            // Close prompt modal and open edit modal with draft
+                                            setShowAiPromptModal(false);
+                                            
+                                            // Pre-fill the editing modal
+                                            setEditingPostId(null);
+                                            setGenType(data.draft.type || 'INTEL');
+                                            setTopic(data.draft.title || '');
+                                            setTitle(data.draft.title || '');
+                                            setContent(data.draft.content || '');
+                                            setOverlayTag(data.draft.title || '');
+                                            
+                                            // Search for image
+                                            if (data.draft.imageSearchTerm || data.draft.title) {
+                                                setIsSearchingImages(true);
+                                                try {
+                                                    const imgRes = await fetch(`/api/admin/image-search?q=${encodeURIComponent(data.draft.imageSearchTerm || data.draft.title)}`);
+                                                    const imgData = await imgRes.json();
+                                                    if (imgData.images && imgData.images.length > 0) {
+                                                        setSearchedImages(imgData.images);
+                                                        setSelectedImageIndex(0);
+                                                        setCustomImagePreview(imgData.images[0]);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Image search failed:', e);
+                                                } finally {
+                                                    setIsSearchingImages(false);
+                                                }
+                                            }
+                                            
+                                            setShowModal(true);
+                                            setAiPrompt(''); // Reset prompt
+                                        } else {
+                                            alert('❌ AI generation failed: ' + (data.error || 'Unknown error'));
+                                        }
+                                    } catch (e: any) {
+                                        alert('❌ Error: ' + e.message);
+                                    } finally {
+                                        setIsAiLoading(false);
+                                    }
+                                }}
+                                disabled={isAiLoading || !aiPrompt.trim()}
+                                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                {isAiLoading ? 'Generating...' : 'Generate Post'}
                             </button>
                         </div>
                     </div>
