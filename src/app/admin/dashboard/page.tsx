@@ -141,10 +141,17 @@ async function getPosts(supabase: any) {
     try {
         const { data: posts } = await supabase
             .from('posts')
-            .select('*')
+            .select('*, status')
             .order('timestamp', { ascending: false })
             .limit(100);
-        return posts || [];
+        
+        // Ensure status defaults to 'pending' if null/undefined
+        const normalizedPosts = (posts || []).map((p: any) => ({
+            ...p,
+            status: p.status || 'pending'
+        }));
+        
+        return normalizedPosts;
     } catch (error) {
         console.error('[Admin Dashboard] Failed to fetch posts:', error);
         return [];

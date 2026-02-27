@@ -31,7 +31,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
         const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
         const source = (p as any).source ?? p.source ?? 'Unknown';
-        const status = (p as any).status ?? p.status ?? 'pending';
+        // CRITICAL: Ensure status is always a valid string, default to 'pending'
+        const rawStatus = (p as any).status ?? p.status;
+        const status = rawStatus && ['pending', 'approved', 'published', 'declined'].includes(rawStatus) ? rawStatus : 'pending';
 
         return {
             ...p,
@@ -1657,8 +1659,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
-                                                {/* DEBUG: Show actual status value */}
-                                                {(() => { console.log(`[DEBUG] Post ${post.id?.slice(0,8)} status:`, post.status, 'isPublished:', post.isPublished); return null; })()}
                                                 <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.status === 'pending' ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20' : post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
                                                     ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
                                                     : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
