@@ -36,20 +36,48 @@ const BlogCard = ({ post }: BlogCardProps) => {
         return post.type;
     };
 
+    // Render video embed (YouTube or X/Twitter)
+    const renderVideoEmbed = () => {
+        if (post.youtube_video_id) {
+            return (
+                <div className={styles.videoContainer}>
+                    <iframe
+                        src={`https://www.youtube.com/embed/${post.youtube_video_id}?autoplay=1&mute=1&loop=1&playlist=${post.youtube_video_id}&rel=0`}
+                        title={post.title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className={styles.videoIframe}
+                    />
+                </div>
+            );
+        }
+
+        if (post.twitter_tweet_id) {
+            return (
+                <div className={styles.videoContainer}>
+                    <iframe
+                        src={`https://platform.twitter.com/embed/Tweet.html?id=${post.twitter_tweet_id}&theme=dark`}
+                        title={post.title}
+                        frameBorder="0"
+                        allow="autoplay; encrypted-media"
+                        className={styles.videoIframe}
+                        scrolling="no"
+                    />
+                </div>
+            );
+        }
+
+        return null;
+    };
+
+    const hasVideoEmbed = post.youtube_video_id || post.twitter_tweet_id;
+
     return (
         <Link href={`/blog/${post.slug}`} className={styles.card}>
             <div className={styles.imageWrapper}>
-                {post.youtube_video_id ? (
-                    <div className={styles.videoContainer}>
-                        <iframe
-                            src={`https://www.youtube.com/embed/${post.youtube_video_id}?autoplay=1&mute=1&loop=1&playlist=${post.youtube_video_id}&rel=0`}
-                            title={post.title}
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            className={styles.videoIframe}
-                        />
-                    </div>
+                {hasVideoEmbed ? (
+                    renderVideoEmbed()
                 ) : post.image ? (
                     <img 
                         src={post.image} 
@@ -59,11 +87,6 @@ const BlogCard = ({ post }: BlogCardProps) => {
                 ) : (
                     <div className={styles.placeholder} />
                 )}
-                {/* REMOVED: Duplicate badge overlay to ensure Single Source of Truth. 
-                    The backend now bakes all headlines directly into the visual asset. */}
-                {/* <span className={`${styles.badge} ${post.type === 'INTEL' ? styles.intelBadge : ''}`}>
-                    {getOverlayText()}
-                </span> */}
             </div>
             <div className={styles.content}>
                 <div className={styles.meta}>

@@ -8,8 +8,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcri
 
 export async function POST(req: NextRequest) {
     try {
-        const { youtubeUrl } = await req.json();
-        const url = youtubeUrl;
+        const { url } = await req.json();
 
         if (!url) {
             return NextResponse.json({ error: 'URL required' }, { status: 400 });

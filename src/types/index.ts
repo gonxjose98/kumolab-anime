@@ -71,6 +71,10 @@ export interface BlogPost {
     youtube_embed_url?: string;
     studio_name?: string;
     
+    // X (Twitter) Integration
+    twitter_tweet_id?: string;
+    twitter_url?: string;
+    
     // Social IDs & Cache
     socialIds?: {
         twitter?: string;
