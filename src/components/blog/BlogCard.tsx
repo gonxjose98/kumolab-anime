@@ -62,7 +62,7 @@ const BlogCard = ({ post }: BlogCardProps) => {
             return (
                 <div className={styles.videoContainer}>
                     <iframe
-                        src={`https://platform.twitter.com/embed/Tweet.html?id=${tweetId}&theme=dark`}
+                        src={`https://twitframe.com/show?url=https://twitter.com/x/status/${tweetId}`}
                         title={post.title}
                         frameBorder="0"
                         allow="autoplay; encrypted-media"
