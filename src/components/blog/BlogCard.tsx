@@ -39,7 +39,18 @@ const BlogCard = ({ post }: BlogCardProps) => {
     return (
         <Link href={`/blog/${post.slug}`} className={styles.card}>
             <div className={styles.imageWrapper}>
-                {post.image ? (
+                {post.youtube_video_id ? (
+                    <div className={styles.videoContainer}>
+                        <iframe
+                            src={`https://www.youtube.com/embed/${post.youtube_video_id}?autoplay=1&mute=1&loop=1&playlist=${post.youtube_video_id}&rel=0`}
+                            title={post.title}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className={styles.videoIframe}
+                        />
+                    </div>
+                ) : post.image ? (
                     <img 
                         src={post.image} 
                         alt={post.title} 
