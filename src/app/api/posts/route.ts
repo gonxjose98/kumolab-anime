@@ -1,49 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { revalidatePath } from 'next/cache';
 
-export async function GET(req: NextRequest) {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
-    const slug = searchParams.get('slug');
+export const dynamic = 'force-dynamic';
 
-    if (id) {
-        const { data, error } = await supabaseAdmin
+export async function GET(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const status = searchParams.get('status');
+        const type = searchParams.get('type');
+        const limit = parseInt(searchParams.get('limit') || '50');
+
+        let query = supabaseAdmin
             .from('posts')
             .select('*')
-            .eq('id', id)
-            .single();
+            .order('timestamp', { ascending: false })
+            .limit(limit);
 
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-        return NextResponse.json(data);
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data: posts, error } = await query;
+
+        if (error) {
+            console.error('[API] GET error:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json(posts);
+    } catch (err: any) {
+        console.error('[API] GET exception:', err);
+        return NextResponse.json({ error: err.message }, { status: 500 });
     }
-
-    if (slug) {
-        const { data, error } = await supabaseAdmin
-            .from('posts')
-            .select('*')
-            .eq('slug', slug)
-            .eq('is_published', true)
-            .single();
-
-        if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-        return NextResponse.json(data);
-    }
-
-    // Use admin client for consistent server-side filtering and to bypass any RLS issues
-    const { data, error } = await supabaseAdmin
-        .from('posts')
-        .select('*')
-        .eq('is_published', true) // PUBLIC ENDPOINT: ALWAYS FILTER BY is_published
-        .order('timestamp', { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
 }
 
 export async function DELETE(req: NextRequest) {
     try {
-        // Check env vars
+        // Check env vars first
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
             console.error('[API] Missing Supabase env vars');
             return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
@@ -58,16 +56,18 @@ export async function DELETE(req: NextRequest) {
 
         console.log(`[API] Deleting post: ${id}`);
 
+        // Get post info for revalidation (optional)
         const { data: post, error: fetchError } = await supabaseAdmin
             .from('posts')
             .select('slug')
             .eq('id', id)
             .single();
 
-        if (fetchError) {
+        if (fetchError && fetchError.code !== 'PGRST116') {
             console.error('[API] Fetch error:', fetchError);
         }
 
+        // Delete the post
         const { error } = await supabaseAdmin
             .from('posts')
             .delete()
@@ -75,12 +75,12 @@ export async function DELETE(req: NextRequest) {
 
         if (error) {
             console.error('[API] Delete error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
         }
 
-        console.log(`[API] Deleted post: ${id}`);
+        console.log(`[API] Successfully deleted post: ${id}`);
 
-        // Revalidate paths (wrapped in try-catch to prevent errors)
+        // Try to revalidate, but don't fail if it errors
         try {
             if (post?.slug) {
                 revalidatePath('/');
@@ -88,49 +88,12 @@ export async function DELETE(req: NextRequest) {
                 revalidatePath(`/blog/${post.slug}`);
             }
         } catch (revError) {
-            console.error('[API] Revalidation error:', revError);
+            console.error('[API] Revalidation error (non-critical):', revError);
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, message: 'Post deleted' });
     } catch (err: any) {
-        console.error('[API] DELETE error:', err);
-        return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 });
-    }
-}
-
-export async function PUT(req: NextRequest) {
-    try {
-        const body = await req.json();
-        const { id, ...updates } = body;
-
-        if (!id) {
-            return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
-        }
-
-        const { error } = await supabaseAdmin
-            .from('posts')
-            .update(updates)
-            .eq('id', id);
-
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        // Fetch the slug to revalidate the specific post page
-        const { data: post } = await supabaseAdmin
-            .from('posts')
-            .select('slug')
-            .eq('id', id)
-            .single();
-
-        if (post?.slug) {
-            revalidatePath('/');
-            revalidatePath('/blog');
-            revalidatePath(`/blog/${post.slug}`);
-        }
-
-        return NextResponse.json({ success: true });
-    } catch (e) {
-        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        console.error('[API] DELETE exception:', err);
+        return NextResponse.json({ error: err.message || 'Delete failed', stack: err.stack }, { status: 500 });
     }
 }
