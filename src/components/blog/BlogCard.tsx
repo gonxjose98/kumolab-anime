@@ -54,11 +54,11 @@ const BlogCard = ({ post }: BlogCardProps) => {
             );
         }
 
-        if (post.twitter_tweet_id) {
+        if (post.socialIds?.twitter) {
             return (
                 <div className={styles.videoContainer}>
                     <iframe
-                        src={`https://platform.twitter.com/embed/Tweet.html?id=${post.twitter_tweet_id}&theme=dark`}
+                        src={`https://platform.twitter.com/embed/Tweet.html?id=${post.socialIds.twitter}&theme=dark`}
                         title={post.title}
                         frameBorder="0"
                         allow="autoplay; encrypted-media"
@@ -72,7 +72,7 @@ const BlogCard = ({ post }: BlogCardProps) => {
         return null;
     };
 
-    const hasVideoEmbed = post.youtube_video_id || post.twitter_tweet_id;
+    const hasVideoEmbed = post.youtube_video_id || post.socialIds?.twitter;
 
     return (
         <Link href={`/blog/${post.slug}`} className={styles.card}>

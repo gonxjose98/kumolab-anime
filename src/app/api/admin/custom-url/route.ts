@@ -180,11 +180,11 @@ async function processXUrl(url: string): Promise<any | null> {
         throw new Error('Could not extract tweet ID from X URL');
     }
 
-    // Check if already exists
+    // Check if already exists (search in content for the tweet URL)
     const { data: existing } = await supabaseAdmin
         .from('posts')
         .select('id')
-        .eq('twitter_tweet_id', tweetId)
+        .ilike('content', `%${tweetId}%`)
         .limit(1);
 
     if (existing && existing.length > 0) {
@@ -212,8 +212,7 @@ From: @${username}
         is_published: false,
         excerpt: 'SO MEDIA UPDATE',
         image: '', // No image by default for X posts
-        twitter_tweet_id: tweetId,
-        twitter_url: url,
+        social_ids: { twitter: tweetId },
         source: `@${username} on X`,
         source_tier: 2,
         verification_badge: `@${username}`,
