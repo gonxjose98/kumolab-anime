@@ -1386,6 +1386,41 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 <button
                     onClick={async () => {
+                        const url = prompt('Paste YouTube URL:');
+                        if (!url) return;
+                        
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/custom-youtube', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ youtubeUrl: url })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                alert(`✅ Video Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nChannel: ${data.post.channel}\n\nCheck the Pending tab to approve it.`);
+                                window.location.reload();
+                            } else {
+                                alert('❌ ' + (data.error || 'Failed to add video'));
+                            }
+                        } catch (e: any) {
+                            alert('❌ Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-orange-950/10 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-orange-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                >
+                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
+                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+                        <span className="text-[10px] font-black uppercase tracking-widest">Add URL</span>
+                    </div>
+                </button>
+
+                <button
+                    onClick={async () => {
                         setIsPublishing(true);
                         try {
                             const res = await fetch('/api/admin/youtube', {
