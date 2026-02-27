@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 
-// Ensure we have a working supabase client
-function getSupabaseAdmin() {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        throw new Error('Missing Supabase environment variables');
-    }
+// Helper to get Supabase client
+function getSupabase() {
     return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 }
 
@@ -23,7 +19,7 @@ export async function GET(request: NextRequest) {
         const type = searchParams.get('type');
         const limit = parseInt(searchParams.get('limit') || '50');
 
-        const supabase = getSupabaseAdmin();
+        const supabase = getSupabase();
 
         let query = supabase
             .from('posts')
@@ -31,24 +27,14 @@ export async function GET(request: NextRequest) {
             .order('timestamp', { ascending: false })
             .limit(limit);
 
-        if (status) {
-            query = query.eq('status', status);
-        }
+        if (status) query = query.eq('status', status);
+        if (type) query = query.eq('type', type);
 
-        if (type) {
-            query = query.eq('type', type);
-        }
+        const { data, error } = await query;
 
-        const { data: posts, error } = await query;
-
-        if (error) {
-            console.error('[API] GET error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        return NextResponse.json(posts);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(data);
     } catch (err: any) {
-        console.error('[API] GET exception:', err);
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }
@@ -59,51 +45,37 @@ export async function DELETE(req: NextRequest) {
         const id = searchParams.get('id');
 
         if (!id) {
-            return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+            return NextResponse.json({ error: 'Post ID required' }, { status: 400 });
         }
 
-        console.log(`[API] Deleting post: ${id}`);
+        const supabase = getSupabase();
 
-        const supabase = getSupabaseAdmin();
-
-        // Get post info for revalidation (optional)
-        const { data: post, error: fetchError } = await supabase
+        // Get slug for revalidation
+        const { data: post } = await supabase
             .from('posts')
             .select('slug')
             .eq('id', id)
             .single();
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-            console.error('[API] Fetch error:', fetchError);
-        }
-
-        // Delete the post
+        // Delete
         const { error } = await supabase
             .from('posts')
             .delete()
             .eq('id', id);
 
         if (error) {
-            console.error('[API] Delete error:', error);
-            return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+            return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        console.log(`[API] Successfully deleted post: ${id}`);
-
-        // Try to revalidate, but don't fail if it errors
+        // Revalidate
         try {
-            if (post?.slug) {
-                revalidatePath('/');
-                revalidatePath('/blog');
-                revalidatePath(`/blog/${post.slug}`);
-            }
-        } catch (revError) {
-            console.error('[API] Revalidation error (non-critical):', revError);
-        }
+            revalidatePath('/');
+            revalidatePath('/blog');
+            if (post?.slug) revalidatePath(`/blog/${post.slug}`);
+        } catch {}
 
-        return NextResponse.json({ success: true, message: 'Post deleted' });
+        return NextResponse.json({ success: true, message: 'Deleted' });
     } catch (err: any) {
-        console.error('[API] DELETE exception:', err);
-        return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 });
+        return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }
