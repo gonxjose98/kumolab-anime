@@ -349,9 +349,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const pendingCount = posts.filter(p => p.status === 'pending').length;
     const approvedCount = posts.filter(p => p.status === 'approved').length;
 
-    const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
+    const handleGenerateClick = (type?: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
         setEditingPostId(null);
-        setGenType(type);
+        setGenType(type || null);
         setTopic('');
         setTitle('');
         setContent('');
@@ -1335,42 +1335,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </button>
 
                 <button
-                    onClick={() => handleGenerateClick('INTEL')}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
-                        <Newspaper size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Intel</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => handleGenerateClick('TRENDING')}
+                    onClick={() => handleGenerateClick()}
                     className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
                     <div className="flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
-                        <Zap size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Trending</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => handleGenerateClick('CUSTOM' as any)}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
                         <Plus size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Create</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => handleGenerateClick('CONFIRMATION_ALERT')}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-orange-950/10 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-orange-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
-                        <CheckCircle2 size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Alert</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Create Post</span>
                     </div>
                 </button>
 
@@ -2259,6 +2229,24 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             {/* Modal Content - Mobile Optimized */}
                             <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6">
                                 <div className="space-y-4">
+                                    {/* 0. POST TYPE (Optional) */}
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                            Post Type (Optional)
+                                        </label>
+                                        <select
+                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all cursor-pointer"
+                                            value={genType || ''}
+                                            onChange={(e) => setGenType(e.target.value as any || null)}
+                                        >
+                                            <option value="">— Select Type —</option>
+                                            <option value="INTEL">Intel (News/Announcements)</option>
+                                            <option value="TRENDING">Trending (Community Buzz)</option>
+                                            <option value="CONFIRMATION_ALERT">Alert (Breaking News)</option>
+                                            <option value="CUSTOM">Custom</option>
+                                        </select>
+                                    </div>
+
                                     {/* 1. TITLE */}
                                     <div className="group">
                                         <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
