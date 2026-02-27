@@ -58,6 +58,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             source
         };
     });
+    
+    // DEBUG: Log normalized posts
+    console.log('[PostManager] Normalized posts:', normalizedPosts.slice(0, 5).map((p: any) => ({ 
+        id: p.id?.slice(0,8), 
+        title: p.title?.substring(0, 30),
+        status: p.status, 
+        isPublished: p.isPublished 
+    })));
 
     console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 3).map(p => ({ 
         title: p.title, 

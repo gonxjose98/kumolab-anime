@@ -139,25 +139,35 @@ async function getAnalytics(supabase: any) {
 
 async function getPosts(supabase: any) {
     try {
-        const { data: posts } = await supabase
+        // Force fresh data by adding cache-busting
+        const { data: posts, error } = await supabase
             .from('posts')
             .select('*')
             .order('timestamp', { ascending: false })
             .limit(100);
         
+        if (error) {
+            console.error('[Admin Dashboard] Supabase error:', error);
+            return [];
+        }
+        
+        console.log(`[Admin Dashboard] Fetched ${posts?.length || 0} posts`);
+        
         // Derive status from is_published if status column doesn't exist or is null
         const normalizedPosts = (posts || []).map((p: any) => {
             let derivedStatus = p.status;
+            
+            // DEBUG: Log first few posts
+            if (posts.indexOf(p) < 3) {
+                console.log(`[Admin Dashboard] Post ${p.id?.slice(0,8)}: status=${p.status}, is_published=${p.is_published}`);
+            }
             
             // If status is missing/invalid, derive it from is_published
             if (!derivedStatus || !['pending', 'approved', 'published', 'declined'].includes(derivedStatus)) {
                 if (p.is_published === true) {
                     derivedStatus = 'published';
                 } else {
-                    // Check if this looks like a new post (recent, no approval info)
-                    const postAge = Date.now() - new Date(p.timestamp).getTime();
-                    const isNew = postAge < 24 * 60 * 60 * 1000; // Less than 24 hours
-                    derivedStatus = isNew ? 'pending' : 'declined';
+                    derivedStatus = 'pending';
                 }
             }
             
@@ -166,6 +176,13 @@ async function getPosts(supabase: any) {
                 status: derivedStatus
             };
         });
+        
+        // Count by status
+        const statusCounts = normalizedPosts.reduce((acc: any, p: any) => {
+            acc[p.status] = (acc[p.status] || 0) + 1;
+            return acc;
+        }, {});
+        console.log('[Admin Dashboard] Status counts:', statusCounts);
         
         return normalizedPosts;
     } catch (error) {
