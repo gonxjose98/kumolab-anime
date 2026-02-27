@@ -9,135 +9,34 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcri
 export async function POST(req: NextRequest) {
     try {
         const { youtubeUrl } = await req.json();
+        const url = youtubeUrl;
 
-        if (!youtubeUrl || !youtubeUrl.includes('youtube.com') && !youtubeUrl.includes('youtu.be')) {
-            return NextResponse.json({ error: 'Valid YouTube URL required' }, { status: 400 });
+        if (!url) {
+            return NextResponse.json({ error: 'URL required' }, { status: 400 });
         }
 
-        // Extract video ID
-        let videoId = '';
-        if (youtubeUrl.includes('v=')) {
-            videoId = youtubeUrl.split('v=')[1]?.split('&')[0];
-        } else if (youtubeUrl.includes('youtu.be/')) {
-            videoId = youtubeUrl.split('youtu.be/')[1]?.split('?')[0];
+        // Detect platform
+        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+        const isX = url.includes('twitter.com') || url.includes('x.com');
+
+        if (!isYouTube && !isX) {
+            return NextResponse.json({ error: 'Only YouTube and X (Twitter) URLs supported' }, { status: 400 });
         }
 
-        if (!videoId || videoId.length < 5) {
-            return NextResponse.json({ error: 'Could not extract video ID from URL' }, { status: 400 });
+        let post: any;
+
+        if (isYouTube) {
+            post = await processYouTubeUrl(url);
+        } else {
+            post = await processXUrl(url);
         }
 
-        console.log(`[Custom Scan] Processing video: ${videoId}`);
-
-        // Check if already exists
-        const { data: existing } = await supabaseAdmin
-            .from('posts')
-            .select('id')
-            .eq('youtube_video_id', videoId)
-            .limit(1);
-
-        if (existing && existing.length > 0) {
-            return NextResponse.json({ 
-                error: 'This video has already been added',
-                existing: true 
-            }, { status: 409 });
+        if (!post) {
+            return NextResponse.json({ error: 'Failed to process URL' }, { status: 500 });
         }
-
-        // Fetch video details from YouTube API
-        const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`;
-        const response = await fetch(apiUrl);
-        
-        if (!response.ok) {
-            return NextResponse.json({ 
-                error: `YouTube API error: ${response.status}` 
-            }, { status: 500 });
-        }
-
-        const data = await response.json();
-        
-        if (!data.items || data.items.length === 0) {
-            return NextResponse.json({ error: 'Video not found on YouTube' }, { status: 404 });
-        }
-
-        const video = data.items[0];
-        const snippet = video.snippet;
-        
-        // Determine content type from title
-        const title = snippet.title;
-        const lowerTitle = title.toLowerCase();
-        
-        let contentType: 'TRAILER' | 'TEASER' | 'PV' | 'INTEL' = 'INTEL';
-        if (lowerTitle.includes('trailer')) contentType = 'TRAILER';
-        else if (lowerTitle.includes('teaser')) contentType = 'TEASER';
-        else if (lowerTitle.includes('pv') || lowerTitle.includes('promo')) contentType = 'PV';
-
-        // Extract anime name from title
-        const cleanTitle = title
-            .replace(/\s*-\s*/g, ' ')
-            .replace(/official trailer/gi, '')
-            .replace(/trailer/gi, '')
-            .replace(/teaser/gi, '')
-            .replace(/pv/gi, '')
-            .replace(/season\s*\d+/gi, '')
-            .replace(/\d+/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        const animeName = cleanTitle.substring(0, 50);
-
-        // Build enhanced content
-        const channelName = snippet.channelTitle;
-        const description = snippet.description || '';
-        const thumbnailUrl = snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url;
-
-        const hashtags = [
-            '#Anime',
-            contentType === 'TRAILER' ? '#Trailer' : contentType === 'TEASER' ? '#Teaser' : '#PV',
-            `#${animeName.replace(/[^a-zA-Z0-9]/g, '')}`,
-            '#KumoLab'
-        ].join(' ');
-
-        const content = `🎬 **${contentType === 'TRAILER' ? 'OFFICIAL TRAILER DROP' : contentType + ' RELEASE'}**
-
-${channelName} just released ${contentType.toLowerCase()} for **${animeName}**!
-
-📺 **Watch the full video:**
-${youtubeUrl}
-
-${description ? description.substring(0, 200) + (description.length > 200 ? '...' : '') : 'Check out the latest anime content!'}
-
-What are your thoughts? Drop your reactions below! 👇
-
-${hashtags}
-
----
-
-🎥 **Video Embed:**
-https://www.youtube.com/embed/${videoId}`;
-
-        // Create post object
-        const post = {
-            id: crypto.randomUUID(),
-            title: title,
-            slug: `${animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}-${contentType.toLowerCase()}-${videoId.substring(0, 8)}`,
-            content: content,
-            type: contentType,
-            status: 'pending',
-            is_published: false,
-            headline: contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType,
-            image: thumbnailUrl,
-            youtube_video_id: videoId,
-            youtube_url: youtubeUrl,
-            youtube_embed_url: `https://www.youtube.com/embed/${videoId}`,
-            source: channelName,
-            source_tier: 1,
-            studio_name: channelName,
-            verification_badge: `${channelName} Official`,
-            verification_score: 90,
-            timestamp: new Date().toISOString(),
-        };
 
         // Check for duplicates
-        const dupCheck = await detectDuplicate(post, { checkWindow: 168 }); // 7 days
+        const dupCheck = await detectDuplicate(post, { checkWindow: 168 });
         if (dupCheck.action === 'BLOCK') {
             return NextResponse.json({ 
                 error: 'Similar post already exists',
@@ -151,25 +50,175 @@ https://www.youtube.com/embed/${videoId}`;
             .insert([post]);
 
         if (insertError) {
-            console.error('[Custom Scan] Insert error:', insertError);
+            console.error('[Custom URL] Insert error:', insertError);
             return NextResponse.json({ error: insertError.message }, { status: 500 });
         }
 
-        console.log(`[Custom Scan] Successfully added: ${title}`);
+        console.log(`[Custom URL] Successfully added: ${post.title}`);
 
         return NextResponse.json({
             success: true,
-            message: 'Video added to pending approvals',
+            message: `${isYouTube ? 'YouTube' : 'X'} post added to pending approvals`,
             post: {
                 id: post.id,
                 title: post.title,
                 type: post.type,
-                channel: channelName
+                platform: isYouTube ? 'YouTube' : 'X'
             }
         });
 
     } catch (err: any) {
-        console.error('[Custom Scan] Error:', err);
+        console.error('[Custom URL] Error:', err);
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
+}
+
+async function processYouTubeUrl(url: string): Promise<any | null> {
+    // Extract video ID
+    let videoId = '';
+    if (url.includes('v=')) {
+        videoId = url.split('v=')[1]?.split('&')[0];
+    } else if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    }
+
+    if (!videoId || videoId.length < 5) {
+        throw new Error('Could not extract video ID from YouTube URL');
+    }
+
+    // Check if already exists
+    const { data: existing } = await supabaseAdmin
+        .from('posts')
+        .select('id')
+        .eq('youtube_video_id', videoId)
+        .limit(1);
+
+    if (existing && existing.length > 0) {
+        throw new Error('This video has already been added');
+    }
+
+    // Fetch from YouTube API
+    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`;
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+        throw new Error(`YouTube API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.items || data.items.length === 0) {
+        throw new Error('Video not found on YouTube');
+    }
+
+    const video = data.items[0];
+    const snippet = video.snippet;
+    const title = snippet.title;
+    const lowerTitle = title.toLowerCase();
+    
+    let contentType: 'TRAILER' | 'TEASER' | 'PV' | 'INTEL' = 'INTEL';
+    if (lowerTitle.includes('trailer')) contentType = 'TRAILER';
+    else if (lowerTitle.includes('teaser')) contentType = 'TEASER';
+    else if (lowerTitle.includes('pv') || lowerTitle.includes('promo')) contentType = 'PV';
+
+    const cleanTitle = title
+        .replace(/\s*-\s*/g, ' ')
+        .replace(/official trailer/gi, '')
+        .replace(/trailer/gi, '')
+        .replace(/teaser/gi, '')
+        .replace(/pv/gi, '')
+        .trim();
+
+    const animeName = cleanTitle.substring(0, 50);
+    const channelName = snippet.channelTitle;
+    const description = snippet.description || '';
+    const thumbnailUrl = snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url;
+
+    const hashtags = ['#Anime', contentType === 'TRAILER' ? '#Trailer' : '#PV', `#${animeName.replace(/[^a-zA-Z0-9]/g, '')}`, '#KumoLab'].join(' ');
+
+    return {
+        id: crypto.randomUUID(),
+        title: title,
+        slug: `${animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}-${contentType.toLowerCase()}-${videoId.substring(0, 8)}`,
+        content: `🎬 **${contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType}**
+
+${channelName} just released ${contentType.toLowerCase()} for **${animeName}**!
+
+📺 **Watch:** ${url}
+
+${description ? description.substring(0, 200) + (description.length > 200 ? '...' : '') : 'Check out the latest anime content!'}
+
+${hashtags}
+
+🎥 **Embed:** https://www.youtube.com/embed/${videoId}`,
+        type: contentType,
+        status: 'pending',
+        is_published: false,
+        headline: contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType,
+        image: thumbnailUrl,
+        youtube_video_id: videoId,
+        youtube_url: url,
+        youtube_embed_url: `https://www.youtube.com/embed/${videoId}`,
+        source: channelName,
+        source_tier: 1,
+        studio_name: channelName,
+        verification_badge: `${channelName} Official`,
+        verification_score: 90,
+        timestamp: new Date().toISOString(),
+    };
+}
+
+async function processXUrl(url: string): Promise<any | null> {
+    // Extract tweet ID from X URL
+    // URL formats:
+    // https://twitter.com/username/status/1234567890
+    // https://x.com/username/status/1234567890
+    
+    const match = url.match(/\/(?:status|statuses)\/(\d+)/);
+    const tweetId = match ? match[1] : '';
+
+    if (!tweetId) {
+        throw new Error('Could not extract tweet ID from X URL');
+    }
+
+    // Check if already exists
+    const { data: existing } = await supabaseAdmin
+        .from('posts')
+        .select('id')
+        .eq('twitter_tweet_id', tweetId)
+        .limit(1);
+
+    if (existing && existing.length > 0) {
+        throw new Error('This tweet has already been added');
+    }
+
+    // Extract username from URL
+    const usernameMatch = url.match(/(?:twitter\.com|x\.com)\/([^\/]+)\//);
+    const username = usernameMatch ? usernameMatch[1] : 'Unknown';
+
+    // Since we can't easily fetch tweet content without API keys,
+    // create a placeholder post that the user can edit
+    return {
+        id: crypto.randomUUID(),
+        title: `X Post from @${username}`,
+        slug: `x-post-${username}-${tweetId.substring(0, 8)}`,
+        content: `📱 **X (Twitter) Post**
+
+From: @${username}
+🔗 **Original post:** ${url}
+
+[Edit this post to add description and context]`,
+        type: 'INTEL',
+        status: 'pending',
+        is_published: false,
+        headline: 'SO MEDIA UPDATE',
+        image: '', // No image by default for X posts
+        twitter_tweet_id: tweetId,
+        twitter_url: url,
+        source: `@${username} on X`,
+        source_tier: 2,
+        verification_badge: `@${username}`,
+        verification_score: 70,
+        timestamp: new Date().toISOString(),
+    };
 }
