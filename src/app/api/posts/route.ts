@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
+
+// Ensure we have a working supabase client
+function getSupabaseAdmin() {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('Missing Supabase environment variables');
+    }
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+}
 
 export async function GET(request: NextRequest) {
     try {
@@ -11,7 +23,9 @@ export async function GET(request: NextRequest) {
         const type = searchParams.get('type');
         const limit = parseInt(searchParams.get('limit') || '50');
 
-        let query = supabaseAdmin
+        const supabase = getSupabaseAdmin();
+
+        let query = supabase
             .from('posts')
             .select('*')
             .order('timestamp', { ascending: false })
@@ -41,12 +55,6 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
-        // Check env vars first
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            console.error('[API] Missing Supabase env vars');
-            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-        }
-
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
 
@@ -56,8 +64,10 @@ export async function DELETE(req: NextRequest) {
 
         console.log(`[API] Deleting post: ${id}`);
 
+        const supabase = getSupabaseAdmin();
+
         // Get post info for revalidation (optional)
-        const { data: post, error: fetchError } = await supabaseAdmin
+        const { data: post, error: fetchError } = await supabase
             .from('posts')
             .select('slug')
             .eq('id', id)
@@ -68,7 +78,7 @@ export async function DELETE(req: NextRequest) {
         }
 
         // Delete the post
-        const { error } = await supabaseAdmin
+        const { error } = await supabase
             .from('posts')
             .delete()
             .eq('id', id);
@@ -94,6 +104,6 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ success: true, message: 'Post deleted' });
     } catch (err: any) {
         console.error('[API] DELETE exception:', err);
-        return NextResponse.json({ error: err.message || 'Delete failed', stack: err.stack }, { status: 500 });
+        return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 });
     }
 }
