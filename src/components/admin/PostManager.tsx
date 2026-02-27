@@ -31,6 +31,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
         const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
         const source = (p as any).source ?? p.source ?? 'Unknown';
+        const status = (p as any).status ?? p.status ?? 'pending';
 
         return {
             ...p,
@@ -40,7 +41,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             sourceTier,
             relevanceScore,
             scrapedAt,
-            source
+            source,
+            status
         };
     });
 
