@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BlogPost } from '@/types';
 import styles from './BlogCard.module.css';
 
@@ -8,6 +8,23 @@ interface BlogCardProps {
 }
 
 const BlogCard = ({ post }: BlogCardProps) => {
+    const twitterRef = useRef<HTMLDivElement>(null);
+    
+    // Load Twitter widget script when component mounts
+    useEffect(() => {
+        const tweetIdMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
+        if (tweetIdMatch && !document.getElementById('twitter-widget-script')) {
+            const script = document.createElement('script');
+            script.id = 'twitter-widget-script';
+            script.src = 'https://platform.twitter.com/widgets.js';
+            script.async = true;
+            script.charset = 'utf-8';
+            document.body.appendChild(script);
+        } else if (tweetIdMatch && (window as any).twttr) {
+            // Re-render tweets if script already loaded
+            (window as any).twttr.widgets.load(twitterRef.current);
+        }
+    }, [post.content]);
     // Rule 4: Card overlay text mapping
     const getOverlayText = () => {
         // Priority 1: User-defined headline (from Mission Control)
@@ -59,17 +76,12 @@ const BlogCard = ({ post }: BlogCardProps) => {
         const tweetId = tweetIdMatch ? tweetIdMatch[1] : null;
         
         if (tweetId) {
+            // Use Twitter's official embed widget
             return (
-                <div className={styles.videoContainer}>
-                    <iframe
-                        src={`https://platform.twitter.com/embed/Tweet.html?id=${tweetId}&theme=dark&cards=visible`}
-                        title={post.title}
-                        frameBorder="0"
-                        allow="autoplay; encrypted-media; picture-in-picture"
-                        className={styles.videoIframe}
-                        scrolling="no"
-                        loading="lazy"
-                    />
+                <div ref={twitterRef} className={styles.videoContainer} style={{ minHeight: '300px' }}>
+                    <blockquote className="twitter-tweet" data-theme="dark" data-conversation="none">
+                        <a href={`https://twitter.com/i/status/${tweetId}`}></a>
+                    </blockquote>
                 </div>
             );
         }
