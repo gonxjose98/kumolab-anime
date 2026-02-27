@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
 
         // If slug or id is provided, fetch single post
         if (slug || id) {
+            console.log('[API /posts] Fetching single post:', { slug, id });
+            
             let query = supabase
                 .from('posts')
                 .select('*');
@@ -29,13 +31,21 @@ export async function GET(request: NextRequest) {
             const { data, error } = await query.single();
             
             if (error) {
-                console.error('Error fetching post:', error);
+                console.error('[API /posts] Error fetching post:', error);
                 return NextResponse.json({ error: 'Post not found' }, { status: 404 });
             }
             
             if (!data) {
+                console.log('[API /posts] Post not found');
                 return NextResponse.json({ error: 'Post not found' }, { status: 404 });
             }
+            
+            console.log('[API /posts] Post found:', {
+                id: data.id,
+                slug: data.slug,
+                is_published: data.is_published,
+                status: data.status
+            });
             
             return NextResponse.json(data);
         }

@@ -17,15 +17,32 @@ export default function BlogPostPage() {
         async function fetchPost() {
             try {
                 // Use public API endpoint instead of admin client
-                const response = await fetch(`/api/posts?slug=${encodeURIComponent(slug)}`);
+                const apiUrl = `/api/posts?slug=${encodeURIComponent(slug)}`;
+                console.log('[BlogPost] Fetching:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                console.log('[BlogPost] Response status:', response.status);
                 
                 if (!response.ok) {
-                    throw new Error('Post not found');
+                    const errorText = await response.text();
+                    console.error('[BlogPost] API error:', response.status, errorText);
+                    throw new Error(`Post not found: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('[BlogPost] Data received:', {
+                    id: data?.id,
+                    slug: data?.slug,
+                    is_published: data?.is_published,
+                    status: data?.status,
+                    title: data?.title?.substring(0, 50)
+                });
                 
-                if (!data || !data.is_published) {
+                // Check both is_published AND status === 'published' for compatibility
+                const isLive = data?.is_published === true || data?.status === 'published';
+                
+                if (!data || !isLive) {
+                    console.log('[BlogPost] Post not live:', { is_published: data?.is_published, status: data?.status });
                     setPost(null);
                 } else {
                     setPost(data);
@@ -33,7 +50,7 @@ export default function BlogPostPage() {
                     document.title = data.seoTitle || `${data.title} | KumoLab`;
                 }
             } catch (e) {
-                console.error('Error fetching post:', e);
+                console.error('[BlogPost] Error fetching post:', e);
                 setPost(null);
             } finally {
                 setLoading(false);
