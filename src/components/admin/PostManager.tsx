@@ -162,6 +162,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState<string | null>(null);
 
+    // Scan Sources Modal State
+    const [showScanModal, setShowScanModal] = useState(false);
+    const [scanSources, setScanSources] = useState({
+        youtube: true,
+        twitter: true,
+        rss: true
+    });
+    const [scanResults, setScanResults] = useState<any>(null);
+
     // AI Assistant State
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -1390,98 +1399,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </button>
 
                 <button
-                    onClick={async () => {
-                        setIsPublishing(true);
-                        try {
-                            const res = await fetch('/api/admin/youtube', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'scan-trailers', hoursBack: 6 })
-                            });
-                            const data = await res.json();
-                            
-                            if (data.success) {
-                                alert(`✅ YouTube Scan Complete!\n\nFound: ${data.found}\nPublished: ${data.published}\n\n${data.trailers.map((t: any) => `• ${t.title}`).join('\n')}`);
-                                window.location.reload();
-                            } else {
-                                alert('❌ Scan failed: ' + (data.error || data.message || 'Unknown error'));
-                            }
-                        } catch (e: any) {
-                            alert('❌ Error: ' + e.message);
-                        } finally {
-                            setIsPublishing(false);
-                        }
-                    }}
+                    onClick={() => { setShowScanModal(true); setScanResults(null); }}
                     disabled={isPublishing}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-cyan-950/10 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 border border-gray-200 dark:border-cyan-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
                 >
-                    <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
-                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>}
-                        <span className="text-[10px] font-black uppercase tracking-widest">Scan YT</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={async () => {
-                        setIsPublishing(true);
-                        try {
-                            const res = await fetch('/api/admin/twitter', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'scan-twitter', hoursBack: 6 })
-                            });
-                            const data = await res.json();
-                            
-                            if (data.success) {
-                                alert(`✅ Twitter Scan Complete!\n\nFound: ${data.found}\nAdded: ${data.added}\n\n${data.tweets.map((t: any) => `• @${t.author}: ${t.text.substring(0, 50)}...`).join('\n')}`);
-                                window.location.reload();
-                            } else {
-                                alert('❌ Scan failed: ' + (data.error || 'Unknown error'));
-                            }
-                        } catch (e: any) {
-                            alert('❌ Error: ' + e.message);
-                        } finally {
-                            setIsPublishing(false);
-                        }
-                    }}
-                    disabled={isPublishing}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
-                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>}
-                        <span className="text-[10px] font-black uppercase tracking-widest">Scan X</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={async () => {
-                        setIsPublishing(true);
-                        try {
-                            const res = await fetch('/api/admin/rss', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'scan-rss', hoursBack: 6 })
-                            });
-                            const data = await res.json();
-                            
-                            if (data.success) {
-                                alert(`✅ RSS Scan Complete!\n\nFound: ${data.found}\nAdded: ${data.added}\n\n${data.articles.map((a: any) => `• [${a.language}] ${a.source}: ${a.title.substring(0, 40)}...`).join('\n')}`);
-                                window.location.reload();
-                            } else {
-                                alert('❌ Scan failed: ' + (data.error || 'Unknown error'));
-                            }
-                        } catch (e: any) {
-                            alert('❌ Error: ' + e.message);
-                        } finally {
-                            setIsPublishing(false);
-                        }
-                    }}
-                    disabled={isPublishing}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
-                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>}
-                        <span className="text-[10px] font-black uppercase tracking-widest">Scan RSS</span>
+                    <div className="flex items-center justify-center gap-2 text-cyan-600 dark:text-cyan-400 group-hover:scale-105 transition-transform">
+                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>}
+                        <span className="text-[10px] font-black uppercase tracking-widest">Scan Sources</span>
                     </div>
                 </button>
 
@@ -2205,6 +2129,173 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
             )
             }
+
+            {/* SCAN SOURCES MODAL */}
+            {showScanModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isPublishing && setShowScanModal(false)} />
+                    <div className="relative bg-[#0a0a0a]/90 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+                        
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-tighter">Scan Sources</h3>
+                            <p className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase mt-1">Select sources to scan for new content</p>
+                        </div>
+
+                        {/* Source Selection */}
+                        <div className="p-6 space-y-4">
+                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Select Sources</label>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, youtube: !prev.youtube }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.youtube
+                                        ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">YouTube</span>
+                                        <span className="text-[10px] text-neutral-500 block">Trailers & official content</span>
+                                    </div>
+                                    {scanSources.youtube && <Check size={16} className="text-red-400" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, twitter: !prev.twitter }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.twitter
+                                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">X / Twitter</span>
+                                        <span className="text-[10px] text-neutral-500 block">Anime news & updates</span>
+                                    </div>
+                                    {scanSources.twitter && <Check size={16} className="text-blue-400" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, rss: !prev.rss }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.rss
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">RSS Feeds</span>
+                                        <span className="text-[10px] text-neutral-500 block">News sites & blogs</span>
+                                    </div>
+                                    {scanSources.rss && <Check size={16} className="text-green-400" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Results Display */}
+                        {scanResults && (
+                            <div className="px-6 pb-4 space-y-2">
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Results</label>
+                                <div className="p-4 bg-white/[0.03] border border-white/10 rounded-xl space-y-2 max-h-40 overflow-y-auto">
+                                    {scanResults.youtube && (
+                                        <div className="text-xs">
+                                            <span className="text-red-400 font-bold">YouTube:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.youtube.found}, Published {scanResults.youtube.published}</span>
+                                        </div>
+                                    )}
+                                    {scanResults.twitter && (
+                                        <div className="text-xs">
+                                            <span className="text-blue-400 font-bold">X/Twitter:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.twitter.found}, Added {scanResults.twitter.added}</span>
+                                        </div>
+                                    )}
+                                    {scanResults.rss && (
+                                        <div className="text-xs">
+                                            <span className="text-green-400 font-bold">RSS:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.rss.found}, Added {scanResults.rss.added}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-4">
+                            <button
+                                onClick={() => setShowScanModal(false)}
+                                disabled={isPublishing}
+                                className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white disabled:opacity-50"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setIsPublishing(true);
+                                    setScanResults(null);
+                                    const results: any = {};
+                                    
+                                    if (scanSources.youtube) {
+                                        try {
+                                            const res = await fetch('/api/admin/youtube', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-trailers', hoursBack: 6 })
+                                            });
+                                            results.youtube = await res.json();
+                                        } catch (e) {
+                                            results.youtube = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    if (scanSources.twitter) {
+                                        try {
+                                            const res = await fetch('/api/admin/twitter', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-twitter', hoursBack: 6 })
+                                            });
+                                            results.twitter = await res.json();
+                                        } catch (e) {
+                                            results.twitter = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    if (scanSources.rss) {
+                                        try {
+                                            const res = await fetch('/api/admin/rss', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-rss', hoursBack: 6 })
+                                            });
+                                            results.rss = await res.json();
+                                        } catch (e) {
+                                            results.rss = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    setScanResults(results);
+                                    setIsPublishing(false);
+                                    
+                                    // Count total added
+                                    const totalAdded = (results.youtube?.published || 0) + (results.twitter?.added || 0) + (results.rss?.added || 0);
+                                    if (totalAdded > 0) {
+                                        setTimeout(() => window.location.reload(), 1500);
+                                    }
+                                }}
+                                disabled={isPublishing || (!scanSources.youtube && !scanSources.twitter && !scanSources.rss)}
+                                className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg shadow-cyan-500/20 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>}
+                                {isPublishing ? 'Scanning...' : 'Start Scan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {
                 showModal && (
