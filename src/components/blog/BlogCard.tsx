@@ -54,11 +54,15 @@ const BlogCard = ({ post }: BlogCardProps) => {
             );
         }
 
-        if (post.socialIds?.twitter) {
+        // Check for X/Twitter embed in content (tweet ID stored in content)
+        const tweetIdMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
+        const tweetId = tweetIdMatch ? tweetIdMatch[1] : null;
+        
+        if (tweetId) {
             return (
                 <div className={styles.videoContainer}>
                     <iframe
-                        src={`https://platform.twitter.com/embed/Tweet.html?id=${post.socialIds.twitter}&theme=dark`}
+                        src={`https://platform.twitter.com/embed/Tweet.html?id=${tweetId}&theme=dark`}
                         title={post.title}
                         frameBorder="0"
                         allow="autoplay; encrypted-media"
@@ -72,7 +76,9 @@ const BlogCard = ({ post }: BlogCardProps) => {
         return null;
     };
 
-    const hasVideoEmbed = post.youtube_video_id || post.socialIds?.twitter;
+    // Check for video embed - YouTube explicit field, X extracted from content
+    const tweetIdMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
+    const hasVideoEmbed = post.youtube_video_id || tweetIdMatch;
 
     return (
         <Link href={`/blog/${post.slug}`} className={styles.card}>

@@ -71,13 +71,14 @@ export interface BlogPost {
     youtube_embed_url?: string;
     studio_name?: string;
     
-    // Social IDs & Cache
+    // Social IDs & Cache (stored as JSONB in database)
     socialIds?: {
         twitter?: string;
         instagram?: string;
         facebook?: string;
         threads?: string;
     };
+    // Note: For X posts added via URL, tweet ID is stored in content field as "Tweet ID: {id}"
     socialMetrics?: {
         twitter?: { views: number; likes: number; comments: number; retweets: number };
         instagram?: { views: number; likes: number; comments: number };

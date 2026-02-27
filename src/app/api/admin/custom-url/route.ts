@@ -197,6 +197,7 @@ async function processXUrl(url: string): Promise<any | null> {
 
     // Since we can't easily fetch tweet content without API keys,
     // create a placeholder post that the user can edit
+    // Using only columns that exist in the database (matching publishPost pattern)
     return {
         id: crypto.randomUUID(),
         title: `X Post from @${username}`,
@@ -206,17 +207,15 @@ async function processXUrl(url: string): Promise<any | null> {
 From: @${username}
 🔗 **Original post:** ${url}
 
+Tweet ID: ${tweetId}
+
 [Edit this post to add description and context]`,
         type: 'INTEL',
         status: 'pending',
         is_published: false,
-        excerpt: 'SO MEDIA UPDATE',
         image: '', // No image by default for X posts
-        social_ids: { twitter: tweetId },
         source: `@${username} on X`,
         source_tier: 2,
-        verification_badge: `@${username}`,
-        verification_score: 70,
         timestamp: new Date().toISOString(),
     };
 }
