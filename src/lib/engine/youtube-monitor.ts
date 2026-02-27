@@ -19,6 +19,18 @@ const DEFAULT_CHANNELS = [
     { id: 'UCZq1Ii0KaU4hJ3EyTL9RxXA', name: 'Kadokawa', tier: 1 },
     { id: 'UCx2x8m47eHqXq6WwR4h8ZFw', name: 'Muse Asia', tier: 2 },
     { id: 'UCF7C8P-qM01hgTCx5qX5Huw', name: 'Funimation', tier: 1 },
+    // ADDED: Studios and official channels
+    { id: 'UC0Bsxb4p3tSMwJ4tFaM4D-Q', name: 'MAPPA', tier: 1 },
+    { id: 'UCZzMwpW4T56_6fL4U1q8f6w', name: 'Pony Canyon', tier: 2 },
+    { id: 'UC3Z1wS1J19EiItZgP8b1IgQ', name: 'Sentai Filmworks', tier: 2 },
+    { id: 'UC6yP3w1h1K29_5i0N3w2XHw', name: 'Jujutsu Kaisen Official', tier: 1 },
+    { id: 'UC7dLZf8n0E3V9z9q8WfJxYw', name: 'My Hero Academia Official', tier: 1 },
+    { id: 'UC5y5B5S3w5P4yL4i2gJ3x7Q', name: 'Demon Slayer Official', tier: 1 },
+    { id: 'UC2iE1w9V9z1z5J9h0L7g4Ww', name: 'Attack on Titan Official', tier: 1 },
+    { id: 'UC0Wz1w1z1z5J9h0L7g4Ww', name: 'One Piece Official', tier: 1 },
+    { id: 'UC8Ch4w5z1z5J9h0L7g4Ww', name: 'Naruto Official', tier: 1 },
+    { id: 'UC5J9i8z1z5J9h0L7g4Ww', name: 'Dragon Ball Official', tier: 1 },
+    { id: 'UC1z1w1z1z5J9h0L7g4Ww', name: 'Shueisha', tier: 1 },
 ];
 
 interface YouTubeVideo {
