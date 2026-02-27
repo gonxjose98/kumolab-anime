@@ -12,6 +12,7 @@ const BlogCard = ({ post }: BlogCardProps) => {
     const getOverlayText = () => {
         // Priority 1: User-defined headline (from Mission Control)
         if (post.headline) return post.headline;
+        if (post.excerpt) return post.excerpt;
 
         // Priority 2: Intel-specific date mapping
         if (post.type === 'INTEL' && post.claimType) {

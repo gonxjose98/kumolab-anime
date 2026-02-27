@@ -153,7 +153,7 @@ ${hashtags}
         type: contentType,
         status: 'pending',
         is_published: false,
-        headline: contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType,
+        excerpt: contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType,
         image: thumbnailUrl,
         youtube_video_id: videoId,
         youtube_url: url,
@@ -210,7 +210,7 @@ From: @${username}
         type: 'INTEL',
         status: 'pending',
         is_published: false,
-        headline: 'SO MEDIA UPDATE',
+        excerpt: 'SO MEDIA UPDATE',
         image: '', // No image by default for X posts
         twitter_tweet_id: tweetId,
         twitter_url: url,
