@@ -359,11 +359,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     };
 
     const filteredPosts = posts.filter((post) => {
+        // Derive effective status from multiple sources
+        const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
+        
         if (filter === 'ALL') return true;
         if (filter === 'LIVE') return post.isPublished === true;
-        if (filter === 'HIDDEN') return post.isPublished === false && post.status !== 'pending' && post.status !== 'approved';
-        if (filter === 'PENDING') return post.status === 'pending';
-        if (filter === 'APPROVED') return post.status === 'approved';
+        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
+        if (filter === 'PENDING') return effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
+        if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
         if (filter === 'PENDING') {
@@ -1670,13 +1673,36 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
-                                                <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.status === 'pending' ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20' : post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
-                                                    ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
-                                                    : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
-                                                    }`}>
-                                                    {post.status === 'approved' ? 'SCHEDULED' : post.status === 'pending' ? 'PENDING' : post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
-                                                </span>
-                                                {post.status === 'approved' && (
+                                                {/* CRITICAL FIX: Derive effective status for display */}
+                                                {(() => {
+                                                    const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
+                                                    const badgeClass = effectiveStatus === 'approved' 
+                                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
+                                                        : effectiveStatus === 'pending'
+                                                        ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                                                        : post.type === 'CONFIRMATION_ALERT'
+                                                        ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20'
+                                                        : post.isPublished
+                                                        ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                                        : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20';
+                                                    
+                                                    const badgeText = effectiveStatus === 'approved' 
+                                                        ? 'SCHEDULED' 
+                                                        : effectiveStatus === 'pending' 
+                                                        ? 'PENDING' 
+                                                        : post.type === 'CONFIRMATION_ALERT' 
+                                                        ? 'ALERT' 
+                                                        : post.isPublished 
+                                                        ? 'LIVE SIGNAL' 
+                                                        : 'HIDDEN';
+                                                    
+                                                    return (
+                                                        <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${badgeClass}`}>
+                                                            {badgeText}
+                                                        </span>
+                                                    );
+                                                })()}
+                                                {(post.status === 'approved' || (post.status || (post.isPublished ? 'published' : 'pending')) === 'approved') && (
                                                     <div className="flex flex-col items-center gap-1.5 pt-1">
                                                         {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
                                                             <div className="flex flex-col items-center text-[9px] font-black text-blue-400 uppercase tracking-tighter leading-tight">
