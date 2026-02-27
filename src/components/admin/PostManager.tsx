@@ -1386,7 +1386,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 <button
                     onClick={async () => {
-                        const url = prompt('Paste YouTube URL:');
+                        const url = prompt('Paste YouTube or X (Twitter) URL:');
                         if (!url) return;
                         
                         setIsPublishing(true);
@@ -1399,10 +1399,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             const data = await res.json();
                             
                             if (data.success) {
-                                alert(`✅ Video Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nChannel: ${data.post.channel}\n\nCheck the Pending tab to approve it.`);
+                                alert(`✅ ${data.post.platform || 'Post'} Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nSource: ${data.post.channel || data.post.platform}\n\nCheck the Pending tab to approve it.`);
                                 window.location.reload();
                             } else {
-                                alert('❌ ' + (data.error || 'Failed to add video'));
+                                alert('❌ ' + (data.error || 'Failed to add post'));
                             }
                         } catch (e: any) {
                             alert('❌ Error: ' + e.message);
