@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
-
-// Helper to get Supabase client
-function getSupabase() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
 
 export async function GET(request: NextRequest) {
     try {
@@ -19,7 +10,10 @@ export async function GET(request: NextRequest) {
         const type = searchParams.get('type');
         const limit = parseInt(searchParams.get('limit') || '50');
 
-        const supabase = getSupabase();
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
         let query = supabase
             .from('posts')
@@ -31,7 +25,6 @@ export async function GET(request: NextRequest) {
         if (type) query = query.eq('type', type);
 
         const { data, error } = await query;
-
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         return NextResponse.json(data);
     } catch (err: any) {
@@ -48,16 +41,11 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'Post ID required' }, { status: 400 });
         }
 
-        const supabase = getSupabase();
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
-        // Get slug for revalidation
-        const { data: post } = await supabase
-            .from('posts')
-            .select('slug')
-            .eq('id', id)
-            .single();
-
-        // Delete
         const { error } = await supabase
             .from('posts')
             .delete()
@@ -67,14 +55,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Revalidate
-        try {
-            revalidatePath('/');
-            revalidatePath('/blog');
-            if (post?.slug) revalidatePath(`/blog/${post.slug}`);
-        } catch {}
-
-        return NextResponse.json({ success: true, message: 'Deleted' });
+        return NextResponse.json({ success: true, message: 'Post deleted' });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
