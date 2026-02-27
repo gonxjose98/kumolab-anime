@@ -31,20 +31,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
         const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
         const source = (p as any).source ?? p.source ?? 'Unknown';
-        // CRITICAL: Ensure status is always a valid string, default to 'pending'
-        const rawStatus = (p as any).status ?? p.status;
-        const status = rawStatus && ['pending', 'approved', 'published', 'declined'].includes(rawStatus) ? rawStatus : 'pending';
+        
+        // Derive status from multiple sources
+        let derivedStatus = (p as any).status ?? p.status;
+        const isPublished = (p as any).is_published ?? p.isPublished;
+        
+        // If no valid status, derive from is_published
+        if (!derivedStatus || !['pending', 'approved', 'published', 'declined'].includes(derivedStatus)) {
+            if (isPublished === true) {
+                derivedStatus = 'published';
+            } else {
+                // New posts (X/YouTube added via URL) are pending
+                derivedStatus = 'pending';
+            }
+        }
 
         return {
             ...p,
-            isPublished: (p as any).is_published ?? p.isPublished,
+            isPublished: isPublished,
+            status: derivedStatus,
             scheduledPostTime: scheduledTime,
             socialIds: (p as any).social_ids ?? (p.socialIds || {}),
             sourceTier,
             relevanceScore,
             scrapedAt,
-            source,
-            status
+            source
         };
     });
 

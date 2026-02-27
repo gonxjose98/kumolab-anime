@@ -141,15 +141,31 @@ async function getPosts(supabase: any) {
     try {
         const { data: posts } = await supabase
             .from('posts')
-            .select('*, status')
+            .select('*')
             .order('timestamp', { ascending: false })
             .limit(100);
         
-        // Ensure status defaults to 'pending' if null/undefined
-        const normalizedPosts = (posts || []).map((p: any) => ({
-            ...p,
-            status: p.status || 'pending'
-        }));
+        // Derive status from is_published if status column doesn't exist or is null
+        const normalizedPosts = (posts || []).map((p: any) => {
+            let derivedStatus = p.status;
+            
+            // If status is missing/invalid, derive it from is_published
+            if (!derivedStatus || !['pending', 'approved', 'published', 'declined'].includes(derivedStatus)) {
+                if (p.is_published === true) {
+                    derivedStatus = 'published';
+                } else {
+                    // Check if this looks like a new post (recent, no approval info)
+                    const postAge = Date.now() - new Date(p.timestamp).getTime();
+                    const isNew = postAge < 24 * 60 * 60 * 1000; // Less than 24 hours
+                    derivedStatus = isNew ? 'pending' : 'declined';
+                }
+            }
+            
+            return {
+                ...p,
+                status: derivedStatus
+            };
+        });
         
         return normalizedPosts;
     } catch (error) {
