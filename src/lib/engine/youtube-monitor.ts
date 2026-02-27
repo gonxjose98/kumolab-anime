@@ -124,16 +124,27 @@ function detectTrailerType(title: string, description: string): { isTrailer: boo
     const lowerTitle = title.toLowerCase();
     const lowerDesc = description.toLowerCase();
     
-    // Skip non-trailer content
-    const skipKeywords = ['review', 'reaction', 'analysis', 'explained', 'vs', 'top 10', 'ranking', 'amv', 'fan'];
-    if (skipKeywords.some(kw => lowerTitle.includes(kw))) {
+    // Skip non-trailer content - but be more permissive
+    const skipKeywords = [
+        'review', 'reaction video', 'analysis video', 'explained video', 
+        'vs battle', 'top 10', 'ranking video', 'amv', 'fan made', 'fandub'
+    ];
+    // Only skip if it's CLEARLY not a trailer (has skip keyword but NO trailer keywords)
+    const hasSkipKeyword = skipKeywords.some(kw => lowerTitle.includes(kw));
+    const hasTrailerKeyword = trailerKeywords.some(kw => lowerTitle.includes(kw));
+    
+    if (hasSkipKeyword && !hasTrailerKeyword) {
         return { isTrailer: false, type: 'OTHER', animeName: '' };
     }
     
-    // Detect trailer types
-    const trailerKeywords = ['official trailer', 'trailer', 'pv', 'promotional video'];
-    const teaserKeywords = ['teaser', 'announcement'];
-    const cmKeywords = ['cm', 'commercial'];
+    // Detect trailer types - EXPANDED for better detection
+    const trailerKeywords = [
+        'official trailer', 'trailer', 'pv', 'promotional video', 'preview',
+        'english dub trailer', 'dub trailer', 'sub trailer', 'season trailer',
+        'arc trailer', 'episode trailer', 'clip', 'highlight', 'official clip'
+    ];
+    const teaserKeywords = ['teaser', 'announcement', 'reveal', 'first look'];
+    const cmKeywords = ['cm', 'commercial', 'spot'];
     
     let contentType: 'TRAILER' | 'TEASER' | 'PV' | 'CM' | 'OTHER' = 'OTHER';
     
