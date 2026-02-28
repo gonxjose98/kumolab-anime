@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
-import { Eye, Calendar } from 'lucide-react';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import PostManager from '@/components/admin/PostManager';
+import AdminTabs from '@/components/admin/AdminTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -209,15 +209,16 @@ export default async function DashboardPage() {
     const posts = await getPosts(supabase);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
-            {/* 1. ANALYTICS DASHBOARD */}
-            <AnalyticsDashboard
-                websiteData={analytics.website}
-                socialData={analytics.social}
-            />
-
-            {/* 2. POST MANAGEMENT */}
-            <PostManager initialPosts={posts} />
-        </div>
+        <AdminTabs
+            dashboardContent={
+                <div className="space-y-8">
+                    <AnalyticsDashboard
+                        websiteData={analytics.website}
+                        socialData={analytics.social}
+                    />
+                    <PostManager initialPosts={posts} />
+                </div>
+            }
+        />
     );
 }
