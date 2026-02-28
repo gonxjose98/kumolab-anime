@@ -18,6 +18,7 @@ import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-preventi
 import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
 import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
 import { scanRSSFeeds, generateRSSPost } from './expanded-rss';
+import { scanXAccounts, generateXPost } from './x-monitor';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -161,6 +162,45 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
             }
         } catch (twError) {
             console.error('[Engine] Twitter scan error:', twError);
+        }
+    }
+
+    // --- 3b. X (TWITTER) API SCAN (Every Hour) ---
+    // Premium source - API v2 for official accounts
+    if (!newPost) {
+        console.log('[Engine] Scanning X (Twitter) API for announcements...');
+        
+        try {
+            const xCandidates = await scanXAccounts(6); // Check last 6 hours
+            
+            if (xCandidates.length > 0) {
+                for (const candidate of xCandidates.slice(0, 3)) { // Max 3 per run
+                    const post = generateXPost(candidate, now);
+                    
+                    // Check for duplicates
+                    const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
+                    if (dupCheck.action === 'BLOCK') {
+                        console.log(`[Engine] BLOCKED duplicate X post: ${post.title}`);
+                        continue;
+                    }
+                    
+                    const { error: insertError } = await supabaseAdmin
+                        .from('posts')
+                        .insert([post]);
+                    
+                    if (!insertError) {
+                        console.log(`[Engine] Added X post to pending: ${post.title}`);
+                        await logSchedulerRun(slot, 'success', `X announcement: ${post.title}`, {
+                            handle: candidate.authorHandle,
+                            tweetId: candidate.id
+                        });
+                    }
+                }
+            } else {
+                console.log('[Engine] No new X announcements');
+            }
+        } catch (xError) {
+            console.error('[Engine] X API scan error:', xError);
         }
     }
 
