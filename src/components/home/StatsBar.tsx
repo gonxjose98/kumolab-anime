@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import styles from './StatsBar.module.css';
 
 interface Stats {
@@ -113,6 +113,12 @@ const StatsBar = () => {
             label: "Today's Drops",
             jp: '本日',
             color: '#00d4ff',
+            color5: 'rgba(0,212,255,0.05)',
+            color7: 'rgba(0,212,255,0.07)',
+            color12: 'rgba(0,212,255,0.12)',
+            color20: 'rgba(0,212,255,0.2)',
+            color30: 'rgba(0,212,255,0.3)',
+            color40: 'rgba(0,212,255,0.4)',
         },
         {
             icon: '◈',
@@ -121,6 +127,12 @@ const StatsBar = () => {
             label: 'Trending',
             jp: 'トレンド',
             color: '#ff3cac',
+            color5: 'rgba(255,60,172,0.05)',
+            color7: 'rgba(255,60,172,0.07)',
+            color12: 'rgba(255,60,172,0.12)',
+            color20: 'rgba(255,60,172,0.2)',
+            color30: 'rgba(255,60,172,0.3)',
+            color40: 'rgba(255,60,172,0.4)',
         },
         {
             icon: '△',
@@ -129,6 +141,12 @@ const StatsBar = () => {
             label: 'Verified This Week',
             jp: '確認済み',
             color: '#7b61ff',
+            color5: 'rgba(123,97,255,0.05)',
+            color7: 'rgba(123,97,255,0.07)',
+            color12: 'rgba(123,97,255,0.12)',
+            color20: 'rgba(123,97,255,0.2)',
+            color30: 'rgba(123,97,255,0.3)',
+            color40: 'rgba(123,97,255,0.4)',
         },
     ];
 
@@ -145,6 +163,12 @@ const StatsBar = () => {
                         className={`${styles.card} ${sectionInView.visible ? styles.visible : ''}`}
                         style={{
                             '--stat-color': stat.color,
+                            '--stat-color-5': stat.color5,
+                            '--stat-color-7': stat.color7,
+                            '--stat-color-12': stat.color12,
+                            '--stat-color-20': stat.color20,
+                            '--stat-color-30': stat.color30,
+                            '--stat-color-40': stat.color40,
                             '--delay': `${i * 0.12}s`,
                         } as React.CSSProperties}
                     >

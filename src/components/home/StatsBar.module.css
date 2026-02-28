@@ -31,11 +31,11 @@
 }
 
 .card:hover {
-    border-color: color-mix(in srgb, var(--stat-color) 30%, transparent);
+    border-color: var(--stat-color-30);
     transform: translateY(-5px);
     box-shadow:
-        0 20px 50px color-mix(in srgb, var(--stat-color) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--stat-color) 12%, transparent);
+        0 20px 50px var(--stat-color-7),
+        inset 0 1px 0 var(--stat-color-12);
 }
 
 .cardAccentTop {
@@ -44,7 +44,7 @@
     left: 0;
     width: 50px;
     height: 1px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--stat-color) 40%, transparent), transparent);
+    background: linear-gradient(90deg, var(--stat-color-40), transparent);
 }
 
 .cardAccentLeft {
@@ -53,7 +53,7 @@
     left: 0;
     width: 1px;
     height: 40px;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--stat-color) 40%, transparent), transparent);
+    background: linear-gradient(180deg, var(--stat-color-40), transparent);
 }
 
 .cardGlow {
@@ -63,7 +63,7 @@
     width: 160px;
     height: 160px;
     border-radius: 50%;
-    background: radial-gradient(circle, color-mix(in srgb, var(--stat-color) 5%, transparent) 0%, transparent 70%);
+    background: radial-gradient(circle, var(--stat-color-5) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -73,7 +73,7 @@
     right: 18px;
     font-size: 11px;
     font-family: var(--font-jp);
-    color: color-mix(in srgb, var(--stat-color) 20%, transparent);
+    color: var(--stat-color-20);
     letter-spacing: 0.08em;
 }
 
@@ -87,7 +87,7 @@
     color: var(--stat-color);
     display: block;
     margin-bottom: 14px;
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--stat-color) 30%, transparent));
+    filter: drop-shadow(0 0 8px var(--stat-color-30));
 }
 
 .cardValue {

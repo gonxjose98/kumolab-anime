@@ -111,8 +111,8 @@
     top: 20px;
     left: 20px;
     padding: 5px 14px;
-    background: color-mix(in srgb, var(--tag-color, #00d4ff) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tag-color, #00d4ff) 20%, transparent);
+    background: var(--tag-color-10, rgba(0, 212, 255, 0.1));
+    border: 1px solid var(--tag-color-20, rgba(0, 212, 255, 0.2));
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     display: flex;
     align-items: center;

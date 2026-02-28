@@ -9,15 +9,17 @@ interface MostRecentFeedProps {
     posts: BlogPost[];
 }
 
-const TAG_COLORS: Record<string, string> = {
-    DROP: '#00d4ff',
-    INTEL: '#7b61ff',
-    TRENDING: '#ff6b35',
-    COMMUNITY: '#00d4ff',
-    CONFIRMATION_ALERT: '#ff3cac',
-    TRAILER: '#ff3cac',
-    TEASER: '#7b61ff',
+const TAG_COLORS: Record<string, { hex: string; r: number; g: number; b: number }> = {
+    DROP: { hex: '#00d4ff', r: 0, g: 212, b: 255 },
+    INTEL: { hex: '#7b61ff', r: 123, g: 97, b: 255 },
+    TRENDING: { hex: '#ff6b35', r: 255, g: 107, b: 53 },
+    COMMUNITY: { hex: '#00d4ff', r: 0, g: 212, b: 255 },
+    CONFIRMATION_ALERT: { hex: '#ff3cac', r: 255, g: 60, b: 172 },
+    TRAILER: { hex: '#ff3cac', r: 255, g: 60, b: 172 },
+    TEASER: { hex: '#7b61ff', r: 123, g: 97, b: 255 },
 };
+
+const DEFAULT_TAG = { hex: '#00d4ff', r: 0, g: 212, b: 255 };
 
 function getRelativeTime(timestamp: string): string {
     const now = new Date();
@@ -88,7 +90,8 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
             {/* TikTok-style scroll container */}
             <div ref={containerRef} className={styles.feedContainer}>
                 {feedPosts.map((post, i) => {
-                    const tagColor = TAG_COLORS[post.type] || '#00d4ff';
+                    const tc = TAG_COLORS[post.type] || DEFAULT_TAG;
+                    const tagColor = tc.hex;
                     const cleanTitle = post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '');
 
                     return (
@@ -121,6 +124,8 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 className={styles.cardTag}
                                 style={{
                                     '--tag-color': tagColor,
+                                    '--tag-color-10': `rgba(${tc.r},${tc.g},${tc.b},0.1)`,
+                                    '--tag-color-20': `rgba(${tc.r},${tc.g},${tc.b},0.2)`,
                                 } as React.CSSProperties}
                             >
                                 <span className={styles.tagDot} />
@@ -144,10 +149,10 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             </div>
 
                             {/* Corner accents */}
-                            <span className={styles.cornerTL} style={{ borderColor: `${tagColor}40` } as React.CSSProperties} />
-                            <span className={styles.cornerTR} style={{ borderColor: `${tagColor}40` } as React.CSSProperties} />
-                            <span className={styles.cornerBL} style={{ borderColor: `${tagColor}40` } as React.CSSProperties} />
-                            <span className={styles.cornerBR} style={{ borderColor: `${tagColor}40` } as React.CSSProperties} />
+                            <span className={styles.cornerTL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerTR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerBL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerBR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
                         </Link>
                     );
                 })}
