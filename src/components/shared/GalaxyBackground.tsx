@@ -1,12 +1,25 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 
 const STAR_COUNT = 120;
 const PARTICLE_COUNT = 70;
-const COLORS = ['#00d4ff', '#ff3cac', '#7b61ff'];
+const COLORS_DARK = ['#00d4ff', '#ff3cac', '#7b61ff'];
+const COLORS_LIGHT = ['#0099cc', '#cc2080', '#5a40cc'];
 
 export default function GalaxyBackground() {
+  const [isLight, setIsLight] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsLight(document.documentElement.classList.contains('light'));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const colors = isLight ? COLORS_LIGHT : COLORS_DARK;
+
   const stars = useMemo(
     () =>
       Array.from({ length: STAR_COUNT }, (_, i) => ({
@@ -57,8 +70,10 @@ export default function GalaxyBackground() {
             width: s.size,
             height: s.size,
             borderRadius: '50%',
-            background: s.tint,
-            opacity: s.opacity,
+            background: isLight
+              ? (s.tint === '#fff' ? '#8090b0' : s.tint === '#d0e8ff' ? '#6080c0' : '#a07050')
+              : s.tint,
+            opacity: isLight ? s.opacity * 0.35 : s.opacity,
             animation: `twinkle ${s.twinkleDur}s ease-in-out ${s.twinkleDelay}s infinite`,
           }}
         />
@@ -73,12 +88,12 @@ export default function GalaxyBackground() {
             width: p.size,
             height: p.size,
             borderRadius: '50%',
-            background: COLORS[p.hue],
-            opacity: p.opacity,
+            background: colors[p.hue],
+            opacity: isLight ? p.opacity * 0.3 : p.opacity,
             animation: `drift${p.id % 3} ${p.dur}s ease-in-out ${p.delay}s infinite`,
             boxShadow:
               p.size > 1.8
-                ? `0 0 ${p.size * 4}px ${COLORS[p.hue]}50`
+                ? `0 0 ${p.size * 4}px ${colors[p.hue]}${isLight ? '30' : '50'}`
                 : 'none',
           }}
         />

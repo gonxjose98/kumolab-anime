@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Globe, Share2, Layers, Heart, MessageCircle, Eye } from 'lucide-react';
+import { Globe, Share2, Layers, Heart, MessageCircle } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
     websiteData: {
@@ -23,178 +23,150 @@ interface AnalyticsDashboardProps {
 
 type ViewMode = 'WEBSITE' | 'SOCIAL' | 'TOTAL';
 
+const MODE_CONFIG = {
+    WEBSITE: { color: '#00d4ff', label: 'Website Traffic', icon: Globe, gradientId: 'gradCyan' },
+    SOCIAL: { color: '#ff3cac', label: 'Social Reach', icon: Share2, gradientId: 'gradPink' },
+    TOTAL: { color: '#7b61ff', label: 'Total Impact', icon: Layers, gradientId: 'gradPurple' },
+};
+
 export default function AnalyticsDashboard({ websiteData, socialData }: AnalyticsDashboardProps) {
     const [mode, setMode] = useState<ViewMode>('WEBSITE');
+    const cfg = MODE_CONFIG[mode];
 
-    // Calculate displayed metrics based on mode
     const metrics = useMemo(() => {
-        const base = {
-            views: 0,
-            likes: 0,
-            comments: 0,
-            label: ''
-        };
-
-        if (mode === 'WEBSITE') {
-            base.views = websiteData.views;
-            base.likes = 0; // Website native likes not tracked yet
-            base.comments = 0; // Website native comments not tracked yet
-            base.label = 'Website Traffic';
-        } else if (mode === 'SOCIAL') {
-            base.views = socialData.views;
-            base.likes = socialData.likes;
-            base.comments = socialData.comments;
-            base.label = 'Social Reach';
-        } else {
-            base.views = websiteData.views + socialData.views;
-            base.likes = socialData.likes;
-            base.comments = socialData.comments;
-            base.label = 'Total Impact';
-        }
-
-        return base;
+        if (mode === 'WEBSITE') return { views: websiteData.views, likes: 0, comments: 0 };
+        if (mode === 'SOCIAL') return { views: socialData.views, likes: socialData.likes, comments: socialData.comments };
+        return { views: websiteData.views + socialData.views, likes: socialData.likes, comments: socialData.comments };
     }, [mode, websiteData, socialData]);
 
+    const socialPlatforms = [
+        { name: 'X (Twitter)', color: '#00d4ff', data: socialData.breakdown?.twitter },
+        { name: 'Instagram', color: '#ff3cac', data: socialData.breakdown?.instagram },
+        { name: 'Facebook', color: '#7b61ff', data: socialData.breakdown?.facebook },
+    ];
+
     return (
-        <div className="col-span-1 md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Main Chart Card */}
+            <div className="md:col-span-2 relative overflow-hidden rounded-2xl h-[400px] flex flex-col" style={{
+                background: 'rgba(12,12,24,0.5)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                backdropFilter: 'blur(20px)',
+            }}>
+                {/* Ambient glow */}
+                <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${cfg.color}12 0%, transparent 70%)` }} />
 
-            {/* 1. CONTROL PANEL & MAIN STATS */}
-            <div className="md:col-span-2 p-6 rounded-2xl bg-white/60 dark:bg-black/20 border border-gray-200 dark:border-white/5 backdrop-blur-xl flex flex-col h-[400px] relative overflow-hidden shadow-xl shadow-purple-900/5 dark:shadow-none">
-
-                {/* Header / Toggle */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 z-10">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 pb-2 z-10">
                     <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-xl border shadow-[0_0_15px_rgba(168,85,247,0.15)] transition-colors ${mode === 'WEBSITE' ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20' :
-                            mode === 'SOCIAL' ? 'bg-pink-50 dark:bg-pink-900/10 text-pink-600 dark:text-pink-400 border-pink-100 dark:border-pink-500/20' :
-                                'bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-500/20'
-                            }`}>
-                            {mode === 'WEBSITE' && <Globe size={20} />}
-                            {mode === 'SOCIAL' && <Share2 size={20} />}
-                            {mode === 'TOTAL' && <Layers size={20} />}
+                        <div className="p-2 rounded-lg" style={{ background: `${cfg.color}12`, border: `1px solid ${cfg.color}20` }}>
+                            <cfg.icon size={18} style={{ color: cfg.color }} />
                         </div>
                         <div>
-                            <h3 className="text-xs font-black text-slate-500 dark:text-neutral-500 uppercase tracking-widest">{metrics.label}</h3>
+                            <div className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>{cfg.label}</div>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
-                                    {metrics.views.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Views</span>
+                                <span className="text-2xl font-black tracking-tight" style={{ fontFamily: 'var(--font-display)', color: cfg.color }}>{metrics.views.toLocaleString()}</span>
+                                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Views</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Toggle Switch */}
-                    <div className="flex bg-slate-100 dark:bg-black/40 p-1 rounded-xl border border-gray-200 dark:border-white/5">
-                        <button
-                            onClick={() => setMode('WEBSITE')}
-                            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${mode === 'WEBSITE'
-                                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-neutral-300'
-                                }`}
-                        >
-                            Website
-                        </button>
-                        <button
-                            onClick={() => setMode('SOCIAL')}
-                            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${mode === 'SOCIAL'
-                                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-neutral-300'
-                                }`}
-                        >
-                            Socials
-                        </button>
-                        <button
-                            onClick={() => setMode('TOTAL')}
-                            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${mode === 'TOTAL'
-                                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-neutral-300'
-                                }`}
-                        >
-                            Total
-                        </button>
+                    {/* Mode Toggle */}
+                    <div className="flex p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {(['WEBSITE', 'SOCIAL', 'TOTAL'] as const).map((m) => (
+                            <button
+                                key={m}
+                                onClick={() => setMode(m)}
+                                className="relative px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300"
+                                style={{
+                                    color: mode === m ? '#fff' : 'var(--text-muted)',
+                                    background: mode === m ? `${MODE_CONFIG[m].color}20` : 'transparent',
+                                    border: mode === m ? `1px solid ${MODE_CONFIG[m].color}40` : '1px solid transparent',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                {m === 'WEBSITE' ? 'Web' : m === 'SOCIAL' ? 'Social' : 'Total'}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                {/* Chart Area */}
-                <div className="flex-1 w-full min-h-0 relative z-10">
+                {/* Chart */}
+                <div className="flex-1 w-full min-h-0 px-2 pb-2 z-10">
                     {mode === 'SOCIAL' ? (
-                        <div className="h-full w-full flex flex-col items-center justify-center">
-                            {/* SOCIAL BREAKDOWN */}
-                            <div className="w-full h-full grid grid-cols-3 gap-4 p-4 text-center items-center">
-                                {/* Twitter / X */}
-                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">X (Twitter)</div>
-                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
-                                        {(socialData.breakdown?.twitter?.views || 0).toLocaleString()}
+                        <div className="h-full grid grid-cols-3 gap-3 p-4 items-center">
+                            {socialPlatforms.map((p) => (
+                                <div key={p.name} className="flex flex-col items-center gap-3 p-4 rounded-xl text-center" style={{
+                                    background: `${p.color}06`,
+                                    border: `1px solid ${p.color}15`,
+                                }}>
+                                    <div className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: p.color, fontFamily: 'var(--font-display)' }}>{p.name}</div>
+                                    <div className="text-2xl font-black" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                                        {(p.data?.views || 0).toLocaleString()}
                                     </div>
-                                    <div className="text-[9px] text-slate-400">VIEWS</div>
-                                </div>
-
-                                {/* Instagram */}
-                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-pink-500">Instagram</div>
-                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
-                                        {(socialData.breakdown?.instagram?.views || 0).toLocaleString()}
+                                    <div className="text-[8px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Views</div>
+                                    <div className="flex gap-4 mt-1">
+                                        <div className="text-center">
+                                            <div className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{(p.data?.likes || 0).toLocaleString()}</div>
+                                            <div className="text-[7px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Likes</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{(p.data?.comments || 0).toLocaleString()}</div>
+                                            <div className="text-[7px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Comments</div>
+                                        </div>
                                     </div>
-                                    <div className="text-[9px] text-slate-400">VIEWS</div>
                                 </div>
-
-                                {/* Facebook */}
-                                <div className="flex flex-col gap-2 p-4 bg-white/40 dark:bg-black/40 rounded-xl border border-white/10">
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Facebook</div>
-                                    <div className="text-xl font-bold text-slate-900 dark:text-white">
-                                        {(socialData.breakdown?.facebook?.views || 0).toLocaleString()}
-                                    </div>
-                                    <div className="text-[9px] text-slate-400">VIEWS</div>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={websiteData.chart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
-                                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={mode === 'TOTAL' ? '#a855f7' : '#3b82f6'} stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor={mode === 'TOTAL' ? '#a855f7' : '#3b82f6'} stopOpacity={0} />
+                                    <linearGradient id="adminChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={cfg.color} stopOpacity={0.25} />
+                                        <stop offset="50%" stopColor={cfg.color} stopOpacity={0.08} />
+                                        <stop offset="95%" stopColor={cfg.color} stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
                                 <XAxis
                                     dataKey="date"
-                                    stroke="#525252"
-                                    tick={{ fill: '#737373', fontSize: 9, fontFamily: 'monospace' }}
+                                    tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 9, fontFamily: 'var(--font-display)' }}
                                     tickLine={false}
                                     axisLine={false}
                                     minTickGap={30}
                                 />
                                 <YAxis
-                                    stroke="#525252"
-                                    tick={{ fill: '#737373', fontSize: 9, fontFamily: 'monospace' }}
+                                    tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 9, fontFamily: 'var(--font-display)' }}
                                     tickLine={false}
                                     axisLine={false}
                                     allowDecimals={false}
                                 />
                                 <Tooltip
                                     contentStyle={{
-                                        backgroundColor: '#0a0a0a',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
+                                        background: 'rgba(12,12,24,0.95)',
+                                        border: `1px solid ${cfg.color}30`,
+                                        borderRadius: '10px',
                                         color: '#fff',
                                         fontSize: '10px',
+                                        fontFamily: 'var(--font-display)',
                                         textTransform: 'uppercase',
                                         letterSpacing: '0.1em',
-                                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                                        boxShadow: `0 10px 40px rgba(0,0,0,0.5), 0 0 20px ${cfg.color}10`,
+                                        padding: '8px 12px',
                                     }}
-                                    cursor={{ stroke: mode === 'TOTAL' ? '#a855f7' : '#3b82f6', strokeDasharray: '4 4' }}
+                                    cursor={{ stroke: cfg.color, strokeDasharray: '4 4', strokeOpacity: 0.3 }}
                                 />
                                 <Area
                                     type="monotone"
                                     dataKey="views"
-                                    stroke={mode === 'TOTAL' ? '#a855f7' : '#3b82f6'}
+                                    stroke={cfg.color}
                                     strokeWidth={2}
                                     fillOpacity={1}
-                                    fill="url(#colorViews)"
+                                    fill="url(#adminChartGrad)"
                                     animationDuration={1500}
+                                    dot={false}
+                                    activeDot={{ r: 4, fill: cfg.color, stroke: '#06060e', strokeWidth: 2 }}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -202,36 +174,46 @@ export default function AnalyticsDashboard({ websiteData, socialData }: Analytic
                 </div>
             </div>
 
-            {/* 2. SECONDARY METRICS (Likes / Comments) */}
-            <div className="flex flex-col gap-6">
-                {/* Engagement Card 1: Likes */}
-                <div className="flex-1 p-6 rounded-2xl bg-white/60 dark:bg-black/20 border border-gray-200 dark:border-white/5 backdrop-blur-xl relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500">
-                            <Heart size={16} />
+            {/* Side Metric Cards */}
+            <div className="flex flex-col gap-4">
+                {/* Likes Card */}
+                <div className="flex-1 relative overflow-hidden rounded-2xl p-5" style={{
+                    background: 'rgba(12,12,24,0.5)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    backdropFilter: 'blur(20px)',
+                }}>
+                    <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,60,172,0.08) 0%, transparent 70%)' }} />
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2 rounded-lg" style={{ background: 'rgba(255,60,172,0.08)', border: '1px solid rgba(255,60,172,0.15)' }}>
+                            <Heart size={14} style={{ color: '#ff3cac' }} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-500 dark:text-neutral-500 uppercase tracking-widest">Total Likes</span>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Total Likes</span>
                     </div>
-                    <div className="text-3xl font-black text-slate-900 dark:text-white mt-1">
+                    <div className="text-3xl font-black relative z-10" style={{ fontFamily: 'var(--font-display)', color: '#ff3cac' }}>
                         {metrics.likes.toLocaleString()}
                     </div>
-                    <div className="mt-4 text-[10px] text-slate-400 font-mono">
+                    <div className="mt-3 text-[9px] font-mono relative z-10" style={{ color: 'var(--text-muted)' }}>
                         {mode === 'WEBSITE' ? 'Not tracked on web' : 'From X, IG, FB'}
                     </div>
                 </div>
 
-                {/* Engagement Card 2: Comments */}
-                <div className="flex-1 p-6 rounded-2xl bg-white/60 dark:bg-black/20 border border-gray-200 dark:border-white/5 backdrop-blur-xl relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-green-50 dark:bg-green-900/10 rounded-lg text-green-500">
-                            <MessageCircle size={16} />
+                {/* Comments Card */}
+                <div className="flex-1 relative overflow-hidden rounded-2xl p-5" style={{
+                    background: 'rgba(12,12,24,0.5)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    backdropFilter: 'blur(20px)',
+                }}>
+                    <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%)' }} />
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2 rounded-lg" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)' }}>
+                            <MessageCircle size={14} style={{ color: '#00d4ff' }} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-500 dark:text-neutral-500 uppercase tracking-widest">Total Comments</span>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Total Comments</span>
                     </div>
-                    <div className="text-3xl font-black text-slate-900 dark:text-white mt-1">
+                    <div className="text-3xl font-black relative z-10" style={{ fontFamily: 'var(--font-display)', color: '#00d4ff' }}>
                         {metrics.comments.toLocaleString()}
                     </div>
-                    <div className="mt-4 text-[10px] text-slate-400 font-mono">
+                    <div className="mt-3 text-[9px] font-mono relative z-10" style={{ color: 'var(--text-muted)' }}>
                         {mode === 'WEBSITE' ? 'Not tracked on web' : 'From X, IG, FB'}
                     </div>
                 </div>
