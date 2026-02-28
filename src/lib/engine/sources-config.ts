@@ -134,15 +134,44 @@ export const YOUTUBE_STUDIO_CHANNELS = {
     TIER_1: [
         { name: 'MAPPA', channelId: 'UCZxsdzmU3OoC9Q8Z3swoS6g', tier: 1 },
         { name: 'Ufotable', channelId: 'UCgHfufyA9n6qMvo3K0XBp2w', tier: 1 },
-        { name: 'A1Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 1 },
-        { name: 'ToeiAnimation', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
+        { name: 'A-1 Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 1 },
+        { name: 'Toei Animation', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
         { name: 'CloverWorks', channelId: 'UC3ryC1YkgR0eJ1O4C9jP-Q', tier: 1 },
-        { name: 'KyotoAnimation', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 }
+        { name: 'Kyoto Animation', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 },
+        { name: 'Wit Studio', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
+        { name: 'Trigger', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 },
+        { name: 'Bones', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
+        { name: 'Madhouse', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 },
+        { name: 'Production I.G', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 1 },
+        { name: 'Science SARU', channelId: 'UCUmkp4PJ8sYsQEKy9S617Q', tier: 1 }
     ],
-    // Tier 2: Publishers & committees
+    // Tier 2: Publishers, committees & major licensors
     TIER_2: [
         { name: 'Aniplex', channelId: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', tier: 2 },
-        { name: 'Kadokawa', channelId: 'UCqmNf2x0c3y9fL8F5xM1A9w', tier: 2 }
+        { name: 'Kadokawa', channelId: 'UCqmNf2x0c3y9fL8F5xM1A9w', tier: 2 },
+        { name: 'TOHO Animation', channelId: 'UCp8LObSyk0vZ02NF4_7PcWg', tier: 2 },
+        { name: 'Bandai Namco', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 2 },
+        { name: 'Pony Canyon', channelId: 'UCZzMwpW4T56_6fL4U1q8f6w', tier: 2 },
+        { name: 'Sentai Filmworks', channelId: 'UC3Z1wS1J19EiItZgP8b1IgQ', tier: 2 },
+        { name: 'Shueisha', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 2 }
+    ],
+    // Tier 3: Streaming platforms & licensors
+    TIER_3: [
+        { name: 'Crunchyroll', channelId: 'UC6pGDc4luvCq5w1C9lt0v0g', tier: 3 },
+        { name: 'Netflix Anime', channelId: 'UC0Q6wx_3LTWqWBp3Z6k5V0Q', tier: 3 },
+        { name: 'Funimation', channelId: 'UCF7C8P-qM01hgTCx5qX5Huw', tier: 3 },
+        { name: 'Muse Asia', channelId: 'UCx2x8m47eHqXq6WwR4h8ZFw', tier: 3 },
+        { name: 'HIDIVE', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 3 }
+    ],
+    // Tier 4: Major anime franchise channels
+    TIER_4: [
+        { name: 'ONE PIECE Official', channelId: 'UCx9yYu1JkN3qC8s8zLjkI7w', tier: 4 },
+        { name: 'Demon Slayer Official', channelId: 'UC5y5B5S3w5P4yL4i2gJ3x7Q', tier: 4 },
+        { name: 'Jujutsu Kaisen Official', channelId: 'UC6yP3w1h1K29_5i0N3w2XHw', tier: 4 },
+        { name: 'My Hero Academia Official', channelId: 'UC7dLZf8n0E3V9z9q8WfJxYw', tier: 4 },
+        { name: 'Attack on Titan Official', channelId: 'UC2iE1w9V9z1z5J9h0L7g4Ww', tier: 4 },
+        { name: 'Naruto Official', channelId: 'UC8Ch4w5z1z5J9h0L7g4Ww', tier: 4 },
+        { name: 'Dragon Ball Official', channelId: 'UC5J9i8z1z5J9h0L7g4Ww', tier: 4 }
     ]
 };
 
