@@ -107,17 +107,17 @@ export default function BlogPostPage() {
                 </h1>
             </div>
 
-            {/* YouTube Video Embed for Trailers */}
-            {(post.type === 'TRAILER' || post.type === 'TEASER') && post.youtube_video_id && (
-                <div className="videoSection">
-                    <div className="videoWrapper">
+            {/* YouTube Video Embed */}
+            {post.youtube_video_id && (
+                <div className={styles.videoSection}>
+                    <div className={styles.videoWrapper}>
                         <iframe
                             src={`https://www.youtube.com/embed/${post.youtube_video_id}?rel=0`}
                             title={post.title}
                             frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                             allowFullScreen
-                            className="videoIframe"
+                            className={styles.videoIframe}
                         />
                     </div>
                 </div>

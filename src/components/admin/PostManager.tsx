@@ -2443,33 +2443,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             {
                 showModal && (
                     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        <div className="absolute inset-0 bg-slate-900/80 dark:bg-black/95 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
-                        <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
+                        <div className="absolute inset-0 backdrop-blur-md animate-in fade-in duration-300" style={{ background: 'rgba(6,6,14,0.95)' }} onClick={() => setShowModal(false)} />
+                        <div className="relative rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden" style={{ background: 'rgba(12,12,24,0.95)', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(40px)' }}>
 
-                            {/* Modal Header - Mobile Optimized */}
-                            <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02] flex-shrink-0">
-                                <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                            {/* Modal Header */}
+                            <div className="p-3 sm:p-4 flex justify-between items-center flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
+                                <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', background: 'linear-gradient(135deg, #00d4ff, #7b61ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                     Edit Post
                                 </h3>
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors touch-manipulation"
+                                    className="p-2 rounded-full transition-colors touch-manipulation"
+                                    style={{ color: 'var(--text-muted)' }}
                                     aria-label="Close"
                                 >
                                     <Plus size={20} className="rotate-45" />
                                 </button>
                             </div>
 
-                            {/* Modal Content - Mobile Optimized */}
+                            {/* Modal Content */}
                             <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6">
                                 <div className="space-y-4">
                                     {/* 0. POST TYPE (Optional) */}
                                     <div className="group">
-                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             Post Type (Optional)
                                         </label>
                                         <select
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all cursor-pointer"
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none transition-all cursor-pointer"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                             value={genType || ''}
                                             onChange={(e) => setGenType(e.target.value as any || null)}
                                         >
@@ -2477,19 +2479,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             <option value="INTEL">Intel (News/Announcements)</option>
                                             <option value="TRENDING">Trending (Community Buzz)</option>
                                             <option value="CONFIRMATION_ALERT">Alert (Breaking News)</option>
+                                            <option value="TRAILER">Trailer / Video</option>
                                             <option value="CUSTOM">Custom</option>
                                         </select>
                                     </div>
 
                                     {/* 1. TITLE */}
                                     <div className="group">
-                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             1. Title
                                         </label>
                                         <input
                                             type="text"
                                             placeholder="Transmission Title..."
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all"
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none transition-all"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                             value={title}
                                             onChange={(e) => {
                                                 setTitle(e.target.value);
@@ -2500,12 +2504,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                     {/* 2. CONTENT/BODY */}
                                     <div className="group">
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             2. Content / Body
                                         </label>
                                         <textarea
                                             placeholder="Enter transmission content..."
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-40 resize-none transition-all"
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none h-40 resize-none transition-all"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                         />
@@ -2513,20 +2518,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                     {/* 3. IMAGE PREVIEW & CONTROLS */}
                                     <div className="space-y-4">
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-0 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-0 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             3. Image Preview & Controls
                                         </label>
-                                        <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-4 space-y-4">
+                                        <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <button
                                                     onClick={() => handleSearchImages(true)}
                                                     disabled={isSearchingImages || !title}
-                                                    className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-50"
+                                                    className="text-[10px] font-bold text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-50"
+                                                    style={{ background: 'rgba(0,255,136,0.15)', border: '1px solid rgba(0,255,136,0.3)' }}
                                                 >
                                                     {isSearchingImages ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                                     Regenerate Image
                                                 </button>
-                                                <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 cursor-pointer">
+                                                <label className="text-[10px] font-bold text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 cursor-pointer" style={{ background: 'rgba(123,97,255,0.15)', border: '1px solid rgba(123,97,255,0.3)' }}>
                                                     <Upload size={12} />
                                                     Upload
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -2855,7 +2861,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </div>
 
                                             {/* --- PURPLE SIGNAL TARGETING --- */}
-                                            <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-5 space-y-4">
+                                            <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className="w-5 h-5 rounded-full bg-purple-600/20 flex items-center justify-center">
                                                         <Sparkles size={12} className="text-purple-400" />
@@ -2958,8 +2964,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             </div>
 
-                            {/* Action Footer - Mobile Optimized */}
-                            <div className="p-3 sm:p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 flex-shrink-0">
+                            {/* Action Footer */}
+                            <div className="p-3 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
                                 {/* Website Publication Toggle */}
                                 <div className="flex items-center gap-3 order-1 sm:order-1 px-2 py-2 bg-white/5 rounded-lg border border-white/10">
                                     <button
@@ -2998,7 +3004,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 <button
                                     onClick={() => handleSavePost(true)}
                                     disabled={isGenerating || isApplyingEffect}
-                                    className="flex-[1.5] py-3 sm:py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 sm:gap-3 order-1 sm:order-3"
+                                    className="flex-[1.5] py-3 sm:py-4 text-white font-black uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 sm:gap-3 order-1 sm:order-3"
+                                    style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,97,255,0.3))', border: '1px solid rgba(123,97,255,0.4)', boxShadow: '0 4px 20px rgba(123,97,255,0.2)', fontFamily: 'var(--font-display)' }}
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
                                     Save Changes

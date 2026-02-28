@@ -34,8 +34,21 @@ function getRelativeTime(timestamp: string): string {
     return `${diffDay}d ago`;
 }
 
+/** Detect if a post has embedded video (YouTube or X/Twitter) */
+function getVideoInfo(post: BlogPost): { type: 'youtube'; videoId: string } | { type: 'twitter'; tweetId: string } | null {
+    if (post.youtube_video_id) {
+        return { type: 'youtube', videoId: post.youtube_video_id };
+    }
+    const tweetMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
+    if (tweetMatch) {
+        return { type: 'twitter', tweetId: tweetMatch[1] };
+    }
+    return null;
+}
+
 const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [playingVideos, setPlayingVideos] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Filter: keep published, non-DROP posts. Deduplicate by title prefix.
@@ -71,6 +84,41 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
         return () => c.removeEventListener('scroll', handler);
     }, []);
 
+    // Stop videos that scroll out of view
+    useEffect(() => {
+        if (playingVideos.size === 0) return;
+        const c = containerRef.current;
+        if (!c) return;
+
+        const handler = () => {
+            const cards = c.querySelectorAll('[data-fc]');
+            // Find the snapped card index
+            let snappedIdx = 0;
+            let minDist = Infinity;
+            cards.forEach((card, i) => {
+                const d = Math.abs(card.getBoundingClientRect().top - c.getBoundingClientRect().top);
+                if (d < minDist) { minDist = d; snappedIdx = i; }
+            });
+
+            // Stop any playing video not on the snapped card
+            const snappedPost = feedPosts[snappedIdx];
+            if (snappedPost) {
+                setPlayingVideos(prev => {
+                    const postId = snappedPost.id || String(snappedIdx);
+                    if (prev.size === 1 && prev.has(postId)) return prev;
+                    if (prev.size === 0) return prev;
+                    // Only keep the snapped card's video playing (if it was playing)
+                    const next = new Set<string>();
+                    if (prev.has(postId)) next.add(postId);
+                    return next;
+                });
+            }
+        };
+
+        c.addEventListener('scroll', handler, { passive: true });
+        return () => c.removeEventListener('scroll', handler);
+    }, [playingVideos.size > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (filteredPosts.length === 0) return null;
 
     // Limit to top 20 for the feed
@@ -93,31 +141,75 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                     const tc = TAG_COLORS[post.type] || DEFAULT_TAG;
                     const tagColor = tc.hex;
                     const cleanTitle = post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '');
+                    const videoInfo = getVideoInfo(post);
+                    const isYouTube = videoInfo?.type === 'youtube';
+                    const postKey = post.id || String(i);
+                    const isPlaying = isYouTube && playingVideos.has(postKey);
 
-                    return (
-                        <Link
-                            href={`/blog/${post.slug}`}
-                            key={post.id}
-                            data-fc=""
-                            className={styles.card}
-                        >
-                            {/* Background image */}
-                            {post.image && (
+                    // Determine image source: YouTube thumbnail or post image
+                    const imageSrc = isYouTube
+                        ? `https://img.youtube.com/vi/${videoInfo.videoId}/maxresdefault.jpg`
+                        : post.image;
+
+                    // --- Card inner content (shared between video + non-video cards) ---
+                    const cardInner = (
+                        <>
+                            {/* YouTube iframe when playing */}
+                            {isYouTube && isPlaying && (
+                                <iframe
+                                    src={`https://www.youtube.com/embed/${videoInfo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                                    title={post.title}
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                    allowFullScreen
+                                    className={styles.videoIframe}
+                                />
+                            )}
+
+                            {/* Background image (hidden when YouTube is playing) */}
+                            {!isPlaying && imageSrc && (
                                 <img
-                                    src={post.image}
+                                    src={imageSrc}
                                     alt=""
                                     loading="lazy"
                                     className={styles.cardImage}
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
-                                        if (!target.src.endsWith('/hero-bg-final.png')) {
+                                        if (isYouTube && target.src.includes('maxresdefault')) {
+                                            target.src = `https://img.youtube.com/vi/${videoInfo.videoId}/hqdefault.jpg`;
+                                        } else if (!target.src.endsWith('/hero-bg-final.png')) {
                                             target.src = '/hero-bg-final.png';
                                         }
                                     }}
                                 />
                             )}
+
+                            {/* Fallback background for posts without images */}
+                            {!isPlaying && !imageSrc && !isYouTube && (
+                                <div className={styles.cardFallback} />
+                            )}
+
                             <div className={styles.cardGradient} />
                             <div className={styles.cardScanlines} />
+
+                            {/* Play button overlay for YouTube videos */}
+                            {isYouTube && !isPlaying && (
+                                <button
+                                    className={styles.playButton}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPlayingVideos(prev => new Set(prev).add(postKey));
+                                    }}
+                                    aria-label="Play video"
+                                >
+                                    <div className={styles.playButtonInner}>
+                                        <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+                                            <path d="M8 5v14l11-7z"/>
+                                        </svg>
+                                    </div>
+                                </button>
+                            )}
 
                             {/* Tag */}
                             <div
@@ -131,6 +223,16 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 <span className={styles.tagDot} />
                                 <span className={styles.tagText}>{post.type}</span>
                             </div>
+
+                            {/* Video badge */}
+                            {videoInfo && (
+                                <div className={styles.videoBadge}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                    VIDEO
+                                </div>
+                            )}
 
                             {/* Counter */}
                             <div className={styles.cardCounter}>
@@ -146,6 +248,15 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     <span className={styles.cardTime}>{getRelativeTime(post.timestamp)}</span>
                                 </div>
                                 <h3 className={styles.cardTitle}>{cleanTitle}</h3>
+                                {isYouTube && (
+                                    <Link
+                                        href={`/blog/${post.slug}`}
+                                        className={styles.cardReadMore}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        View full post &rarr;
+                                    </Link>
+                                )}
                             </div>
 
                             {/* Corner accents */}
@@ -153,6 +264,27 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             <span className={styles.cornerTR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
                             <span className={styles.cornerBL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
                             <span className={styles.cornerBR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                        </>
+                    );
+
+                    // YouTube video cards: use div wrapper (allows interactive iframe)
+                    if (isYouTube) {
+                        return (
+                            <div key={postKey} data-fc="" className={styles.card}>
+                                {cardInner}
+                            </div>
+                        );
+                    }
+
+                    // All other cards (including Twitter video posts): use Link wrapper
+                    return (
+                        <Link
+                            href={`/blog/${post.slug}`}
+                            key={postKey}
+                            data-fc=""
+                            className={styles.card}
+                        >
+                            {cardInner}
                         </Link>
                     );
                 })}
