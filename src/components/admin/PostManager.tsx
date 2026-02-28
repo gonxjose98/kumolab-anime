@@ -9,6 +9,18 @@ interface PostManagerProps {
     initialPosts: BlogPost[];
 }
 
+/** Detect if a post has embedded video (YouTube or X/Twitter) */
+function getPostVideoInfo(post: BlogPost): { type: 'youtube'; id: string } | { type: 'twitter'; id: string } | null {
+    if (post.youtube_video_id) {
+        return { type: 'youtube', id: post.youtube_video_id };
+    }
+    const match = post.content?.match(/Tweet ID:\s*(\d+)/);
+    if (match) {
+        return { type: 'twitter', id: match[1] };
+    }
+    return null;
+}
+
 const WIDTH = 1080;
 const HEIGHT = 1350;
 
@@ -82,7 +94,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [showModal, setShowModal] = useState(false);
 
     // Modal State
-    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT' | null>(null);
+    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT' | 'TRAILER' | null>(null);
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -123,6 +135,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     // Website Publication State
     const [isWebsitePublished, setIsWebsitePublished] = useState(false);
+
+    // Video Preview State
+    const [videoPreviewPost, setVideoPreviewPost] = useState<BlogPost | null>(null);
+    const twitterWidgetRef = useRef<HTMLDivElement>(null);
 
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(false);
@@ -171,6 +187,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         });
         (window as any).debugPosts = posts;
     }, [posts]);
+
+    // Load Twitter widget when video preview opens
+    useEffect(() => {
+        if (videoPreviewPost) {
+            const videoInfo = getPostVideoInfo(videoPreviewPost);
+            if (videoInfo?.type === 'twitter') {
+                if (!document.getElementById('twitter-widget-script')) {
+                    const script = document.createElement('script');
+                    script.id = 'twitter-widget-script';
+                    script.src = 'https://platform.twitter.com/widgets.js';
+                    script.async = true;
+                    script.charset = 'utf-8';
+                    document.body.appendChild(script);
+                    script.onload = () => {
+                        if ((window as any).twttr && twitterWidgetRef.current) {
+                            (window as any).twttr.widgets.load(twitterWidgetRef.current);
+                        }
+                    };
+                } else if ((window as any).twttr && twitterWidgetRef.current) {
+                    setTimeout(() => {
+                        (window as any).twttr.widgets.load(twitterWidgetRef.current);
+                    }, 100);
+                }
+            }
+        }
+    }, [videoPreviewPost]);
 
     const [layoutMetadata, setLayoutMetadata] = useState<LayoutMetadata | null>(null);
 
@@ -903,34 +945,38 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 imageFileToUpload = customImage;
                 imageFileName = customImage.name;
             } else {
-                // If we have an image source but processing failed, show error
-                console.error('[Admin] Save failed: No valid processed image');
-                console.error('[Admin] finalImageToSave:', finalImageToSave ? `Length ${finalImageToSave.length}, starts with: ${finalImageToSave.substring(0, 30)}` : 'null');
-                console.error('[Admin] processedImage:', processedImage ? `Length ${processedImage.length}, starts with: ${processedImage.substring(0, 30)}` : 'null');
-                alert('ERROR: No processed image available. Click "Show Preview" first to generate the image, then save.');
-                setIsGenerating(false);
-                return;
+                // Check if this is a video post (no image needed)
+                const isVideoPost = content?.match(/Tweet ID:\s*(\d+)/) || (editingPostId && posts.find(p => p.id === editingPostId)?.youtube_video_id);
+                if (!isVideoPost) {
+                    console.error('[Admin] Save failed: No valid processed image');
+                    alert('ERROR: No processed image available. Click "Show Preview" first to generate the image, then save.');
+                    setIsGenerating(false);
+                    return;
+                }
+                console.log('[Admin] Video post detected — saving without image.');
             }
 
             const formData = new FormData();
             formData.append('title', finalTitle);
             formData.append('content', content || `Transmission for ${finalTitle}.`);
-            formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
+            formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : genType === 'TRAILER' ? 'TRAILER' : 'COMMUNITY');
             formData.append('headline', (overlayTag || 'FEATURED').toUpperCase());
             formData.append('isWebsitePublished', isWebsitePublished ? 'true' : 'false');
 
             if (imageFileToUpload) {
                 formData.append('image', imageFileToUpload, imageFileName);
                 formData.append('skipProcessing', 'true');
-            } else if (editingPostId && !imageFileToUpload) {
-                // Editing but no new image generated - this is an error
-                alert('ERROR: Image processing failed. Changes were NOT saved. Please try again or check console for errors.');
-                setIsGenerating(false);
-                return;
+            } else if (editingPostId) {
+                // Editing an existing post — if no new image, that's OK (video posts have no image, or keeping existing)
+                console.log('[Admin] Editing post without new image — preserving existing.');
             } else {
-                alert('Visual asset is required for new transmissions.');
-                setIsGenerating(false);
-                return;
+                // New post — check if video post (no image needed)
+                const isVideoPost = content?.match(/Tweet ID:\s*(\d+)/);
+                if (!isVideoPost) {
+                    alert('Visual asset is required for new transmissions.');
+                    setIsGenerating(false);
+                    return;
+                }
             }
 
             if (editingPostId) {
@@ -1731,32 +1777,66 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
 
                                     <td className="p-4 align-top w-[100px]">
-                                        <div className="w-16 h-20 rounded-lg overflow-hidden relative transition-all" style={{ background: 'rgba(12,12,24,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                            {post.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img
-                                                    src={post.image}
-                                                    alt=""
-                                                    className="w-full h-full object-cover"
-                                                    style={{ animation: 'none', opacity: 1 }}
-                                                    onError={(e) => {
-                                                        const target = e.target as HTMLImageElement;
-                                                        target.onerror = null;
-                                                        target.src = '/hero-bg-final.png';
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-                                                    <ImageIcon size={16} />
+                                        {(() => {
+                                            const videoInfo = getPostVideoInfo(post);
+                                            const ytThumb = videoInfo?.type === 'youtube' ? `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg` : null;
+                                            const thumbSrc = post.image || ytThumb;
+                                            return (
+                                                <div
+                                                    className="w-16 h-20 rounded-lg overflow-hidden relative transition-all cursor-pointer group/thumb"
+                                                    style={{ background: 'rgba(12,12,24,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}
+                                                    onClick={(e) => { if (videoInfo) { e.stopPropagation(); setVideoPreviewPost(post); } }}
+                                                    title={videoInfo ? 'Click to watch video' : ''}
+                                                >
+                                                    {thumbSrc ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img
+                                                            src={thumbSrc}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                            style={{ animation: 'none', opacity: 1 }}
+                                                            onError={(e) => {
+                                                                const target = e.target as HTMLImageElement;
+                                                                target.onerror = null;
+                                                                target.src = '/hero-bg-final.png';
+                                                            }}
+                                                        />
+                                                    ) : videoInfo?.type === 'twitter' ? (
+                                                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'rgba(29,155,240,0.1)' }}>
+                                                            <Twitter size={16} style={{ color: '#1d9bf0' }} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
+                                                            <ImageIcon size={16} />
+                                                        </div>
+                                                    )}
+                                                    {/* Play overlay for video posts */}
+                                                    {videoInfo && (
+                                                        <div className="absolute inset-0 flex items-center justify-center opacity-80 group-hover/thumb:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                                                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                                                <svg viewBox="0 0 24 24" fill="white" width="10" height="10"><path d="M8 5v14l11-7z"/></svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="p-4 align-top">
                                         <div className="flex items-center gap-2 mb-1">
                                             <h3 className="text-sm font-bold transition-colors" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-main)' }}>
                                                 {post.title}
                                             </h3>
+                                            {getPostVideoInfo(post) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setVideoPreviewPost(post); }}
+                                                    className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest rounded flex items-center gap-1 transition-all hover:scale-105"
+                                                    style={{ background: 'rgba(255,60,172,0.1)', color: '#ff3cac', border: '1px solid rgba(255,60,172,0.2)' }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="currentColor" width="8" height="8"><path d="M8 5v14l11-7z"/></svg>
+                                                    Watch
+                                                </button>
+                                            )}
                                             {post.isDuplicate && (
                                                 <span className="px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest rounded flex items-center gap-1" style={{ background: 'rgba(255,180,0,0.08)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.15)' }}>
                                                     <AlertTriangle size={8} /> DUP
@@ -2463,6 +2543,56 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                             {/* Modal Content */}
                             <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6">
+                                {/* Video Preview (for video posts being edited) */}
+                                {editingPostId && (() => {
+                                    const editPost = posts.find(p => p.id === editingPostId);
+                                    if (!editPost) return null;
+                                    const videoInfo = getPostVideoInfo(editPost);
+                                    if (!videoInfo) return null;
+                                    return (
+                                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                                            <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ background: videoInfo.type === 'youtube' ? '#ff0000' : '#1d9bf0' }} />
+                                                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-muted)' }}>
+                                                    {videoInfo.type === 'youtube' ? 'YouTube' : 'X'} Video Preview
+                                                </span>
+                                                <button
+                                                    className="ml-auto text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded transition-colors"
+                                                    style={{ color: '#00d4ff', background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)' }}
+                                                    onClick={() => setVideoPreviewPost(editPost)}
+                                                >
+                                                    Expand
+                                                </button>
+                                            </div>
+                                            {videoInfo.type === 'youtube' ? (
+                                                <div className="relative w-full" style={{ paddingBottom: '56.25%', background: '#000' }}>
+                                                    <iframe
+                                                        src={`https://www.youtube.com/embed/${videoInfo.id}?rel=0`}
+                                                        title="Video preview"
+                                                        frameBorder="0"
+                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                                        allowFullScreen
+                                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="p-3 flex justify-center" style={{ background: 'rgba(0,0,0,0.2)', minHeight: '100px' }}>
+                                                    <a
+                                                        href={`https://x.com/i/status/${videoInfo.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs font-bold flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                                                        style={{ color: '#1d9bf0', background: 'rgba(29,155,240,0.1)', border: '1px solid rgba(29,155,240,0.2)' }}
+                                                    >
+                                                        <Twitter size={14} />
+                                                        View on X
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 <div className="space-y-4">
                                     {/* 0. POST TYPE (Optional) */}
                                     <div className="group">
@@ -3072,6 +3202,80 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         </div>
                     </div>
                 )} a
+
+            {/* VIDEO PREVIEW MODAL */}
+            {videoPreviewPost && (() => {
+                const videoInfo = getPostVideoInfo(videoPreviewPost);
+                if (!videoInfo) return null;
+                return (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setVideoPreviewPost(null)}>
+                        <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(6,6,14,0.95)' }} />
+                        <div
+                            className="relative w-full max-w-3xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-300"
+                            style={{ background: 'rgba(12,12,24,0.95)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 0 60px rgba(0,212,255,0.1)' }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full" style={{ background: videoInfo.type === 'youtube' ? '#ff0000' : '#1d9bf0', boxShadow: `0 0 8px ${videoInfo.type === 'youtube' ? 'rgba(255,0,0,0.4)' : 'rgba(29,155,240,0.4)'}` }} />
+                                    <span className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                                        {videoInfo.type === 'youtube' ? 'YouTube Video' : 'X / Twitter Post'}
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(255,60,172,0.1)', color: '#ff3cac', border: '1px solid rgba(255,60,172,0.2)' }}>
+                                        VIDEO
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setVideoPreviewPost(null)}
+                                    className="p-2 rounded-full transition-colors hover:bg-white/5"
+                                    style={{ color: 'var(--text-muted)' }}
+                                >
+                                    <Plus size={20} className="rotate-45" />
+                                </button>
+                            </div>
+
+                            {/* Video Content */}
+                            <div className="p-4">
+                                {videoInfo.type === 'youtube' ? (
+                                    <div className="relative w-full" style={{ paddingBottom: '56.25%', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+                                        <iframe
+                                            src={`https://www.youtube.com/embed/${videoInfo.id}?rel=0&modestbranding=1`}
+                                            title={videoPreviewPost.title}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                            allowFullScreen
+                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div ref={twitterWidgetRef} className="flex justify-center min-h-[300px] py-4" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                                        <blockquote className="twitter-tweet" data-theme="dark" data-conversation="none" data-media-max-width="560">
+                                            <a href={`https://twitter.com/i/status/${videoInfo.id}`}>Loading tweet...</a>
+                                        </blockquote>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Post Info Footer */}
+                            <div className="px-4 pb-4">
+                                <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                                    {videoPreviewPost.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                    <span>{videoPreviewPost.source || 'Unknown'}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                    <span>{new Date(videoPreviewPost.timestamp).toLocaleDateString()}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                    <span className="uppercase font-bold" style={{ color: videoPreviewPost.status === 'pending' ? '#ff3cac' : videoPreviewPost.status === 'approved' ? '#00d4ff' : '#00ff88' }}>
+                                        {videoPreviewPost.status}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* SCHEDULER LOGS MODAL */}
             {
