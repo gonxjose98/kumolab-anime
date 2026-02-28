@@ -73,16 +73,19 @@
   }
 }
 
-/* Light mode adjustments */
+/* Light mode adjustments — lighter galaxy theme */
 .light {
-  --bg-color: #f8fafc;
-  --surface-color: #ffffff;
-  --surface-hover: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  --text-muted: #94a3b8;
-  --border-subtle: #e2e8f0;
+  --bg-color: #e8ecf4;
+  --surface-color: rgba(220, 225, 240, 0.7);
+  --surface-hover: rgba(200, 210, 230, 0.5);
+  --text-primary: #0c0e1a;
+  --text-secondary: #3a3d5c;
+  --text-tertiary: #5a5e80;
+  --text-muted: #8088a8;
+  --border-subtle: rgba(120, 130, 170, 0.15);
+  --accent-cyan: #0099cc;
+  --accent-pink: #cc2080;
+  --accent-purple: #5a40cc;
 }
 
 * {

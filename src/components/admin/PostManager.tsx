@@ -1321,87 +1321,72 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-6 animate-in fade-in duration-700">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-2">
-                    <h2 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 tracking-tighter uppercase drop-shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+                <div className="space-y-1">
+                    <h2 className="text-2xl md:text-3xl font-black tracking-tight uppercase" style={{ fontFamily: 'var(--font-display)', background: 'linear-gradient(135deg, #00d4ff 0%, #7b61ff 40%, #ff3cac 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         Mission Control
                     </h2>
-                    <p className="text-neutral-500 text-xs md:text-sm font-mono tracking-widest uppercase">
-                        Admin Intelligence System v2.0
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                        Intelligence System v2.0
                     </p>
                 </div>
 
                 {/* Filters */}
-                <div className="flex bg-white/60 dark:bg-black/40 p-1.5 rounded-xl border border-gray-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-none overflow-x-auto">
-                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => (
-                        <button
-                            key={f}
-                            onClick={() => setFilter(f)}
-                            className={`relative px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest rounded-lg transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${filter === f
-                                ? 'text-white shadow-[0_4px_10px_rgba(168,85,247,0.3)]'
-                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                                }`}
-                        >
-                            {filter === f && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg -z-10" />
-                            )}
-                            <span>{f}</span>
-                            {f === 'PENDING' && pendingCount > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-purple-600' : 'bg-purple-600 text-white'}`}>
-                                    {pendingCount}
-                                </span>
-                            )}
-                            {f === 'APPROVED' && approvedCount > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'}`}>
-                                    {approvedCount}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+                <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
+                        const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
+                        const c = tabColors[f];
+                        return (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
+                                style={{
+                                    color: filter === f ? '#fff' : 'var(--text-muted)',
+                                    background: filter === f ? `${c}18` : 'transparent',
+                                    border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
+                                    fontFamily: 'var(--font-display)',
+                                    boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
+                                }}
+                            >
+                                <span>{f}</span>
+                                {f === 'PENDING' && pendingCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
+                                        {pendingCount}
+                                    </span>
+                                )}
+                                {f === 'APPROVED' && approvedCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
+                                        {approvedCount}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Action Bar */}
-            {/* Action Bar - Modern Glass Cards */}
-            {/* Action Bar - Modern Aesthetic Compact */}
-            <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
                 <button
                     onClick={() => setShowAiPromptModal(true)}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 border border-purple-400 backdrop-blur-xl shadow-lg shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 min-w-[120px]"
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[110px]"
+                    style={{ background: 'linear-gradient(135deg, rgba(123,97,255,0.2), rgba(255,60,172,0.2))', border: '1px solid rgba(123,97,255,0.3)', boxShadow: '0 4px 15px rgba(123,97,255,0.15)' }}
                 >
                     <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                        <Sparkles size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">AI Assist</span>
+                        <Sparkles size={14} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>AI Assist</span>
                     </div>
                 </button>
 
-                <button
-                    onClick={() => handleGenerateClick()}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
-                        <Plus size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Create Post</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => { setShowLogsModal(true); handleFetchLogs(); }}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-950/10 hover:bg-slate-50 dark:hover:bg-slate-900/20 border border-gray-200 dark:border-slate-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-slate-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform">
-                        <Terminal size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Logs</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={async () => {
+                {[
+                    { label: 'Create', icon: <Plus size={14} />, color: '#7b61ff', onClick: () => handleGenerateClick() },
+                    { label: 'Logs', icon: <Terminal size={14} />, color: '#00d4ff', onClick: () => { setShowLogsModal(true); handleFetchLogs(); } },
+                    { label: 'Add URL', icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>, color: '#ff8c00', onClick: async () => {
                         const url = prompt('Paste YouTube or X (Twitter) URL:');
                         if (!url) return;
-                        
                         setIsPublishing(true);
                         try {
                             const res = await fetch('/api/admin/custom-url', {
@@ -1410,44 +1395,38 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 body: JSON.stringify({ url: url })
                             });
                             const data = await res.json();
-                            
                             if (data.success) {
-                                alert(`✅ ${data.post.platform || 'Post'} Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nSource: ${data.post.channel || data.post.platform}\n\nCheck the Pending tab to approve it.`);
+                                alert(`${data.post.platform || 'Post'} Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nSource: ${data.post.channel || data.post.platform}\n\nCheck the Pending tab to approve it.`);
                                 window.location.reload();
                             } else {
-                                alert('❌ ' + (data.error || 'Failed to add post'));
+                                alert('Failed: ' + (data.error || 'Failed to add post'));
                             }
                         } catch (e: any) {
-                            alert('❌ Error: ' + e.message);
+                            alert('Error: ' + e.message);
                         } finally {
                             setIsPublishing(false);
                         }
-                    }}
-                    disabled={isPublishing}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-orange-950/10 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-orange-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
-                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
-                        <span className="text-[10px] font-black uppercase tracking-widest">Add URL</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => { setShowScanModal(true); setScanResults(null); }}
-                    disabled={isPublishing}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-cyan-950/10 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 border border-gray-200 dark:border-cyan-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-cyan-600 dark:text-cyan-400 group-hover:scale-105 transition-transform">
-                        {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>}
-                        <span className="text-[10px] font-black uppercase tracking-widest">Scan Sources</span>
-                    </div>
-                </button>
+                    }},
+                    { label: 'Scan', icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>, color: '#00d4ff', onClick: () => { setShowScanModal(true); setScanResults(null); } },
+                ].map((btn) => (
+                    <button
+                        key={btn.label}
+                        onClick={btn.onClick}
+                        disabled={isPublishing}
+                        className="flex-1 md:flex-none group relative overflow-hidden px-3 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[90px]"
+                        style={{ background: `${btn.color}08`, border: `1px solid ${btn.color}20`, backdropFilter: 'blur(10px)' }}
+                    >
+                        <div className="flex items-center justify-center gap-1.5 group-hover:scale-105 transition-transform" style={{ color: btn.color }}>
+                            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : btn.icon}
+                            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>{btn.label}</span>
+                        </div>
+                    </button>
+                ))}
 
                 {filter === 'PENDING' && (
                     <button
                         onClick={async () => {
-                            if (!confirm('🧹 This will delete duplicate posts from pending approvals.\n\nKeep: Highest tier/source post from each duplicate group\nDelete: Lower tier duplicates and similar titles (75%+ match)\n\nProceed?')) return;
-                            
+                            if (!confirm('This will delete duplicate posts from pending approvals.\n\nKeep: Highest tier/source post from each duplicate group\nDelete: Lower tier duplicates and similar titles (75%+ match)\n\nProceed?')) return;
                             setIsPublishing(true);
                             try {
                                 const res = await fetch('/api/admin/cleanup-duplicates', {
@@ -1456,84 +1435,59 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     body: JSON.stringify({ action: 'cleanup-pending' })
                                 });
                                 const data = await res.json();
-                                
                                 if (data.success) {
-                                    alert(`✅ Cleanup complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} posts`);
-                                    // Refresh posts
+                                    alert(`Cleanup complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} posts`);
                                     window.location.reload();
                                 } else {
-                                    alert('❌ Cleanup failed: ' + (data.error || 'Unknown error'));
+                                    alert('Cleanup failed: ' + (data.error || 'Unknown error'));
                                 }
                             } catch (e: any) {
-                                alert('❌ Error: ' + e.message);
+                                alert('Error: ' + e.message);
                             } finally {
                                 setIsPublishing(false);
                             }
                         }}
                         disabled={isPublishing}
-                        className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                        className="flex-1 md:flex-none group relative overflow-hidden px-3 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[90px]"
+                        style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)' }}
                     >
-                        <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
-                            {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                            <span className="text-[10px] font-black uppercase tracking-widest">Clean Dups</span>
+                        <div className="flex items-center justify-center gap-1.5 group-hover:scale-105 transition-transform" style={{ color: '#ff4444' }}>
+                            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>Clean Dups</span>
                         </div>
                     </button>
                 )}
 
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Delete</span>
+                        <button onClick={handleBulkDelete} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: '#ff4444' }}>
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider hidden md:inline" style={{ fontFamily: 'var(--font-display)' }}>Delete</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={handleBulkHide}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-neutral-900/40 hover:bg-gray-50 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-neutral-400 group-hover:scale-105 transition-transform">
-                                <EyeOff size={16} />
-                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Hide</span>
+                        <button onClick={handleBulkHide} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                                <EyeOff size={14} />
+                                <span className="text-[9px] font-bold uppercase tracking-wider hidden md:inline" style={{ fontFamily: 'var(--font-display)' }}>Hide</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={() => handleApprove(selectedIds)}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 border border-green-400 backdrop-blur-xl shadow-lg shadow-green-500/20 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Approve ({selectedIds.length})</span>
+                        <button onClick={() => handleApprove(selectedIds)} disabled={isPublishing} className="flex-1 md:flex-none group px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5" style={{ background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.3)', boxShadow: '0 4px 15px rgba(0,255,136,0.1)' }}>
+                            <div className="flex items-center justify-center gap-1.5 text-white">
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} style={{ color: '#00ff88' }} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#00ff88' }}>Approve ({selectedIds.length})</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={() => handleDecline(selectedIds)}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 border border-red-400 backdrop-blur-xl shadow-lg shadow-red-500/20 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Decline ({selectedIds.length})</span>
+                        <button onClick={() => handleDecline(selectedIds)} disabled={isPublishing} className="flex-1 md:flex-none group px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5" style={{ background: 'rgba(255,60,60,0.12)', border: '1px solid rgba(255,60,60,0.3)', boxShadow: '0 4px 15px rgba(255,60,60,0.1)' }}>
+                            <div className="flex items-center justify-center gap-1.5 text-white">
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} style={{ color: '#ff4444' }} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#ff4444' }}>Decline ({selectedIds.length})</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={handlePublishToSocials}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Broadcast ({selectedIds.length})</span>
+                        <button onClick={handlePublishToSocials} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,60,172,0.08)', border: '1px solid rgba(255,60,172,0.2)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: '#ff3cac' }}>
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>Broadcast ({selectedIds.length})</span>
                             </div>
                         </button>
                     </div>
@@ -1541,139 +1495,126 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             </div>
 
             {/* Content Display - Hybrid Table (Desktop) / Cards (Mobile) */}
-            <div className="bg-white/60 dark:bg-black/20 backdrop-blur-xl border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl">
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(12,12,24,0.4)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
                 {/* Desktop Table View */}
                 <div className="hidden md:block">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50/50 dark:bg-white/5 text-slate-500 dark:text-neutral-400 border-b border-gray-200 dark:border-white/5">
+                        <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <tr>
                                 <th className="p-4 pl-6 w-[40px]">
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.length === filteredPosts.length && filteredPosts.length > 0}
                                         onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                        className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider">
-                                    {filter === 'PENDING' ? 'Metadata' : 'Signal Status'}
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                                    {filter === 'PENDING' ? 'Metadata' : 'Status'}
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider">Visual</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider w-full">Intel</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-right pr-6">Controls</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Visual</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em] w-full" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Intel</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em] text-right pr-6" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Controls</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                        <tbody style={{ borderTop: 'none' }}>
                             {filteredPosts.map((post) => (
-                                <tr key={post.id} className={`group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${post.id && selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                <tr key={post.id} className="group transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: post.id && selectedIds.includes(post.id) ? 'rgba(123,97,255,0.06)' : 'transparent' }} onMouseEnter={(e) => { if (!(post.id && selectedIds.includes(post.id))) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = post.id && selectedIds.includes(post.id) ? 'rgba(123,97,255,0.06)' : 'transparent'; }}>
                                     <td className="p-4 pl-6 align-top">
                                         <input
                                             type="checkbox"
                                             checked={!!post.id && selectedIds.includes(post.id)}
                                             onChange={() => post.id && toggleSelect(post.id)}
-                                            className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                            className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
                                     <td className="p-4 align-top w-[180px]">
                                         {filter === 'PENDING' ? (
-                                            <div className="flex flex-col gap-2">
-                                                {/* LOUD VERIFICATION LOG */}
+                                            <div className="flex flex-col gap-1.5">
                                                 {(() => {
-                                                    const logMsg = `[V3-REFRESH] METADATA RENDERING: Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier} | ClaimType=${post.claimType} | Time=${new Date().toISOString()}`;
-                                                    console.log(`%c ${logMsg}`, 'background: #222; color: #bada55; font-size: 10px; font-weight: bold;');
+                                                    console.log(`[V3] Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier}`);
                                                     return null;
                                                 })()}
-                                                
+
+                                                {/* Source + Tier + Score Row */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[9px] font-bold uppercase tracking-tight" style={{ color: '#00d4ff', fontFamily: 'var(--font-display)' }}>
+                                                        {post.source || 'Unknown'}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(123,97,255,0.1)', color: '#7b61ff', border: '1px solid rgba(123,97,255,0.2)' }}>
+                                                        T{post.sourceTier || 3}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(0,212,255,0.08)', color: '#00d4ff', border: '1px solid rgba(0,212,255,0.15)' }}>
+                                                        {post.relevanceScore || 0}
+                                                    </span>
+                                                </div>
+
                                                 {/* Verification Badge */}
                                                 {(post as any).verification_badge && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-black uppercase tracking-wide" style={{ color: (post as any).verification_color || '#9ca3af' }}>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold uppercase" style={{ color: (post as any).verification_color || 'var(--text-muted)' }}>
                                                             {(post as any).verification_badge}
                                                         </span>
-                                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
+                                                        <span className="text-[7px] px-1 py-0.5 rounded font-mono" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                                                             {(post as any).verification_score || 0}
                                                         </span>
                                                     </div>
                                                 )}
-                                                
-                                                {/* Duplicate Warning */}
-                                                {((post as any).is_duplicate || (post as any).duplicate_of) && (
-                                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-900/30 border border-red-500/30">
-                                                        <span className="text-[8px] text-red-400 font-black uppercase">⚠ DUPLICATE</span>
-                                                        {(post as any).duplicate_confidence && (
-                                                            <span className="text-[7px] text-red-400/70 font-mono">
-                                                                {Math.round((post as any).duplicate_confidence)}%
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {(post as any).requires_review && (
-                                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-900/30 border border-amber-500/30">
-                                                        <span className="text-[8px] text-amber-400 font-black uppercase">⚡ REVIEW</span>
-                                                        <span className="text-[7px] text-amber-400/70 truncate max-w-[100px]">
-                                                            {(post as any).review_reason || 'Similar post exists'}
+
+                                                {/* Flags Row */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {((post as any).is_duplicate || (post as any).duplicate_of) && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,60,60,0.1)', color: '#ff4444', border: '1px solid rgba(255,60,60,0.2)' }}>
+                                                            DUP {(post as any).duplicate_confidence ? `${Math.round((post as any).duplicate_confidence)}%` : ''}
                                                         </span>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Classification & Priority */}
-                                                {(post as any).verification_classification && (
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                                            (post as any).auto_post_eligible ? 'bg-green-900/30 text-green-400' : 'bg-amber-900/30 text-amber-400'
-                                                        }`}>
-                                                            {(post as any).auto_post_eligible ? '✓ Auto-Post' : '⚠ Review Required'}
+                                                    )}
+                                                    {(post as any).requires_review && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,180,0,0.1)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.2)' }}>
+                                                            Review
                                                         </span>
-                                                        <span className="text-[8px] text-neutral-500 uppercase">
-                                                            {(post as any).priority_level}
+                                                    )}
+                                                    {(post as any).verification_classification && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: (post as any).auto_post_eligible ? 'rgba(0,255,136,0.08)' : 'rgba(255,180,0,0.08)', color: (post as any).auto_post_eligible ? '#00ff88' : '#ffb400', border: `1px solid ${(post as any).auto_post_eligible ? 'rgba(0,255,136,0.15)' : 'rgba(255,180,0,0.15)'}` }}>
+                                                            {(post as any).auto_post_eligible ? 'Auto' : 'Manual'}
                                                         </span>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Source & Tier */}
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
-                                                        {post.source || 'Unknown'}
-                                                    </span>
-                                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
-                                                        T{post.sourceTier || 3}
-                                                    </span>
-                                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400 font-mono">
-                                                        {post.relevanceScore || 0}
-                                                    </span>
+                                                    )}
                                                 </div>
-                                                
-                                                {/* Claim Type Badge */}
-                                                {post.claimType && (
-                                                    <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-1 rounded border w-fit ${
-                                                        post.claimType === 'NEW_SEASON_CONFIRMED' ? 'bg-green-900/30 text-green-400 border-green-500/30' :
-                                                        post.claimType === 'DELAY' ? 'bg-red-900/30 text-red-400 border-red-500/30' :
-                                                        post.claimType === 'TRAILER_DROP' ? 'bg-blue-900/30 text-blue-400 border-blue-500/30' :
-                                                        post.claimType === 'NEW_KEY_VISUAL' ? 'bg-pink-900/30 text-pink-400 border-pink-500/30' :
-                                                        post.claimType === 'DATE_ANNOUNCED' ? 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30' :
-                                                        'bg-neutral-800 text-neutral-400 border-neutral-700'
-                                                    }`}>
-                                                        {post.claimType.replace(/_/g, ' ')}
-                                                    </span>
-                                                )}
-                                                
+
+                                                {/* Claim Type */}
+                                                {post.claimType && (() => {
+                                                    const claimColors: Record<string, string> = {
+                                                        'NEW_SEASON_CONFIRMED': '#00ff88',
+                                                        'DELAY': '#ff4444',
+                                                        'TRAILER_DROP': '#00d4ff',
+                                                        'NEW_KEY_VISUAL': '#ff3cac',
+                                                        'DATE_ANNOUNCED': '#ffb400',
+                                                    };
+                                                    const cc = claimColors[post.claimType] || 'var(--text-muted)';
+                                                    return (
+                                                        <span className="text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit" style={{ background: `${cc}10`, color: cc, border: `1px solid ${cc}25` }}>
+                                                            {post.claimType.replace(/_/g, ' ')}
+                                                        </span>
+                                                    );
+                                                })()}
+
                                                 {/* Timestamp */}
-                                                <div className="text-[8px] font-mono text-neutral-600">
+                                                <div className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
                                                     {post.scrapedAt ? new Date(post.scrapedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Manual'}
                                                 </div>
-                                                
-                                                {/* Source URL Link */}
+
+                                                {/* Verify Link */}
                                                 {(post as any).verification_sources?.source_url && (
-                                                    <a 
+                                                    <a
                                                         href={(post as any).verification_sources.source_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1.5 text-[9px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider mt-1 group/link"
+                                                        className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider group/link"
+                                                        style={{ color: '#00d4ff' }}
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover/link:animate-pulse"></span>
-                                                        Verify Signal
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <span className="w-1 h-1 rounded-full" style={{ background: '#00d4ff' }} />
+                                                        Verify
+                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                         </svg>
                                                     </a>
@@ -1790,22 +1731,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
 
                                     <td className="p-4 align-top w-[100px]">
-                                        <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden relative group-hover:border-purple-300 dark:group-hover:border-white/30 transition-colors">
+                                        <div className="w-16 h-20 rounded-lg overflow-hidden relative transition-all" style={{ background: 'rgba(12,12,24,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                             {post.image ? (
                                                 /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img
                                                     src={post.image}
                                                     alt=""
                                                     className="w-full h-full object-cover"
+                                                    style={{ animation: 'none', opacity: 1 }}
                                                     onError={(e) => {
                                                         const target = e.target as HTMLImageElement;
-                                                        console.error(`[PostManager] Image failed to load: ${post.image}. Falling back to /hero-bg-final.png`);
-                                                        target.onerror = null; // Prevent infinite loop
+                                                        target.onerror = null;
                                                         target.src = '/hero-bg-final.png';
                                                     }}
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-neutral-800">
+                                                <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                                                     <ImageIcon size={16} />
                                                 </div>
                                             )}
@@ -1813,61 +1754,63 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
                                     <td className="p-4 align-top">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
+                                            <h3 className="text-sm font-bold transition-colors" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-main)' }}>
                                                 {post.title}
                                             </h3>
                                             {post.isDuplicate && (
-                                                <span className="px-1.5 py-0.5 bg-yellow-400/10 border border-yellow-400/20 text-yellow-500 text-[8px] font-black uppercase tracking-widest rounded flex items-center gap-1">
-                                                    <AlertTriangle size={8} /> DUPLICATE
+                                                <span className="px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest rounded flex items-center gap-1" style={{ background: 'rgba(255,180,0,0.08)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.15)' }}>
+                                                    <AlertTriangle size={8} /> DUP
                                                 </span>
                                             )}
                                         </div>
-                                        
-                                        {/* Content Preview for Pending */}
+
                                         {filter === 'PENDING' && post.content && (
-                                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2 max-w-[400px]">
+                                            <p className="text-[10px] mt-1 line-clamp-2 max-w-[400px]" style={{ color: 'var(--text-tertiary)' }}>
                                                 {post.content.replace(/\n/g, ' ').substring(0, 150)}{post.content.length > 150 ? '...' : ''}
                                             </p>
                                         )}
-                                        
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide mt-1.5">
+
+                                        <div className="flex items-center gap-2 text-[9px] font-mono tracking-wide mt-1.5" style={{ color: 'var(--text-muted)' }}>
                                             <span>{new Date(post.timestamp).toLocaleDateString()}</span>
-                                            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
+                                            <span className="w-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
                                             <span className="truncate max-w-[200px]">{post.slug}</span>
                                             {post.anime_id && (
                                                 <>
-                                                    <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
-                                                    <span className="text-neutral-600">{post.anime_id}</span>
+                                                    <span className="w-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                                                    <span>{post.anime_id}</span>
                                                 </>
                                             )}
                                         </div>
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex justify-end gap-1.5">
                                             {filter === 'PENDING' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleApprove([post.id!])}
-                                                        title="Approve Transmission"
-                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 hover:bg-green-500 text-green-500 hover:text-white border border-green-500/20 transition-all"
+                                                        title="Approve"
+                                                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                        style={{ background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', color: '#00ff88' }}
                                                     >
-                                                        <Check size={14} />
+                                                        <Check size={13} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDecline([post.id!])}
-                                                        title="Decline Transmission"
-                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 transition-all"
+                                                        title="Decline"
+                                                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                        style={{ background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.2)', color: '#ff4444' }}
                                                     >
-                                                        <X size={14} />
+                                                        <X size={13} />
                                                     </button>
                                                 </>
                                             )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
-                                                title="Edit Post"
-                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-500/10 hover:bg-purple-500 text-purple-500 hover:text-white border border-purple-500/20 transition-all"
+                                                title="Edit"
+                                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                style={{ background: 'rgba(123,97,255,0.08)', border: '1px solid rgba(123,97,255,0.2)', color: '#7b61ff' }}
                                             >
-                                                <Edit2 size={14} />
+                                                <Edit2 size={13} />
                                             </button>
                                         </div>
                                     </td>
@@ -2073,10 +2016,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 {filteredPosts.length === 0 && (
                     <div className="p-12 text-center">
-                        <div className="inline-flex p-4 rounded-full bg-slate-100 dark:bg-neutral-900/50 text-slate-400 dark:text-neutral-700 mb-4">
-                            <Newspaper size={24} />
+                        <div className="inline-flex p-4 rounded-full mb-4" style={{ background: 'rgba(123,97,255,0.06)', border: '1px solid rgba(123,97,255,0.1)' }}>
+                            <Newspaper size={24} style={{ color: 'var(--text-muted)' }} />
                         </div>
-                        <p className="text-neutral-500 text-sm font-medium">No transmissions found in this sector.</p>
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>No transmissions in this sector.</p>
                     </div>
                 )}
             </div>
