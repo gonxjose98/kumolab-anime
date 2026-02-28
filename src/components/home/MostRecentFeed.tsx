@@ -1,6 +1,6 @@
-
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import styles from './MostRecentFeed.module.css';
 import { BlogPost } from '@/types';
 import Link from 'next/link';
@@ -9,12 +9,38 @@ interface MostRecentFeedProps {
     posts: BlogPost[];
 }
 
-const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
-    // Filter out: Daily Drops (DROP) and HIDDEN posts. Keep COMMUNITY/INTEL.
-    let filteredPosts = posts.filter(p => p.type !== 'DROP' && p.isPublished);
+const TAG_COLORS: Record<string, { hex: string; r: number; g: number; b: number }> = {
+    DROP: { hex: '#00d4ff', r: 0, g: 212, b: 255 },
+    INTEL: { hex: '#7b61ff', r: 123, g: 97, b: 255 },
+    TRENDING: { hex: '#ff6b35', r: 255, g: 107, b: 53 },
+    COMMUNITY: { hex: '#00d4ff', r: 0, g: 212, b: 255 },
+    CONFIRMATION_ALERT: { hex: '#ff3cac', r: 255, g: 60, b: 172 },
+    TRAILER: { hex: '#ff3cac', r: 255, g: 60, b: 172 },
+    TEASER: { hex: '#7b61ff', r: 123, g: 97, b: 255 },
+};
 
-    // Deduplicate by Title (Simple heuristic: first 30 chars)
-    const seenTitles = new Set();
+const DEFAULT_TAG = { hex: '#00d4ff', r: 0, g: 212, b: 255 };
+
+function getRelativeTime(timestamp: string): string {
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffMs = now.getTime() - then.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay}d ago`;
+}
+
+const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
+    const [activeIndex, setActiveIndex] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Filter: keep published, non-DROP posts. Deduplicate by title prefix.
+    let filteredPosts = posts.filter(p => p.type !== 'DROP' && p.isPublished);
+    const seenTitles = new Set<string>();
     filteredPosts = filteredPosts.filter(post => {
         const titleKey = post.title.substring(0, 30).toLowerCase();
         if (seenTitles.has(titleKey)) return false;
@@ -22,57 +48,124 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
         return true;
     });
 
+    // Track which card is in view for the scroll indicator
+    useEffect(() => {
+        const c = containerRef.current;
+        if (!c) return;
+        const handler = () => {
+            const cards = c.querySelectorAll('[data-fc]');
+            let closest = 0;
+            let minDist = Infinity;
+            cards.forEach((card, i) => {
+                const d = Math.abs(
+                    card.getBoundingClientRect().top - c.getBoundingClientRect().top
+                );
+                if (d < minDist) {
+                    minDist = d;
+                    closest = i;
+                }
+            });
+            setActiveIndex(closest);
+        };
+        c.addEventListener('scroll', handler, { passive: true });
+        return () => c.removeEventListener('scroll', handler);
+    }, []);
+
     if (filteredPosts.length === 0) return null;
+
+    // Limit to top 20 for the feed
+    const feedPosts = filteredPosts.slice(0, 20);
 
     return (
         <section className={styles.section}>
-            <div className="container">
-                <h2 className={styles.sectionTitle}>MOST RECENT</h2>
-
-                <div className={styles.feed}>
-                    {filteredPosts.map((post) => (
-                        <Link href={`/blog/${post.slug}`} key={post.id} className={styles.card}>
-                            <div className={styles.content}>
-                                <div className={styles.meta}>
-                                    <time className={styles.date}>
-                                        {new Date(post.timestamp).toLocaleDateString(undefined, {
-                                            month: 'long', day: 'numeric', year: 'numeric'
-                                        })}
-                                    </time>
-                                </div>
-                                <h3 className={styles.title}>
-                                    {post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '')}
-                                </h3>
-                            </div>
-
-                            <div className={styles.imageWrapper}>
-                                {post.image ? (
-                                    <div className={styles.imageAspectRatio}>
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={`${post.image}${post.updated_at ? `?v=${new Date(post.updated_at).getTime()}` : ''}`}
-                                            alt={post.title}
-                                            className={styles.image}
-                                            loading="lazy"
-                                            onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                const fallbackUrl = '/hero-bg-final.png';
-
-                                                if (!target.src.endsWith(fallbackUrl)) {
-                                                    console.warn(`[MostRecentFeed] Image failed to load: ${target.src}. Falling back to ${fallbackUrl}`);
-                                                    target.src = fallbackUrl;
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className={styles.placeholder} />
-                                )}
-                                <span className={styles.badge}>{post.type}</span>
-                            </div>
-                        </Link>
-                    ))}
+            {/* Section Header */}
+            <div className={styles.header}>
+                <div className={styles.headerTag}>◉ 最新 — Most Recent</div>
+                <div className={styles.headerRow}>
+                    <h2 className={styles.headerTitle}>Most Recent</h2>
+                    <span className={styles.headerHint}>Swipe to discover</span>
                 </div>
+            </div>
+
+            {/* TikTok-style scroll container */}
+            <div ref={containerRef} className={styles.feedContainer}>
+                {feedPosts.map((post, i) => {
+                    const tc = TAG_COLORS[post.type] || DEFAULT_TAG;
+                    const tagColor = tc.hex;
+                    const cleanTitle = post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '');
+
+                    return (
+                        <Link
+                            href={`/blog/${post.slug}`}
+                            key={post.id}
+                            data-fc=""
+                            className={styles.card}
+                        >
+                            {/* Background image */}
+                            {post.image && (
+                                <img
+                                    src={post.image}
+                                    alt=""
+                                    loading="lazy"
+                                    className={styles.cardImage}
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        if (!target.src.endsWith('/hero-bg-final.png')) {
+                                            target.src = '/hero-bg-final.png';
+                                        }
+                                    }}
+                                />
+                            )}
+                            <div className={styles.cardGradient} />
+                            <div className={styles.cardScanlines} />
+
+                            {/* Tag */}
+                            <div
+                                className={styles.cardTag}
+                                style={{
+                                    '--tag-color': tagColor,
+                                    '--tag-color-10': `rgba(${tc.r},${tc.g},${tc.b},0.1)`,
+                                    '--tag-color-20': `rgba(${tc.r},${tc.g},${tc.b},0.2)`,
+                                } as React.CSSProperties}
+                            >
+                                <span className={styles.tagDot} />
+                                <span className={styles.tagText}>{post.type}</span>
+                            </div>
+
+                            {/* Counter */}
+                            <div className={styles.cardCounter}>
+                                {String(i + 1).padStart(2, '0')}/{String(feedPosts.length).padStart(2, '0')}
+                            </div>
+
+                            {/* Bottom content */}
+                            <div className={styles.cardBottom}>
+                                <div className={styles.cardMeta}>
+                                    {post.source && (
+                                        <span className={styles.cardSource}>{post.source}</span>
+                                    )}
+                                    <span className={styles.cardTime}>{getRelativeTime(post.timestamp)}</span>
+                                </div>
+                                <h3 className={styles.cardTitle}>{cleanTitle}</h3>
+                            </div>
+
+                            {/* Corner accents */}
+                            <span className={styles.cornerTL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerTR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerBL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            <span className={styles.cornerBR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                        </Link>
+                    );
+                })}
+            </div>
+
+            {/* Scroll progress dots */}
+            <div className={styles.scrollDots}>
+                {feedPosts.slice(0, 10).map((_, i) => (
+                    <div
+                        key={i}
+                        className={`${styles.dot} ${activeIndex === i ? styles.dotActive : ''}`}
+                    />
+                ))}
             </div>
         </section>
     );

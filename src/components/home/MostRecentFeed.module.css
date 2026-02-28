@@ -1,183 +1,276 @@
-/* MOBILE-FIRST MostRecentFeed */
+/* ─── MOST RECENT FEED — TIKTOK STYLE ────────────────────────────── */
 .section {
-    padding: var(--space-xl) 0;
-    background: var(--bg-color);
+    padding: 20px 0 0;
 }
 
-.sectionTitle {
-    font-family: var(--font-display);
-    font-size: var(--font-small);
-    font-weight: 800;
-    letter-spacing: 0.15em;
-    color: var(--text-secondary);
-    margin-bottom: var(--space-lg);
-    text-align: left;
-    position: relative;
-    padding-left: 12px;
-    text-transform: uppercase;
-}
-
-.sectionTitle::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 14px;
-    background: var(--accent-primary);
-    border-radius: 2px;
-}
-
-.feed {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-    max-width: 100%;
+/* Header */
+.header {
+    max-width: 1100px;
     margin: 0 auto;
+    padding: 0 24px 28px;
 }
 
-.card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    text-decoration: none;
-    transition: transform 0.2s ease;
-    /* Large touch target for mobile */
-    padding: var(--space-xs);
-    margin: calc(var(--space-xs) * -1);
-    border-radius: 12px;
-}
-
-.card:active {
-    transform: scale(0.98);
-    background: var(--surface-hover);
-}
-
-.imageWrapper {
-    position: relative;
-    width: 100%;
-    background: var(--surface-color);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    aspect-ratio: 1 / 1;
-}
-
-.imageAspectRatio {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.image {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-    object-position: center;
-    transition: transform 0.3s ease;
-}
-
-.card:hover .image,
-.card:active .image {
-    transform: scale(1.03);
-}
-
-.placeholder {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, var(--surface-color), var(--bg-color));
-}
-
-.badge {
-    position: absolute;
-    top: var(--space-sm);
-    left: var(--space-sm);
-    background: rgba(124, 58, 237, 0.95);
-    color: #fff;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
+.headerTag {
+    font-size: 10px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--accent-pink);
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    backdrop-filter: blur(8px);
+    margin-bottom: 8px;
+}
+
+.headerRow {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+}
+
+.headerTitle {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.headerHint {
+    font-size: 12px;
+    font-family: var(--font-main);
+    color: var(--text-muted);
+}
+
+/* Feed container — phone-like scroll snap */
+.feedContainer {
+    max-width: 480px;
+    margin: 0 auto;
+    height: 85vh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+    position: relative;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(6, 6, 14, 0.5);
+}
+
+.feedContainer::-webkit-scrollbar {
+    display: none;
+}
+
+/* Individual card */
+.card {
+    scroll-snap-align: start;
+    height: 85vh;
+    position: relative;
+    overflow: hidden;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.cardImage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cardGradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(6, 6, 14, 0.3) 0%,
+        transparent 30%,
+        transparent 50%,
+        rgba(6, 6, 14, 0.85) 75%,
+        rgba(6, 6, 14, 0.98) 100%
+    );
+}
+
+.cardScanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.03) 3px,
+        rgba(0, 0, 0, 0.03) 4px
+    );
+    pointer-events: none;
+}
+
+/* Tag badge */
+.cardTag {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 5px 14px;
+    background: var(--tag-color-10, rgba(0, 212, 255, 0.1));
+    border: 1px solid var(--tag-color-20, rgba(0, 212, 255, 0.2));
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
     z-index: 2;
 }
 
-.content {
-    padding: var(--space-xs) 0;
+.tagDot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--tag-color, #00d4ff);
+    box-shadow: 0 0 6px var(--tag-color, #00d4ff);
 }
 
-.meta {
-    margin-bottom: var(--space-xs);
-}
-
-.date {
-    font-size: var(--font-small);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 500;
-}
-
-.title {
+.tagText {
+    font-size: 11px;
     font-family: var(--font-display);
-    font-size: var(--font-h3);
-    font-weight: 800;
-    color: var(--text-primary);
+    font-weight: 700;
+    color: var(--tag-color, #00d4ff);
+    letter-spacing: 0.12em;
+}
+
+/* Counter */
+.cardCounter {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 11px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.3);
+    z-index: 2;
+}
+
+/* Bottom content */
+.cardBottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 40px 24px 28px;
+    z-index: 2;
+}
+
+.cardMeta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    font-family: var(--font-main);
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.cardSource {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    font-size: 10px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.08em;
+}
+
+.cardTime {
+    font-size: 12px;
+}
+
+.cardTitle {
+    font-size: clamp(1.25rem, 4.5vw, 1.6rem);
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: #f0f0ff;
     line-height: 1.3;
-    /* Limit to 3 lines on mobile */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    margin: 0;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
 }
 
-/* TABLET */
-@media (min-width: 640px) {
-    .feed {
-        max-width: 600px;
-        gap: 3rem;
-    }
-    
-    .imageWrapper {
-        aspect-ratio: 4 / 5;
-    }
+/* Corner accents */
+.cornerTL,
+.cornerTR,
+.cornerBL,
+.cornerBR {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    z-index: 3;
 }
 
-/* DESKTOP */
-@media (min-width: 1024px) {
-    .section {
-        padding: 5rem 0;
-    }
-    
-    .feed {
-        max-width: 800px;
-    }
-    
-    .card:hover {
-        transform: translateY(-4px);
-    }
-    
-    .title {
-        font-size: var(--font-h2);
-        -webkit-line-clamp: 4;
+.cornerTL {
+    top: 12px;
+    left: 12px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+}
+
+.cornerTR {
+    top: 12px;
+    right: 12px;
+    border-top: 1.5px solid;
+    border-right: 1.5px solid;
+}
+
+.cornerBL {
+    bottom: 12px;
+    left: 12px;
+    border-bottom: 1.5px solid;
+    border-left: 1.5px solid;
+}
+
+.cornerBR {
+    bottom: 12px;
+    right: 12px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+}
+
+/* Scroll dots */
+.scrollDots {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 50;
+    opacity: 0.5;
+}
+
+.dot {
+    width: 3px;
+    height: 8px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
+}
+
+.dotActive {
+    height: 20px;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+/* Hide scroll dots on mobile — they overlap content */
+@media (max-width: 640px) {
+    .scrollDots {
+        display: none;
     }
 }
 
 /* REDUCED MOTION */
 @media (prefers-reduced-motion: reduce) {
-    .card,
-    .image {
-        transition: none;
-    }
-    
-    .card:hover,
-    .card:active {
-        transform: none;
+    .feedContainer {
+        scroll-snap-type: none;
     }
 }
