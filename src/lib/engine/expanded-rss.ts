@@ -149,16 +149,85 @@ function detectClaimType(title: string): string {
 }
 
 /**
- * Check if article has already been processed
+ * Normalize text for fuzzy matching
  */
-async function isArticleProcessed(link: string): Promise<boolean> {
-    const { data } = await supabaseAdmin
+function normalizeForMatching(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/season\s*\d+/gi, '')
+        .replace(/[^\w]/g, '')
+        .trim();
+}
+
+/**
+ * Check if article has already been processed (by URL OR fuzzy title match)
+ */
+async function isArticleProcessed(link: string, title: string): Promise<{ isDuplicate: boolean; reason: string }> {
+    // 1. Check exact URL match
+    const { data: urlMatch } = await supabaseAdmin
         .from('posts')
-        .select('id')
+        .select('id, title')
         .eq('source_url', link)
         .limit(1);
     
-    return !!(data && data.length > 0);
+    if (urlMatch && urlMatch.length > 0) {
+        return { isDuplicate: true, reason: 'URL already exists' };
+    }
+    
+    // 2. Check fuzzy title match (same story from different sources)
+    const normalizedTitle = normalizeForMatching(title);
+    if (normalizedTitle.length < 10) {
+        return { isDuplicate: false, reason: '' }; // Too short to match reliably
+    }
+    
+    // Look for similar titles in last 48 hours
+    const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: titleMatches } = await supabaseAdmin
+        .from('posts')
+        .select('id, title, source')
+        .gt('timestamp', cutoffTime)
+        .limit(50);
+    
+    if (titleMatches) {
+        for (const post of titleMatches) {
+            const normalizedExisting = normalizeForMatching(post.title);
+            // Check for significant overlap (80%+ similarity)
+            const longer = Math.max(normalizedTitle.length, normalizedExisting.length);
+            const shorter = Math.min(normalizedTitle.length, normalizedExisting.length);
+            
+            if (shorter / longer > 0.8) {
+                // Check if one contains the other
+                if (normalizedExisting.includes(normalizedTitle.substring(0, 20)) ||
+                    normalizedTitle.includes(normalizedExisting.substring(0, 20))) {
+                    return { isDuplicate: true, reason: `Similar to existing: "${post.title}" from ${post.source}` };
+                }
+            }
+        }
+    }
+    
+    return { isDuplicate: false, reason: '' };
+}
+
+interface RejectionLog {
+    title: string;
+    source: string;
+    reason: string;
+    timestamp: string;
+}
+
+/**
+ * Log rejection for debugging
+ */
+async function logRejection(title: string, source: string, reason: string) {
+    const logEntry: RejectionLog = {
+        title: title.substring(0, 100),
+        source,
+        reason,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Log to console for now (can be stored to DB later)
+    console.log(`[RSS REJECTED] ${source}: "${title.substring(0, 60)}..." | Reason: ${reason}`);
 }
 
 /**
@@ -171,31 +240,40 @@ export async function scanRSSFeeds(
     
     const candidates: NewsCandidate[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+    let stats = { total: 0, tooOld: 0, duplicate: 0, notAnime: 0, accepted: 0 };
     
     for (const source of RSS_SOURCES) {
         console.log(`[RSS] Checking ${source.name}...`);
         
         const items = await fetchRSSFeed(source.url);
+        console.log(`[RSS] ${source.name}: ${items.length} raw items`);
         
         for (const item of items) {
+            stats.total++;
             const publishedAt = new Date(item.pubDate);
             
             // Skip old articles
             if (publishedAt < cutoffTime) {
+                stats.tooOld++;
                 continue;
             }
             
-            // Check if already processed
-            const alreadyProcessed = await isArticleProcessed(item.link);
-            if (alreadyProcessed) {
+            // Check if already processed (fuzzy matching)
+            const dupCheck = await isArticleProcessed(item.link, item.title);
+            if (dupCheck.isDuplicate) {
+                stats.duplicate++;
+                await logRejection(item.title, source.name, dupCheck.reason);
                 continue;
             }
             
             // Check if anime-related
             if (!isAnimeRelated(item.title, item.description)) {
+                stats.notAnime++;
+                await logRejection(item.title, source.name, 'Not anime-related');
                 continue;
             }
             
+            stats.accepted++;
             candidates.push({
                 title: item.title,
                 link: item.link,
@@ -208,14 +286,20 @@ export async function scanRSSFeeds(
                 contentSnippet: item.content || item.description,
             });
             
-            console.log(`[RSS] Found: ${item.title.substring(0, 60)}...`);
+            console.log(`[RSS] ACCEPTED: ${item.title.substring(0, 60)}...`);
         }
         
         // Small delay between sources
         await new Promise(resolve => setTimeout(resolve, 300));
     }
     
-    console.log(`[RSS] Found ${candidates.length} new articles`);
+    console.log(`[RSS] SCAN COMPLETE:`);
+    console.log(`  Total checked: ${stats.total}`);
+    console.log(`  Too old: ${stats.tooOld}`);
+    console.log(`  Duplicate: ${stats.duplicate}`);
+    console.log(`  Not anime: ${stats.notAnime}`);
+    console.log(`  ACCEPTED: ${stats.accepted}`);
+    
     return candidates;
 }
 
