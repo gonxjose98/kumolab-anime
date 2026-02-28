@@ -5,11 +5,12 @@
  */
 
 import { supabaseAdmin } from '../supabase/admin';
+import { getXSources } from './dynamic-sources';
 
 // X API v2 Bearer Token (set in env vars)
 const X_BEARER_TOKEN = process.env.X_BEARER_TOKEN;
 
-// Official anime accounts to monitor
+// Default monitored accounts (used when no dynamic config exists)
 const MONITORED_ACCOUNTS = [
     { id: '1567507580', handle: 'Crunchyroll', name: 'Crunchyroll', tier: 1 },
     { id: '18817213', handle: 'FUNimation', name: 'Funimation', tier: 1 },
@@ -160,18 +161,24 @@ export async function scanXAccounts(
     hoursBack: number = 6
 ): Promise<XTweet[]> {
     const bearerToken = X_BEARER_TOKEN || process.env.X_BEARER_TOKEN;
-    
+
     if (!bearerToken) {
         console.log('[X Monitor] No bearer token configured, skipping X scan');
         return [];
     }
 
-    console.log(`[X Monitor] Scanning ${MONITORED_ACCOUNTS.length} accounts for announcements...`);
-    
+    // Try dynamic sources first, fall back to hardcoded defaults
+    const dynamicX = await getXSources();
+    const accounts = dynamicX
+        ? dynamicX.map(s => ({ id: s.id || '', handle: s.handle, name: s.name, tier: s.tier }))
+        : MONITORED_ACCOUNTS;
+
+    console.log(`[X Monitor] Scanning ${accounts.length} accounts for announcements...`);
+
     const candidates: XTweet[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
 
-    for (const account of MONITORED_ACCOUNTS) {
+    for (const account of accounts) {
         console.log(`[X Monitor] Checking @${account.handle}...`);
         
         try {

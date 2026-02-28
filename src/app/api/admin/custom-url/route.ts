@@ -151,6 +151,7 @@ ${hashtags}
 
 🎥 **Embed:** https://www.youtube.com/embed/${videoId}`,
         type: contentType,
+        status: 'pending',
         is_published: false,
         excerpt: contentType === 'TRAILER' ? 'OFFICIAL TRAILER' : contentType,
         image: thumbnailUrl,
@@ -210,6 +211,7 @@ Tweet ID: ${tweetId}
 
 [Edit this post to add description and context]`,
         type: 'INTEL',
+        status: 'pending',
         is_published: false,
         image: '', // No image by default for X posts
         source: `@${username} on X`,

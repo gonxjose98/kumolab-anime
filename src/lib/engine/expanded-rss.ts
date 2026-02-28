@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/admin';
+import { getRSSSources } from './dynamic-sources';
 
 interface RSSSource {
     name: string;
@@ -253,12 +254,24 @@ export async function scanRSSFeeds(
     hoursBack: number = 6
 ): Promise<NewsCandidate[]> {
     console.log(`[RSS] Scanning feeds for articles from last ${hoursBack} hours...`);
-    
+
+    // Try dynamic sources first, fall back to hardcoded defaults
+    const dynamicRSS = await getRSSSources();
+    const sources: RSSSource[] = dynamicRSS
+        ? dynamicRSS.map(s => ({
+            name: s.name,
+            url: s.url || '',
+            tier: s.tier || 2,
+            type: 'NEWS' as const,
+            language: (s.lang === 'JP' ? 'JP' : 'EN') as 'EN' | 'JP',
+        }))
+        : RSS_SOURCES;
+
     const candidates: NewsCandidate[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
     let stats = { total: 0, tooOld: 0, duplicate: 0, notAnime: 0, accepted: 0 };
-    
-    for (const source of RSS_SOURCES) {
+
+    for (const source of sources) {
         console.log(`[RSS] Checking ${source.name}...`);
         
         const items = await fetchRSSFeed(source.url);
