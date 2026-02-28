@@ -566,60 +566,158 @@ export async function fetchAnimeIntel(telemetry?: any): Promise<any[]> {
 
 /**
  * Fetches real Trending discussions from Reddit r/anime (Hot/Top)
+ * Tries multiple methods: JSON API -> RSS -> Pushshift fallback
  */
 export async function fetchTrendingSignals(telemetry?: any): Promise<any[]> {
+    const validTrends: any[] = [];
+    
+    // Method 1: Try Reddit JSON API with browser-like headers
     try {
-        // Reddit JSON API (No auth needed for read-only public)
-        const response = await fetch('https://www.reddit.com/r/anime/top.json?t=day&limit=10', {
+        console.log('[Reddit] Trying JSON API...');
+        const response = await fetch('https://www.reddit.com/r/anime/top.json?t=day&limit=15', {
             headers: {
-                'User-Agent': 'KumoLab-Bot/1.0'
-            }
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+            },
+            signal: AbortSignal.timeout(10000)
         });
 
-        if (!response.ok) throw new Error('Reddit API failed');
+        if (response.ok) {
+            const json = await response.json();
+            const posts = json.data?.children || [];
+            console.log(`[Reddit] JSON API returned ${posts.length} posts`);
 
-        const json = await response.json();
-        const posts = json.data?.children || [];
+            for (const post of posts) {
+                const data = post.data;
+                if (data.stickied || data.is_meta) continue;
 
-        const validTrends = [];
+                let trendReason = "Community Hype";
+                if (data.title.includes('Episode') && data.title.includes('Discussion')) {
+                    trendReason = "Episode Climax";
+                } else if (data.title.includes('Visual') || data.title.includes('Trailer')) {
+                    trendReason = "Visual Reveal";
+                }
 
-        for (const post of posts) {
-            const data = post.data;
-            // Filter: No meta discussions, must be substantial
-            if (data.stickied || data.is_meta) continue;
+                const titleClean = data.title.split(' - ')[0].replace(' [Spoilers]', '');
 
-            // Exclude "Episode Discussion" threads if we want specific *moments*, 
-            // OR include them if we want to extract the moment.
-            // For now, let's treat popular episode threads as trending moments.
-
-            let trendReason = "Community Hype";
-            if (data.title.includes('Episode') && data.title.includes('Discussion')) {
-                trendReason = "Episode Climax";
-            } else if (data.title.includes('Visual') || data.title.includes('Trailer')) {
-                trendReason = "Visual Reveal";
+                validTrends.push({
+                    title: titleClean,
+                    fullTitle: data.title,
+                    slug: 'trending-' + data.id,
+                    content: data.selftext ? data.selftext.substring(0, 200) + '...' : data.title,
+                    imageSearchTerm: titleClean,
+                    momentum: data.score / 10000,
+                    trendReason: trendReason,
+                    source: `Reddit r/anime (Score: ${data.score})`
+                });
             }
-
-            // Extract anime name attempt
-            // "Frieren: Beyond Journey's End - Episode 15 Discussion" -> "Frieren: Beyond Journey's End"
-            const titleClean = data.title.split(' - ')[0].replace(' [Spoilers]', '');
-
-            validTrends.push({
-                title: titleClean,
-                fullTitle: data.title,
-                slug: 'trending-' + data.id,
-                content: data.selftext ? data.selftext.substring(0, 200) + '...' : data.title,
-                imageSearchTerm: titleClean,
-                momentum: data.score / 10000, // Normalized score
-                trendReason: trendReason,
-                source: `Reddit r/anime (Score: ${data.score})`
-            });
+            
+            if (validTrends.length > 0) {
+                console.log(`[Reddit] JSON API success: ${validTrends.length} trends`);
+                return validTrends.slice(0, 3);
+            }
         }
-
-        return validTrends.slice(0, 3);
     } catch (e) {
-        console.error("Failed to fetch Reddit Trending:", e);
-        return [];
+        console.log('[Reddit] JSON API failed:', (e as Error).message);
     }
+
+    // Method 2: Try Reddit RSS feed
+    try {
+        console.log('[Reddit] Trying RSS feed...');
+        const rssResponse = await fetch('https://www.reddit.com/r/anime/top/.rss?t=day&limit=10', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/rss+xml, text/xml'
+            },
+            signal: AbortSignal.timeout(10000)
+        });
+
+        if (rssResponse.ok) {
+            const xmlText = await rssResponse.text();
+            const items = xmlText.match(/<entry[\s\S]*?<\/entry>/g) || [];
+            console.log(`[Reddit] RSS feed returned ${items.length} entries`);
+
+            for (const entry of items.slice(0, 10)) {
+                const titleMatch = entry.match(/<title>(.*?)<\/title>/);
+                const linkMatch = entry.match(/<link href="(.*?)"/);
+                
+                if (!titleMatch) continue;
+                
+                const title = titleMatch[1].replace('&amp;', '&');
+                
+                // Skip meta posts
+                if (title.includes('[Meta]') || title.includes('[Discussion]')) continue;
+                
+                const titleClean = title.split(' - ')[0].replace(' [Spoilers]', '');
+                
+                validTrends.push({
+                    title: titleClean,
+                    fullTitle: title,
+                    slug: 'trending-' + (linkMatch ? linkMatch[1].split('/').pop() || Date.now() : Date.now()),
+                    content: title,
+                    imageSearchTerm: titleClean,
+                    momentum: 0.5, // Default since RSS doesn't have scores
+                    trendReason: title.includes('Episode') ? 'Episode Discussion' : 'Community Hype',
+                    source: 'Reddit r/anime (RSS)'
+                });
+            }
+            
+            if (validTrends.length > 0) {
+                console.log(`[Reddit] RSS success: ${validTrends.length} trends`);
+                return validTrends.slice(0, 3);
+            }
+        }
+    } catch (e) {
+        console.log('[Reddit] RSS feed failed:', (e as Error).message);
+    }
+
+    // Method 3: Pushshift API (archived Reddit data)
+    try {
+        console.log('[Reddit] Trying Pushshift API...');
+        const after = Math.floor(Date.now() / 1000) - 86400; // 24 hours ago
+        const pushshiftUrl = `https://api.pullpush.io/reddit/search/submission/?subreddit=anime&sort=score&order=desc&size=10&after=${after}`;
+        
+        const psResponse = await fetch(pushshiftUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(15000)
+        });
+
+        if (psResponse.ok) {
+            const psData = await psResponse.json();
+            const posts = psData.data || [];
+            console.log(`[Reddit] Pushshift returned ${posts.length} posts`);
+
+            for (const post of posts) {
+                if (!post.title) continue;
+                
+                const title = post.title;
+                if (title.includes('[Meta]') || title.includes('[Discussion]')) continue;
+                
+                const titleClean = title.split(' - ')[0].replace(' [Spoilers]', '');
+                
+                validTrends.push({
+                    title: titleClean,
+                    fullTitle: title,
+                    slug: 'trending-' + (post.id || Date.now()),
+                    content: post.selftext ? post.selftext.substring(0, 200) + '...' : title,
+                    imageSearchTerm: titleClean,
+                    momentum: (post.score || 100) / 10000,
+                    trendReason: title.includes('Episode') ? 'Episode Discussion' : 'Community Hype',
+                    source: `Reddit r/anime (Pushshift, Score: ${post.score || 'N/A'})`
+                });
+            }
+            
+            if (validTrends.length > 0) {
+                console.log(`[Reddit] Pushshift success: ${validTrends.length} trends`);
+                return validTrends.slice(0, 3);
+            }
+        }
+    } catch (e) {
+        console.log('[Reddit] Pushshift API failed:', (e as Error).message);
+    }
+
+    console.log('[Reddit] All methods failed, returning empty');
+    return [];
 }
 
 /**
