@@ -1,102 +1,62 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronDown, Shield, Clock, Ban } from 'lucide-react';
 import styles from './Hero.module.css';
 
 const Hero = () => {
-    const [offset, setOffset] = useState(0);
-    const [isAnimating, setIsAnimating] = useState(true);
-    const [isMobile, setIsMobile] = useState(false);
+    const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
-        // Check mobile
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-
-        // Initial Page Load Check
-        const played = sessionStorage.getItem('hero_animated');
-        if (!played) {
-            setIsAnimating(true);
-            sessionStorage.setItem('hero_animated', 'true');
-            setTimeout(() => setIsAnimating(false), 2000);
-        } else {
-            setIsAnimating(false);
-        }
-
-        const handleScroll = () => {
-            setOffset(window.scrollY);
-        };
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-            window.removeEventListener('resize', checkMobile);
-        };
+        requestAnimationFrame(() => setLoaded(true));
     }, []);
-
-    // Subtle parallax - reduced on mobile
-    const parallaxTranslate = offset * (isMobile ? 0.008 : 0.015);
 
     return (
         <section className={styles.hero}>
-            <div
-                className={styles.parallaxBg}
-                style={{ transform: `translateY(${parallaxTranslate}px)` }}
-            />
-            <div className={styles.heroOverlay}></div>
-            
-            {/* Atmospheric Effects */}
-            <div className={styles.petalsContainer}>
-                {[...Array(10)].map((_, i) => (
-                    <div key={i} className={styles.petal} />
-                ))}
-            </div>
-            <div className={styles.orb} />
-            <div className={styles.orb} />
-            <div className={styles.orb} />
+            {/* Ambient gradient orbs */}
+            <div className={styles.ambientGradients} />
+            <div className={styles.orb1} />
+            <div className={styles.orb2} />
+            <div className={styles.gridOverlay} />
 
-            <div className={`${styles.heroContent} ${isAnimating ? styles.animating : ''}`}>
-                {/* Main Headline */}
-                <div className={styles.headlineContainer}>
-                    <h1 className={styles.mainHeadline}>DAILY ANIME INTELLIGENCE</h1>
-                    <div className={styles.subtitle}>
-                        <span className={styles.subtitleLine}>Confirmed release dates, trailers, and news</span>
-                        <span className={styles.subtitleLine}>verified by <strong className={styles.kumolabText}>KumoLab</strong></span>
-                    </div>
+            <div className={`${styles.heroContent} ${loaded ? styles.loaded : ''}`}>
+                {/* Live badge */}
+                <div className={styles.liveBadge}>
+                    <span className={styles.liveDot} />
+                    <span className={styles.liveText}>ライブ — Live Intelligence Feed</span>
                 </div>
 
-                {/* CTA Button */}
+                {/* Main headline */}
+                <h1 className={styles.mainHeadline}>
+                    Your Anime<br />
+                    <span className={styles.gradientText}>Intelligence Hub</span>
+                </h1>
+
+                {/* Japanese subtitle */}
+                <div className={styles.jpSubtitle}>アニメ・インテリジェンス・ハブ</div>
+
+                {/* Description */}
+                <p className={styles.description}>
+                    Real-time tracking of every anime announcement, trailer drop, and industry move. Verified intel. Zero noise.
+                </p>
+
+                {/* CTA Buttons */}
                 <div className={styles.buttons}>
                     <Link href="/latest-daily-drop" className={styles.primaryBtn}>
-                        <span>View Today&apos;s Drops</span>
-                        <ArrowRight size={isMobile ? 18 : 20} className={styles.arrow} />
+                        <span className={styles.btnShine} />
+                        <span className={styles.btnText}>View Today&apos;s Drops</span>
+                    </Link>
+                    <Link href="/blog" className={styles.secondaryBtn}>
+                        <span className={styles.btnAccentTop} />
+                        <span className={styles.btnAccentBottom} />
+                        <span className={styles.btnText}>Explore Feed →</span>
                     </Link>
                 </div>
 
-                {/* Trust Badges */}
-                <div className={styles.trustBadges}>
-                    <div className={styles.badge}>
-                        <Shield size={14} className={styles.badgeIcon} />
-                        <span>Verified Sources</span>
+                {/* Scroll indicator */}
+                <div className={styles.scrollIndicator}>
+                    <div className={styles.scrollMouse}>
+                        <div className={styles.scrollDot} />
                     </div>
-                    <div className={styles.badge}>
-                        <Clock size={14} className={styles.badgeIcon} />
-                        <span>Daily Updates</span>
-                    </div>
-                    <div className={styles.badge}>
-                        <Ban size={14} className={styles.badgeIcon} />
-                        <span>Zero Spam</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Scroll Indicator */}
-            <div className={styles.scrollIndicator}>
-                <div className={styles.scrollContent}>
-                    <span className={styles.scrollText}>Scroll</span>
-                    <ChevronDown size={20} className={styles.scrollIcon} />
                 </div>
             </div>
         </section>

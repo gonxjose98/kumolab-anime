@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, Outfit } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/layout/Navigation';
 import Footer from '@/components/layout/Footer';
+import GalaxyBackground from '@/components/shared/GalaxyBackground';
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -80,8 +81,9 @@ export default function RootLayout({
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AnalyticsTracker />
+          <GalaxyBackground />
           <Navigation />
-          <main>{children}</main>
+          <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>
           <Footer />
         </ThemeProvider>
       </body>

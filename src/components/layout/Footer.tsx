@@ -4,38 +4,16 @@ import styles from './Footer.module.css';
 const Footer = () => {
     return (
         <footer className={styles.footer}>
-            <div className={`container ${styles.footerContainer}`}>
-                <div className={styles.brand}>
-                    <h2 className={styles.logo}>KUMOLAB</h2>
-                    <p className={styles.tagline}>Anime Intelligence. Daily. v1.9</p>
+            <Link href="/" className={styles.brand}>
+                <div className={styles.hexIcon}>
+                    <span className={styles.hexLetter}>K</span>
                 </div>
-                <div className={styles.links}>
-                    <div>
-                        <h4>Platform</h4>
-                        <ul>
-                            <li><Link href="/">Home</Link></li>
-                            <li><Link href="/blog">Blog</Link></li>
-                            <li><Link href="/merch">Merch</Link></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4>Company</h4>
-                        <ul>
-                            <li><Link href="/about">About</Link></li>
-                            <li><Link href="/contact">Contact</Link></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4>Socials</h4>
-                        <ul>
-                            <li><a href="https://x.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">X (Twitter)</a></li>
-                            <li><a href="https://instagram.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">Instagram</a></li>
-                            <li><a href="https://facebook.com/KumoLabAnime" target="_blank" rel="noopener noreferrer">Facebook</a></li>
-                        </ul>
-                    </div>
-
-                </div>
-            </div>
+                <span className={styles.brandName}>KUMOLAB</span>
+                <span className={styles.brandJp}>クモラボ</span>
+            </Link>
+            <p className={styles.tagline}>
+                Your Anime Intelligence Hub — Verified · Real-Time · Always On
+            </p>
             <div className={styles.copyright}>
                 &copy; {new Date().getFullYear()} KumoLab. All rights reserved.
             </div>
