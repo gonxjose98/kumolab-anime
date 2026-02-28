@@ -19,7 +19,13 @@ export async function POST(req: NextRequest) {
         const backgroundImageUrl = formData.get('background_image') as string;
         const isWebsitePublished = formData.get('isWebsitePublished') === 'true';
 
-        if (!title || (!imageFile && !postId)) {
+        if (!title) {
+            return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+        }
+
+        // Video posts (X/Twitter, YouTube) may not have an image — that's OK
+        const isVideoPost = content?.match(/Tweet ID:\s*\d+/) || content?.includes('youtube.com');
+        if (!imageFile && !postId && !isVideoPost) {
             return NextResponse.json({ error: 'Title and image are required' }, { status: 400 });
         }
 
