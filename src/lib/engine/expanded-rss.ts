@@ -218,7 +218,7 @@ interface RejectionLog {
 /**
  * Log rejection for debugging
  */
-async function logRejection(title: string, source: string, reason: string) {
+async function logRejection(title: string, source: string, reason: string, articleUrl?: string) {
     const logEntry: RejectionLog = {
         title: title.substring(0, 100),
         source,
@@ -226,8 +226,24 @@ async function logRejection(title: string, source: string, reason: string) {
         timestamp: new Date().toISOString()
     };
     
-    // Log to console for now (can be stored to DB later)
+    // Log to console
     console.log(`[RSS REJECTED] ${source}: "${title.substring(0, 60)}..." | Reason: ${reason}`);
+    
+    // Store in database for dashboard viewing
+    try {
+        await supabaseAdmin
+            .from('rejection_logs')
+            .insert([{
+                title: title.substring(0, 200),
+                source,
+                reason: reason.substring(0, 500),
+                article_url: articleUrl || null,
+                timestamp: new Date().toISOString()
+            }]);
+    } catch (e) {
+        // Silent fail - don't break scraping if logging fails
+        console.log('[RSS] Failed to log rejection to DB:', e);
+    }
 }
 
 /**

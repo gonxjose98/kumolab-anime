@@ -70,16 +70,53 @@ export async function POST(req: NextRequest) {
     }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const { searchParams } = new URL(req.url);
+    const view = searchParams.get('view');
+    
+    // View rejection logs
+    if (view === 'rejection-logs') {
+        const hours = parseInt(searchParams.get('hours') || '24');
+        const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        
+        const { data, error } = await supabaseAdmin
+            .from('rejection_logs')
+            .select('*')
+            .gte('timestamp', cutoff)
+            .order('timestamp', { ascending: false })
+            .limit(100);
+        
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        
+        // Group by reason
+        const byReason = data?.reduce((acc, log) => {
+            acc[log.reason] = (acc[log.reason] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        
+        return NextResponse.json({
+            total: data?.length || 0,
+            byReason,
+            logs: data
+        });
+    }
+    
+    // Default: return source status
     return NextResponse.json({
         status: 'ok',
         message: 'RSS monitoring API is active',
         sources: [
-            { name: 'MyAnimeList News', language: 'EN', tier: 1 },
-            { name: 'Crunchyroll News', language: 'EN', tier: 1 },
-            { name: 'Anime News Network', language: 'EN', tier: 1 },
+            { name: 'MyAnimeList News', language: 'EN', tier: 2 },
+            { name: 'OtakuNews', language: 'EN', tier: 2 },
+            { name: 'Anime News Network', language: 'EN', tier: 2 },
             { name: 'Natalie.mu Anime', language: 'JP', tier: 1 },
             { name: 'Oricon Anime', language: 'JP', tier: 1 },
-        ]
+        ],
+        endpoints: {
+            scan: 'POST /api/admin/rss { action: "scan-rss", hoursBack: 6 }',
+            logs: 'GET /api/admin/rss?view=rejection-logs&hours=24'
+        }
     });
 }
