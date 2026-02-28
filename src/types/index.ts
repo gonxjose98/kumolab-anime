@@ -44,6 +44,7 @@ export interface BlogPost {
     is_announcement_tied?: boolean;
     headline?: string;
     timestamp: string; // ISO string
+    updated_at?: string; // ISO string - for cache busting images
     isPublished: boolean;
     status: 'pending' | 'approved' | 'published' | 'declined';
     sourceTier?: number;
