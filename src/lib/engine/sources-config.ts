@@ -96,18 +96,31 @@ export const CONTENT_RULES = {
 
 /**
  * FREE RSS SOURCES — Tier 2-4 quality, no API costs
- * All sources verified working as of 2025
+ * 
+ * Last verified: 2026-02-27
+ * - ANN: 195 items ✅
+ * - OtakuNews: 50 items ✅
+ * - MAL: 20 items ✅
+ * - ComicBook: 0 items ❌ (dead)
+ * - Crunchyroll: 0 items ❌ (dead)
  */
 export const RSS_SOURCES = {
-    // Tier 2: Established anime news
+    // Tier 2: Established anime news (verified working)
     TIER_2: [
         { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2 },
-        { name: 'MyAnimeList', url: 'https://myanimelist.net/rss/news.xml', tier: 2 }
+        { name: 'MyAnimeList', url: 'https://myanimelist.net/rss/news.xml', tier: 2 },
+        { name: 'OtakuNews', url: 'https://www.otakunews.com/rss/rss.xml', tier: 2 }
     ],
-    // Tier 3: Platform/entertainment news  
+    // Tier 3: Platform/entertainment news (currently no working sources)
     TIER_3: [
-        { name: 'ComicBook', url: 'https://comicbook.com/anime/rss', tier: 3 },
-        { name: 'CrunchyrollNews', url: 'https://www.crunchyroll.com/news/rss', tier: 3 }
+        // Sources disabled - returning empty/broken
+        // { name: 'ComicBook', url: 'https://comicbook.com/anime/rss', tier: 3 },
+        // { name: 'CrunchyrollNews', url: 'https://www.crunchyroll.com/news/rss', tier: 3 }
+    ],
+    // Tier 1: Japanese primary sources (earlier news, requires translation)
+    TIER_1_JP: [
+        { name: 'Natalie.mu', url: 'https://natalie.mu/comic/feed/news', tier: 1 },
+        { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 1 }
     ]
 };
 
@@ -138,7 +151,8 @@ export const YOUTUBE_STUDIO_CHANNELS = {
  */
 export const ALL_RSS_SOURCES = [
     ...RSS_SOURCES.TIER_2,
-    ...RSS_SOURCES.TIER_3
+    ...RSS_SOURCES.TIER_3,
+    ...(RSS_SOURCES.TIER_1_JP || [])
 ];
 
 // ============================================================
