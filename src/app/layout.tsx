@@ -4,6 +4,7 @@ import './globals.css';
 import Navigation from '@/components/layout/Navigation';
 import Footer from '@/components/layout/Footer';
 import GalaxyBackground from '@/components/shared/GalaxyBackground';
+import ConditionalLayout from '@/components/shared/ConditionalLayout';
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -81,10 +82,9 @@ export default function RootLayout({
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AnalyticsTracker />
-          <GalaxyBackground />
-          <Navigation />
-          <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>
-          <Footer />
+          <ConditionalLayout nav={<><GalaxyBackground /><Navigation /></>} footer={<Footer />}>
+            <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>
+          </ConditionalLayout>
         </ThemeProvider>
       </body>
     </html>
