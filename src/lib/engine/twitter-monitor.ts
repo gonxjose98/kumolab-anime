@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/admin';
+import { getXSources } from './dynamic-sources';
 
 // Official anime accounts to monitor
 const MONITORED_ACCOUNTS = [
@@ -45,7 +46,8 @@ interface TweetCandidate {
  */
 async function fetchNitterFeed(
     handle: string,
-    instanceIndex: number = 0
+    instanceIndex: number = 0,
+    accountInfo?: { handle: string; name: string; tier: number }
 ): Promise<TweetCandidate[]> {
     const instance = NITTER_INSTANCES[instanceIndex % NITTER_INSTANCES.length];
     const rssUrl = `${instance}/${handle}/rss`;
@@ -98,8 +100,8 @@ async function fetchNitterFeed(
                 text: title.replace(/^RT @[^:]+: /, '').replace(/^@\S+\s*/, ''),
                 createdAt: pubDate,
                 authorHandle: handle,
-                authorName: MONITORED_ACCOUNTS.find(a => a.handle === handle)?.name || handle,
-                authorTier: MONITORED_ACCOUNTS.find(a => a.handle === handle)?.tier || 3,
+                authorName: accountInfo?.name || MONITORED_ACCOUNTS.find(a => a.handle === handle)?.name || handle,
+                authorTier: accountInfo?.tier || MONITORED_ACCOUNTS.find(a => a.handle === handle)?.tier || 3,
                 url: link,
                 mediaUrls,
                 isRetweet,
@@ -175,10 +177,16 @@ export async function scanTwitterAccounts(
     const candidates: TweetCandidate[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
     
-    for (const account of MONITORED_ACCOUNTS) {
+    // Try dynamic sources first, fall back to hardcoded defaults
+    const dynamicX = await getXSources();
+    const accounts = dynamicX
+        ? dynamicX.map(s => ({ handle: s.handle, name: s.name, tier: s.tier }))
+        : MONITORED_ACCOUNTS;
+
+    for (const account of accounts) {
         console.log(`[Twitter] Checking @${account.handle}...`);
-        
-        const tweets = await fetchNitterFeed(account.handle);
+
+        const tweets = await fetchNitterFeed(account.handle, 0, account);
         
         for (const tweet of tweets) {
             const createdAt = new Date(tweet.createdAt);

@@ -103,7 +103,7 @@
     height: 180px;
     position: relative;
     overflow: hidden;
-    background: #0a0a0a;
+    background: var(--bg-color);
 }
 
 .imageContainer {

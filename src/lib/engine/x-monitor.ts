@@ -52,7 +52,8 @@ interface XTweet {
 async function fetchUserTweets(
     userId: string,
     bearerToken: string,
-    maxResults: number = 5
+    maxResults: number = 5,
+    accountInfo?: { handle: string; name: string; tier: number }
 ): Promise<XTweet[]> {
     const url = new URL(`https://api.twitter.com/2/users/${userId}/tweets`);
     url.searchParams.set('max_results', maxResults.toString());
@@ -95,7 +96,7 @@ async function fetchUserTweets(
         // Skip if it's a retweet or reply
         if (isRetweet || isReply) continue;
 
-        const account = MONITORED_ACCOUNTS.find(a => a.id === userId);
+        const account = accountInfo || MONITORED_ACCOUNTS.find(a => a.id === userId);
 
         tweets.push({
             id: tweet.id,
@@ -182,7 +183,7 @@ export async function scanXAccounts(
         console.log(`[X Monitor] Checking @${account.handle}...`);
         
         try {
-            const tweets = await fetchUserTweets(account.id, bearerToken, 5);
+            const tweets = await fetchUserTweets(account.id, bearerToken, 5, account);
             
             for (const tweet of tweets) {
                 const createdAt = new Date(tweet.createdAt);
