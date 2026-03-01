@@ -71,9 +71,9 @@ export default function GalaxyBackground() {
             height: s.size,
             borderRadius: '50%',
             background: isLight
-              ? (s.tint === '#fff' ? '#8090b0' : s.tint === '#d0e8ff' ? '#6080c0' : '#a07050')
+              ? (s.tint === '#fff' ? '#c0d0f0' : s.tint === '#d0e8ff' ? '#90b8e8' : '#d0a880')
               : s.tint,
-            opacity: isLight ? s.opacity * 0.35 : s.opacity,
+            opacity: isLight ? s.opacity * 0.75 : s.opacity,
             animation: `twinkle ${s.twinkleDur}s ease-in-out ${s.twinkleDelay}s infinite`,
           }}
         />
@@ -89,11 +89,11 @@ export default function GalaxyBackground() {
             height: p.size,
             borderRadius: '50%',
             background: colors[p.hue],
-            opacity: isLight ? p.opacity * 0.3 : p.opacity,
+            opacity: isLight ? p.opacity * 0.65 : p.opacity,
             animation: `drift${p.id % 3} ${p.dur}s ease-in-out ${p.delay}s infinite`,
             boxShadow:
               p.size > 1.8
-                ? `0 0 ${p.size * 4}px ${colors[p.hue]}${isLight ? '30' : '50'}`
+                ? `0 0 ${p.size * 4}px ${colors[p.hue]}${isLight ? '45' : '50'}`
                 : 'none',
           }}
         />

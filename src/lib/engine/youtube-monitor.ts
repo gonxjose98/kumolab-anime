@@ -5,12 +5,13 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { YOUTUBE_STUDIO_CHANNELS } from './sources-config';
+import { getYouTubeSources } from './dynamic-sources';
 import { randomUUID } from 'crypto';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
-// Fallback API key (also set in env vars)
-const FALLBACK_API_KEY = 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
+// API key from environment variables
+const FALLBACK_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 // Build channel list from sources-config.ts
 const DEFAULT_CHANNELS = [
@@ -110,26 +111,26 @@ async function fetchChannelVideos(
 function detectTrailerType(title: string, description: string): { isTrailer: boolean; type: string; animeName: string } {
     const lowerTitle = title.toLowerCase();
     const lowerDesc = description.toLowerCase();
-    
-    // Skip non-trailer content - but be more permissive
-    const skipKeywords = [
-        'review', 'reaction video', 'analysis video', 'explained video', 
-        'vs battle', 'top 10', 'ranking video', 'amv', 'fan made', 'fandub'
-    ];
-    // Only skip if it's CLEARLY not a trailer (has skip keyword but NO trailer keywords)
-    const hasSkipKeyword = skipKeywords.some(kw => lowerTitle.includes(kw));
-    const hasTrailerKeyword = trailerKeywords.some(kw => lowerTitle.includes(kw));
-    
-    if (hasSkipKeyword && !hasTrailerKeyword) {
-        return { isTrailer: false, type: 'OTHER', animeName: '' };
-    }
-    
+
     // Detect trailer types - EXPANDED for better detection
     const trailerKeywords = [
         'official trailer', 'trailer', 'pv', 'promotional video', 'preview',
         'english dub trailer', 'dub trailer', 'sub trailer', 'season trailer',
         'arc trailer', 'episode trailer', 'clip', 'highlight', 'official clip'
     ];
+
+    // Skip non-trailer content - but be more permissive
+    const skipKeywords = [
+        'review', 'reaction video', 'analysis video', 'explained video',
+        'vs battle', 'top 10', 'ranking video', 'amv', 'fan made', 'fandub'
+    ];
+    // Only skip if it's CLEARLY not a trailer (has skip keyword but NO trailer keywords)
+    const hasSkipKeyword = skipKeywords.some(kw => lowerTitle.includes(kw));
+    const hasTrailerKeyword = trailerKeywords.some(kw => lowerTitle.includes(kw));
+
+    if (hasSkipKeyword && !hasTrailerKeyword) {
+        return { isTrailer: false, type: 'OTHER', animeName: '' };
+    }
     const teaserKeywords = ['teaser', 'announcement', 'reveal', 'first look'];
     const cmKeywords = ['cm', 'commercial', 'spot'];
     
@@ -227,14 +228,30 @@ export async function scanYouTubeChannels(
 ): Promise<TrailerCandidate[]> {
     const key = apiKey || FALLBACK_API_KEY || process.env.YOUTUBE_API_KEY;
     console.log(`[YouTube] Scanning channels for trailers from last ${hoursBack} hours...`);
-    
+
     const candidates: TrailerCandidate[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-    
-    for (const channel of DEFAULT_CHANNELS) {
+
+    // Try dynamic sources first, fall back to hardcoded defaults
+    const dynamicYT = await getYouTubeSources();
+    const channels = dynamicYT
+        ? dynamicYT.filter(s => s.channelId).map(s => ({ id: s.channelId!, name: s.name, tier: s.tier }))
+        : DEFAULT_CHANNELS;
+
+    // Deduplicate channels by ID (sources-config has duplicated IDs)
+    const seen = new Set<string>();
+    const uniqueChannels = channels.filter(c => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+    });
+
+    console.log(`[YouTube] Scanning ${uniqueChannels.length} unique channels (${channels.length - uniqueChannels.length} duplicates removed)`);
+
+    for (const channel of uniqueChannels) {
         console.log(`[YouTube] Checking ${channel.name}...`);
         
-        const videos = await fetchChannelVideos(channel.id, key, 15);
+        const videos = await fetchChannelVideos(channel.id, key!, 15);
         
         for (const video of videos) {
             const publishedAt = new Date(video.publishedAt);
@@ -266,7 +283,7 @@ export async function scanYouTubeChannels(
                     publishedAt: video.publishedAt,
                     channelName: channel.name,
                     channelTier: channel.tier,
-                    thumbnailUrl: video.thumbnails.high?.url || video.thumbnails.medium?.url || video.thumbnails.default?.url,
+                    thumbnailUrl: video.thumbnails.high?.url || video.thumbnails.medium?.url || video.thumbnails.default?.url || '',
                     videoUrl: `https://youtube.com/watch?v=${video.id}`,
                     embedUrl: `https://www.youtube.com/embed/${video.id}`,
                     animeName: detection.animeName,
@@ -370,8 +387,8 @@ export function generateTrailerPost(candidate: TrailerCandidate, now: Date): any
         slug: slug,
         content: enhancedContent,
         type: contentType,
-        status: 'published', // Auto-publish trailers
-        is_published: true,
+        status: 'pending',
+        is_published: false,
         headline: headlinePrefix,
         image: candidate.thumbnailUrl,
         youtube_video_id: candidate.videoId,
@@ -383,8 +400,6 @@ export function generateTrailerPost(candidate: TrailerCandidate, now: Date): any
         verification_badge: `${candidate.channelName} Official`,
         verification_score: candidate.channelTier === 1 ? 95 : 85,
         timestamp: now.toISOString(),
-        // Skip pending approval - go straight to live
-        skipApproval: true,
     };
 }
 

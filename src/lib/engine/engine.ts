@@ -92,7 +92,7 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
     {
         console.log('[Engine] Scanning YouTube for new trailers...');
 
-        const youtubeApiKey = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
+        const youtubeApiKey = process.env.YOUTUBE_API_KEY;
         if (youtubeApiKey) {
             try {
                 const trailerCandidates = await scanYouTubeChannels(youtubeApiKey, 2);

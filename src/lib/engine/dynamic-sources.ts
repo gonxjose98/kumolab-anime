@@ -91,4 +91,13 @@ export async function getRSSSources(): Promise<RSSSource[] | null> {
     return config?.rss || null;
 }
 
+/**
+ * Get YouTube channel sources.
+ * If dynamic config exists, uses that. Otherwise returns null (use hardcoded).
+ */
+export async function getYouTubeSources(): Promise<YouTubeSource[] | null> {
+    const config = await loadDynamicSources();
+    return config?.youtube || null;
+}
+
 export type { XSource, YouTubeSource, RSSSource, RedditSource, ScraperConfig };

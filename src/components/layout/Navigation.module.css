@@ -18,6 +18,10 @@
     border-bottom-color: rgba(0, 212, 255, 0.08);
 }
 
+:global(.light) .nav.scrolled {
+    background: rgba(20, 24, 42, 0.9);
+}
+
 .navContainer {
     max-width: 1200px;
     margin: 0 auto;
@@ -55,9 +59,6 @@
     object-fit: contain;
     display: block;
     transition: filter 0.3s ease;
-}
-
-:global(.dark) .logoImg {
     filter: invert(1) brightness(1);
 }
 
