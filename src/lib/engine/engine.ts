@@ -84,162 +84,168 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
     }
 
-    // --- 2. YOUTUBE TRAILER SCAN (Every Hour) ---
-    if (!newPost) {
+    // --- ALL SCRAPERS RUN INDEPENDENTLY (no gating on newPost) ---
+    // Each scraper runs regardless of what other scrapers found.
+    // This ensures Twitter/X/RSS content always gets picked up.
+
+    // --- 2. YOUTUBE TRAILER SCAN ---
+    {
         console.log('[Engine] Scanning YouTube for new trailers...');
-        
+
         const youtubeApiKey = process.env.YOUTUBE_API_KEY || 'AIzaSyAG95SlNgSuBQGnFcridjRUD8wRBTGC73g';
         if (youtubeApiKey) {
             try {
-                const trailerCandidates = await scanYouTubeChannels(youtubeApiKey, 2); // Check last 2 hours
-                
+                const trailerCandidates = await scanYouTubeChannels(youtubeApiKey, 2);
+
                 if (trailerCandidates.length > 0) {
-                    // Process the first (most recent) trailer
-                    const candidate = trailerCandidates[0];
-                    const trailerPost = generateTrailerPost(candidate, now);
-                    
-                    // Auto-publish trailers - no approval needed
-                    console.log(`[Engine] AUTO-PUBLISHING TRAILER: ${trailerPost.title}`);
-                    
-                    const { error: insertError } = await supabaseAdmin
-                        .from('posts')
-                        .insert([{
-                            ...trailerPost,
-                            timestamp: now.toISOString(),
-                            is_published: true,
-                            status: 'published'
-                        }]);
-                    
-                    if (!insertError) {
-                        await logSchedulerRun(slot, 'success', `Auto-published trailer: ${trailerPost.title}`, {
-                            videoId: candidate.videoId,
-                            channel: candidate.channelName,
-                            type: candidate.contentType
-                        });
-                        
-                        // Return the trailer post
-                        return trailerPost;
-                    } else {
-                        console.error('[Engine] Failed to insert trailer:', insertError);
+                    for (const candidate of trailerCandidates.slice(0, 3)) {
+                        const trailerPost = generateTrailerPost(candidate, now);
+
+                        // Send to pending approval (admin reviews before publishing)
+                        console.log(`[Engine] Adding trailer to PENDING: ${trailerPost.title}`);
+
+                        const { error: insertError } = await supabaseAdmin
+                            .from('posts')
+                            .insert([{
+                                ...trailerPost,
+                                timestamp: now.toISOString(),
+                                is_published: false,
+                                status: 'pending'
+                            }]);
+
+                        if (!insertError) {
+                            await logSchedulerRun(slot, 'success', `YouTube trailer → pending: ${trailerPost.title}`, {
+                                videoId: candidate.videoId,
+                                channel: candidate.channelName,
+                                type: candidate.contentType
+                            });
+                        } else {
+                            console.error('[Engine] Failed to insert trailer:', insertError.message);
+                        }
                     }
                 } else {
                     console.log('[Engine] No new trailers found');
                 }
-            } catch (ytError) {
-                console.error('[Engine] YouTube scan error:', ytError);
+            } catch (ytError: any) {
+                console.error('[Engine] YouTube scan error:', ytError?.message || ytError);
+                await logSchedulerRun(slot, 'error', `YouTube scan failed: ${ytError?.message}`, { error: String(ytError) }).catch(() => {});
             }
         } else {
             console.log('[Engine] YouTube API key not configured, skipping trailer scan');
         }
     }
 
-    // --- 3. TWITTER/X SCAN (Every Hour) ---
-    if (!newPost) {
-        console.log('[Engine] Scanning Twitter/X for announcements...');
-        
+    // --- 3. TWITTER/NITTER SCAN ---
+    {
+        console.log('[Engine] Scanning Twitter/Nitter for announcements...');
+
         try {
-            const twitterCandidates = await scanTwitterAccounts(6); // Check last 6 hours
-            
+            const twitterCandidates = await scanTwitterAccounts(6);
+
             if (twitterCandidates.length > 0) {
-                // Process Twitter announcements (go to pending for approval)
-                for (const candidate of twitterCandidates.slice(0, 3)) { // Max 3 per run
+                for (const candidate of twitterCandidates.slice(0, 3)) {
                     const post = generateTwitterPost(candidate, now);
-                    
+
                     const { error: insertError } = await supabaseAdmin
                         .from('posts')
                         .insert([post]);
-                    
+
                     if (!insertError) {
                         console.log(`[Engine] Added Twitter post to pending: ${post.title}`);
                         await logSchedulerRun(slot, 'success', `Twitter announcement: ${post.title}`, {
                             handle: candidate.authorHandle,
                             tweetId: candidate.id
                         });
+                    } else {
+                        console.error(`[Engine] Twitter insert error: ${insertError.message}`);
                     }
                 }
             } else {
                 console.log('[Engine] No new Twitter announcements');
             }
-        } catch (twError) {
-            console.error('[Engine] Twitter scan error:', twError);
+        } catch (twError: any) {
+            console.error('[Engine] Twitter scan error:', twError?.message || twError);
+            await logSchedulerRun(slot, 'error', `Twitter scan failed: ${twError?.message}`, { error: String(twError) }).catch(() => {});
         }
     }
 
-    // --- 3b. X (TWITTER) API SCAN (Every Hour) ---
-    // Premium source - API v2 for official accounts
-    if (!newPost) {
+    // --- 3b. X API v2 SCAN ---
+    {
         console.log('[Engine] Scanning X (Twitter) API for announcements...');
-        
+
         try {
-            const xCandidates = await scanXAccounts(6); // Check last 6 hours
-            
+            const xCandidates = await scanXAccounts(6);
+
             if (xCandidates.length > 0) {
-                for (const candidate of xCandidates.slice(0, 3)) { // Max 3 per run
+                for (const candidate of xCandidates.slice(0, 3)) {
                     const post = generateXPost(candidate, now);
-                    
-                    // Check for duplicates
+
                     const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
                     if (dupCheck.action === 'BLOCK') {
                         console.log(`[Engine] BLOCKED duplicate X post: ${post.title}`);
                         continue;
                     }
-                    
+
                     const { error: insertError } = await supabaseAdmin
                         .from('posts')
                         .insert([post]);
-                    
+
                     if (!insertError) {
                         console.log(`[Engine] Added X post to pending: ${post.title}`);
                         await logSchedulerRun(slot, 'success', `X announcement: ${post.title}`, {
                             handle: candidate.authorHandle,
                             tweetId: candidate.id
                         });
+                    } else {
+                        console.error(`[Engine] X insert error: ${insertError.message}`);
                     }
                 }
             } else {
                 console.log('[Engine] No new X announcements');
             }
-        } catch (xError) {
-            console.error('[Engine] X API scan error:', xError);
+        } catch (xError: any) {
+            console.error('[Engine] X API scan error:', xError?.message || xError);
+            await logSchedulerRun(slot, 'error', `X API scan failed: ${xError?.message}`, { error: String(xError) }).catch(() => {});
         }
     }
 
-    // --- 4. EXPANDED RSS SCAN (Every Hour) ---
-    if (!newPost) {
+    // --- 4. EXPANDED RSS SCAN ---
+    {
         console.log('[Engine] Scanning expanded RSS feeds...');
-        
+
         try {
-            const rssCandidates = await scanRSSFeeds(6); // Check last 6 hours
-            
+            const rssCandidates = await scanRSSFeeds(6);
+
             if (rssCandidates.length > 0) {
-                // Process RSS articles (go to pending for approval)
-                for (const candidate of rssCandidates.slice(0, 5)) { // Max 5 per run
+                for (const candidate of rssCandidates.slice(0, 5)) {
                     const post = generateRSSPost(candidate, now);
-                    
-                    // Check for duplicates
+
                     const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
                     if (dupCheck.action === 'BLOCK') {
                         console.log(`[Engine] BLOCKED duplicate RSS: ${post.title}`);
                         continue;
                     }
-                    
+
                     const { error: insertError } = await supabaseAdmin
                         .from('posts')
                         .insert([post]);
-                    
+
                     if (!insertError) {
                         console.log(`[Engine] Added RSS post to pending: ${post.title}`);
                         await logSchedulerRun(slot, 'success', `RSS article: ${post.title}`, {
                             source: candidate.sourceName,
                             language: candidate.language
                         });
+                    } else {
+                        console.error(`[Engine] RSS insert error: ${insertError.message}`);
                     }
                 }
             } else {
                 console.log('[Engine] No new RSS articles');
             }
-        } catch (rssError) {
-            console.error('[Engine] RSS scan error:', rssError);
+        } catch (rssError: any) {
+            console.error('[Engine] RSS scan error:', rssError?.message || rssError);
+            await logSchedulerRun(slot, 'error', `RSS scan failed: ${rssError?.message}`, { error: String(rssError) }).catch(() => {});
         }
     }
 
