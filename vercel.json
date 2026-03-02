@@ -1,8 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron?slot=hourly",
-      "schedule": "0 * * * *"
+      "path": "/api/cron?worker=detection",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron?worker=processing",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron?worker=dailydrops",
+      "schedule": "0 13 * * *"
     }
   ]
 }
