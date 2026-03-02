@@ -364,6 +364,54 @@
     color: #00d4ff;
 }
 
+/* ─── TWITTER EMBED STYLES ───────────────────────────────────────── */
+
+.twitterEmbedWrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: #06060e;
+    overflow-y: auto;
+    padding: 60px 12px 100px;
+    scrollbar-width: none;
+}
+
+.twitterEmbedWrapper::-webkit-scrollbar {
+    display: none;
+}
+
+.twitterEmbed {
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.twitterLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    font-family: var(--font-main);
+}
+
+.loadingSpinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* REDUCED MOTION */
 @media (prefers-reduced-motion: reduce) {
     .feedContainer {
@@ -372,5 +420,9 @@
 
     .playButtonInner {
         transition: none;
+    }
+
+    .loadingSpinner {
+        animation: none;
     }
 }

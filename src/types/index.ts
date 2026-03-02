@@ -71,7 +71,11 @@ export interface BlogPost {
     youtube_url?: string;
     youtube_embed_url?: string;
     studio_name?: string;
-    
+
+    // Twitter/X Integration
+    twitter_tweet_id?: string;
+    twitter_url?: string;
+
     // Social IDs & Cache (stored as JSONB in database)
     socialIds?: {
         twitter?: string;
@@ -79,7 +83,6 @@ export interface BlogPost {
         facebook?: string;
         threads?: string;
     };
-    // Note: For X posts added via URL, tweet ID is stored in content field as "Tweet ID: {id}"
     socialMetrics?: {
         twitter?: { views: number; likes: number; comments: number; retweets: number };
         instagram?: { views: number; likes: number; comments: number };

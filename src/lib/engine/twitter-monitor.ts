@@ -223,22 +223,55 @@ export async function scanTwitterAccounts(
 }
 
 /**
- * Generate a post from a Twitter announcement
+ * Generate a post from a Twitter announcement with smart titling
  */
 export function generateTwitterPost(candidate: TweetCandidate, now: Date): any {
     const slug = `twitter-${candidate.authorHandle.toLowerCase()}-${candidate.id.substring(0, 8)}`;
-    
-    // Extract anime name (simplified - take first 3-4 significant words)
-    const words = candidate.text.split(/\s+/).filter(w => w.length > 3);
-    const animeName = words.slice(0, 4).join(' ').replace(/[^a-zA-Z0-9\s]/g, '');
-    
+
+    // Smart title extraction
+    const lowerText = candidate.text.toLowerCase();
+    let eventLabel = '';
+    let postType = 'INTEL';
+
+    if (lowerText.includes('trailer') || lowerText.includes(' pv')) { eventLabel = 'Official Trailer'; postType = 'TRAILER'; }
+    else if (lowerText.includes('teaser')) { eventLabel = 'Teaser'; postType = 'TRAILER'; }
+    else if (lowerText.includes('season') && (lowerText.includes('confirmed') || lowerText.includes('announce'))) eventLabel = 'New Season Confirmed';
+    else if (lowerText.includes('visual') || lowerText.includes('poster')) eventLabel = 'New Key Visual';
+    else if (lowerText.includes('release date') || lowerText.includes('premiere')) eventLabel = 'Release Date Announced';
+    else if (lowerText.includes('cast')) eventLabel = 'New Cast Revealed';
+    else if (lowerText.includes('delay') || lowerText.includes('postpone')) eventLabel = 'Delayed';
+    else if (lowerText.includes('announce') || lowerText.includes('reveal')) eventLabel = 'New Announcement';
+
+    // Extract anime name from hashtags or capitalized words
+    let animeName = '';
+    const quotedMatch = candidate.text.match(/["「『]([^"」』]{3,40})["」』]/);
+    if (quotedMatch) animeName = quotedMatch[1];
+    if (!animeName) {
+        const hashtags = candidate.text.match(/#([A-Za-z][A-Za-z0-9_]{2,30})/g);
+        if (hashtags) {
+            const skip = new Set(['anime', 'manga', 'trailer', 'pv', 'teaser', 'newanime']);
+            const tag = hashtags.find(h => !skip.has(h.slice(1).toLowerCase()));
+            if (tag) animeName = tag.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+        }
+    }
+    if (!animeName) {
+        animeName = candidate.text.split(/\s+/).filter(w => w.length > 2 && !w.startsWith('http') && !w.startsWith('@') && !w.startsWith('#')).slice(0, 4).join(' ').replace(/[^\w\s'-]/g, '').trim();
+    }
+
+    const title = animeName && eventLabel ? `${animeName} — ${eventLabel}` : animeName ? `${animeName} — ${candidate.authorName} Announcement` : eventLabel ? `${eventLabel} — ${candidate.authorName}` : `${candidate.authorName} — New Announcement`;
+
+    // Clean caption
+    let cleanText = candidate.text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+    cleanText = cleanText.replace(/(\s*#\w+){3,}$/, '').trim();
+    const content = `${cleanText}\n\nSource: @${candidate.authorHandle} (${candidate.authorName})\n${candidate.url}`;
+
     return {
         id: crypto.randomUUID(),
-        title: `${animeName} - Announcement from ${candidate.authorName}`,
-        slug: slug,
-        content: `${candidate.text}\n\nSource: ${candidate.url}`,
-        type: 'INTEL',
-        status: 'pending', // Twitter posts need approval
+        title,
+        slug,
+        content,
+        type: postType,
+        status: 'pending',
         is_published: false,
         headline: 'OFFICIAL ANNOUNCEMENT',
         image: candidate.mediaUrls[0] || '',

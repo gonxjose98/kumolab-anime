@@ -151,3 +151,76 @@
     height: 100%;
     border: none;
 }
+
+/* --- Twitter/X Embed --- */
+.twitterEmbed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 200px;
+    margin: 0 auto;
+    max-width: 550px;
+}
+
+.twitterLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 200px;
+}
+
+.loadingSpinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* --- Content Formatting --- */
+.sourceAttribution {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 1rem;
+    margin-top: 2rem;
+}
+
+.highlightBlock {
+    background: rgba(123, 97, 255, 0.1);
+    border-left: 4px solid var(--accent-purple);
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    border-radius: 0 8px 8px 0;
+    font-weight: 500;
+}
+
+.youtubeLink {
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.watchButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.watchButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+}

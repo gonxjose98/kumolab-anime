@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './MostRecentFeed.module.css';
 import { BlogPost } from '@/types';
 import Link from 'next/link';
@@ -35,20 +35,85 @@ function getRelativeTime(timestamp: string): string {
 }
 
 /** Detect if a post has embedded video (YouTube or X/Twitter) */
-function getVideoInfo(post: BlogPost): { type: 'youtube'; videoId: string } | { type: 'twitter'; tweetId: string } | null {
+function getVideoInfo(post: BlogPost): { type: 'youtube'; videoId: string } | { type: 'twitter'; tweetId: string; tweetUrl: string } | null {
     if (post.youtube_video_id) {
         return { type: 'youtube', videoId: post.youtube_video_id };
     }
-    const tweetMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
-    if (tweetMatch) {
-        return { type: 'twitter', tweetId: tweetMatch[1] };
+    // Check for Twitter post (via proper fields or content fallback)
+    const tweetId = post.twitter_tweet_id || post.content?.match(/Tweet ID:\s*(\d+)/)?.[1];
+    const tweetUrl = post.twitter_url || post.content?.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/)?.[0];
+    if (tweetId) {
+        return { type: 'twitter', tweetId, tweetUrl: tweetUrl || `https://x.com/i/status/${tweetId}` };
     }
     return null;
+}
+
+/** Twitter embed component — loads the tweet widget inline */
+function TwitterEmbed({ tweetId, tweetUrl }: { tweetId: string; tweetUrl: string }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [loaded, setLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        // Load Twitter widgets.js if not already loaded
+        const loadWidget = () => {
+            const win = window as any;
+            if (win.twttr?.widgets) {
+                win.twttr.widgets.createTweet(tweetId, containerRef.current!, {
+                    theme: 'dark',
+                    align: 'center',
+                    dnt: true,
+                    conversation: 'none',
+                }).then(() => setLoaded(true));
+            }
+        };
+
+        const win = window as any;
+        if (win.twttr?.widgets) {
+            loadWidget();
+        } else {
+            // Load the script
+            if (!document.getElementById('twitter-wjs')) {
+                const script = document.createElement('script');
+                script.id = 'twitter-wjs';
+                script.src = 'https://platform.twitter.com/widgets.js';
+                script.async = true;
+                script.onload = loadWidget;
+                document.head.appendChild(script);
+            } else {
+                // Script exists but not loaded yet — poll for it
+                const interval = setInterval(() => {
+                    if ((window as any).twttr?.widgets) {
+                        clearInterval(interval);
+                        loadWidget();
+                    }
+                }, 200);
+                return () => clearInterval(interval);
+            }
+        }
+    }, [tweetId]);
+
+    return (
+        <div
+            ref={containerRef}
+            className={styles.twitterEmbed}
+            style={{ minHeight: loaded ? 'auto' : '300px' }}
+        >
+            {!loaded && (
+                <div className={styles.twitterLoading}>
+                    <div className={styles.loadingSpinner} />
+                    <span>Loading post...</span>
+                </div>
+            )}
+        </div>
+    );
 }
 
 const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [playingVideos, setPlayingVideos] = useState<Set<string>>(new Set());
+    const [expandedTweets, setExpandedTweets] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Filter: keep published, non-DROP posts. Deduplicate by title prefix.
@@ -92,7 +157,6 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
 
         const handler = () => {
             const cards = c.querySelectorAll('[data-fc]');
-            // Find the snapped card index
             let snappedIdx = 0;
             let minDist = Infinity;
             cards.forEach((card, i) => {
@@ -100,14 +164,12 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                 if (d < minDist) { minDist = d; snappedIdx = i; }
             });
 
-            // Stop any playing video not on the snapped card
             const snappedPost = feedPosts[snappedIdx];
             if (snappedPost) {
                 setPlayingVideos(prev => {
                     const postId = snappedPost.id || String(snappedIdx);
                     if (prev.size === 1 && prev.has(postId)) return prev;
                     if (prev.size === 0) return prev;
-                    // Only keep the snapped card's video playing (if it was playing)
                     const next = new Set<string>();
                     if (prev.has(postId)) next.add(postId);
                     return next;
@@ -121,7 +183,6 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
 
     if (filteredPosts.length === 0) return null;
 
-    // Limit to top 20 for the feed
     const feedPosts = filteredPosts.slice(0, 20);
 
     return (
@@ -143,21 +204,23 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                     const cleanTitle = post.title.replace(/\s+-\s+\d{4}-\d{2}-\d{2}.*$/, '');
                     const videoInfo = getVideoInfo(post);
                     const isYouTube = videoInfo?.type === 'youtube';
+                    const isTwitter = videoInfo?.type === 'twitter';
+                    const hasVideo = !!videoInfo;
                     const postKey = post.id || String(i);
                     const isPlaying = isYouTube && playingVideos.has(postKey);
+                    const isTweetExpanded = isTwitter && expandedTweets.has(postKey);
 
-                    // Determine image source: YouTube thumbnail or post image
+                    // Determine image source
                     const imageSrc = isYouTube
-                        ? `https://img.youtube.com/vi/${videoInfo.videoId}/maxresdefault.jpg`
+                        ? `https://img.youtube.com/vi/${(videoInfo as any).videoId}/maxresdefault.jpg`
                         : post.image;
 
-                    // --- Card inner content (shared between video + non-video cards) ---
                     const cardInner = (
                         <>
                             {/* YouTube iframe when playing */}
                             {isYouTube && isPlaying && (
                                 <iframe
-                                    src={`https://www.youtube.com/embed/${videoInfo.videoId}?autoplay=1&rel=0&modestbranding=1`}
+                                    src={`https://www.youtube.com/embed/${(videoInfo as any).videoId}?autoplay=1&rel=0&modestbranding=1`}
                                     title={post.title}
                                     frameBorder="0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -166,8 +229,18 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 />
                             )}
 
-                            {/* Background image (hidden when YouTube is playing) */}
-                            {!isPlaying && imageSrc && (
+                            {/* Twitter embed when expanded */}
+                            {isTwitter && isTweetExpanded && (
+                                <div className={styles.twitterEmbedWrapper}>
+                                    <TwitterEmbed
+                                        tweetId={(videoInfo as any).tweetId}
+                                        tweetUrl={(videoInfo as any).tweetUrl}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Background image (hidden when video is playing or tweet expanded) */}
+                            {!isPlaying && !isTweetExpanded && imageSrc && (
                                 <img
                                     src={imageSrc}
                                     alt=""
@@ -176,7 +249,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         if (isYouTube && target.src.includes('maxresdefault')) {
-                                            target.src = `https://img.youtube.com/vi/${videoInfo.videoId}/hqdefault.jpg`;
+                                            target.src = `https://img.youtube.com/vi/${(videoInfo as any).videoId}/hqdefault.jpg`;
                                         } else if (!target.src.endsWith('/hero-bg-final.png')) {
                                             target.src = '/hero-bg-final.png';
                                         }
@@ -185,14 +258,14 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             )}
 
                             {/* Fallback background for posts without images */}
-                            {!isPlaying && !imageSrc && !isYouTube && (
+                            {!isPlaying && !isTweetExpanded && !imageSrc && (
                                 <div className={styles.cardFallback} />
                             )}
 
-                            <div className={styles.cardGradient} />
-                            <div className={styles.cardScanlines} />
+                            {!isTweetExpanded && <div className={styles.cardGradient} />}
+                            {!isTweetExpanded && <div className={styles.cardScanlines} />}
 
-                            {/* Play button overlay for YouTube videos */}
+                            {/* Play button for YouTube */}
                             {isYouTube && !isPlaying && (
                                 <button
                                     className={styles.playButton}
@@ -206,6 +279,25 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     <div className={styles.playButtonInner}>
                                         <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
                                             <path d="M8 5v14l11-7z"/>
+                                        </svg>
+                                    </div>
+                                </button>
+                            )}
+
+                            {/* View post button for Twitter */}
+                            {isTwitter && !isTweetExpanded && (
+                                <button
+                                    className={styles.playButton}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setExpandedTweets(prev => new Set(prev).add(postKey));
+                                    }}
+                                    aria-label="View post"
+                                >
+                                    <div className={styles.playButtonInner}>
+                                        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                                         </svg>
                                     </div>
                                 </button>
@@ -225,12 +317,16 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             </div>
 
                             {/* Video badge */}
-                            {videoInfo && (
+                            {hasVideo && (
                                 <div className={styles.videoBadge}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M8 5v14l11-7z"/>
+                                        {isTwitter ? (
+                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                        ) : (
+                                            <path d="M8 5v14l11-7z"/>
+                                        )}
                                     </svg>
-                                    VIDEO
+                                    {isTwitter ? 'X POST' : 'VIDEO'}
                                 </div>
                             )}
 
@@ -240,7 +336,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             </div>
 
                             {/* Bottom content */}
-                            <div className={styles.cardBottom}>
+                            <div className={styles.cardBottom} style={isTweetExpanded ? { background: 'rgba(6,6,14,0.95)' } : undefined}>
                                 <div className={styles.cardMeta}>
                                     {post.source && (
                                         <span className={styles.cardSource}>{post.source}</span>
@@ -248,7 +344,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                     <span className={styles.cardTime}>{getRelativeTime(post.timestamp)}</span>
                                 </div>
                                 <h3 className={styles.cardTitle}>{cleanTitle}</h3>
-                                {isYouTube && (
+                                {hasVideo && (
                                     <Link
                                         href={`/blog/${post.slug}`}
                                         className={styles.cardReadMore}
@@ -267,8 +363,8 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                         </>
                     );
 
-                    // YouTube video cards: use div wrapper (allows interactive iframe)
-                    if (isYouTube) {
+                    // Video cards (YouTube or Twitter): use div wrapper for interactive content
+                    if (hasVideo) {
                         return (
                             <div key={postKey} data-fc="" className={styles.card}>
                                 {cardInner}
@@ -276,7 +372,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                         );
                     }
 
-                    // All other cards (including Twitter video posts): use Link wrapper
+                    // All other cards: use Link wrapper
                     return (
                         <Link
                             href={`/blog/${post.slug}`}
