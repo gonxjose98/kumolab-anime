@@ -9,11 +9,13 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+console.log('[Worker] Starting...');
+console.log('[Worker] SUPABASE_URL:', SUPABASE_URL ? `set (${SUPABASE_URL.slice(0, 20)}...)` : 'MISSING');
+console.log('[Worker] SUPABASE_KEY:', SUPABASE_KEY ? `set (${SUPABASE_KEY.slice(0, 10)}...)` : 'MISSING');
+
 // Validate environment before creating client
 if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error('❌ FATAL: Missing required environment variables');
-    console.error('   NEXT_PUBLIC_SUPABASE_URL:', SUPABASE_URL ? 'set' : 'MISSING');
-    console.error('   SUPABASE_SERVICE_ROLE_KEY:', SUPABASE_KEY ? 'set' : 'MISSING');
     process.exit(1);
 }
 
@@ -33,14 +35,22 @@ const RSS_SOURCES = [
  * Simple RSS fetch
  */
 async function fetchRSS(url: string): Promise<string | null> {
+    console.log(`[Worker] Fetching: ${url}`);
     try {
         const response = await fetch(url, {
             headers: { 'User-Agent': 'KumoLab-DetectionWorker/1.0' },
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(15000)
         });
-        if (!response.ok) return null;
-        return await response.text();
-    } catch (e) {
+        console.log(`[Worker] Response status: ${response.status}`);
+        if (!response.ok) {
+            console.log(`[Worker] Failed with status: ${response.status}`);
+            return null;
+        }
+        const text = await response.text();
+        console.log(`[Worker] Fetched ${text.length} bytes`);
+        return text;
+    } catch (e: any) {
+        console.error(`[Worker] Fetch error:`, e.message);
         return null;
     }
 }
@@ -52,12 +62,18 @@ function parseRSS(xml: string, sourceName: string): any[] {
     const items = [];
     const itemRegex = /<item>[\s\S]*?<\/item>/g;
     const matches = xml.match(itemRegex) || [];
+    console.log(`[Worker] Found ${matches.length} items in ${sourceName} feed`);
     
     for (const item of matches.slice(0, 10)) {
-        const title = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/)?.[1] || '';
-        const link = item.match(/<link>(.*?)<\/link>/)?.[1] || '';
-        const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
-        const desc = item.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/)?.[1] || '';
+        const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+        const linkMatch = item.match(/<link>(.*?)<\/link>/);
+        const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
+        const descMatch = item.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/);
+        
+        const title = titleMatch?.[1] || '';
+        const link = linkMatch?.[1] || '';
+        const pubDate = pubDateMatch?.[1] || '';
+        const desc = descMatch?.[1] || '';
         
         if (!title || !link) continue;
         
@@ -82,11 +98,16 @@ function parseRSS(xml: string, sourceName: string): any[] {
  * Check for duplicates
  */
 async function isDuplicate(fingerprint: string, url: string): Promise<boolean> {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('detection_candidates')
         .select('id')
         .or(`fingerprint.eq.${fingerprint},source_url.eq.${url}`)
         .limit(1);
+    
+    if (error) {
+        console.error('[Worker] Duplicate check error:', error);
+        return false;
+    }
     return data && data.length > 0;
 }
 
@@ -94,29 +115,42 @@ async function isDuplicate(fingerprint: string, url: string): Promise<boolean> {
  * Acquire lock
  */
 async function acquireLock(): Promise<boolean> {
+    console.log('[Worker] Checking lock...');
     try {
-        const { data: existing } = await supabase
+        const { data: existing, error: fetchError } = await supabase
             .from('worker_locks')
             .select('*')
             .eq('lock_id', LOCK_ID)
             .single();
         
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            console.error('[Worker] Lock fetch error:', fetchError);
+        }
+        
         if (existing) {
             const age = Date.now() - new Date(existing.acquired_at).getTime();
+            console.log(`[Worker] Found existing lock, age: ${age}ms`);
             if (age < LOCK_DURATION_MS) {
                 console.log('[Worker] Lock active, skipping...');
                 return false;
             }
+            console.log('[Worker] Lock expired, releasing...');
             await supabase.from('worker_locks').delete().eq('lock_id', LOCK_ID);
         }
         
-        await supabase.from('worker_locks').insert({
+        const { error: insertError } = await supabase.from('worker_locks').insert({
             lock_id: LOCK_ID,
             acquired_at: new Date().toISOString(),
             process_id: process.env.GITHUB_RUN_ID || 'local',
             hostname: 'github-actions'
         });
         
+        if (insertError) {
+            console.error('[Worker] Lock insert error:', insertError);
+            return false;
+        }
+        
+        console.log('[Worker] Lock acquired');
         return true;
     } catch (e: any) {
         console.error('[Worker] Lock error:', e.message);
@@ -128,6 +162,7 @@ async function acquireLock(): Promise<boolean> {
  * Release lock
  */
 async function releaseLock(): Promise<void> {
+    console.log('[Worker] Releasing lock...');
     await supabase.from('worker_locks').delete().eq('lock_id', LOCK_ID);
 }
 
@@ -141,29 +176,40 @@ async function runDetection(): Promise<{saved: number, total: number}> {
     
     // Fetch RSS feeds
     for (const source of RSS_SOURCES) {
-        console.log(`[Worker] Fetching ${source.name}...`);
+        console.log(`[Worker] Processing ${source.name}...`);
         const xml = await fetchRSS(source.url);
         if (xml) {
             const items = parseRSS(xml, source.name);
             allCandidates.push(...items);
-            console.log(`[Worker] ${source.name}: ${items.length} items`);
+            console.log(`[Worker] ${source.name}: ${items.length} items parsed`);
         } else {
-            console.log(`[Worker] ${source.name}: Failed`);
+            console.log(`[Worker] ${source.name}: Failed to fetch`);
         }
     }
+    
+    console.log(`[Worker] Total candidates: ${allCandidates.length}`);
     
     // Save to database
     let saved = 0;
+    let duplicates = 0;
     for (const candidate of allCandidates) {
-        if (await isDuplicate(candidate.fingerprint, candidate.source_url)) {
+        const isDup = await isDuplicate(candidate.fingerprint, candidate.source_url);
+        if (isDup) {
+            duplicates++;
             continue;
         }
         
+        console.log(`[Worker] Saving: ${candidate.title.substring(0, 50)}...`);
         const { error } = await supabase.from('detection_candidates').insert(candidate);
-        if (!error) saved++;
+        if (error) {
+            console.error('[Worker] Insert error:', error);
+        } else {
+            saved++;
+            console.log('[Worker] Saved successfully');
+        }
     }
     
-    console.log(`[Worker] Saved ${saved}/${allCandidates.length} candidates`);
+    console.log(`[Worker] Results: ${saved} saved, ${duplicates} duplicates, ${allCandidates.length - saved - duplicates} errors`);
     return { saved, total: allCandidates.length };
 }
 
