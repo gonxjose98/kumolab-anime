@@ -1,0 +1,50 @@
+name: Detection Worker
+
+on:
+  schedule:
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: detection-worker
+  cancel-in-progress: false  # Prevent overlapping runs
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2  # Hard limit to prevent runaway jobs
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Detection Worker
+        env:
+          # Supabase Configuration
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          
+          # YouTube API (for Tier 1 source monitoring)
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          
+          # Site Configuration
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          
+        run: npx tsx scripts/run-detection-worker.ts
+        
+      - name: Log run metrics
+        if: always()
+        run: |
+          echo "Detection worker completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Runtime: ${{ job.status }}"
