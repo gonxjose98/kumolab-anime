@@ -25,10 +25,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const LOCK_ID = 'detection_worker_lock';
 const LOCK_DURATION_MS = 5 * 60 * 1000;
 
-// RSS Sources
+// RSS Sources - expanded for more content
 const RSS_SOURCES = [
     { name: 'ANN', url: 'https://www.animenewsnetwork.com/news/rss.xml', tier: 2 },
-    { name: 'ComicBook', url: 'https://comicbook.com/anime/feed/', tier: 2 },
+    { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2 },
+    { name: 'MyAnimeList', url: 'https://myanimelist.net/rss/news.xml', tier: 2 },
+    { name: 'Crunchyroll', url: 'https://cr-news-api-service.prd.crunchyrollsvc.com/v1/en-US/rss', tier: 2 },
 ];
 
 /**

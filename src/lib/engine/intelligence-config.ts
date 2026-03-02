@@ -245,7 +245,7 @@ export const QUALITY_SIGNALS = {
 
 // Thresholds
 export const SCORING_THRESHOLDS = {
-  PUBLISH_MINIMUM: 4,      // Score >= 4 → pending approval
+  PUBLISH_MINIMUM: 2,      // Score >= 2 → pending approval (lowered for more content)
   AUTO_REJECT: -2,         // Score < -2 → discard
   HIGH_CONFIDENCE: 7,      // Score >= 7 → high confidence
 };
