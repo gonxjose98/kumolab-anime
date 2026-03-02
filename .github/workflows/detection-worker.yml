@@ -41,7 +41,10 @@ jobs:
           # Site Configuration
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
           
-        run: npx tsx scripts/run-detection-worker.ts
+        run: |
+          echo "Starting Detection Worker..."
+          npx tsx scripts/run-detection-worker.ts
+          echo "Exit code: $?"
         
       - name: Log run metrics
         if: always()
