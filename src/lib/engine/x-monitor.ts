@@ -1,13 +1,18 @@
 /**
  * x-monitor.ts
  * Monitors X (Twitter) for real-time anime announcements
- * Uses X API v2 (free tier: 100 requests/month)
+ * Uses X API v2 with OAuth 1.0a authentication
  */
 
 import { supabaseAdmin } from '../supabase/admin';
 import { getXSources } from './dynamic-sources';
+import crypto from 'crypto';
 
-// X API v2 Bearer Token (set in env vars)
+// X API Credentials from env vars
+const X_API_KEY = process.env.X_API_KEY;
+const X_API_SECRET = process.env.X_API_SECRET;
+const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
 const X_BEARER_TOKEN = process.env.X_BEARER_TOKEN;
 
 // Default monitored accounts (used when no dynamic config exists)
@@ -47,14 +52,130 @@ interface XTweet {
 }
 
 /**
- * Fetch recent tweets from a user using X API v2
+ * Generate OAuth 1.0a signature
  */
-async function fetchUserTweets(
+function generateOAuthSignature(
+    method: string,
+    url: string,
+    params: Record<string, string>,
+    consumerSecret: string,
+    tokenSecret: string
+): string {
+    const sortedParams = Object.keys(params)
+        .sort()
+        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+        .join('&');
+    
+    const signatureBase = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
+    const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
+    
+    return crypto.createHmac('sha1', signingKey).update(signatureBase).digest('base64');
+}
+
+/**
+ * Build OAuth 1.0a header
+ */
+function buildOAuthHeader(
+    method: string,
+    url: string,
+    apiKey: string,
+    apiSecret: string,
+    accessToken: string,
+    accessTokenSecret: string
+): string {
+    const oauthParams: Record<string, string> = {
+        oauth_consumer_key: apiKey,
+        oauth_token: accessToken,
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_nonce: Math.random().toString(36).substring(2),
+        oauth_version: '1.0'
+    };
+    
+    oauthParams.oauth_signature = generateOAuthSignature(
+        method,
+        url,
+        oauthParams,
+        apiSecret,
+        accessTokenSecret
+    );
+    
+    const headerParts = Object.keys(oauthParams)
+        .sort()
+        .map(k => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`);
+    
+    return `OAuth ${headerParts.join(', ')}`;
+}
+
+/**
+ * Fetch recent tweets from a user using X API v2 with OAuth 1.0a
+ */
+async function fetchUserTweetsOAuth(
     userId: string,
-    bearerToken: string,
     maxResults: number = 5,
     accountInfo?: { handle: string; name: string; tier: number }
 ): Promise<XTweet[]> {
+    // Check if we have OAuth credentials
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+        console.log('[X Monitor] OAuth credentials not configured, falling back to Bearer Token');
+        return fetchUserTweetsBearer(userId, maxResults, accountInfo);
+    }
+    
+    const baseUrl = `https://api.twitter.com/2/users/${userId}/tweets`;
+    const queryParams = new URLSearchParams({
+        max_results: maxResults.toString(),
+        'tweet.fields': 'created_at,public_metrics,entities,referenced_tweets',
+        expansions: 'attachments.media_keys',
+        'media.fields': 'url,preview_image_url',
+        exclude: 'retweets,replies'
+    });
+    
+    const url = `${baseUrl}?${queryParams.toString()}`;
+    
+    const authHeader = buildOAuthHeader(
+        'GET',
+        baseUrl,
+        X_API_KEY,
+        X_API_SECRET,
+        X_ACCESS_TOKEN,
+        X_ACCESS_TOKEN_SECRET
+    );
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': authHeader,
+                'User-Agent': 'KumoLab-Monitor/1.0'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[X API OAuth] Error fetching user ${userId}: ${response.status} - ${errorText}`);
+            // Fallback to Bearer Token
+            return fetchUserTweetsBearer(userId, maxResults, accountInfo);
+        }
+
+        return parseTweetResponse(await response.json(), userId, accountInfo);
+    } catch (error) {
+        console.error(`[X API OAuth] Error:`, error);
+        return fetchUserTweetsBearer(userId, maxResults, accountInfo);
+    }
+}
+
+/**
+ * Fetch with Bearer Token (fallback)
+ */
+async function fetchUserTweetsBearer(
+    userId: string,
+    maxResults: number = 5,
+    accountInfo?: { handle: string; name: string; tier: number }
+): Promise<XTweet[]> {
+    if (!X_BEARER_TOKEN) {
+        console.log('[X Monitor] Bearer Token not configured');
+        return [];
+    }
+    
     const url = new URL(`https://api.twitter.com/2/users/${userId}/tweets`);
     url.searchParams.set('max_results', maxResults.toString());
     url.searchParams.set('tweet.fields', 'created_at,public_metrics,entities,referenced_tweets');
@@ -64,19 +185,30 @@ async function fetchUserTweets(
 
     const response = await fetch(url.toString(), {
         headers: {
-            'Authorization': `Bearer ${bearerToken}`,
+            'Authorization': `Bearer ${X_BEARER_TOKEN}`,
             'User-Agent': 'KumoLab-Monitor/1.0'
         }
     });
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[X API] Error fetching user ${userId}: ${response.status} - ${errorText}`);
+        console.error(`[X API Bearer] Error fetching user ${userId}: ${response.status} - ${errorText}`);
         return [];
     }
 
-    const data = await response.json();
+    return parseTweetResponse(await response.json(), userId, accountInfo);
+}
+
+/**
+ * Parse tweet response
+ */
+function parseTweetResponse(
+    data: any,
+    userId: string,
+    accountInfo?: { handle: string; name: string; tier: number }
+): XTweet[] {
     const tweets: XTweet[] = [];
+    const account = accountInfo || MONITORED_ACCOUNTS.find(a => a.id === userId);
 
     for (const tweet of data.data || []) {
         // Extract media URLs
@@ -95,8 +227,6 @@ async function fetchUserTweets(
 
         // Skip if it's a retweet or reply
         if (isRetweet || isReply) continue;
-
-        const account = accountInfo || MONITORED_ACCOUNTS.find(a => a.id === userId);
 
         tweets.push({
             id: tweet.id,
@@ -150,177 +280,79 @@ async function isTweetProcessed(tweetId: string): Promise<boolean> {
         .from('posts')
         .select('id')
         .eq('twitter_tweet_id', tweetId)
-        .limit(1);
+        .single();
     
-    return !!(data && data.length > 0);
+    return !!data;
 }
 
 /**
- * Main function to scan all monitored X accounts
+ * Scan all monitored X accounts for new anime announcements
  */
-export async function scanXAccounts(
-    hoursBack: number = 6
-): Promise<XTweet[]> {
-    const bearerToken = X_BEARER_TOKEN || process.env.X_BEARER_TOKEN;
-
-    if (!bearerToken) {
-        console.log('[X Monitor] No bearer token configured, skipping X scan');
+export async function scanXAccounts(maxPerAccount: number = 5): Promise<XTweet[]> {
+    console.log('[X Monitor] Starting scan of monitored accounts...');
+    
+    // Check which auth method is available
+    const hasOAuth = X_API_KEY && X_API_SECRET && X_ACCESS_TOKEN && X_ACCESS_TOKEN_SECRET;
+    const hasBearer = !!X_BEARER_TOKEN;
+    
+    if (!hasOAuth && !hasBearer) {
+        console.log('[X Monitor] No X API credentials configured');
         return [];
     }
-
-    // Try dynamic sources first, fall back to hardcoded defaults
-    const dynamicX = await getXSources();
-    const accounts = dynamicX
-        ? dynamicX.map(s => ({ id: s.id || '', handle: s.handle, name: s.name, tier: s.tier }))
-        : MONITORED_ACCOUNTS;
-
-    console.log(`[X Monitor] Scanning ${accounts.length} accounts for announcements...`);
-
-    const candidates: XTweet[] = [];
-    const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-
-    for (const account of accounts) {
-        console.log(`[X Monitor] Checking @${account.handle}...`);
-        
+    
+    console.log(`[X Monitor] Auth: OAuth=${hasOAuth}, Bearer=${hasBearer}`);
+    
+    const allCandidates: XTweet[] = [];
+    
+    for (const account of MONITORED_ACCOUNTS) {
         try {
-            const tweets = await fetchUserTweets(account.id, bearerToken, 5, account);
+            let tweets: XTweet[];
+            
+            if (hasOAuth) {
+                // Try OAuth first
+                tweets = await fetchUserTweetsOAuth(account.id, maxPerAccount, account);
+            } else {
+                // Fall back to Bearer
+                tweets = await fetchUserTweetsBearer(account.id, maxPerAccount, account);
+            }
             
             for (const tweet of tweets) {
-                const createdAt = new Date(tweet.createdAt);
-                
-                // Skip old tweets
-                if (createdAt < cutoffTime) {
-                    continue;
-                }
-                
                 // Check if already processed
-                const alreadyProcessed = await isTweetProcessed(tweet.id);
-                if (alreadyProcessed) {
+                if (await isTweetProcessed(tweet.id)) {
                     continue;
                 }
                 
                 // Check if it's an anime announcement
                 if (isAnimeAnnouncement(tweet.text)) {
-                    candidates.push(tweet);
                     console.log(`[X Monitor] Found announcement from @${account.handle}: ${tweet.text.substring(0, 60)}...`);
+                    allCandidates.push(tweet);
                 }
             }
         } catch (error) {
             console.error(`[X Monitor] Error scanning @${account.handle}:`, error);
         }
-        
-        // Delay between accounts to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.log(`[X Monitor] Found ${candidates.length} new announcements`);
-    return candidates;
+    console.log(`[X Monitor] Scan complete. Found ${allCandidates.length} new announcements.`);
+    return allCandidates;
 }
 
 /**
- * Extract a smart title from tweet text.
- * Identifies anime name + event type for a clean, relevant title.
+ * Generate a post from X tweet
  */
-function extractSmartTitle(text: string, authorName: string): { title: string; claimType: string; postType: string } {
-    const lowerText = text.toLowerCase();
-    let claimType = 'OTHER';
-    let eventLabel = '';
-    let postType = 'INTEL';
-
-    if (lowerText.includes('trailer') || lowerText.includes(' pv')) {
-        claimType = 'TRAILER_DROP'; eventLabel = 'Official Trailer'; postType = 'TRAILER';
-    } else if (lowerText.includes('teaser')) {
-        claimType = 'TRAILER_DROP'; eventLabel = 'Teaser'; postType = 'TRAILER';
-    } else if (lowerText.includes('season') && (lowerText.includes('confirmed') || lowerText.includes('announce') || lowerText.includes('renewed'))) {
-        claimType = 'NEW_SEASON_CONFIRMED'; eventLabel = 'New Season Confirmed';
-    } else if (lowerText.includes('visual') || lowerText.includes('poster')) {
-        claimType = 'NEW_KEY_VISUAL'; eventLabel = 'New Key Visual';
-    } else if ((lowerText.includes('release date') || lowerText.includes('premiere')) && !lowerText.includes('trailer')) {
-        claimType = 'DATE_ANNOUNCED'; eventLabel = 'Release Date Announced';
-    } else if (lowerText.includes('cast') && (lowerText.includes('reveal') || lowerText.includes('announce'))) {
-        claimType = 'CAST_ADDITION'; eventLabel = 'New Cast Revealed';
-    } else if (lowerText.includes('delay') || lowerText.includes('postpone')) {
-        claimType = 'DELAY'; eventLabel = 'Delayed';
-    } else if (lowerText.includes('announce') || lowerText.includes('confirm') || lowerText.includes('reveal')) {
-        eventLabel = 'New Announcement';
-    }
-
-    // Try to extract anime name from quoted titles, hashtags, or capitalized phrases
-    let animeName = '';
-
-    // Quoted titles: "Title" or 「Title」
-    const quotedMatch = text.match(/["「『]([^"」』]{3,40})["」』]/);
-    if (quotedMatch) animeName = quotedMatch[1];
-
-    // Hashtag-based names
-    if (!animeName) {
-        const hashtags = text.match(/#([A-Za-z][A-Za-z0-9_]{2,30})/g);
-        if (hashtags) {
-            const genericTags = new Set(['anime', 'manga', 'trailer', 'pv', 'teaser', 'animetrailer', 'newanime', 'otaku']);
-            const animeTag = hashtags.find(h => !genericTags.has(h.slice(1).toLowerCase()));
-            if (animeTag) animeName = animeTag.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
-        }
-    }
-
-    // Capitalized phrases (likely anime titles)
-    if (!animeName) {
-        const capMatches = text.match(/(?:^|\s)([A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[a-z]{1,3}|[0-9]+)){1,5})/g);
-        if (capMatches) {
-            const skipStarts = /^(From|Source|Watch|Click|Check|Season|Episode|Official|New|The This|That|Just|Will|Now|Out|More|Read|See|Get)\s/i;
-            const cleaned = capMatches.map(m => m.trim()).filter(m => m.length > 4 && !skipStarts.test(m));
-            if (cleaned.length > 0) animeName = cleaned.reduce((a, b) => a.length >= b.length ? a : b);
-        }
-    }
-
-    // Fallback: first meaningful words
-    if (!animeName) {
-        animeName = text.split(/\s+/).filter(w => w.length > 2 && !w.startsWith('http') && !w.startsWith('@') && !w.startsWith('#')).slice(0, 5).join(' ').replace(/[^\w\s'-]/g, '').trim().substring(0, 50);
-    }
-
-    // Build title
-    if (animeName && eventLabel) return { title: `${animeName} — ${eventLabel}`, claimType, postType };
-    if (animeName) return { title: `${animeName} — ${authorName} Announcement`, claimType, postType };
-    if (eventLabel) return { title: `${eventLabel} — ${authorName}`, claimType, postType };
-    return { title: `${authorName} — New Announcement`, claimType, postType };
-}
-
-/**
- * Build a clean, readable caption from tweet text.
- */
-function buildSmartCaption(text: string, url: string, authorHandle: string, authorName: string): string {
-    let cleanText = text.replace(/https?:\/\/t\.co\/\S+/g, '').replace(/\s+/g, ' ').trim();
-    cleanText = cleanText.replace(/(\s*#\w+){3,}$/, '').trim();
-    return `${cleanText}\n\nSource: @${authorHandle} (${authorName})\n${url}`;
-}
-
-/**
- * Generate a post from an X announcement
- */
-export function generateXPost(candidate: XTweet, now: Date): any {
-    const { title, claimType, postType } = extractSmartTitle(candidate.text, candidate.authorName);
-    const slug = `x-${candidate.authorHandle.toLowerCase()}-${candidate.id.substring(0, 8)}`;
-    const content = buildSmartCaption(candidate.text, candidate.url, candidate.authorHandle, candidate.authorName);
-
+export function generateXPost(tweet: XTweet, now: Date): any {
     return {
-        id: crypto.randomUUID(),
-        title,
-        slug,
-        content,
-        type: postType,
-        claim_type: claimType,
-        status: 'pending',
-        is_published: false,
-        headline: 'OFFICIAL ANNOUNCEMENT',
-        image: candidate.mediaUrls[0] || '',
-        twitter_tweet_id: candidate.id,
-        twitter_url: candidate.url,
-        source: candidate.authorName,
-        source_tier: candidate.authorTier,
-        verification_badge: `@${candidate.authorHandle} Official`,
-        verification_score: candidate.authorTier === 1 ? 90 : 80,
+        title: `${tweet.authorName}: ${tweet.text.substring(0, 80)}${tweet.text.length > 80 ? '...' : ''}`,
+        content: tweet.text,
+        type: 'INTEL',
+        source: `@${tweet.authorHandle}`,
+        sourceTier: tweet.authorTier,
         timestamp: now.toISOString(),
+        status: 'pending',
+        isPublished: false,
+        twitter_tweet_id: tweet.id,
+        twitter_url: tweet.url,
+        mediaUrls: tweet.mediaUrls,
+        publicMetrics: tweet.publicMetrics
     };
 }
-
-export { MONITORED_ACCOUNTS };
-export type { XTweet };
