@@ -344,6 +344,7 @@ async function createPendingPost(
     
     if (error) {
       console.error('[ProcessingWorker] Error creating post:', error);
+      console.error('[ProcessingWorker] Post data:', JSON.stringify(post, null, 2));
       return false;
     }
     
