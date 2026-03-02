@@ -168,11 +168,6 @@ ${hashtags}
 }
 
 async function processXUrl(url: string): Promise<any | null> {
-    // Extract tweet ID from X URL
-    // URL formats:
-    // https://twitter.com/username/status/1234567890
-    // https://x.com/username/status/1234567890
-    
     const match = url.match(/\/(?:status|statuses)\/(\d+)/);
     const tweetId = match ? match[1] : '';
 
@@ -180,11 +175,11 @@ async function processXUrl(url: string): Promise<any | null> {
         throw new Error('Could not extract tweet ID from X URL');
     }
 
-    // Check if already exists (search in content for the tweet URL)
+    // Check if already exists
     const { data: existing } = await supabaseAdmin
         .from('posts')
         .select('id')
-        .ilike('content', `%${tweetId}%`)
+        .or(`twitter_tweet_id.eq.${tweetId},content.ilike.%${tweetId}%`)
         .limit(1);
 
     if (existing && existing.length > 0) {
@@ -195,26 +190,93 @@ async function processXUrl(url: string): Promise<any | null> {
     const usernameMatch = url.match(/(?:twitter\.com|x\.com)\/([^\/]+)\//);
     const username = usernameMatch ? usernameMatch[1] : 'Unknown';
 
-    // Since we can't easily fetch tweet content without API keys,
-    // create a placeholder post that the user can edit
-    // Using only confirmed database columns
+    // Try to fetch tweet content via X API if bearer token is available
+    const bearerToken = process.env.X_BEARER_TOKEN;
+    let tweetText = '';
+    let mediaUrl = '';
+
+    if (bearerToken) {
+        try {
+            const apiUrl = `https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=text,entities&expansions=attachments.media_keys&media.fields=url,preview_image_url`;
+            const resp = await fetch(apiUrl, {
+                headers: { 'Authorization': `Bearer ${bearerToken}` },
+                signal: AbortSignal.timeout(5000),
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                tweetText = data.data?.text || '';
+                // Extract media
+                if (data.includes?.media?.[0]) {
+                    mediaUrl = data.includes.media[0].url || data.includes.media[0].preview_image_url || '';
+                }
+                if (!mediaUrl && data.data?.entities?.urls) {
+                    for (const u of data.data.entities.urls) {
+                        if (u.images?.[0]) { mediaUrl = u.images[0].url; break; }
+                    }
+                }
+            }
+        } catch {
+            console.log('[Custom URL] Could not fetch tweet via API, using placeholder');
+        }
+    }
+
+    // Smart title generation
+    let title = `@${username} — New Post`;
+    let postType = 'INTEL';
+
+    if (tweetText) {
+        const lower = tweetText.toLowerCase();
+        let eventLabel = '';
+        if (lower.includes('trailer') || lower.includes(' pv')) { eventLabel = 'Official Trailer'; postType = 'TRAILER'; }
+        else if (lower.includes('teaser')) { eventLabel = 'Teaser'; postType = 'TRAILER'; }
+        else if (lower.includes('season') && (lower.includes('confirmed') || lower.includes('announce'))) eventLabel = 'New Season Confirmed';
+        else if (lower.includes('visual') || lower.includes('poster')) eventLabel = 'New Key Visual';
+        else if (lower.includes('release date') || lower.includes('premiere')) eventLabel = 'Release Date Announced';
+        else if (lower.includes('announce') || lower.includes('reveal') || lower.includes('confirm')) eventLabel = 'New Announcement';
+
+        // Extract anime name
+        let animeName = '';
+        const quoted = tweetText.match(/["「『]([^"」』]{3,40})["」』]/);
+        if (quoted) animeName = quoted[1];
+        if (!animeName) {
+            const tags = tweetText.match(/#([A-Za-z][A-Za-z0-9_]{2,30})/g);
+            if (tags) {
+                const skip = new Set(['anime', 'manga', 'trailer', 'pv', 'teaser', 'newanime']);
+                const tag = tags.find(h => !skip.has(h.slice(1).toLowerCase()));
+                if (tag) animeName = tag.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+            }
+        }
+        if (!animeName) {
+            animeName = tweetText.split(/\s+/).filter(w => w.length > 2 && !w.startsWith('http') && !w.startsWith('@') && !w.startsWith('#')).slice(0, 4).join(' ').replace(/[^\w\s'-]/g, '').trim();
+        }
+
+        if (animeName && eventLabel) title = `${animeName} — ${eventLabel}`;
+        else if (animeName) title = `${animeName} — @${username} Announcement`;
+        else if (eventLabel) title = `${eventLabel} — @${username}`;
+    }
+
+    // Build clean content
+    let content: string;
+    if (tweetText) {
+        let cleanText = tweetText.replace(/https?:\/\/t\.co\/\S+/g, '').replace(/\s+/g, ' ').trim();
+        cleanText = cleanText.replace(/(\s*#\w+){3,}$/, '').trim();
+        content = `${cleanText}\n\nSource: @${username}\n${url}`;
+    } else {
+        content = `New post from @${username}.\n\nSource: @${username}\n${url}`;
+    }
+
     return {
         id: crypto.randomUUID(),
-        title: `X Post from @${username}`,
-        slug: `x-post-${username}-${tweetId.substring(0, 8)}`,
-        content: `📱 **X (Twitter) Post**
-
-From: @${username}
-🔗 **Original post:** ${url}
-
-Tweet ID: ${tweetId}
-
-[Edit this post to add description and context]`,
-        type: 'INTEL',
+        title,
+        slug: `x-post-${username.toLowerCase()}-${tweetId.substring(0, 8)}`,
+        content,
+        type: postType,
         status: 'pending',
         is_published: false,
-        image: '', // No image by default for X posts
-        source: `@${username} on X`,
+        image: mediaUrl,
+        twitter_tweet_id: tweetId,
+        twitter_url: url,
+        source: `@${username}`,
         source_tier: 2,
         timestamp: new Date().toISOString(),
     };

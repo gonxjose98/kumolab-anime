@@ -218,31 +218,95 @@ export async function scanXAccounts(
 }
 
 /**
+ * Extract a smart title from tweet text.
+ * Identifies anime name + event type for a clean, relevant title.
+ */
+function extractSmartTitle(text: string, authorName: string): { title: string; claimType: string; postType: string } {
+    const lowerText = text.toLowerCase();
+    let claimType = 'OTHER';
+    let eventLabel = '';
+    let postType = 'INTEL';
+
+    if (lowerText.includes('trailer') || lowerText.includes(' pv')) {
+        claimType = 'TRAILER_DROP'; eventLabel = 'Official Trailer'; postType = 'TRAILER';
+    } else if (lowerText.includes('teaser')) {
+        claimType = 'TRAILER_DROP'; eventLabel = 'Teaser'; postType = 'TRAILER';
+    } else if (lowerText.includes('season') && (lowerText.includes('confirmed') || lowerText.includes('announce') || lowerText.includes('renewed'))) {
+        claimType = 'NEW_SEASON_CONFIRMED'; eventLabel = 'New Season Confirmed';
+    } else if (lowerText.includes('visual') || lowerText.includes('poster')) {
+        claimType = 'NEW_KEY_VISUAL'; eventLabel = 'New Key Visual';
+    } else if ((lowerText.includes('release date') || lowerText.includes('premiere')) && !lowerText.includes('trailer')) {
+        claimType = 'DATE_ANNOUNCED'; eventLabel = 'Release Date Announced';
+    } else if (lowerText.includes('cast') && (lowerText.includes('reveal') || lowerText.includes('announce'))) {
+        claimType = 'CAST_ADDITION'; eventLabel = 'New Cast Revealed';
+    } else if (lowerText.includes('delay') || lowerText.includes('postpone')) {
+        claimType = 'DELAY'; eventLabel = 'Delayed';
+    } else if (lowerText.includes('announce') || lowerText.includes('confirm') || lowerText.includes('reveal')) {
+        eventLabel = 'New Announcement';
+    }
+
+    // Try to extract anime name from quoted titles, hashtags, or capitalized phrases
+    let animeName = '';
+
+    // Quoted titles: "Title" or 「Title」
+    const quotedMatch = text.match(/["「『]([^"」』]{3,40})["」』]/);
+    if (quotedMatch) animeName = quotedMatch[1];
+
+    // Hashtag-based names
+    if (!animeName) {
+        const hashtags = text.match(/#([A-Za-z][A-Za-z0-9_]{2,30})/g);
+        if (hashtags) {
+            const genericTags = new Set(['anime', 'manga', 'trailer', 'pv', 'teaser', 'animetrailer', 'newanime', 'otaku']);
+            const animeTag = hashtags.find(h => !genericTags.has(h.slice(1).toLowerCase()));
+            if (animeTag) animeName = animeTag.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+        }
+    }
+
+    // Capitalized phrases (likely anime titles)
+    if (!animeName) {
+        const capMatches = text.match(/(?:^|\s)([A-Z][a-zA-Z]+(?:\s+(?:[A-Z][a-zA-Z]+|[a-z]{1,3}|[0-9]+)){1,5})/g);
+        if (capMatches) {
+            const skipStarts = /^(From|Source|Watch|Click|Check|Season|Episode|Official|New|The This|That|Just|Will|Now|Out|More|Read|See|Get)\s/i;
+            const cleaned = capMatches.map(m => m.trim()).filter(m => m.length > 4 && !skipStarts.test(m));
+            if (cleaned.length > 0) animeName = cleaned.reduce((a, b) => a.length >= b.length ? a : b);
+        }
+    }
+
+    // Fallback: first meaningful words
+    if (!animeName) {
+        animeName = text.split(/\s+/).filter(w => w.length > 2 && !w.startsWith('http') && !w.startsWith('@') && !w.startsWith('#')).slice(0, 5).join(' ').replace(/[^\w\s'-]/g, '').trim().substring(0, 50);
+    }
+
+    // Build title
+    if (animeName && eventLabel) return { title: `${animeName} — ${eventLabel}`, claimType, postType };
+    if (animeName) return { title: `${animeName} — ${authorName} Announcement`, claimType, postType };
+    if (eventLabel) return { title: `${eventLabel} — ${authorName}`, claimType, postType };
+    return { title: `${authorName} — New Announcement`, claimType, postType };
+}
+
+/**
+ * Build a clean, readable caption from tweet text.
+ */
+function buildSmartCaption(text: string, url: string, authorHandle: string, authorName: string): string {
+    let cleanText = text.replace(/https?:\/\/t\.co\/\S+/g, '').replace(/\s+/g, ' ').trim();
+    cleanText = cleanText.replace(/(\s*#\w+){3,}$/, '').trim();
+    return `${cleanText}\n\nSource: @${authorHandle} (${authorName})\n${url}`;
+}
+
+/**
  * Generate a post from an X announcement
  */
 export function generateXPost(candidate: XTweet, now: Date): any {
+    const { title, claimType, postType } = extractSmartTitle(candidate.text, candidate.authorName);
     const slug = `x-${candidate.authorHandle.toLowerCase()}-${candidate.id.substring(0, 8)}`;
-    
-    // Extract anime name (first 3-4 significant words)
-    const words = candidate.text.split(/\s+/).filter(w => w.length > 3 && !w.startsWith('http'));
-    const animeName = words.slice(0, 4).join(' ').replace(/[^a-zA-Z0-9\s]/g, '');
-    
-    // Detect claim type
-    const lowerText = candidate.text.toLowerCase();
-    let claimType = 'OTHER';
-    if (lowerText.includes('trailer') || lowerText.includes('pv')) claimType = 'TRAILER_DROP';
-    else if (lowerText.includes('season') && (lowerText.includes('confirmed') || lowerText.includes('announce'))) claimType = 'NEW_SEASON_CONFIRMED';
-    else if (lowerText.includes('visual') || lowerText.includes('poster')) claimType = 'NEW_KEY_VISUAL';
-    else if (lowerText.includes('date') || lowerText.includes('premiere')) claimType = 'DATE_ANNOUNCED';
-    else if (lowerText.includes('cast')) claimType = 'CAST_ADDITION';
-    else if (lowerText.includes('delay') || lowerText.includes('postpone')) claimType = 'DELAY';
+    const content = buildSmartCaption(candidate.text, candidate.url, candidate.authorHandle, candidate.authorName);
 
     return {
         id: crypto.randomUUID(),
-        title: `${animeName} — Announcement from ${candidate.authorName}`,
-        slug: slug,
-        content: `${candidate.text}\n\nSource: ${candidate.url}`,
-        type: 'INTEL',
+        title,
+        slug,
+        content,
+        type: postType,
         claim_type: claimType,
         status: 'pending',
         is_published: false,
