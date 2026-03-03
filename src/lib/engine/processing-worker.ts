@@ -202,7 +202,19 @@ function determineClaimType(title: string, content: string): string {
 async function checkForDuplicates(
   candidate: ProcessingCandidate,
   animeName?: string
-): Promise<{ isDuplicate: boolean; duplicateOf?: string; similarity: number }> {
+): Promise<{ isDuplicate: boolean; duplicateOf?: string; similarity: number; isDeclined?: boolean }> {
+  // 0. Check if this candidate was previously declined
+  const { data: declinedMatch } = await supabaseAdmin
+    .from('declined_posts')
+    .select('id')
+    .ilike('title', candidate.title)
+    .limit(1);
+  
+  if (declinedMatch && declinedMatch.length > 0) {
+    console.log(`[ProcessingWorker] Candidate was previously declined: ${candidate.title}`);
+    return { isDuplicate: true, duplicateOf: declinedMatch[0].id, similarity: 1.0, isDeclined: true };
+  }
+
   // 1. Check URL match (fingerprint column doesn't exist in posts table)
   const { data: urlMatch } = await supabaseAdmin
     .from('posts')
@@ -458,6 +470,22 @@ export async function runProcessingWorker(): Promise<{
           };
           stats.duplicates++;
           console.log(`[ProcessingWorker] Candidate ${candidate.id} is duplicate of ${dupCheck.duplicateOf}`);
+          
+          // If it was previously declined, mark candidate as discarded
+          if (dupCheck.isDeclined) {
+            console.log(`[ProcessingWorker] Candidate was declined before, marking as discarded`);
+            await markCandidateProcessed(
+              candidate.id,
+              'discarded',
+              {
+                candidate,
+                score,
+                action: 'duplicate',
+                enrichedData,
+                error: 'Previously declined by admin'
+              }
+            );
+          }
         } else if (score.total < SCORING_THRESHOLDS.PUBLISH_MINIMUM) {
           result = {
             candidate,
