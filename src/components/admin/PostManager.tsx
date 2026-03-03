@@ -390,17 +390,34 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleDecline = async (postIds: string[], reason: string = '') => {
         setIsPublishing(true);
         try {
+            console.log('[Decline] Sending decline request:', postIds);
             const resp = await fetch('/api/admin/decline', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ postIds, reason })
             });
+            
             const result = await resp.json();
+            console.log('[Decline] API response:', result);
+            
             if (result.success) {
-                // Remove declined posts from local state
-                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
+                // Check if all were successful
+                const failed = result.results?.filter((r: any) => !r.success) || [];
+                const succeeded = result.results?.filter((r: any) => r.success) || [];
+                
+                if (failed.length > 0) {
+                    console.error('[Decline] Some posts failed:', failed);
+                    alert(`Decline partial failure:\n${failed.map((f: any) => `${f.id}: ${f.error}`).join('\n')}`);
+                }
+                
+                if (succeeded.length > 0) {
+                    // Remove successfully declined posts from local state
+                    const successIds = succeeded.map((s: any) => s.id);
+                    setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
+                    console.log('[Decline] Posts declined successfully:', successIds);
+                }
+                
                 setSelectedIds([]);
-                console.log('[Decline] Posts declined successfully:', postIds);
             } else {
                 console.error('[Decline] API error:', result);
                 alert('Decline failed: ' + (result.error || 'Unknown error'));

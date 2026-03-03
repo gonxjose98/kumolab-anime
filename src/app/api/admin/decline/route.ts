@@ -1,12 +1,14 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function POST(req: NextRequest) {
+    console.log('[Decline API] Called');
     try {
         const { postIds, reason } = await req.json();
+        console.log('[Decline API] Received postIds:', postIds);
 
         if (!postIds || !Array.isArray(postIds)) {
+            console.log('[Decline API] Invalid postIds');
             return NextResponse.json({ success: false, error: 'Invalid postIds' }, { status: 400 });
         }
 
@@ -14,6 +16,8 @@ export async function POST(req: NextRequest) {
         const results = [];
 
         for (const postId of postIds) {
+            console.log(`[Decline API] Processing post: ${postId}`);
+            
             // 1. Get post details first
             const { data: post, error: fetchError } = await supabaseAdmin
                 .from('posts')
@@ -22,11 +26,15 @@ export async function POST(req: NextRequest) {
                 .single();
 
             if (fetchError || !post) {
+                console.error(`[Decline API] Post not found: ${postId}`, fetchError);
                 results.push({ id: postId, success: false, error: 'Post not found' });
                 continue;
             }
 
+            console.log(`[Decline API] Found post: ${post.title}`);
+
             // 2. Insert into declined_posts
+            console.log(`[Decline API] Inserting into declined_posts`);
             const { error: insertError } = await supabaseAdmin
                 .from('declined_posts')
                 .insert([{
@@ -39,25 +47,34 @@ export async function POST(req: NextRequest) {
                 }]);
 
             if (insertError) {
+                console.error(`[Decline API] Insert error:`, insertError);
                 results.push({ id: postId, success: false, error: insertError.message });
                 continue;
             }
 
-            // 3. Delete from posts (or mark as declined? User said "removes from pending")
-            const { error: deleteError } = await supabaseAdmin
+            console.log(`[Decline API] Inserted into declined_posts`);
+
+            // 3. Delete from posts
+            console.log(`[Decline API] Deleting from posts`);
+            const { error: deleteError, data: deleteData } = await supabaseAdmin
                 .from('posts')
                 .delete()
-                .eq('id', postId);
+                .eq('id', postId)
+                .select();
 
             if (deleteError) {
+                console.error(`[Decline API] Delete error:`, deleteError);
                 results.push({ id: postId, success: false, error: deleteError.message });
             } else {
+                console.log(`[Decline API] Successfully deleted post: ${postId}`, deleteData);
                 results.push({ id: postId, success: true });
             }
         }
 
+        console.log('[Decline API] Results:', results);
         return NextResponse.json({ success: true, results });
     } catch (e: any) {
+        console.error('[Decline API] Fatal error:', e);
         return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }
