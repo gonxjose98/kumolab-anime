@@ -309,17 +309,9 @@ async function createPendingPost(
     post.content = sanitizeString(candidate.content, 5000);
     post.excerpt = sanitizeString(candidate.content, 197) + '...';
     
-    // Optional fields
-    post.image = candidate.media_urls && candidate.media_urls.length > 0 
-      ? candidate.media_urls[0] 
-      : null;
-    post.source_url = candidate.canonical_url || candidate.source_url || '';
-    post.source = candidate.source_name || 'Unknown';
-    post.source_tier = candidate.source_tier || 2;
+    // Only use columns that exist in the database
     post.timestamp = now;
     post.status = 'pending';
-    post.scraped_at = candidate.detected_at || now;
-    // fingerprint and headline columns don't exist - skip them
     
     // Log what we're trying to insert
     console.log('[ProcessingWorker] Inserting post:', {
@@ -560,5 +552,6 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-/ /   D e p l o y m e n t   t r i g g e r    
+/ /   D e p l o y m e n t   t r i g g e r   
+ 
  
