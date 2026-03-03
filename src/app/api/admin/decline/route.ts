@@ -54,7 +54,27 @@ export async function POST(req: NextRequest) {
 
             console.log(`[Decline API] Inserted into declined_posts`);
 
-            // 3. Delete from posts
+            // 3. Mark detection_candidates as discarded to prevent recreation
+            console.log(`[Decline API] Marking detection_candidates as discarded`);
+            if (post.fingerprint) {
+                const { error: candidateError } = await supabaseAdmin
+                    .from('detection_candidates')
+                    .update({ 
+                        status: 'discarded',
+                        processed_at: now.toISOString(),
+                        action_taken: 'declined',
+                        error_message: `Post declined by admin: ${reason || 'No reason given'}`
+                    })
+                    .eq('fingerprint', post.fingerprint);
+                
+                if (candidateError) {
+                    console.error(`[Decline API] Failed to mark candidate discarded:`, candidateError);
+                } else {
+                    console.log(`[Decline API] Marked candidate as discarded for fingerprint: ${post.fingerprint}`);
+                }
+            }
+
+            // 4. Delete from posts
             console.log(`[Decline API] Deleting from posts`);
             const { error: deleteError, data: deleteData } = await supabaseAdmin
                 .from('posts')
