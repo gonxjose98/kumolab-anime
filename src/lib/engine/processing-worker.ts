@@ -319,7 +319,8 @@ async function createPendingPost(
       content: sanitizeString(candidate.content, 5000),
       excerpt: sanitizeString(candidate.content, 197) + '...',
       timestamp: now,
-      status: 'pending'
+      status: 'pending',
+      is_published: false  // CRITICAL: Never auto-publish
     };
     
     // Log what we're trying to insert
