@@ -319,8 +319,7 @@ async function createPendingPost(
     post.timestamp = now;
     post.status = 'pending';
     post.scraped_at = candidate.detected_at || now;
-    // fingerprint column doesn't exist in posts table - skip it
-    post.headline = sanitizeString(candidate.title, 100);
+    // fingerprint and headline columns don't exist - skip them
     
     // Log what we're trying to insert
     console.log('[ProcessingWorker] Inserting post:', {
