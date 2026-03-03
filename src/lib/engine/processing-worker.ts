@@ -310,32 +310,24 @@ async function createPendingPost(
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
     
-    const post = {
+    // Simplified post - only core fields to avoid schema issues
+    const post: any = {
       title: candidate.title.substring(0, 200),
       slug: `${slug}-${Date.now().toString(36)}`,
       type: 'INTEL',
       claim_type: enrichedData.claimType || 'OTHER',
       content: candidate.content,
-      excerpt: candidate.content.substring(0, 200) + '...',
-      image: candidate.media_urls[0] || null,
-      source_url: candidate.canonical_url,
+      excerpt: candidate.content ? candidate.content.substring(0, 200) + '...' : '',
+      image: candidate.media_urls && candidate.media_urls.length > 0 ? candidate.media_urls[0] : null,
+      source_url: candidate.canonical_url || candidate.source_url,
       source: candidate.source_name,
-      source_tier: candidate.source_tier,
-      relevance_score: score.total,
-      verification_score: score.total,
+      source_tier: candidate.source_tier || 2,
       timestamp: now,
       isPublished: false,
       status: 'pending',
-      scraped_at: candidate.detected_at,
+      scraped_at: candidate.detected_at || now,
       fingerprint: candidate.fingerprint,
-      headline: candidate.title.substring(0, 100),
-      media_urls: candidate.media_urls,
-      // Store score breakdown
-      metadata: {
-        score_breakdown: score.breakdown,
-        detection_method: 'processing_worker',
-        enriched_data: enrichedData
-      }
+      headline: candidate.title.substring(0, 100)
     };
     
     const { error } = await supabaseAdmin
