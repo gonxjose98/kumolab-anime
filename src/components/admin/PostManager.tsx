@@ -90,6 +90,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
+    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier'>('newest'); // NEW: Sort filter
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -419,15 +420,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
-        if (filter === 'PENDING') {
-            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
-                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        // NEW: Sort by user selection
+        if (sortBy === 'newest') {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        }
+        if (sortBy === 'oldest') {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        }
+        if (sortBy === 'tier') {
+            // Highest tier first (Tier 1 > Tier 2 > Tier 3)
+            if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
+                return (a.sourceTier || 3) - (b.sourceTier || 3);
             }
-            return (a.sourceTier || 3) - (b.sourceTier || 3);
+            // If same tier, sort by score
+            return (b.relevanceScore || 0) - (a.relevanceScore || 0);
         }
-        if (filter === 'APPROVED') {
-            return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
-        }
+        // Default fallback
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
@@ -1411,6 +1419,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             </button>
                         );
                     })}
+                </div>
+
+                {/* Sort Filter */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#7b61ff' }}>
+                        <path d="m3 16 4 4 4-4"/>
+                        <path d="M7 20V4"/>
+                        <path d="m21 8-4-4-4 4"/>
+                        <path d="M17 4v16"/>
+                    </svg>
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'tier')}
+                        className="bg-transparent text-[9px] font-bold uppercase tracking-wider cursor-pointer outline-none"
+                        style={{ color: '#fff', fontFamily: 'var(--font-display)' }}
+                    >
+                        <option value="newest" style={{ background: '#0c0c18', color: '#fff' }}>Newest First</option>
+                        <option value="oldest" style={{ background: '#0c0c18', color: '#fff' }}>Oldest First</option>
+                        <option value="tier" style={{ background: '#0c0c18', color: '#fff' }}>Highest Tier</option>
+                    </select>
                 </div>
             </div>
 
