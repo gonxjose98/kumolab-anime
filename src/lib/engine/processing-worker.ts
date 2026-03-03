@@ -323,7 +323,6 @@ async function createPendingPost(
       source: candidate.source_name,
       source_tier: candidate.source_tier || 2,
       timestamp: now,
-      isPublished: false,
       status: 'pending',
       scraped_at: candidate.detected_at || now,
       fingerprint: candidate.fingerprint,

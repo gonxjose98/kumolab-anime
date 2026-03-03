@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
             content: 'Test content',
             excerpt: 'Test excerpt...',
             timestamp: new Date().toISOString(),
-            isPublished: false,
             status: 'pending'
         };
         
