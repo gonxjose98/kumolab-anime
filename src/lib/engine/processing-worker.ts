@@ -1,5 +1,5 @@
 /**
- * Processing Worker
+ * Processing Worker - FIXED VERSION
  * Heavy processing that runs every 60 minutes
  * Responsibilities: enrichment, scoring, deduplication, filtering, pending approval generation
  */
@@ -43,6 +43,7 @@ interface ProcessedResult {
     studio?: string;
     seasonNumber?: number;
   };
+  error?: string;
 }
 
 /**
@@ -66,7 +67,6 @@ function calculateContentScore(
   if (candidate.source_tier === 1) {
     breakdown.sourceAuthority = SCORING_WEIGHTS.OFFICIAL_STUDIO_SOURCE;
   } else if (candidate.source_tier === 2) {
-    // Check if it's a known publisher
     const publisherMatch = /kadokawa|aniplex|toho|shueisha|bandai|pony canyon/.test(combined);
     breakdown.sourceAuthority = publisherMatch 
       ? SCORING_WEIGHTS.PUBLISHER_CONFIRMATION 
@@ -114,22 +114,18 @@ function calculateContentScore(
   // 5. Apply Penalties
   let penalties = 0;
   
-  // Merchandise penalty
   if (/merchandise|merch|goods only|figure|toy|nendoroid|figma/.test(combined)) {
     penalties += SCORING_PENALTIES.MERCHANDISE_ONLY;
   }
   
-  // Figures/toys
   if (/\bfigure\b|\bfigurine\b|\bstatue\b|\bcollectible/.test(combined)) {
     penalties += SCORING_PENALTIES.FIGURES_TOYS;
   }
   
-  // Speculation
   if (/rumor|speculation|reportedly|allegedly|might|could|possibly/.test(combined)) {
     penalties += SCORING_PENALTIES.FAN_SPECULATION;
   }
   
-  // Off-topic (games not anime)
   if (/\bgame\b(?!.*\banime\b).*\bannouncement\b/.test(combined)) {
     penalties += SCORING_PENALTIES.OFF_TOPIC;
   }
@@ -160,10 +156,6 @@ function calculateContentScore(
  * Extract anime name from title/content
  */
 function extractAnimeName(title: string, content: string): string | undefined {
-  // Try to extract anime name from patterns like:
-  // "Anime Name Season 2 Announced"
-  // "New Trailer for Anime Name Released"
-  
   const patterns = [
     /^(.+?)\s+(?:Season|Movie|Film|Anime)/i,
     /^(?:New|Latest)\s+(.+?)\s+(?:Trailer|PV|Teaser|Visual)/i,
@@ -299,50 +291,86 @@ function generateSlug(title: string): string {
 }
 
 /**
- * Create pending post from candidate
+ * Sanitize string for database
+ */
+function sanitizeString(str: string | null | undefined, maxLength: number = 200): string {
+  if (!str) return '';
+  return str.substring(0, maxLength).replace(/\x00/g, '');
+}
+
+/**
+ * Create pending post from candidate - FIXED VERSION
  */
 async function createPendingPost(
   candidate: ProcessingCandidate,
   score: ContentScore,
   enrichedData: any
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string; postId?: string }> {
   try {
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
     
-    // Simplified post - only core fields to avoid schema issues
-    const post: any = {
-      title: candidate.title.substring(0, 200),
-      slug: `${slug}-${Date.now().toString(36)}`,
-      type: 'INTEL',
-      claim_type: enrichedData.claimType || 'OTHER',
-      content: candidate.content,
-      excerpt: candidate.content ? candidate.content.substring(0, 200) + '...' : '',
-      image: candidate.media_urls && candidate.media_urls.length > 0 ? candidate.media_urls[0] : null,
-      source_url: candidate.canonical_url || candidate.source_url,
-      source: candidate.source_name,
-      source_tier: candidate.source_tier || 2,
-      timestamp: now,
-      status: 'pending',
-      scraped_at: candidate.detected_at || now,
-      fingerprint: candidate.fingerprint,
-      headline: candidate.title.substring(0, 100)
-    };
+    // Build post with validation
+    const post: Record<string, any> = {};
     
-    const { error } = await supabaseAdmin
+    // Required fields
+    post.title = sanitizeString(candidate.title, 200);
+    post.slug = `${slug}-${Date.now().toString(36)}`;
+    post.type = 'INTEL';
+    post.claim_type = enrichedData.claimType || 'OTHER';
+    post.content = sanitizeString(candidate.content, 5000);
+    post.excerpt = sanitizeString(candidate.content, 197) + '...';
+    
+    // Optional fields
+    post.image = candidate.media_urls && candidate.media_urls.length > 0 
+      ? candidate.media_urls[0] 
+      : null;
+    post.source_url = candidate.canonical_url || candidate.source_url || '';
+    post.source = candidate.source_name || 'Unknown';
+    post.source_tier = candidate.source_tier || 2;
+    post.timestamp = now;
+    post.status = 'pending';
+    post.scraped_at = candidate.detected_at || now;
+    post.fingerprint = candidate.fingerprint || `${Date.now()}`;
+    post.headline = sanitizeString(candidate.title, 100);
+    
+    // Log what we're trying to insert
+    console.log('[ProcessingWorker] Inserting post:', {
+      title: post.title,
+      slug: post.slug,
+      type: post.type,
+      claim_type: post.claim_type,
+      status: post.status,
+      source: post.source,
+      source_tier: post.source_tier
+    });
+    
+    const { data, error } = await supabaseAdmin
       .from('posts')
-      .insert([post]);
+      .insert([post])
+      .select();
     
     if (error) {
-      console.error('[ProcessingWorker] Error creating post:', error);
-      console.error('[ProcessingWorker] Post data:', JSON.stringify(post, null, 2));
-      return false;
+      console.error('[ProcessingWorker] Supabase error:', JSON.stringify(error, null, 2));
+      return { 
+        success: false, 
+        error: `Supabase error: ${error.message} (code: ${error.code})` 
+      };
     }
     
-    return true;
-  } catch (error) {
+    if (!data || data.length === 0) {
+      return { success: false, error: 'No data returned from insert' };
+    }
+    
+    console.log('[ProcessingWorker] Post created successfully:', data[0].id);
+    return { success: true, postId: data[0].id };
+    
+  } catch (error: any) {
     console.error('[ProcessingWorker] Exception creating post:', error);
-    return false;
+    return { 
+      success: false, 
+      error: `Exception: ${error.message}` 
+    };
   }
 }
 
@@ -354,21 +382,31 @@ async function markCandidateProcessed(
   status: 'processed' | 'discarded',
   result: ProcessedResult
 ): Promise<void> {
-  await supabaseAdmin
+  const updateData: any = {
+    status,
+    processed_at: new Date().toISOString(),
+    score: result.score.total,
+    score_breakdown: result.score.breakdown,
+    action_taken: result.action,
+    duplicate_of: result.duplicateOf || null
+  };
+  
+  if (result.error) {
+    updateData.error_message = result.error;
+  }
+  
+  const { error } = await supabaseAdmin
     .from('detection_candidates')
-    .update({
-      status,
-      processed_at: new Date().toISOString(),
-      score: result.score.total,
-      score_breakdown: result.score.breakdown,
-      action_taken: result.action,
-      duplicate_of: result.duplicateOf
-    })
+    .update(updateData)
     .eq('id', candidateId);
+    
+  if (error) {
+    console.error('[ProcessingWorker] Failed to mark candidate processed:', error);
+  }
 }
 
 /**
- * Main Processing Worker function
+ * Main Processing Worker function - FIXED VERSION
  */
 export async function runProcessingWorker(): Promise<{
   processed: number;
@@ -378,6 +416,7 @@ export async function runProcessingWorker(): Promise<{
   errors: string[];
 }> {
   console.log('[ProcessingWorker] Starting processing cycle...');
+  console.log('[ProcessingWorker] Publish threshold:', SCORING_THRESHOLDS.PUBLISH_MINIMUM);
   const startTime = Date.now();
   
   const stats = {
@@ -412,9 +451,11 @@ export async function runProcessingWorker(): Promise<{
     for (const candidate of candidates) {
       try {
         stats.processed++;
+        console.log(`[ProcessingWorker] Processing candidate ${candidate.id}: ${candidate.title.substring(0, 50)}...`);
         
         // Calculate score
         const score = calculateContentScore(candidate);
+        console.log(`[ProcessingWorker] Score: ${score.total}, Threshold: ${SCORING_THRESHOLDS.PUBLISH_MINIMUM}, Pass: ${score.publishThreshold}`);
         
         // Extract enriched data
         const animeName = extractAnimeName(candidate.title, candidate.content);
@@ -432,7 +473,6 @@ export async function runProcessingWorker(): Promise<{
         let result: ProcessedResult;
         
         if (dupCheck.isDuplicate) {
-          // Duplicate found
           result = {
             candidate,
             score,
@@ -441,8 +481,8 @@ export async function runProcessingWorker(): Promise<{
             enrichedData
           };
           stats.duplicates++;
+          console.log(`[ProcessingWorker] Candidate ${candidate.id} is duplicate of ${dupCheck.duplicateOf}`);
         } else if (score.total < SCORING_THRESHOLDS.PUBLISH_MINIMUM) {
-          // Score too low
           result = {
             candidate,
             score,
@@ -450,11 +490,13 @@ export async function runProcessingWorker(): Promise<{
             enrichedData
           };
           stats.rejected++;
+          console.log(`[ProcessingWorker] Candidate ${candidate.id} rejected - score ${score.total} below threshold ${SCORING_THRESHOLDS.PUBLISH_MINIMUM}`);
         } else {
           // Accept and create pending post
-          const created = await createPendingPost(candidate, score, enrichedData);
+          console.log(`[ProcessingWorker] Creating post for candidate ${candidate.id}...`);
+          const createResult = await createPendingPost(candidate, score, enrichedData);
           
-          if (created) {
+          if (createResult.success) {
             result = {
               candidate,
               score,
@@ -462,15 +504,18 @@ export async function runProcessingWorker(): Promise<{
               enrichedData
             };
             stats.accepted++;
+            console.log(`[ProcessingWorker] Post created: ${createResult.postId}`);
           } else {
             result = {
               candidate,
               score,
               action: 'reject',
-              enrichedData
+              enrichedData,
+              error: createResult.error
             };
             stats.rejected++;
-            stats.errors.push(`Failed to create post for ${candidate.id}`);
+            stats.errors.push(`Failed to create post for ${candidate.id}: ${createResult.error}`);
+            console.error(`[ProcessingWorker] Failed to create post: ${createResult.error}`);
           }
         }
         
@@ -482,8 +527,21 @@ export async function runProcessingWorker(): Promise<{
         );
         
       } catch (error: any) {
-        stats.errors.push(`Candidate ${candidate.id}: ${error.message}`);
+        const errorMsg = `Candidate ${candidate.id}: ${error.message}`;
+        stats.errors.push(errorMsg);
         console.error(`[ProcessingWorker] Error processing candidate ${candidate.id}:`, error);
+        
+        // Still mark as processed to avoid infinite retry
+        await markCandidateProcessed(
+          candidate.id,
+          'discarded',
+          {
+            candidate,
+            score: { total: 0, breakdown: { sourceAuthority: 0, contentType: 0, visualEvidence: 0, temporalRelevance: 0 }, confidence: 'low', publishThreshold: false },
+            action: 'reject',
+            error: error.message
+          }
+        );
       }
     }
     
@@ -515,5 +573,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-/ /   D e p l o y e d   0 3 / 0 3 / 2 0 2 6   0 0 : 2 2 : 3 9  
- 
