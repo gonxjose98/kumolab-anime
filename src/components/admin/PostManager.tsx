@@ -397,13 +397,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
+                // Remove declined posts from local state
                 setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
                 setSelectedIds([]);
+                console.log('[Decline] Posts declined successfully:', postIds);
             } else {
-                alert('Decline failed: ' + result.error);
+                console.error('[Decline] API error:', result);
+                alert('Decline failed: ' + (result.error || 'Unknown error'));
             }
-        } catch (e) {
-            console.error(e);
+        } catch (e: any) {
+            console.error('[Decline] Exception:', e);
+            alert('Decline error: ' + e.message);
         } finally {
             setIsPublishing(false);
         }
@@ -3409,5 +3413,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         </div>
     );
 }
-/ /   S o r t   f i l t e r   d e p l o y e d    
+/ /   S o r t   f i l t e r   d e p l o y e d   
+ 
  
