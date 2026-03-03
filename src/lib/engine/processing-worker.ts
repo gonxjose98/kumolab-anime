@@ -298,20 +298,17 @@ async function createPendingPost(
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
     
-    // Build post with validation
-    const post: Record<string, any> = {};
-    
-    // Required fields
-    post.title = sanitizeString(candidate.title, 200);
-    post.slug = `${slug}-${Date.now().toString(36)}`;
-    post.type = 'INTEL';
-    post.claim_type = enrichedData.claimType || 'OTHER';
-    post.content = sanitizeString(candidate.content, 5000);
-    post.excerpt = sanitizeString(candidate.content, 197) + '...';
-    
-    // Only use columns that exist in the database
-    post.timestamp = now;
-    post.status = 'pending';
+    // Build post with validation - ONLY use columns that exist in posts table
+    const post = {
+      title: sanitizeString(candidate.title, 200),
+      slug: `${slug}-${Date.now().toString(36)}`,
+      type: 'INTEL',
+      claim_type: enrichedData.claimType || 'OTHER',
+      content: sanitizeString(candidate.content, 5000),
+      excerpt: sanitizeString(candidate.content, 197) + '...',
+      timestamp: now,
+      status: 'pending'
+    };
     
     // Log what we're trying to insert
     console.log('[ProcessingWorker] Inserting post:', {
