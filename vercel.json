@@ -8,5 +8,10 @@
       "path": "/api/cron?worker=dailydrops",
       "schedule": "0 13 * * *"
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  }
 }
