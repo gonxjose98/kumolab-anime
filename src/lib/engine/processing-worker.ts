@@ -203,19 +203,7 @@ async function checkForDuplicates(
   candidate: ProcessingCandidate,
   animeName?: string
 ): Promise<{ isDuplicate: boolean; duplicateOf?: string; similarity: number }> {
-  // 1. Check exact fingerprint match
-  const { data: fingerprintMatch } = await supabaseAdmin
-    .from('posts')
-    .select('id, title')
-    .eq('fingerprint', candidate.fingerprint)
-    .gte('timestamp', new Date(Date.now() - DEDUPLICATION_CONFIG.CHECK_WINDOW * 60 * 60 * 1000).toISOString())
-    .limit(1);
-  
-  if (fingerprintMatch && fingerprintMatch.length > 0) {
-    return { isDuplicate: true, duplicateOf: fingerprintMatch[0].id, similarity: 1.0 };
-  }
-  
-  // 2. Check URL match
+  // 1. Check URL match (fingerprint column doesn't exist in posts table)
   const { data: urlMatch } = await supabaseAdmin
     .from('posts')
     .select('id')
@@ -331,7 +319,7 @@ async function createPendingPost(
     post.timestamp = now;
     post.status = 'pending';
     post.scraped_at = candidate.detected_at || now;
-    post.fingerprint = candidate.fingerprint || `${Date.now()}`;
+    // fingerprint column doesn't exist in posts table - skip it
     post.headline = sanitizeString(candidate.title, 100);
     
     // Log what we're trying to insert
