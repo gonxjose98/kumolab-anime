@@ -1442,8 +1442,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     })}
                 </div>
 
-                {/* Sort Filter */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                {/* Sort Filter - V2 */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(123,97,255,0.15)', border: '1px solid rgba(123,97,255,0.3)' }}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#7b61ff' }}>
                         <path d="m3 16 4 4 4-4"/>
                         <path d="M7 20V4"/>
