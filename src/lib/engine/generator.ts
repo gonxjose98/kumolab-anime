@@ -58,8 +58,8 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
         content,
         image: '/daily-drops-permanent.jpg', // Permanent branded image
         timestamp: date.toISOString(),
-        isPublished: true,
-        status: 'published',
+        isPublished: false,
+        status: 'pending',
         verification_tier: episodes[0].provenance?.tier,
         verification_reason: 'Strict Primary Source Verified',
         verification_sources: sourcesMap
@@ -257,8 +257,8 @@ export async function generateIntelPost(intelItems: any[], date: Date): Promise<
         image_settings: imageSettings,
         is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
-        isPublished: true,
-        status: 'published',
+        isPublished: false,
+        status: 'pending',
         verification_tier: item.verification_tier,
         verification_reason: `Factual Match: ${claimType}`,
         verification_sources: { 
@@ -422,8 +422,8 @@ export async function generateTrendingPost(trendingItem: any, date: Date): Promi
         image_settings: imageSettings,
         is_announcement_tied: isAnnouncementTied,
         timestamp: date.toISOString(),
-        isPublished: true,
-        status: 'published',
+        isPublished: false,
+        status: 'pending',
         verification_tier: trendingItem.verification_tier,
         verification_reason: `Trending Signal: ${trendingItem.sources?.join(', ')}`,
         verification_sources: {

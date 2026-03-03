@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
                     .insert([{
                         ...post,
                         timestamp: now.toISOString(),
-                        is_published: true,
-                        status: 'published'
+                        is_published: false,
+                        status: 'pending'
                     }]);
                 
                 if (!error) {

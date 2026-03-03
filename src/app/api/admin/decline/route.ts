@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -26,38 +25,44 @@ export async function POST(req: NextRequest) {
                 continue;
             }
 
-            // 2. Insert into declined_posts
-            const { error: insertError } = await supabaseAdmin
-                .from('declined_posts')
-                .insert([{
-                    original_post_id: post.id,
-                    title: post.title,
-                    source: post.source || 'Unknown',
-                    declined_at: now.toISOString(),
-                    declined_by: 'admin',
-                    reason: reason || ''
-                }]);
-
-            if (insertError) {
-                results.push({ id: postId, success: false, error: insertError.message });
-                continue;
+            // 2. Try to insert into declined_posts for tracking (non-blocking)
+            // If the table doesn't exist, we still proceed with deletion
+            try {
+                await supabaseAdmin
+                    .from('declined_posts')
+                    .insert([{
+                        original_post_id: post.id,
+                        title: post.title,
+                        slug: post.slug,
+                        source: post.source || 'Unknown',
+                        declined_at: now.toISOString(),
+                        declined_by: 'admin',
+                        reason: reason || ''
+                    }]);
+            } catch (insertErr) {
+                // Non-blocking — table may not exist yet
+                console.warn('[Decline] Could not insert into declined_posts:', insertErr);
             }
 
-            // 3. Delete from posts (or mark as declined? User said "removes from pending")
+            // 3. Delete from posts table — this is the critical operation
             const { error: deleteError } = await supabaseAdmin
                 .from('posts')
                 .delete()
                 .eq('id', postId);
 
             if (deleteError) {
+                console.error(`[Decline] Failed to delete post ${postId}:`, deleteError);
                 results.push({ id: postId, success: false, error: deleteError.message });
             } else {
+                console.log(`[Decline] Successfully deleted post: ${post.title}`);
                 results.push({ id: postId, success: true });
             }
         }
 
-        return NextResponse.json({ success: true, results });
+        const allSuccess = results.every(r => r.success);
+        return NextResponse.json({ success: allSuccess, results });
     } catch (e: any) {
+        console.error('[Decline] Error:', e);
         return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }

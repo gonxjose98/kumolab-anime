@@ -90,6 +90,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
+    const [pendingSort, setPendingSort] = useState<'newest' | 'oldest' | 'top_scored'>('newest');
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -323,10 +324,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
-                // Fetch updated posts or update locally
-                // For simplicity, update locally with estimated times (or refresh)
+                // Update local state — move posts to approved status
+                setPosts(prev => prev.map(p =>
+                    postIds.includes(p.id!)
+                        ? { ...p, status: 'approved', isPublished: false }
+                        : p
+                ));
+                setSelectedIds([]);
                 setFilter('APPROVED');
-                window.location.reload(); // Reliable sync
             } else {
                 alert('Approve failed: ' + result.error);
             }
@@ -396,13 +401,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
-                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
-                setSelectedIds([]);
+                // Remove declined posts from local state
+                const successIds = result.results
+                    ?.filter((r: any) => r.success)
+                    .map((r: any) => r.id) || postIds;
+                setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
+                setSelectedIds(prev => prev.filter(id => !successIds.includes(id)));
+
+                const failedCount = result.results?.filter((r: any) => !r.success).length || 0;
+                if (failedCount > 0) {
+                    alert(`${successIds.length} posts declined. ${failedCount} failed.`);
+                }
             } else {
-                alert('Decline failed: ' + result.error);
+                alert('Decline failed: ' + (result.error || 'Unknown error'));
             }
-        } catch (e) {
-            console.error(e);
+        } catch (e: any) {
+            console.error('[PostManager] Decline error:', e);
+            alert('Decline failed: ' + e.message);
         } finally {
             setIsPublishing(false);
         }
@@ -420,10 +435,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         return true;
     }).sort((a, b) => {
         if (filter === 'PENDING') {
-            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
-                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+            if (pendingSort === 'top_scored') {
+                if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                    return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+                }
+                return (a.sourceTier || 3) - (b.sourceTier || 3);
             }
-            return (a.sourceTier || 3) - (b.sourceTier || 3);
+            if (pendingSort === 'oldest') {
+                return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            }
+            // 'newest' — default
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         }
         if (filter === 'APPROVED') {
             return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
@@ -525,7 +547,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(settings.isApplyWatermark ?? true);
         
         // Load website publication status
-        setIsWebsitePublished(post.is_published ?? false);
+        setIsWebsitePublished((post as any).is_published ?? post.isPublished ?? false);
         setPurpleWordIndices(settings.purpleWordIndices || []);
         setGradientPosition(settings.gradientPosition || 'bottom');
 
@@ -1414,6 +1436,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
             </div>
 
+            {/* Sort Buttons — visible on PENDING tab */}
+            {filter === 'PENDING' && (
+                <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.15em] mr-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Sort:</span>
+                    {([
+                        { key: 'newest' as const, label: 'Most Recent' },
+                        { key: 'oldest' as const, label: 'Oldest' },
+                        { key: 'top_scored' as const, label: 'Top Scored' },
+                    ]).map(({ key, label }) => (
+                        <button
+                            key={key}
+                            onClick={() => setPendingSort(key)}
+                            className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                            style={{
+                                fontFamily: 'var(--font-display)',
+                                color: pendingSort === key ? '#fff' : 'var(--text-muted)',
+                                background: pendingSort === key ? 'rgba(255,60,172,0.15)' : 'rgba(255,255,255,0.03)',
+                                border: pendingSort === key ? '1px solid rgba(255,60,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                            }}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Action Bar */}
             <div className="flex flex-wrap gap-2 items-center">
                 <button
@@ -1697,7 +1745,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         </span>
                                                     );
                                                 })()}
-                                                {(post.status === 'approved' || (post.status || (post.isPublished ? 'published' : 'pending')) === 'approved') && (
+                                                {post.status === 'approved' && (
                                                     <div className="flex flex-col items-center gap-1.5 pt-1">
                                                         {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
                                                             <div className="flex flex-col items-center text-[9px] font-black text-blue-400 uppercase tracking-tighter leading-tight">
