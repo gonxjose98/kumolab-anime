@@ -90,6 +90,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
+    
+    // Advanced Filter State
+    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier-high' | 'tier-low'>('newest');
+    const [claimTypeFilter, setClaimTypeFilter] = useState<ClaimType | 'ALL'>('ALL');
+    const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+                setShowFilterDropdown(false);
+            }
+        }
+        if (showFilterDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showFilterDropdown]);
+    
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -412,23 +433,59 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // Derive effective status from multiple sources
         const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
         
-        if (filter === 'ALL') return true;
-        if (filter === 'LIVE') return post.isPublished === true;
-        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
-        if (filter === 'PENDING') return effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
-        if (filter === 'APPROVED') return effectiveStatus === 'approved';
-        return true;
-    }).sort((a, b) => {
-        if (filter === 'PENDING') {
-            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
-                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        // Status filter
+        let statusMatch = true;
+        if (filter === 'ALL') statusMatch = true;
+        else if (filter === 'LIVE') statusMatch = post.isPublished === true;
+        else if (filter === 'HIDDEN') statusMatch = post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
+        else if (filter === 'PENDING') statusMatch = effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
+        else if (filter === 'APPROVED') statusMatch = effectiveStatus === 'approved';
+        
+        // Claim type filter
+        const claimTypeMatch = claimTypeFilter === 'ALL' || post.claimType === claimTypeFilter;
+        
+        // Date range filter
+        let dateMatch = true;
+        if (dateRange.start || dateRange.end) {
+            const postDate = new Date(post.timestamp);
+            if (dateRange.start) {
+                dateMatch = dateMatch && postDate >= new Date(dateRange.start);
             }
-            return (a.sourceTier || 3) - (b.sourceTier || 3);
+            if (dateRange.end) {
+                dateMatch = dateMatch && postDate <= new Date(dateRange.end + 'T23:59:59');
+            }
         }
-        if (filter === 'APPROVED') {
-            return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
+        
+        return statusMatch && claimTypeMatch && dateMatch;
+    }).sort((a, b) => {
+        // Apply sortBy selection
+        switch (sortBy) {
+            case 'oldest':
+                return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            case 'tier-high':
+                if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
+                    return (a.sourceTier || 3) - (b.sourceTier || 3);
+                }
+                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+            case 'tier-low':
+                if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
+                    return (b.sourceTier || 3) - (a.sourceTier || 3);
+                }
+                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+            case 'newest':
+            default:
+                // Default: newest first
+                if (filter === 'PENDING') {
+                    if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                        return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+                    }
+                    return (a.sourceTier || 3) - (b.sourceTier || 3);
+                }
+                if (filter === 'APPROVED') {
+                    return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
+                }
+                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         }
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
     const pendingCount = posts.filter(p => p.status === 'pending').length;
@@ -1380,37 +1437,173 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
-                        const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
-                        const c = tabColors[f];
-                        return (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
-                                style={{
-                                    color: filter === f ? '#fff' : 'var(--text-muted)',
-                                    background: filter === f ? `${c}18` : 'transparent',
-                                    border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
-                                    fontFamily: 'var(--font-display)',
-                                    boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
+                <div className="flex flex-col gap-2">
+                    {/* Status Tabs */}
+                    <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+                        {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
+                            const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
+                            const c = tabColors[f];
+                            return (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
+                                    style={{
+                                        color: filter === f ? '#fff' : 'var(--text-muted)',
+                                        background: filter === f ? `${c}18` : 'transparent',
+                                        border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
+                                        fontFamily: 'var(--font-display)',
+                                        boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
+                                    }}
+                                >
+                                    <span>{f}</span>
+                                    {f === 'PENDING' && pendingCount > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
+                                            {pendingCount}
+                                        </span>
+                                    )}
+                                    {f === 'APPROVED' && approvedCount > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
+                                            {approvedCount}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    
+                    {/* Advanced Filter Dropdown */}
+                    <div className="relative" ref={filterDropdownRef}>
+                        <button
+                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all"
+                            style={{ 
+                                background: showFilterDropdown ? 'rgba(123,97,255,0.3)' : 'rgba(123,97,255,0.15)', 
+                                border: '1px solid rgba(123,97,255,0.5)',
+                                color: '#fff',
+                                fontFamily: 'var(--font-display)'
+                            }}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                            </svg>
+                            <span>Filter & Sort</span>
+                            {(sortBy !== 'newest' || claimTypeFilter !== 'ALL' || dateRange.start || dateRange.end) && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black bg-[#ff3cac] text-white">ON</span>
+                            )}
+                        </button>
+                        
+                        {showFilterDropdown && (
+                            <div 
+                                className="absolute top-full left-0 mt-2 w-80 rounded-xl p-4 z-50"
+                                style={{ 
+                                    background: 'rgba(12,12,24,0.98)', 
+                                    border: '1px solid rgba(123,97,255,0.4)',
+                                    backdropFilter: 'blur(20px)',
+                                    boxShadow: '0 20px 60px rgba(0,0,0,0.6)'
                                 }}
                             >
-                                <span>{f}</span>
-                                {f === 'PENDING' && pendingCount > 0 && (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
-                                        {pendingCount}
-                                    </span>
-                                )}
-                                {f === 'APPROVED' && approvedCount > 0 && (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
-                                        {approvedCount}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
+                                {/* Sort By */}
+                                <div className="mb-5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                        Sort By
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { value: 'newest', label: 'Newest First' },
+                                            { value: 'oldest', label: 'Oldest First' },
+                                            { value: 'tier-high', label: 'Tier: High → Low' },
+                                            { value: 'tier-low', label: 'Tier: Low → High' }
+                                        ].map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => setSortBy(opt.value as any)}
+                                                className="px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all text-left"
+                                                style={{
+                                                    background: sortBy === opt.value ? 'rgba(123,97,255,0.4)' : 'rgba(255,255,255,0.05)',
+                                                    border: sortBy === opt.value ? '1px solid rgba(123,97,255,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                                                    color: sortBy === opt.value ? '#fff' : 'var(--text-muted)',
+                                                    fontFamily: 'var(--font-display)'
+                                                }}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Claim Type Filter */}
+                                <div className="mb-5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                        Claim Type
+                                    </label>
+                                    <select
+                                        value={claimTypeFilter}
+                                        onChange={(e) => setClaimTypeFilter(e.target.value as ClaimType | 'ALL')}
+                                        className="w-full px-3 py-2.5 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                        style={{ fontFamily: 'var(--font-display)' }}
+                                    >
+                                        <option value="ALL">All Claim Types</option>
+                                        <option value="NEW_SEASON_CONFIRMED">New Season Confirmed</option>
+                                        <option value="DATE_ANNOUNCED">Date Announced</option>
+                                        <option value="DELAY">Delay</option>
+                                        <option value="NEW_KEY_VISUAL">New Key Visual</option>
+                                        <option value="TRAILER_DROP">Trailer Drop</option>
+                                        <option value="CAST_ADDITION">Cast Addition</option>
+                                        <option value="STAFF_UPDATE">Staff Update</option>
+                                        <option value="TRENDING_UPDATE">Trending Update</option>
+                                    </select>
+                                </div>
+                                
+                                {/* Date Range */}
+                                <div className="mb-5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                        Date Range
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>From</label>
+                                            <input
+                                                type="date"
+                                                value={dateRange.start || ''}
+                                                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                                className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                                style={{ fontFamily: 'var(--font-display)' }}
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>To</label>
+                                            <input
+                                                type="date"
+                                                value={dateRange.end || ''}
+                                                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                                className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                                style={{ fontFamily: 'var(--font-display)' }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Reset Button */}
+                                <button
+                                    onClick={() => {
+                                        setSortBy('newest');
+                                        setClaimTypeFilter('ALL');
+                                        setDateRange({});
+                                    }}
+                                    className="w-full py-2.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-white/10"
+                                    style={{ 
+                                        background: 'rgba(255,60,60,0.15)', 
+                                        border: '1px solid rgba(255,60,60,0.4)',
+                                        color: '#ff6666',
+                                        fontFamily: 'var(--font-display)'
+                                    }}
+                                >
+                                    Reset All Filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
