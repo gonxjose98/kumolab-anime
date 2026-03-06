@@ -90,7 +90,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
-    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier'>('newest'); // NEW: Sort filter
+    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier-high' | 'tier-low'>('newest'); // NEW: Sort filter
+    const [claimTypeFilter, setClaimTypeFilter] = useState<ClaimType | 'ALL'>('ALL');
+    const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -220,6 +224,19 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isApplyGradient, setIsApplyGradient] = useState(true);
     const [isApplyText, setIsApplyText] = useState(true);
     const [dragTarget, setDragTarget] = useState<'image' | 'text' | 'watermark' | null>(null);
+
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+                setShowFilterDropdown(false);
+            }
+        }
+        if (showFilterDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showFilterDropdown]);
 
 
     // Multi-select state
@@ -434,12 +451,30 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // Derive effective status from multiple sources
         const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
         
-        if (filter === 'ALL') return true;
-        if (filter === 'LIVE') return post.isPublished === true;
-        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
-        if (filter === 'PENDING') return effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
-        if (filter === 'APPROVED') return effectiveStatus === 'approved';
-        return true;
+        // Status filter
+        let statusMatch = true;
+        if (filter === 'ALL') statusMatch = true;
+        else if (filter === 'LIVE') statusMatch = post.isPublished === true;
+        else if (filter === 'HIDDEN') statusMatch = post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
+        else if (filter === 'PENDING') statusMatch = effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
+        else if (filter === 'APPROVED') statusMatch = effectiveStatus === 'approved';
+        
+        // Claim type filter
+        const claimTypeMatch = claimTypeFilter === 'ALL' || post.claimType === claimTypeFilter;
+        
+        // Date range filter
+        let dateMatch = true;
+        if (dateRange.start || dateRange.end) {
+            const postDate = new Date(post.timestamp);
+            if (dateRange.start) {
+                dateMatch = dateMatch && postDate >= new Date(dateRange.start);
+            }
+            if (dateRange.end) {
+                dateMatch = dateMatch && postDate <= new Date(dateRange.end + 'T23:59:59');
+            }
+        }
+        
+        return statusMatch && claimTypeMatch && dateMatch;
     }).sort((a, b) => {
         // NEW: Sort by user selection
         if (sortBy === 'newest') {
@@ -448,10 +483,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (sortBy === 'oldest') {
             return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
         }
-        if (sortBy === 'tier') {
+        if (sortBy === 'tier-high') {
             // Highest tier first (Tier 1 > Tier 2 > Tier 3)
             if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
                 return (a.sourceTier || 3) - (b.sourceTier || 3);
+            }
+            // If same tier, sort by score
+            return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        }
+        if (sortBy === 'tier-low') {
+            // Lowest tier first (Tier 3 > Tier 2 > Tier 1)
+            if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
+                return (b.sourceTier || 3) - (a.sourceTier || 3);
             }
             // If same tier, sort by score
             return (b.relevanceScore || 0) - (a.relevanceScore || 0);
@@ -1442,24 +1485,137 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     })}
                 </div>
 
-                {/* Sort Filter - V2 */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(123,97,255,0.15)', border: '1px solid rgba(123,97,255,0.3)' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#7b61ff' }}>
-                        <path d="m3 16 4 4 4-4"/>
-                        <path d="M7 20V4"/>
-                        <path d="m21 8-4-4-4 4"/>
-                        <path d="M17 4v16"/>
-                    </svg>
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'tier')}
-                        className="bg-transparent text-[9px] font-bold uppercase tracking-wider cursor-pointer outline-none"
-                        style={{ color: '#fff', fontFamily: 'var(--font-display)' }}
+                {/* Advanced Filter Dropdown */}
+                <div className="relative" ref={filterDropdownRef}>
+                    <button
+                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all"
+                        style={{ 
+                            background: showFilterDropdown ? 'rgba(123,97,255,0.3)' : 'rgba(123,97,255,0.15)', 
+                            border: '1px solid rgba(123,97,255,0.5)',
+                            color: '#fff',
+                            fontFamily: 'var(--font-display)'
+                        }}
                     >
-                        <option value="newest" style={{ background: '#0c0c18', color: '#fff' }}>Newest First</option>
-                        <option value="oldest" style={{ background: '#0c0c18', color: '#fff' }}>Oldest First</option>
-                        <option value="tier" style={{ background: '#0c0c18', color: '#fff' }}>Highest Tier</option>
-                    </select>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                        </svg>
+                        <span>Filter & Sort</span>
+                        {(sortBy !== 'newest' || claimTypeFilter !== 'ALL' || dateRange.start || dateRange.end) && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black bg-[#ff3cac] text-white">ON</span>
+                        )}
+                    </button>
+                    
+                    {showFilterDropdown && (
+                        <div 
+                            className="absolute top-full right-0 mt-2 w-80 rounded-xl p-4 z-50"
+                            style={{ 
+                                background: 'rgba(12,12,24,0.98)', 
+                                border: '1px solid rgba(123,97,255,0.4)',
+                                backdropFilter: 'blur(20px)',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.6)'
+                            }}
+                        >
+                            {/* Sort By */}
+                            <div className="mb-5">
+                                <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                    Sort By
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { value: 'newest', label: 'Newest First' },
+                                        { value: 'oldest', label: 'Oldest First' },
+                                        { value: 'tier-high', label: 'Tier: High → Low' },
+                                        { value: 'tier-low', label: 'Tier: Low → High' }
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setSortBy(opt.value as any)}
+                                            className="px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all text-left"
+                                            style={{
+                                                background: sortBy === opt.value ? 'rgba(123,97,255,0.4)' : 'rgba(255,255,255,0.05)',
+                                                border: sortBy === opt.value ? '1px solid rgba(123,97,255,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                                                color: sortBy === opt.value ? '#fff' : 'var(--text-muted)',
+                                                fontFamily: 'var(--font-display)'
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Claim Type Filter */}
+                            <div className="mb-5">
+                                <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                    Claim Type
+                                </label>
+                                <select
+                                    value={claimTypeFilter}
+                                    onChange={(e) => setClaimTypeFilter(e.target.value as ClaimType | 'ALL')}
+                                    className="w-full px-3 py-2.5 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                    style={{ fontFamily: 'var(--font-display)' }}
+                                >
+                                    <option value="ALL">All Claim Types</option>
+                                    <option value="NEW_SEASON_CONFIRMED">🎬 New Season Confirmed</option>
+                                    <option value="DATE_ANNOUNCED">📅 Date Announced</option>
+                                    <option value="DELAY">⏰ Delay</option>
+                                    <option value="NEW_KEY_VISUAL">🖼️ New Key Visual</option>
+                                    <option value="TRAILER_DROP">🎞️ Trailer Drop</option>
+                                    <option value="CAST_ADDITION">🎭 Cast Addition</option>
+                                    <option value="STAFF_UPDATE">👥 Staff Update</option>
+                                    <option value="TRENDING_UPDATE">📈 Trending Update</option>
+                                </select>
+                            </div>
+                            
+                            {/* Date Range */}
+                            <div className="mb-5">
+                                <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
+                                    Date Range
+                                </label>
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>From</label>
+                                        <input
+                                            type="date"
+                                            value={dateRange.start || ''}
+                                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                            className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                            style={{ fontFamily: 'var(--font-display)' }}
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>To</label>
+                                        <input
+                                            type="date"
+                                            value={dateRange.end || ''}
+                                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                            className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
+                                            style={{ fontFamily: 'var(--font-display)' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Reset Button */}
+                            <button
+                                onClick={() => {
+                                    setSortBy('newest');
+                                    setClaimTypeFilter('ALL');
+                                    setDateRange({});
+                                }}
+                                className="w-full py-2.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-white/10"
+                                style={{ 
+                                    background: 'rgba(255,60,60,0.15)', 
+                                    border: '1px solid rgba(255,60,60,0.4)',
+                                    color: '#ff6666',
+                                    fontFamily: 'var(--font-display)'
+                                }}
+                            >
+                                Reset All Filters
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
