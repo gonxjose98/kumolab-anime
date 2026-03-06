@@ -90,7 +90,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
-    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier'>('newest'); // NEW: Sort filter
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -390,41 +389,20 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleDecline = async (postIds: string[], reason: string = '') => {
         setIsPublishing(true);
         try {
-            console.log('[Decline] Sending decline request:', postIds);
             const resp = await fetch('/api/admin/decline', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ postIds, reason })
             });
-            
             const result = await resp.json();
-            console.log('[Decline] API response:', result);
-            
             if (result.success) {
-                // Check if all were successful
-                const failed = result.results?.filter((r: any) => !r.success) || [];
-                const succeeded = result.results?.filter((r: any) => r.success) || [];
-                
-                if (failed.length > 0) {
-                    console.error('[Decline] Some posts failed:', failed);
-                    alert(`Decline partial failure:\n${failed.map((f: any) => `${f.id}: ${f.error}`).join('\n')}`);
-                }
-                
-                if (succeeded.length > 0) {
-                    // Remove successfully declined posts from local state
-                    const successIds = succeeded.map((s: any) => s.id);
-                    setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
-                    console.log('[Decline] Posts declined successfully:', successIds);
-                }
-                
+                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
                 setSelectedIds([]);
             } else {
-                console.error('[Decline] API error:', result);
-                alert('Decline failed: ' + (result.error || 'Unknown error'));
+                alert('Decline failed: ' + result.error);
             }
-        } catch (e: any) {
-            console.error('[Decline] Exception:', e);
-            alert('Decline error: ' + e.message);
+        } catch (e) {
+            console.error(e);
         } finally {
             setIsPublishing(false);
         }
@@ -441,22 +419,15 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
-        // NEW: Sort by user selection
-        if (sortBy === 'newest') {
-            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-        }
-        if (sortBy === 'oldest') {
-            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-        }
-        if (sortBy === 'tier') {
-            // Highest tier first (Tier 1 > Tier 2 > Tier 3)
-            if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
-                return (a.sourceTier || 3) - (b.sourceTier || 3);
+        if (filter === 'PENDING') {
+            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
             }
-            // If same tier, sort by score
-            return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+            return (a.sourceTier || 3) - (b.sourceTier || 3);
         }
-        // Default fallback
+        if (filter === 'APPROVED') {
+            return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
+        }
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
@@ -1440,26 +1411,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             </button>
                         );
                     })}
-                </div>
-
-                {/* Sort Filter - V2 */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(123,97,255,0.15)', border: '1px solid rgba(123,97,255,0.3)' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#7b61ff' }}>
-                        <path d="m3 16 4 4 4-4"/>
-                        <path d="M7 20V4"/>
-                        <path d="m21 8-4-4-4 4"/>
-                        <path d="M17 4v16"/>
-                    </svg>
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'tier')}
-                        className="bg-transparent text-[9px] font-bold uppercase tracking-wider cursor-pointer outline-none"
-                        style={{ color: '#fff', fontFamily: 'var(--font-display)' }}
-                    >
-                        <option value="newest" style={{ background: '#0c0c18', color: '#fff' }}>Newest First</option>
-                        <option value="oldest" style={{ background: '#0c0c18', color: '#fff' }}>Oldest First</option>
-                        <option value="tier" style={{ background: '#0c0c18', color: '#fff' }}>Highest Tier</option>
-                    </select>
                 </div>
             </div>
 
@@ -3430,6 +3381,3 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         </div>
     );
 }
-/ /   S o r t   f i l t e r   d e p l o y e d   
- 
- 

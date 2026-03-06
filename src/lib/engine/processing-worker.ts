@@ -202,19 +202,7 @@ function determineClaimType(title: string, content: string): string {
 async function checkForDuplicates(
   candidate: ProcessingCandidate,
   animeName?: string
-): Promise<{ isDuplicate: boolean; duplicateOf?: string; similarity: number; isDeclined?: boolean }> {
-  // 0. Check if this candidate was previously declined
-  const { data: declinedMatch } = await supabaseAdmin
-    .from('declined_posts')
-    .select('id')
-    .ilike('title', candidate.title)
-    .limit(1);
-  
-  if (declinedMatch && declinedMatch.length > 0) {
-    console.log(`[ProcessingWorker] Candidate was previously declined: ${candidate.title}`);
-    return { isDuplicate: true, duplicateOf: declinedMatch[0].id, similarity: 1.0, isDeclined: true };
-  }
-
+): Promise<{ isDuplicate: boolean; duplicateOf?: string; similarity: number }> {
   // 1. Check URL match (fingerprint column doesn't exist in posts table)
   const { data: urlMatch } = await supabaseAdmin
     .from('posts')
@@ -310,18 +298,28 @@ async function createPendingPost(
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
     
-    // Build post with validation - ONLY use columns that exist in posts table
-    const post = {
-      title: sanitizeString(candidate.title, 200),
-      slug: `${slug}-${Date.now().toString(36)}`,
-      type: 'INTEL',
-      claim_type: enrichedData.claimType || 'OTHER',
-      content: sanitizeString(candidate.content, 5000),
-      excerpt: sanitizeString(candidate.content, 197) + '...',
-      timestamp: now,
-      status: 'pending',
-      is_published: false  // CRITICAL: Never auto-publish
-    };
+    // Build post with validation
+    const post: Record<string, any> = {};
+    
+    // Required fields
+    post.title = sanitizeString(candidate.title, 200);
+    post.slug = `${slug}-${Date.now().toString(36)}`;
+    post.type = 'INTEL';
+    post.claim_type = enrichedData.claimType || 'OTHER';
+    post.content = sanitizeString(candidate.content, 5000);
+    post.excerpt = sanitizeString(candidate.content, 197) + '...';
+    
+    // Optional fields
+    post.image = candidate.media_urls && candidate.media_urls.length > 0 
+      ? candidate.media_urls[0] 
+      : null;
+    post.source_url = candidate.canonical_url || candidate.source_url || '';
+    post.source = candidate.source_name || 'Unknown';
+    post.source_tier = candidate.source_tier || 2;
+    post.timestamp = now;
+    post.status = 'pending';
+    post.scraped_at = candidate.detected_at || now;
+    // fingerprint and headline columns don't exist - skip them
     
     // Log what we're trying to insert
     console.log('[ProcessingWorker] Inserting post:', {
@@ -471,22 +469,6 @@ export async function runProcessingWorker(): Promise<{
           };
           stats.duplicates++;
           console.log(`[ProcessingWorker] Candidate ${candidate.id} is duplicate of ${dupCheck.duplicateOf}`);
-          
-          // If it was previously declined, mark candidate as discarded
-          if (dupCheck.isDeclined) {
-            console.log(`[ProcessingWorker] Candidate was declined before, marking as discarded`);
-            await markCandidateProcessed(
-              candidate.id,
-              'discarded',
-              {
-                candidate,
-                score,
-                action: 'duplicate',
-                enrichedData,
-                error: 'Previously declined by admin'
-              }
-            );
-          }
         } else if (score.total < SCORING_THRESHOLDS.PUBLISH_MINIMUM) {
           result = {
             candidate,
@@ -578,6 +560,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-/ /   D e p l o y m e n t   t r i g g e r   
- 
- 
