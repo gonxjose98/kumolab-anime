@@ -400,19 +400,22 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({ postIds, reason })
             });
             const result = await resp.json();
-            if (result.success) {
-                // Remove declined posts from local state
-                const successIds = result.results
-                    ?.filter((r: any) => r.success)
-                    .map((r: any) => r.id) || postIds;
+
+            // Always remove successfully processed posts from local state
+            const successIds = (result.results || [])
+                .filter((r: any) => r.success)
+                .map((r: any) => r.id);
+
+            if (successIds.length > 0) {
                 setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
                 setSelectedIds(prev => prev.filter(id => !successIds.includes(id)));
+            }
 
-                const failedCount = result.results?.filter((r: any) => !r.success).length || 0;
-                if (failedCount > 0) {
-                    alert(`${successIds.length} posts declined. ${failedCount} failed.`);
-                }
-            } else {
+            const failedResults = (result.results || []).filter((r: any) => !r.success);
+            if (failedResults.length > 0) {
+                const errors = failedResults.map((r: any) => `${r.id?.slice(0, 8)}: ${r.error}`).join('\n');
+                alert(`${successIds.length} declined, ${failedResults.length} failed:\n${errors}`);
+            } else if (successIds.length === 0 && !result.success) {
                 alert('Decline failed: ' + (result.error || 'Unknown error'));
             }
         } catch (e: any) {
@@ -426,7 +429,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const filteredPosts = posts.filter((post) => {
         // Derive effective status from multiple sources
         const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
-        
+
+        // Never show declined posts (fallback state when delete fails)
+        if (effectiveStatus === 'declined') return false;
+
         if (filter === 'ALL') return true;
         if (filter === 'LIVE') return post.isPublished === true;
         if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';

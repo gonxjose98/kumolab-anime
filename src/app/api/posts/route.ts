@@ -121,19 +121,25 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'Post ID required' }, { status: 400 });
         }
 
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+        // Use supabaseAdmin to ensure service_role key (bypasses RLS)
+        const { supabaseAdmin } = await import('@/lib/supabase/admin');
 
-        const { error } = await supabase
+        const { data: deleted, error } = await supabaseAdmin
             .from('posts')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .select('id');
 
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
+
+        if (!deleted || deleted.length === 0) {
+            return NextResponse.json({ error: 'No rows deleted — post may not exist or RLS blocked the operation' }, { status: 404 });
+        }
+
+        const { revalidatePath } = await import('next/cache');
+        revalidatePath('/admin/dashboard');
 
         return NextResponse.json({ success: true, message: 'Post deleted' });
     } catch (err: any) {

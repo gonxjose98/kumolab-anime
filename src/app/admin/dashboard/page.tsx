@@ -5,6 +5,7 @@ import PostManager from '@/components/admin/PostManager';
 import AdminTabs from '@/components/admin/AdminTabs';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 function formatDate(dateString: string) {
     const d = new Date(dateString);
@@ -153,8 +154,11 @@ async function getPosts(supabase: any) {
         
         console.log(`[Admin Dashboard] Fetched ${posts?.length || 0} posts`);
         
+        // Filter out declined posts (fallback path sets status='declined' when delete fails)
+        const activePosts = (posts || []).filter((p: any) => p.status !== 'declined');
+
         // Derive status from is_published if status column doesn't exist or is null
-        const normalizedPosts = (posts || []).map((p: any) => {
+        const normalizedPosts = activePosts.map((p: any) => {
             let derivedStatus = p.status;
             
             // DEBUG: Log first few posts
