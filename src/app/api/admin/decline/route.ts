@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function POST(req: NextRequest) {
-    console.log('[Decline API] Called');
     try {
         const { postIds, reason } = await req.json();
-        console.log('[Decline API] Received postIds:', postIds);
 
-        if (!postIds || !Array.isArray(postIds)) {
-            console.log('[Decline API] Invalid postIds');
+        if (!postIds || !Array.isArray(postIds) || postIds.length === 0) {
             return NextResponse.json({ success: false, error: 'Invalid postIds' }, { status: 400 });
         }
 
+        console.log(`[Decline] Processing ${postIds.length} post(s)...`);
         const now = new Date();
         const results = [];
 
         for (const postId of postIds) {
-            console.log(`[Decline API] Processing post: ${postId}`);
-            
-            // 1. Get post details first
+            // 1. Fetch the post first
             const { data: post, error: fetchError } = await supabaseAdmin
                 .from('posts')
                 .select('*')
@@ -26,75 +23,94 @@ export async function POST(req: NextRequest) {
                 .single();
 
             if (fetchError || !post) {
-                console.error(`[Decline API] Post not found: ${postId}`, fetchError);
+                console.error(`[Decline] Post ${postId} not found:`, fetchError?.message);
                 results.push({ id: postId, success: false, error: 'Post not found' });
                 continue;
             }
 
-            console.log(`[Decline API] Found post: ${post.title}`);
+            // 2. Delete from posts FIRST (before inserting into declined_posts to avoid FK issues)
+            const { data: deletedRows, error: deleteError } = await supabaseAdmin
+                .from('posts')
+                .delete()
+                .eq('id', postId)
+                .select('id');
 
-            // 2. Insert into declined_posts
-            console.log(`[Decline API] Inserting into declined_posts`);
-            const { error: insertError } = await supabaseAdmin
+            if (deleteError) {
+                console.error(`[Decline] DELETE failed for "${post.title}":`, deleteError.message);
+
+                // Fallback: if delete fails (e.g. RLS), try updating status instead
+                const { error: updateError } = await supabaseAdmin
+                    .from('posts')
+                    .update({ status: 'declined', is_published: false })
+                    .eq('id', postId);
+
+                if (updateError) {
+                    console.error(`[Decline] UPDATE fallback also failed:`, updateError.message);
+                    results.push({ id: postId, success: false, error: deleteError.message });
+                } else {
+                    console.log(`[Decline] Fallback: marked "${post.title}" as declined (not deleted)`);
+                    results.push({ id: postId, success: true, method: 'status_update' });
+                }
+                continue;
+            }
+
+            // 3. Verify the delete actually removed a row
+            if (!deletedRows || deletedRows.length === 0) {
+                console.error(`[Decline] DELETE returned 0 rows for "${post.title}" — likely RLS blocking`);
+
+                // Fallback: update status
+                const { error: updateError } = await supabaseAdmin
+                    .from('posts')
+                    .update({ status: 'declined', is_published: false })
+                    .eq('id', postId);
+
+                if (updateError) {
+                    results.push({ id: postId, success: false, error: 'Delete silent failure + update failed' });
+                } else {
+                    console.log(`[Decline] Fallback: marked "${post.title}" as declined`);
+                    results.push({ id: postId, success: true, method: 'status_update' });
+                }
+                continue;
+            }
+
+            console.log(`[Decline] Deleted "${post.title}" (verified)`);
+
+            // 4. Record in declined_posts for future dedup (non-blocking, best-effort)
+            const { error: trackError } = await supabaseAdmin
                 .from('declined_posts')
                 .insert([{
                     original_post_id: post.id,
                     title: post.title,
+                    slug: post.slug,
                     source: post.source || 'Unknown',
                     declined_at: now.toISOString(),
                     declined_by: 'admin',
                     reason: reason || ''
                 }]);
 
-            if (insertError) {
-                console.error(`[Decline API] Insert error:`, insertError);
-                results.push({ id: postId, success: false, error: insertError.message });
-                continue;
+            if (trackError) {
+                // Non-critical — table may not exist
+                console.warn(`[Decline] Could not track in declined_posts:`, trackError.message);
             }
 
-            console.log(`[Decline API] Inserted into declined_posts`);
-
-            // 3. Mark detection_candidates as discarded to prevent recreation
-            console.log(`[Decline API] Marking detection_candidates as discarded`);
-            if (post.fingerprint) {
-                const { error: candidateError } = await supabaseAdmin
-                    .from('detection_candidates')
-                    .update({ 
-                        status: 'discarded',
-                        processed_at: now.toISOString(),
-                        action_taken: 'declined',
-                        error_message: `Post declined by admin: ${reason || 'No reason given'}`
-                    })
-                    .eq('fingerprint', post.fingerprint);
-                
-                if (candidateError) {
-                    console.error(`[Decline API] Failed to mark candidate discarded:`, candidateError);
-                } else {
-                    console.log(`[Decline API] Marked candidate as discarded for fingerprint: ${post.fingerprint}`);
-                }
-            }
-
-            // 4. Delete from posts
-            console.log(`[Decline API] Deleting from posts`);
-            const { error: deleteError, data: deleteData } = await supabaseAdmin
-                .from('posts')
-                .delete()
-                .eq('id', postId)
-                .select();
-
-            if (deleteError) {
-                console.error(`[Decline API] Delete error:`, deleteError);
-                results.push({ id: postId, success: false, error: deleteError.message });
-            } else {
-                console.log(`[Decline API] Successfully deleted post: ${postId}`, deleteData);
-                results.push({ id: postId, success: true });
-            }
+            results.push({ id: postId, success: true, method: 'deleted' });
         }
 
-        console.log('[Decline API] Results:', results);
-        return NextResponse.json({ success: true, results });
+        // Bust Next.js cache so refresh shows correct data
+        revalidatePath('/admin/dashboard');
+        revalidatePath('/blog');
+
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        console.log(`[Decline] Done. Success: ${successCount}, Failed: ${failCount}`);
+
+        return NextResponse.json({
+            success: failCount === 0,
+            results,
+            summary: { success: successCount, failed: failCount }
+        });
     } catch (e: any) {
-        console.error('[Decline API] Fatal error:', e);
+        console.error('[Decline] Unhandled error:', e);
         return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }

@@ -90,27 +90,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
-    
-    // Advanced Filter State
-    const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'tier-high' | 'tier-low'>('newest');
-    const [claimTypeFilter, setClaimTypeFilter] = useState<ClaimType | 'ALL'>('ALL');
-    const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
-    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-    const filterDropdownRef = useRef<HTMLDivElement>(null);
-    
-    // Close filter dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
-                setShowFilterDropdown(false);
-            }
-        }
-        if (showFilterDropdown) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [showFilterDropdown]);
-    
+    const [pendingSort, setPendingSort] = useState<'newest' | 'oldest' | 'top_scored'>('newest');
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -344,10 +324,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
-                // Fetch updated posts or update locally
-                // For simplicity, update locally with estimated times (or refresh)
+                // Update local state — move posts to approved status
+                setPosts(prev => prev.map(p =>
+                    postIds.includes(p.id!)
+                        ? { ...p, status: 'approved', isPublished: false }
+                        : p
+                ));
+                setSelectedIds([]);
                 setFilter('APPROVED');
-                window.location.reload(); // Reliable sync
             } else {
                 alert('Approve failed: ' + result.error);
             }
@@ -416,14 +400,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({ postIds, reason })
             });
             const result = await resp.json();
-            if (result.success) {
-                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
-                setSelectedIds([]);
-            } else {
-                alert('Decline failed: ' + result.error);
+
+            // Always remove successfully processed posts from local state
+            const successIds = (result.results || [])
+                .filter((r: any) => r.success)
+                .map((r: any) => r.id);
+
+            if (successIds.length > 0) {
+                setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
+                setSelectedIds(prev => prev.filter(id => !successIds.includes(id)));
             }
-        } catch (e) {
-            console.error(e);
+
+            const failedResults = (result.results || []).filter((r: any) => !r.success);
+            if (failedResults.length > 0) {
+                const errors = failedResults.map((r: any) => `${r.id?.slice(0, 8)}: ${r.error}`).join('\n');
+                alert(`${successIds.length} declined, ${failedResults.length} failed:\n${errors}`);
+            } else if (successIds.length === 0 && !result.success) {
+                alert('Decline failed: ' + (result.error || 'Unknown error'));
+            }
+        } catch (e: any) {
+            console.error('[PostManager] Decline error:', e);
+            alert('Decline failed: ' + e.message);
         } finally {
             setIsPublishing(false);
         }
@@ -432,60 +429,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const filteredPosts = posts.filter((post) => {
         // Derive effective status from multiple sources
         const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
-        
-        // Status filter
-        let statusMatch = true;
-        if (filter === 'ALL') statusMatch = true;
-        else if (filter === 'LIVE') statusMatch = post.isPublished === true;
-        else if (filter === 'HIDDEN') statusMatch = post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
-        else if (filter === 'PENDING') statusMatch = effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
-        else if (filter === 'APPROVED') statusMatch = effectiveStatus === 'approved';
-        
-        // Claim type filter
-        const claimTypeMatch = claimTypeFilter === 'ALL' || post.claimType === claimTypeFilter;
-        
-        // Date range filter
-        let dateMatch = true;
-        if (dateRange.start || dateRange.end) {
-            const postDate = new Date(post.timestamp);
-            if (dateRange.start) {
-                dateMatch = dateMatch && postDate >= new Date(dateRange.start);
-            }
-            if (dateRange.end) {
-                dateMatch = dateMatch && postDate <= new Date(dateRange.end + 'T23:59:59');
-            }
-        }
-        
-        return statusMatch && claimTypeMatch && dateMatch;
+
+        // Never show declined posts (fallback state when delete fails)
+        if (effectiveStatus === 'declined') return false;
+
+        if (filter === 'ALL') return true;
+        if (filter === 'LIVE') return post.isPublished === true;
+        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
+        if (filter === 'PENDING') return effectiveStatus === 'pending' || (post.isPublished === false && !effectiveStatus);
+        if (filter === 'APPROVED') return effectiveStatus === 'approved';
+        return true;
     }).sort((a, b) => {
-        // Apply sortBy selection
-        switch (sortBy) {
-            case 'oldest':
-                return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-            case 'tier-high':
-                if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
-                    return (a.sourceTier || 3) - (b.sourceTier || 3);
-                }
-                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-            case 'tier-low':
-                if ((a.sourceTier || 3) !== (b.sourceTier || 3)) {
-                    return (b.sourceTier || 3) - (a.sourceTier || 3);
-                }
-                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-            case 'newest':
-            default:
-                // Default: newest first
-                if (filter === 'PENDING') {
-                    if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
-                        return (b.relevanceScore || 0) - (a.relevanceScore || 0);
-                    }
-                    return (a.sourceTier || 3) - (b.sourceTier || 3);
-                }
-                if (filter === 'APPROVED') {
-                    return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
-                }
-                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        // Apply user-selected sort on all tabs
+        if (pendingSort === 'top_scored') {
+            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+            }
+            return (a.sourceTier || 3) - (b.sourceTier || 3);
         }
+        if (pendingSort === 'oldest') {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        }
+        // 'newest' — default
+        if (filter === 'APPROVED') {
+            return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
+        }
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
     const pendingCount = posts.filter(p => p.status === 'pending').length;
@@ -582,7 +551,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(settings.isApplyWatermark ?? true);
         
         // Load website publication status
-        setIsWebsitePublished(post.is_published ?? false);
+        setIsWebsitePublished((post as any).is_published ?? post.isPublished ?? false);
         setPurpleWordIndices(settings.purpleWordIndices || []);
         setGradientPosition(settings.gradientPosition || 'bottom');
 
@@ -1437,174 +1406,94 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-col gap-2">
-                    {/* Status Tabs */}
-                    <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-                        {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
-                            const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
-                            const c = tabColors[f];
-                            return (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
-                                    style={{
-                                        color: filter === f ? '#fff' : 'var(--text-muted)',
-                                        background: filter === f ? `${c}18` : 'transparent',
-                                        border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
-                                        fontFamily: 'var(--font-display)',
-                                        boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
-                                    }}
-                                >
-                                    <span>{f}</span>
-                                    {f === 'PENDING' && pendingCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
-                                            {pendingCount}
-                                        </span>
-                                    )}
-                                    {f === 'APPROVED' && approvedCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
-                                            {approvedCount}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    
-                    {/* Advanced Filter Dropdown */}
-                    <div className="relative" ref={filterDropdownRef}>
-                        <button
-                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all"
-                            style={{ 
-                                background: showFilterDropdown ? 'rgba(123,97,255,0.3)' : 'rgba(123,97,255,0.15)', 
-                                border: '1px solid rgba(123,97,255,0.5)',
-                                color: '#fff',
-                                fontFamily: 'var(--font-display)'
-                            }}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                            </svg>
-                            <span>Filter & Sort</span>
-                            {(sortBy !== 'newest' || claimTypeFilter !== 'ALL' || dateRange.start || dateRange.end) && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black bg-[#ff3cac] text-white">ON</span>
-                            )}
-                        </button>
-                        
-                        {showFilterDropdown && (
-                            <div 
-                                className="absolute top-full left-0 mt-2 w-80 rounded-xl p-4 z-50"
-                                style={{ 
-                                    background: 'rgba(12,12,24,0.98)', 
-                                    border: '1px solid rgba(123,97,255,0.4)',
-                                    backdropFilter: 'blur(20px)',
-                                    boxShadow: '0 20px 60px rgba(0,0,0,0.6)'
+                <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
+                        const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
+                        const c = tabColors[f];
+                        return (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
+                                style={{
+                                    color: filter === f ? '#fff' : 'var(--text-muted)',
+                                    background: filter === f ? `${c}18` : 'transparent',
+                                    border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
+                                    fontFamily: 'var(--font-display)',
+                                    boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
                                 }}
                             >
-                                {/* Sort By */}
-                                <div className="mb-5">
-                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
-                                        Sort By
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                            { value: 'newest', label: 'Newest First' },
-                                            { value: 'oldest', label: 'Oldest First' },
-                                            { value: 'tier-high', label: 'Tier: High → Low' },
-                                            { value: 'tier-low', label: 'Tier: Low → High' }
-                                        ].map((opt) => (
-                                            <button
-                                                key={opt.value}
-                                                onClick={() => setSortBy(opt.value as any)}
-                                                className="px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all text-left"
-                                                style={{
-                                                    background: sortBy === opt.value ? 'rgba(123,97,255,0.4)' : 'rgba(255,255,255,0.05)',
-                                                    border: sortBy === opt.value ? '1px solid rgba(123,97,255,0.6)' : '1px solid rgba(255,255,255,0.1)',
-                                                    color: sortBy === opt.value ? '#fff' : 'var(--text-muted)',
-                                                    fontFamily: 'var(--font-display)'
-                                                }}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                
-                                {/* Claim Type Filter */}
-                                <div className="mb-5">
-                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
-                                        Claim Type
-                                    </label>
-                                    <select
-                                        value={claimTypeFilter}
-                                        onChange={(e) => setClaimTypeFilter(e.target.value as ClaimType | 'ALL')}
-                                        className="w-full px-3 py-2.5 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
-                                        style={{ fontFamily: 'var(--font-display)' }}
-                                    >
-                                        <option value="ALL">All Claim Types</option>
-                                        <option value="NEW_SEASON_CONFIRMED">New Season Confirmed</option>
-                                        <option value="DATE_ANNOUNCED">Date Announced</option>
-                                        <option value="DELAY">Delay</option>
-                                        <option value="NEW_KEY_VISUAL">New Key Visual</option>
-                                        <option value="TRAILER_DROP">Trailer Drop</option>
-                                        <option value="CAST_ADDITION">Cast Addition</option>
-                                        <option value="STAFF_UPDATE">Staff Update</option>
-                                        <option value="TRENDING_UPDATE">Trending Update</option>
-                                    </select>
-                                </div>
-                                
-                                {/* Date Range */}
-                                <div className="mb-5">
-                                    <label className="text-[10px] font-black uppercase tracking-wider mb-3 block" style={{ color: '#7b61ff', fontFamily: 'var(--font-display)' }}>
-                                        Date Range
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>From</label>
-                                            <input
-                                                type="date"
-                                                value={dateRange.start || ''}
-                                                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                                className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
-                                                style={{ fontFamily: 'var(--font-display)' }}
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-[8px] uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>To</label>
-                                            <input
-                                                type="date"
-                                                value={dateRange.end || ''}
-                                                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                                className="w-full px-2 py-2 rounded-lg text-[10px] bg-black/40 border border-white/10 text-white outline-none focus:border-[#7b61ff] transition-colors"
-                                                style={{ fontFamily: 'var(--font-display)' }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Reset Button */}
-                                <button
-                                    onClick={() => {
-                                        setSortBy('newest');
-                                        setClaimTypeFilter('ALL');
-                                        setDateRange({});
-                                    }}
-                                    className="w-full py-2.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-white/10"
-                                    style={{ 
-                                        background: 'rgba(255,60,60,0.15)', 
-                                        border: '1px solid rgba(255,60,60,0.4)',
-                                        color: '#ff6666',
-                                        fontFamily: 'var(--font-display)'
-                                    }}
-                                >
-                                    Reset All Filters
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                                <span>{f}</span>
+                                {f === 'PENDING' && pendingCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
+                                        {pendingCount}
+                                    </span>
+                                )}
+                                {f === 'APPROVED' && approvedCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
+                                        {approvedCount}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
+            </div>
+
+            {/* Sort Buttons — visible on all tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-bold uppercase tracking-[0.15em] mr-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Sort:</span>
+                {([
+                    { key: 'newest' as const, label: 'Most Recent' },
+                    { key: 'oldest' as const, label: 'Oldest' },
+                    { key: 'top_scored' as const, label: 'Top Scored' },
+                ]).map(({ key, label }) => (
+                    <button
+                        key={key}
+                        onClick={() => setPendingSort(key)}
+                        className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                        style={{
+                            fontFamily: 'var(--font-display)',
+                            color: pendingSort === key ? '#fff' : 'var(--text-muted)',
+                            background: pendingSort === key ? 'rgba(255,60,172,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: pendingSort === key ? '1px solid rgba(255,60,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                    >
+                        {label}
+                    </button>
+                ))}
+
+                {/* Purge Duplicates — quick mass cleanup */}
+                <button
+                    onClick={async () => {
+                        if (!confirm('This will DELETE all duplicate posts from the database, keeping only the first instance of each article.\n\nThis action cannot be undone. Proceed?')) return;
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/purge-duplicates', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(`Purge complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} unique posts`);
+                                window.location.reload();
+                            } else {
+                                alert('Purge failed: ' + (data.error || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="ml-auto px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                    style={{
+                        fontFamily: 'var(--font-display)',
+                        color: '#ff4444',
+                        background: 'rgba(255,60,60,0.06)',
+                        border: '1px solid rgba(255,60,60,0.15)',
+                    }}
+                >
+                    {isPublishing ? 'Purging...' : 'Purge Duplicates'}
+                </button>
             </div>
 
             {/* Action Bar */}
@@ -1890,7 +1779,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         </span>
                                                     );
                                                 })()}
-                                                {(post.status === 'approved' || (post.status || (post.isPublished ? 'published' : 'pending')) === 'approved') && (
+                                                {post.status === 'approved' && (
                                                     <div className="flex flex-col items-center gap-1.5 pt-1">
                                                         {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
                                                             <div className="flex flex-col items-center text-[9px] font-black text-blue-400 uppercase tracking-tighter leading-tight">

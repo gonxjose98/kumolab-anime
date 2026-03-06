@@ -425,7 +425,7 @@ async function publishPost(post: BlogPost) {
                 content: post.content,
                 image: post.image,
                 timestamp: post.timestamp,
-                is_published: post.status === 'published' || (post.isPublished && post.status !== 'pending' && post.status !== 'approved'),
+                is_published: post.status === 'published' && post.isPublished === true,
                 claim_type: post.claimType,
                 premiere_date: post.premiereDate,
                 event_fingerprint: post.event_fingerprint,
@@ -437,7 +437,7 @@ async function publishPost(post: BlogPost) {
                 verification_reason: post.verification_reason,
                 verification_sources: post.verification_sources,
                 // New Approval Columns
-                status: post.status || 'published',
+                status: post.status || 'pending',
                 source_tier: (post as any).source_tier || 3,
                 relevance_score: (post as any).relevance_score || 0,
                 is_duplicate: (post as any).is_duplicate || false,
@@ -575,8 +575,8 @@ async function generateCommunityNightPost(date: Date): Promise<BlogPost | null> 
             content,
             image: '/hero-bg-final.png', // Fallback image
             timestamp: date.toISOString(),
-            isPublished: true,
-            status: 'published'
+            isPublished: false,
+            status: 'pending'
         };
     } catch (error) {
         console.log('Community Night skipped (no content):', error);
