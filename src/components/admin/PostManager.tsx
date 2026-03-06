@@ -434,19 +434,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
-        if (filter === 'PENDING') {
-            if (pendingSort === 'top_scored') {
-                if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
-                    return (b.relevanceScore || 0) - (a.relevanceScore || 0);
-                }
-                return (a.sourceTier || 3) - (b.sourceTier || 3);
+        // Apply user-selected sort on all tabs
+        if (pendingSort === 'top_scored') {
+            if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
+                return (b.relevanceScore || 0) - (a.relevanceScore || 0);
             }
-            if (pendingSort === 'oldest') {
-                return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-            }
-            // 'newest' — default
-            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+            return (a.sourceTier || 3) - (b.sourceTier || 3);
         }
+        if (pendingSort === 'oldest') {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        }
+        // 'newest' — default
         if (filter === 'APPROVED') {
             return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
         }
@@ -1436,31 +1434,61 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 </div>
             </div>
 
-            {/* Sort Buttons — visible on PENDING tab */}
-            {filter === 'PENDING' && (
-                <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold uppercase tracking-[0.15em] mr-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Sort:</span>
-                    {([
-                        { key: 'newest' as const, label: 'Most Recent' },
-                        { key: 'oldest' as const, label: 'Oldest' },
-                        { key: 'top_scored' as const, label: 'Top Scored' },
-                    ]).map(({ key, label }) => (
-                        <button
-                            key={key}
-                            onClick={() => setPendingSort(key)}
-                            className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
-                            style={{
-                                fontFamily: 'var(--font-display)',
-                                color: pendingSort === key ? '#fff' : 'var(--text-muted)',
-                                background: pendingSort === key ? 'rgba(255,60,172,0.15)' : 'rgba(255,255,255,0.03)',
-                                border: pendingSort === key ? '1px solid rgba(255,60,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                            }}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {/* Sort Buttons — visible on all tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-bold uppercase tracking-[0.15em] mr-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Sort:</span>
+                {([
+                    { key: 'newest' as const, label: 'Most Recent' },
+                    { key: 'oldest' as const, label: 'Oldest' },
+                    { key: 'top_scored' as const, label: 'Top Scored' },
+                ]).map(({ key, label }) => (
+                    <button
+                        key={key}
+                        onClick={() => setPendingSort(key)}
+                        className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                        style={{
+                            fontFamily: 'var(--font-display)',
+                            color: pendingSort === key ? '#fff' : 'var(--text-muted)',
+                            background: pendingSort === key ? 'rgba(255,60,172,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: pendingSort === key ? '1px solid rgba(255,60,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                    >
+                        {label}
+                    </button>
+                ))}
+
+                {/* Purge Duplicates — quick mass cleanup */}
+                <button
+                    onClick={async () => {
+                        if (!confirm('This will DELETE all duplicate posts from the database, keeping only the first instance of each article.\n\nThis action cannot be undone. Proceed?')) return;
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/purge-duplicates', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(`Purge complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} unique posts`);
+                                window.location.reload();
+                            } else {
+                                alert('Purge failed: ' + (data.error || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="ml-auto px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                    style={{
+                        fontFamily: 'var(--font-display)',
+                        color: '#ff4444',
+                        background: 'rgba(255,60,60,0.06)',
+                        border: '1px solid rgba(255,60,60,0.15)',
+                    }}
+                >
+                    {isPublishing ? 'Purging...' : 'Purge Duplicates'}
+                </button>
+            </div>
 
             {/* Action Bar */}
             <div className="flex flex-wrap gap-2 items-center">

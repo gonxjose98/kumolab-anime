@@ -15,21 +15,17 @@ interface RSSSource {
     language: 'EN' | 'JP';
 }
 
-// Expanded RSS sources
+// Expanded RSS sources — verified working feeds
 const RSS_SOURCES: RSSSource[] = [
     // English sources
     { name: 'MyAnimeList News', url: 'https://myanimelist.net/rss/news.xml', tier: 1, type: 'NEWS', language: 'EN' },
-    { name: 'Crunchyroll News', url: 'https://cr-news-api-service.prd.crunchyrollsvc.com/v1/en-US/rss', tier: 1, type: 'OFFICIAL', language: 'EN' },
     { name: 'Anime News Network', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 1, type: 'NEWS', language: 'EN' },
-    
+
     // Japanese sources (primary sources - earlier news)
     { name: 'Natalie.mu Anime', url: 'https://natalie.mu/comic/feed/news', tier: 1, type: 'NEWS', language: 'JP' },
-    { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 1, type: 'NEWS', language: 'JP' },
-    { name: 'MANTAN Web', url: 'https://mantan-web.jp/rss.xml', tier: 2, type: 'NEWS', language: 'JP' },
-    
+
     // Additional English sources
     { name: 'Anime UK News', url: 'https://animeuknews.net/feed/', tier: 2, type: 'BLOG', language: 'EN' },
-    { name: 'Anime Herald', url: 'https://www.animeherald.com/feed/', tier: 2, type: 'NEWS', language: 'EN' },
 ];
 
 interface RSSItem {
@@ -38,6 +34,7 @@ interface RSSItem {
     pubDate: string;
     description: string;
     content?: string;
+    imageUrl?: string;
 }
 
 interface NewsCandidate {
@@ -50,10 +47,61 @@ interface NewsCandidate {
     sourceType: string;
     language: string;
     contentSnippet: string;
+    imageUrl?: string;
 }
 
 /**
- * Fetch and parse RSS feed
+ * Strip CDATA wrapper if present
+ */
+function stripCDATA(text: string): string {
+    return text.replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, '$1').trim();
+}
+
+/**
+ * Extract image URL from HTML content
+ */
+function extractImageFromHTML(html: string): string | null {
+    if (!html) return null;
+    // Look for <img> tags
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (imgMatch && imgMatch[1]) {
+        const url = imgMatch[1];
+        // Skip tracking pixels, icons, and tiny images
+        if (url.includes('tracking') || url.includes('pixel') || url.includes('1x1')) return null;
+        return url;
+    }
+    // Look for <enclosure> or media:content URLs
+    const mediaMatch = html.match(/url=["']([^"']+\.(?:jpg|jpeg|png|webp|gif)[^"']*)["']/i);
+    if (mediaMatch) return mediaMatch[1];
+    return null;
+}
+
+/**
+ * Decode HTML entities and strip tags for clean text
+ */
+function decodeHtmlEntities(text: string): string {
+    if (!text) return '';
+    // First strip CDATA
+    let cleaned = stripCDATA(text);
+    // Decode common HTML entities
+    cleaned = cleaned
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&#x27;/g, "'")
+        .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)))
+        .replace(/&nbsp;/g, ' ');
+    // Strip all HTML tags
+    cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+    // Collapse whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned;
+}
+
+/**
+ * Fetch and parse RSS feed with proper CDATA handling
  */
 async function fetchRSSFeed(url: string): Promise<RSSItem[]> {
     try {
@@ -62,36 +110,54 @@ async function fetchRSSFeed(url: string): Promise<RSSItem[]> {
                 'Accept': 'application/rss+xml, text/xml, application/xml',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             },
-            // Timeout after 10 seconds
             signal: AbortSignal.timeout(10000)
         });
-        
+
         if (!response.ok) {
             console.error(`[RSS] Failed to fetch ${url}: ${response.status}`);
             return [];
         }
-        
+
         const xmlText = await response.text();
-        
+
         // Parse RSS items
         const items = xmlText.match(/<item>[\s\S]*?<\/item>/g) || [];
-        
+
         return items.map(item => {
-            const titleMatch = item.match(/<title>(.*?)<\/title>/);
-            const linkMatch = item.match(/<link>(.*?)<\/link>/);
-            const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
-            const descMatch = item.match(/<description>(.*?)<\/description>/);
-            const contentMatch = item.match(/<content:encoded>(.*?)<\/content:encoded>/);
-            
+            // Use [\s\S]*? for multiline content (handles CDATA)
+            const titleMatch = item.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+            const linkMatch = item.match(/<link[^>]*>([\s\S]*?)<\/link>/);
+            const pubDateMatch = item.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/);
+            const descMatch = item.match(/<description[^>]*>([\s\S]*?)<\/description>/);
+            const contentMatch = item.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/);
+
+            // Extract image from multiple possible locations
+            const enclosureMatch = item.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]*type=["']image/i);
+            const mediaMatch = item.match(/<media:content[^>]+url=["']([^"']+)["']/i);
+            const mediaThumbnail = item.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
+
+            const rawTitle = titleMatch ? titleMatch[1] : '';
+            const rawDesc = descMatch ? descMatch[1] : '';
+            const rawContent = contentMatch ? contentMatch[1] : '';
+
+            // Try to find an image in order of priority
+            let imageUrl = enclosureMatch?.[1]
+                || mediaMatch?.[1]
+                || mediaThumbnail?.[1]
+                || extractImageFromHTML(stripCDATA(rawContent))
+                || extractImageFromHTML(stripCDATA(rawDesc))
+                || null;
+
             return {
-                title: titleMatch ? decodeHtmlEntities(titleMatch[1]) : '',
-                link: linkMatch ? linkMatch[1] : '',
-                pubDate: pubDateMatch ? pubDateMatch[1] : '',
-                description: descMatch ? decodeHtmlEntities(descMatch[1]) : '',
-                content: contentMatch ? decodeHtmlEntities(contentMatch[1]) : '',
+                title: decodeHtmlEntities(rawTitle),
+                link: linkMatch ? linkMatch[1].trim() : '',
+                pubDate: pubDateMatch ? pubDateMatch[1].trim() : '',
+                description: decodeHtmlEntities(rawDesc),
+                content: decodeHtmlEntities(rawContent),
+                imageUrl: imageUrl || undefined,
             };
         });
-        
+
     } catch (error) {
         console.error(`[RSS] Error fetching ${url}:`, error);
         return [];
@@ -99,36 +165,21 @@ async function fetchRSSFeed(url: string): Promise<RSSItem[]> {
 }
 
 /**
- * Decode HTML entities
- */
-function decodeHtmlEntities(text: string): string {
-    if (!text) return '';
-    return text
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ')
-        .replace(/<[^>]+>/g, ' ') // Strip HTML tags
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-/**
  * Check if article is anime-related
  */
 function isAnimeRelated(title: string, description: string): boolean {
     const text = (title + ' ' + description).toLowerCase();
-    
+
     const animeKeywords = [
         'anime', 'manga', 'season', 'episode', 'trailer', 'pv',
         'studio', 'voice actor', 'seiyuu', 'adaptation',
         'crunchyroll', 'funimation', 'netflix', 'hidive',
         'mappa', 'kyoto animation', 'ufotable', 'wit studio',
-        'production', 'animation', 'broadcast', 'airing'
+        'production', 'animation', 'broadcast', 'airing',
+        'shonen', 'shojo', 'isekai', 'light novel', 'visual novel',
+        'simulcast', 'dub', 'sub', 'key visual', 'premiere'
     ];
-    
+
     return animeKeywords.some(kw => text.includes(kw));
 }
 
@@ -137,7 +188,7 @@ function isAnimeRelated(title: string, description: string): boolean {
  */
 function detectClaimType(title: string): string {
     const lower = title.toLowerCase();
-    
+
     if (lower.includes('trailer') || lower.includes('pv')) return 'TRAILER_DROP';
     if (lower.includes('cast') && lower.includes('reveal')) return 'CAST_ADDITION';
     if (lower.includes('release date') || lower.includes('premiere')) return 'DATE_ANNOUNCED';
@@ -145,8 +196,24 @@ function detectClaimType(title: string): string {
     if (lower.includes('key visual') || lower.includes('visual')) return 'NEW_KEY_VISUAL';
     if (lower.includes('staff')) return 'STAFF_UPDATE';
     if (lower.includes('delay') || lower.includes('postpone')) return 'DELAY';
-    
+
     return 'OTHER';
+}
+
+/**
+ * Generate a stable slug from title (not URL)
+ */
+function generateSlug(title: string, source: string): string {
+    const base = title
+        .toLowerCase()
+        .replace(/['']/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 60);
+
+    // Add source prefix for uniqueness
+    const srcPrefix = source.substring(0, 3).toLowerCase().replace(/[^a-z]/g, '');
+    return `${srcPrefix}-${base}`;
 }
 
 /**
@@ -161,90 +228,85 @@ function normalizeForMatching(text: string): string {
 }
 
 /**
- * Check if article has already been processed (by URL OR fuzzy title match)
+ * Check if article has already been processed (by URL, slug, OR fuzzy title match)
  */
-async function isArticleProcessed(link: string, title: string): Promise<{ isDuplicate: boolean; reason: string }> {
+async function isArticleProcessed(link: string, title: string, slug: string): Promise<{ isDuplicate: boolean; reason: string }> {
     // 1. Check exact URL match
     const { data: urlMatch } = await supabaseAdmin
         .from('posts')
         .select('id, title')
         .eq('source_url', link)
         .limit(1);
-    
+
     if (urlMatch && urlMatch.length > 0) {
-        return { isDuplicate: true, reason: 'URL already exists' };
+        return { isDuplicate: true, reason: `URL already exists: "${urlMatch[0].title}"` };
     }
-    
-    // 2. Check fuzzy title match (same story from different sources)
+
+    // 2. Check slug collision
+    const { data: slugMatch } = await supabaseAdmin
+        .from('posts')
+        .select('id, title')
+        .eq('slug', slug)
+        .limit(1);
+
+    if (slugMatch && slugMatch.length > 0) {
+        return { isDuplicate: true, reason: `Slug collision: "${slugMatch[0].title}"` };
+    }
+
+    // 3. Check fuzzy title match (same story from different sources)
     const normalizedTitle = normalizeForMatching(title);
     if (normalizedTitle.length < 10) {
-        return { isDuplicate: false, reason: '' }; // Too short to match reliably
+        return { isDuplicate: false, reason: '' };
     }
-    
-    // Look for similar titles in last 48 hours
-    const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    // Look for similar titles in last 72 hours
+    const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     const { data: titleMatches } = await supabaseAdmin
         .from('posts')
         .select('id, title, source')
         .gt('timestamp', cutoffTime)
-        .limit(50);
-    
+        .limit(100);
+
     if (titleMatches) {
         for (const post of titleMatches) {
             const normalizedExisting = normalizeForMatching(post.title);
-            // Check for significant overlap (80%+ similarity)
             const longer = Math.max(normalizedTitle.length, normalizedExisting.length);
             const shorter = Math.min(normalizedTitle.length, normalizedExisting.length);
-            
-            if (shorter / longer > 0.8) {
-                // Check if one contains the other
-                if (normalizedExisting.includes(normalizedTitle.substring(0, 20)) ||
-                    normalizedTitle.includes(normalizedExisting.substring(0, 20))) {
-                    return { isDuplicate: true, reason: `Similar to existing: "${post.title}" from ${post.source}` };
+
+            if (shorter / longer > 0.7) {
+                // Check if titles share significant words
+                const words1 = normalizedTitle.match(/\w{4,}/g) || ([] as string[]);
+                const words2 = normalizedExisting.match(/\w{4,}/g) || ([] as string[]);
+                const overlap = words1.filter(w => words2.includes(w)).length;
+                const maxWords = Math.max(words1.length, words2.length);
+
+                if (maxWords > 0 && overlap / maxWords > 0.6) {
+                    return { isDuplicate: true, reason: `Similar to: "${post.title}" from ${post.source}` };
                 }
             }
         }
     }
-    
-    return { isDuplicate: false, reason: '' };
-}
 
-interface RejectionLog {
-    title: string;
-    source: string;
-    reason: string;
-    timestamp: string;
-}
-
-/**
- * Log rejection for debugging
- */
-async function logRejection(title: string, source: string, reason: string, articleUrl?: string) {
-    const logEntry: RejectionLog = {
-        title: title.substring(0, 100),
-        source,
-        reason,
-        timestamp: new Date().toISOString()
-    };
-    
-    // Log to console
-    console.log(`[RSS REJECTED] ${source}: "${title.substring(0, 60)}..." | Reason: ${reason}`);
-    
-    // Store in database for dashboard viewing
+    // 4. Check declined posts to avoid re-scraping
     try {
-        await supabaseAdmin
-            .from('rejection_logs')
-            .insert([{
-                title: title.substring(0, 200),
-                source,
-                reason: reason.substring(0, 500),
-                article_url: articleUrl || null,
-                timestamp: new Date().toISOString()
-            }]);
-    } catch (e) {
-        // Silent fail - don't break scraping if logging fails
-        console.log('[RSS] Failed to log rejection to DB:', e);
+        const { data: declined } = await supabaseAdmin
+            .from('declined_posts')
+            .select('title')
+            .limit(50);
+
+        if (declined) {
+            for (const d of declined) {
+                const normalizedDeclined = normalizeForMatching(d.title);
+                if (normalizedDeclined.length > 10 && normalizedTitle.includes(normalizedDeclined.substring(0, 20))) {
+                    return { isDuplicate: true, reason: 'Previously declined' };
+                }
+            }
+        }
+    } catch {
+        // declined_posts table may not exist yet
     }
+
+    return { isDuplicate: false, reason: '' };
 }
 
 /**
@@ -269,39 +331,54 @@ export async function scanRSSFeeds(
 
     const candidates: NewsCandidate[] = [];
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-    let stats = { total: 0, tooOld: 0, duplicate: 0, notAnime: 0, accepted: 0 };
+    const seenTitles = new Set<string>(); // In-batch dedup
+    let stats = { total: 0, tooOld: 0, duplicate: 0, notAnime: 0, accepted: 0, inBatchDup: 0 };
 
     for (const source of sources) {
         console.log(`[RSS] Checking ${source.name}...`);
-        
+
         const items = await fetchRSSFeed(source.url);
         console.log(`[RSS] ${source.name}: ${items.length} raw items`);
-        
+
         for (const item of items) {
             stats.total++;
+
+            // Skip items with no title
+            if (!item.title || item.title.length < 5) continue;
+
             const publishedAt = new Date(item.pubDate);
-            
+
             // Skip old articles
             if (publishedAt < cutoffTime) {
                 stats.tooOld++;
                 continue;
             }
-            
-            // Check if already processed (fuzzy matching)
-            const dupCheck = await isArticleProcessed(item.link, item.title);
-            if (dupCheck.isDuplicate) {
-                stats.duplicate++;
-                await logRejection(item.title, source.name, dupCheck.reason);
+
+            // In-batch dedup by normalized title
+            const normalizedTitle = normalizeForMatching(item.title);
+            if (seenTitles.has(normalizedTitle)) {
+                stats.inBatchDup++;
                 continue;
             }
-            
+            seenTitles.add(normalizedTitle);
+
+            // Generate slug early for duplicate checking
+            const slug = generateSlug(item.title, source.name);
+
+            // Check if already processed (URL + slug + fuzzy title)
+            const dupCheck = await isArticleProcessed(item.link, item.title, slug);
+            if (dupCheck.isDuplicate) {
+                stats.duplicate++;
+                console.log(`[RSS SKIP] ${source.name}: "${item.title.substring(0, 50)}..." — ${dupCheck.reason}`);
+                continue;
+            }
+
             // Check if anime-related
             if (!isAnimeRelated(item.title, item.description)) {
                 stats.notAnime++;
-                await logRejection(item.title, source.name, 'Not anime-related');
                 continue;
             }
-            
+
             stats.accepted++;
             candidates.push({
                 title: item.title,
@@ -313,22 +390,24 @@ export async function scanRSSFeeds(
                 sourceType: source.type,
                 language: source.language,
                 contentSnippet: item.content || item.description,
+                imageUrl: item.imageUrl,
             });
-            
-            console.log(`[RSS] ACCEPTED: ${item.title.substring(0, 60)}...`);
+
+            console.log(`[RSS] ACCEPTED: ${item.title.substring(0, 60)}...${item.imageUrl ? ' [HAS IMAGE]' : ' [NO IMAGE]'}`);
         }
-        
+
         // Small delay between sources
         await new Promise(resolve => setTimeout(resolve, 300));
     }
-    
+
     console.log(`[RSS] SCAN COMPLETE:`);
     console.log(`  Total checked: ${stats.total}`);
     console.log(`  Too old: ${stats.tooOld}`);
     console.log(`  Duplicate: ${stats.duplicate}`);
+    console.log(`  In-batch dup: ${stats.inBatchDup}`);
     console.log(`  Not anime: ${stats.notAnime}`);
     console.log(`  ACCEPTED: ${stats.accepted}`);
-    
+
     return candidates;
 }
 
@@ -337,19 +416,25 @@ export async function scanRSSFeeds(
  */
 export function generateRSSPost(candidate: NewsCandidate, now: Date): any {
     const claimType = detectClaimType(candidate.title);
-    const slug = candidate.link.split('/').pop()?.replace(/[^a-zA-Z0-9]/g, '-') || 
-                 `rss-${Date.now()}`;
-    
+    const slug = generateSlug(candidate.title, candidate.sourceName);
+
     // Determine post type
     let postType: 'INTEL' | 'TRENDING' | 'TRAILER' = 'INTEL';
     if (claimType === 'TRAILER_DROP') postType = 'TRAILER';
     else if (candidate.sourceType === 'BLOG') postType = 'TRENDING';
-    
+
+    // Clean description — remove any leftover HTML entities or tags
+    let cleanDesc = candidate.description;
+    if (cleanDesc.length > 500) {
+        cleanDesc = cleanDesc.substring(0, 500) + '...';
+    }
+
     return {
         id: crypto.randomUUID(),
         title: candidate.title,
-        slug: slug.substring(0, 50),
-        content: `${candidate.description}\n\nRead more: ${candidate.link}`,
+        slug,
+        content: `${cleanDesc}\n\nSource: ${candidate.sourceName}\nRead more: ${candidate.link}`,
+        image: candidate.imageUrl || null,
         type: postType,
         claim_type: claimType,
         status: 'pending',
