@@ -89,6 +89,9 @@ const nextConfig = {
     // Experimental features for performance
     experimental: {
         optimizePackageImports: ['lucide-react'],
+        turbopack: {
+            root: process.cwd(),
+        },
     }
 };
 
