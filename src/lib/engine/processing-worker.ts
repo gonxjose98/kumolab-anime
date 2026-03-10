@@ -317,7 +317,22 @@ async function createPendingPost(
     post.source = candidate.source_name || 'Unknown';
     post.source_tier = candidate.source_tier || 2;
     post.timestamp = now;
-    post.status = 'pending';
+    
+    // Auto-publish Daily Drops (Tier 1 sources like YouTube official channels)
+    // These are verified official content that don't need manual approval
+    const isDailyDrop = candidate.source_tier === 1 || 
+                        candidate.source_name?.toLowerCase().includes('youtube') ||
+                        candidate.source_url?.includes('youtube.com');
+    
+    if (isDailyDrop) {
+      post.status = 'approved';
+      post.is_published = true;
+      post.published_at = now;
+      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name);
+    } else {
+      post.status = 'pending';
+    }
+    
     post.scraped_at = candidate.detected_at || now;
     // fingerprint and headline columns don't exist - skip them
     
