@@ -328,12 +328,12 @@ async function createPendingPost(
       post.status = 'approved';
       post.is_published = true;
       post.published_at = now;
-      // Set scheduled time for next hour slot so scheduler picks it up
-      const nextHour = new Date(now);
-      nextHour.setHours(nextHour.getHours() + 1);
-      nextHour.setMinutes(0, 0, 0);
-      post.scheduled_post_time = nextHour.toISOString();
-      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name, '- scheduled for:', post.scheduled_post_time);
+      // Schedule for 6 AM EST (11 AM UTC) the next day
+      const scheduled = new Date(now);
+      scheduled.setUTCDate(scheduled.getUTCDate() + 1);
+      scheduled.setUTCHours(11, 0, 0, 0); // 11 AM UTC = 6 AM EST
+      post.scheduled_post_time = scheduled.toISOString();
+      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name, '- scheduled for 6 AM EST:', post.scheduled_post_time);
     } else {
       post.status = 'pending';
     }
