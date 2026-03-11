@@ -19,7 +19,8 @@
 }
 
 :global(.light) .nav.scrolled {
-    background: rgba(20, 24, 42, 0.9);
+    background: rgba(28, 27, 58, 0.85);
+    border-bottom-color: rgba(0, 212, 255, 0.12);
 }
 
 .navContainer {
@@ -190,6 +191,11 @@
     transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
     clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
     z-index: 1002;
+}
+
+:global(.light) .dropdown {
+    background: rgba(30, 30, 65, 0.95);
+    border-color: rgba(0, 212, 255, 0.15);
 }
 
 .dropdownOpen {

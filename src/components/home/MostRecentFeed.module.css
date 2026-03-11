@@ -52,8 +52,9 @@
     scrollbar-width: none;
     position: relative;
     border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    background: rgba(6, 6, 14, 0.5);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-color);
+    transition: background 0.8s ease, border-color 0.8s ease;
 }
 
 .feedContainer::-webkit-scrollbar {
@@ -90,6 +91,21 @@
         rgba(6, 6, 14, 0.85) 75%,
         rgba(6, 6, 14, 0.98) 100%
     );
+}
+
+:global(.light) .cardGradient {
+    background: linear-gradient(
+        180deg,
+        rgba(28, 27, 58, 0.2) 0%,
+        transparent 30%,
+        transparent 50%,
+        rgba(28, 27, 58, 0.82) 75%,
+        rgba(28, 27, 58, 0.96) 100%
+    );
+}
+
+:global(.light) .cardFallback {
+    background: linear-gradient(135deg, #1c1b3a 0%, #252244 50%, #1c1b3a 100%);
 }
 
 .cardScanlines {
@@ -288,6 +304,10 @@
     background: linear-gradient(135deg, #06060e 0%, #0c0c24 50%, #06060e 100%);
 }
 
+:global(.light) .cardFallback {
+    background: linear-gradient(135deg, #1c1b3a 0%, #252244 50%, #1c1b3a 100%);
+}
+
 /* Play button — centered overlay */
 .playButton {
     position: absolute;
@@ -374,6 +394,10 @@
     overflow-y: auto;
     padding: 60px 12px 100px;
     scrollbar-width: none;
+}
+
+:global(.light) .twitterEmbedWrapper {
+    background: #1c1b3a;
 }
 
 .twitterEmbedWrapper::-webkit-scrollbar {

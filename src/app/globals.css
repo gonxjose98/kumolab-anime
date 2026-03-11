@@ -73,21 +73,22 @@
   }
 }
 
-/* Light mode — softer galaxy theme, not bright white */
+/* Light mode — cosmic dawn aesthetic: galaxy stays, sun illuminates the nebula */
 .light {
-  --bg-color: #1a1d2e;
-  --surface-color: rgba(200, 210, 235, 0.12);
-  --surface-hover: rgba(200, 210, 235, 0.18);
-  --text-primary: #e0e4f0;
-  --text-secondary: #b0b8d4;
-  --text-tertiary: #8890b0;
-  --text-muted: #606880;
-  --border-subtle: rgba(200, 210, 240, 0.1);
-  --accent-cyan: #40d8ff;
-  --accent-pink: #ff5cc0;
-  --accent-purple: #9b81ff;
-  --accent-primary: #9b81ff;
-  --accent-glow: rgba(64, 216, 255, 0.35);
+  --bg-color: #1c1b3a;
+  --surface-color: rgba(200, 200, 240, 0.12);
+  --surface-hover: rgba(200, 200, 240, 0.18);
+  --surface-solid: rgba(180, 180, 230, 0.15);
+  --text-primary: #e8e8ff;
+  --text-secondary: #c8c8e8;
+  --text-tertiary: #a0a0d0;
+  --text-muted: #8080b8;
+  --border-subtle: rgba(255, 255, 255, 0.15);
+  --accent-cyan: #00d4ff;
+  --accent-pink: #ff3cac;
+  --accent-purple: #7b61ff;
+  --accent-primary: #7b61ff;
+  --accent-glow: rgba(0, 212, 255, 0.4);
 }
 
 * {
