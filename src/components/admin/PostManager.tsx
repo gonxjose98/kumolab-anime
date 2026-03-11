@@ -1551,41 +1551,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </button>
                 ))}
 
-                {filter === 'PENDING' && (
-                    <button
-                        onClick={async () => {
-                            if (!confirm('This will delete duplicate posts from pending approvals.\n\nKeep: Highest tier/source post from each duplicate group\nDelete: Lower tier duplicates and similar titles (75%+ match)\n\nProceed?')) return;
-                            setIsPublishing(true);
-                            try {
-                                const res = await fetch('/api/admin/cleanup-duplicates', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ action: 'cleanup-pending' })
-                                });
-                                const data = await res.json();
-                                if (data.success) {
-                                    alert(`Cleanup complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} posts`);
-                                    window.location.reload();
-                                } else {
-                                    alert('Cleanup failed: ' + (data.error || 'Unknown error'));
-                                }
-                            } catch (e: any) {
-                                alert('Error: ' + e.message);
-                            } finally {
-                                setIsPublishing(false);
-                            }
-                        }}
-                        disabled={isPublishing}
-                        className="flex-1 md:flex-none group relative overflow-hidden px-3 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[90px]"
-                        style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)' }}
-                    >
-                        <div className="flex items-center justify-center gap-1.5 group-hover:scale-105 transition-transform" style={{ color: '#ff4444' }}>
-                            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>Clean Dups</span>
-                        </div>
-                    </button>
-                )}
-
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
                         <button onClick={handleBulkDelete} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)' }}>
