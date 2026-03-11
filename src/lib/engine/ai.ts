@@ -22,6 +22,14 @@ export class AntigravityAI {
         const openAIKey = process.env.OPENAI_API_KEY;
         const kimiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
         
+        // DEBUG: Log env var availability (don't log the actual keys!)
+        console.log('[AntigravityAI] Env check:', {
+            hasAntigravity: !!antigravityEndpoint,
+            hasOpenAI: !!openAIKey,
+            hasKimi: !!kimiKey,
+            kimiKeyLength: kimiKey ? kimiKey.length : 0
+        });
+        
         if (antigravityEndpoint) {
             // Use Antigravity AI
             this.provider = 'antigravity';
@@ -36,6 +44,7 @@ export class AntigravityAI {
             this.apiKey = kimiKey;
             this.model = process.env.KIMI_MODEL || 'kimi-k2.5';
             console.log("[AntigravityAI] Using Kimi/Moonshot provider with model:", this.model);
+            console.log("[AntigravityAI] Key starts with sk-:", kimiKey.startsWith('sk-'));
         } else if (openAIKey) {
             // Fallback to OpenAI
             this.provider = 'openai';
