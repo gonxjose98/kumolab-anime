@@ -328,7 +328,12 @@ async function createPendingPost(
       post.status = 'approved';
       post.is_published = true;
       post.published_at = now;
-      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name);
+      // Set scheduled time for next hour slot so scheduler picks it up
+      const nextHour = new Date(now);
+      nextHour.setHours(nextHour.getHours() + 1);
+      nextHour.setMinutes(0, 0, 0);
+      post.scheduled_post_time = nextHour.toISOString();
+      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name, '- scheduled for:', post.scheduled_post_time);
     } else {
       post.status = 'pending';
     }
