@@ -33,9 +33,11 @@ export class AntigravityAI {
             // Use Kimi/Moonshot
             this.provider = 'openai'; // Kimi uses OpenAI-compatible API
             this.baseURL = 'https://api.moonshot.cn/v1';
-            this.apiKey = kimiKey;
+            // Ensure key has proper format (add sk- prefix if missing)
+            this.apiKey = kimiKey.startsWith('sk-') ? kimiKey : `sk-${kimiKey}`;
             this.model = process.env.KIMI_MODEL || 'moonshot-v1-8k';
             console.log("[AntigravityAI] Using Kimi/Moonshot provider with model:", this.model);
+            console.log("[AntigravityAI] Key format check:", this.apiKey.startsWith('sk-') ? "Valid sk- prefix" : "Raw key");
         } else if (openAIKey) {
             // Fallback to OpenAI
             this.provider = 'openai';
