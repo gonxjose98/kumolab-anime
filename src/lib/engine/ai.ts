@@ -14,16 +14,42 @@ export class AntigravityAI {
     private baseURL: string;
     private apiKey: string;
     private model: string;
+    private provider: 'antigravity' | 'openai';
 
     private constructor() {
-        // Strict Configuration: No default to OpenAI
-        // The user must provide an endpoint or we fail.
-        this.baseURL = process.env.ANTIGRAVITY_AI_ENDPOINT || '';
-        this.apiKey = process.env.ANTIGRAVITY_AI_KEY || 'internal-bearer';
-        this.model = process.env.ANTIGRAVITY_AI_MODEL || 'antigravity-1.0';
-
-        if (!this.baseURL) {
-            console.warn("[AntigravityAI] Warning: ANTIGRAVITY_AI_ENDPOINT is not set. AI features will fail.");
+        // Check for Antigravity config first, fallback to OpenAI, then Kimi
+        const antigravityEndpoint = process.env.ANTIGRAVITY_AI_ENDPOINT;
+        const openAIKey = process.env.OPENAI_API_KEY;
+        const kimiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
+        
+        if (antigravityEndpoint) {
+            // Use Antigravity AI
+            this.provider = 'antigravity';
+            this.baseURL = antigravityEndpoint;
+            this.apiKey = process.env.ANTIGRAVITY_AI_KEY || 'internal-bearer';
+            this.model = process.env.ANTIGRAVITY_AI_MODEL || 'antigravity-1.0';
+            console.log("[AntigravityAI] Using Antigravity AI provider");
+        } else if (kimiKey) {
+            // Use Kimi/Moonshot
+            this.provider = 'openai'; // Kimi uses OpenAI-compatible API
+            this.baseURL = 'https://api.moonshot.cn/v1';
+            this.apiKey = kimiKey;
+            this.model = process.env.KIMI_MODEL || 'moonshot-v1-8k';
+            console.log("[AntigravityAI] Using Kimi/Moonshot provider with model:", this.model);
+        } else if (openAIKey) {
+            // Fallback to OpenAI
+            this.provider = 'openai';
+            this.baseURL = 'https://api.openai.com/v1';
+            this.apiKey = openAIKey;
+            this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+            console.log("[AntigravityAI] Using OpenAI provider with model:", this.model);
+        } else {
+            // No AI provider configured
+            this.provider = 'antigravity';
+            this.baseURL = '';
+            this.apiKey = '';
+            this.model = '';
+            console.warn("[AntigravityAI] Warning: No AI provider configured. Set ANTIGRAVITY_AI_ENDPOINT, KIMI_API_KEY, or OPENAI_API_KEY.");
         }
     }
 
@@ -39,25 +65,31 @@ export class AntigravityAI {
      * Sends standard chat completion payload to the configured endpoint.
      */
     private async sendCompletionRequest(messages: any[], jsonMode: boolean = true): Promise<any> {
-        if (!this.baseURL) {
-            throw new Error("Antigravity AI Configuration Missing: ANTIGRAVITY_AI_ENDPOINT is not set in .env.local");
+        if (!this.baseURL || !this.apiKey) {
+            throw new Error("AI Configuration Missing: Set ANTIGRAVITY_AI_ENDPOINT or OPENAI_API_KEY in environment variables.");
         }
 
         const url = `${this.baseURL}/chat/completions`;
 
         try {
+            const requestBody: any = {
+                model: this.model,
+                messages: messages,
+                temperature: 0.7,
+            };
+            
+            // Only add response_format for OpenAI models that support it
+            if (jsonMode && this.provider === 'openai' && this.model.includes('gpt-4')) {
+                requestBody.response_format = { type: 'json_object' };
+            }
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.apiKey}`
                 },
-                body: JSON.stringify({
-                    model: this.model,
-                    messages: messages,
-                    temperature: 0.7,
-                    response_format: jsonMode ? { type: 'json_object' } : undefined
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
