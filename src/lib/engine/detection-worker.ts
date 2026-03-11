@@ -312,12 +312,12 @@ async function scanYouTubeForDetection(): Promise<DetectionCandidate[]> {
     return candidates;
   }
   
-  // Tier 1 YouTube channels
+  // Tier 1 YouTube channels - VERIFIED IDs
   const channels = [
-    { id: 'UCZxsdzmU3OoC9Q8Z3swoS6g', name: 'MAPPA', tier: 1 },
-    { id: 'UCgHfufyA9n6qMvo3K0XBp2w', name: 'Ufotable', tier: 1 },
-    { id: 'UCp8LObSyk0vZ02NF4_7PcWg', name: 'TOHO Animation', tier: 1 },
-    { id: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', name: 'Aniplex', tier: 1 },
+    { id: 'UCjfAEJZdfbIjVHdo5yODfyQ', name: 'MAPPA', tier: 1 },
+    { id: 'UCRc3mprfrE8qaugB1VfQXiA', name: 'Ufotable', tier: 1 },
+    { id: 'UC14Yc2Qv92DMuyNRlHvpo2Q', name: 'TOHO Animation', tier: 1 },
+    { id: 'UCDb0peSmF5rLX7BvuTcJfCw', name: 'Aniplex', tier: 1 },
   ];
   
   for (const channel of channels) {
@@ -337,11 +337,15 @@ async function scanYouTubeForDetection(): Promise<DetectionCandidate[]> {
         const description = item.snippet?.description || '';
         const publishedAt = item.snippet?.publishedAt;
         
-        // Check for anime-related keywords
-        const animeKeywords = ['trailer', 'pv', 'teaser', 'announcement', 'preview', 'key visual'];
+        // Check for anime-related keywords - EXPANDED for better detection
+        const animeKeywords = ['trailer', 'pv', 'teaser', 'announcement', 'preview', 'key visual', 
+                               'opening', 'ending', 'cm', 'commercial', 'season', 'episode',
+                               'new anime', 'anime adaptation', 'release date', 'broadcast'];
         const hasAnimeKeyword = animeKeywords.some(kw => 
           title.toLowerCase().includes(kw) || description.toLowerCase().includes(kw)
         );
+        
+        console.log(`[YouTube] Video: "${title.substring(0, 50)}..." - Keyword match: ${hasAnimeKeyword}`);
         
         if (!hasAnimeKeyword) continue;
         
