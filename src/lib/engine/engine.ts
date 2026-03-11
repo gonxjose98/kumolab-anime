@@ -445,7 +445,9 @@ async function publishPost(post: BlogPost) {
                 scraped_at: (post as any).scraped_at || post.timestamp,
                 source: (post as any).source || 'Unknown',
                 background_image: post.background_image,
-                image_settings: post.image_settings
+                image_settings: post.image_settings,
+                // Scheduled publishing
+                scheduled_post_time: (post as any).scheduledPostTime || null
             }], { onConflict: 'slug' });
 
         if (error) {

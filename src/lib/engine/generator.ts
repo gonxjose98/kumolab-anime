@@ -50,6 +50,10 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
         }
     });
 
+    // Calculate 6 AM EST (11 AM UTC) for the same day
+    const scheduledTime = new Date(date);
+    scheduledTime.setUTCHours(11, 0, 0, 0); // 11 AM UTC = 6 AM EST
+    
     return {
         id: randomUUID(),
         title: `Daily Drops - ${dateString}`,
@@ -59,7 +63,8 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
         image: '/daily-drops-permanent.jpg', // Permanent branded image
         timestamp: date.toISOString(),
         isPublished: false,
-        status: 'pending',
+        status: 'approved', // Auto-approved, will publish via scheduler
+        scheduledPostTime: scheduledTime.toISOString(), // 6 AM EST
         verification_tier: episodes[0].provenance?.tier,
         verification_reason: 'Strict Primary Source Verified',
         verification_sources: sourcesMap
