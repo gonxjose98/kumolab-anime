@@ -325,16 +325,28 @@ async function createPendingPost(
                         candidate.source_url?.includes('youtube.com');
     
     if (isDailyDrop) {
-      post.status = 'approved';
-      post.is_published = true;
-      post.published_at = now;
-      // Schedule for 6 AM EST (11 AM UTC) the next day
-      const scheduled = new Date(now);
-      scheduled.setUTCDate(scheduled.getUTCDate() + 1);
-      scheduled.setUTCHours(11, 0, 0, 0); // 11 AM UTC = 6 AM EST
-      post.scheduled_post_time = scheduled.toISOString();
-      console.log('[ProcessingWorker] Auto-publishing Daily Drop from Tier 1 source:', candidate.source_name, '- scheduled for 6 AM EST:', post.scheduled_post_time);
+      // Check if this is a Daily Drops scheduled post vs immediate Tier 1 content
+      const isScheduledDailyDrop = candidate.claim_type === 'DAILY_DROP' || 
+                                   candidate.title?.toLowerCase().includes('daily drop');
+      
+      if (isScheduledDailyDrop) {
+        // Daily Drops: Schedule for 6 AM EST (11 AM UTC) the next day
+        post.status = 'approved';
+        post.is_published = false; // Wait for scheduler
+        const scheduled = new Date(now);
+        scheduled.setUTCDate(scheduled.getUTCDate() + 1);
+        scheduled.setUTCHours(11, 0, 0, 0); // 11 AM UTC = 6 AM EST
+        post.scheduled_post_time = scheduled.toISOString();
+        console.log('[ProcessingWorker] Daily Drop scheduled for 6 AM EST:', candidate.source_name, '-', post.scheduled_post_time);
+      } else {
+        // Tier 1 trailer/content: Publish immediately
+        post.status = 'approved';
+        post.is_published = true;
+        post.published_at = now;
+        console.log('[ProcessingWorker] Tier 1 auto-approved (immediate):', candidate.source_name);
+      }
     } else {
+      // Tier 2/3/4: Go to pending approval
       post.status = 'pending';
     }
     
