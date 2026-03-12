@@ -16,7 +16,8 @@ import { publishToSocials } from '../social/publisher';
 import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
 import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
 import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
-import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
+// Nitter fallback removed 2026-03-12 — Nitter instances are dead, X API v2 is primary
+// import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
 import { scanRSSFeeds, generateRSSPost } from './expanded-rss';
 import { scanXAccounts, generateXPost } from './x-monitor';
 
@@ -135,41 +136,8 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
         }
     }
 
-    // --- 3. TWITTER/NITTER SCAN ---
-    {
-        console.log('[Engine] Scanning Twitter/Nitter for announcements...');
-
-        try {
-            const twitterCandidates = await scanTwitterAccounts(6);
-
-            if (twitterCandidates.length > 0) {
-                for (const candidate of twitterCandidates.slice(0, 3)) {
-                    const post = generateTwitterPost(candidate, now);
-
-                    const { error: insertError } = await supabaseAdmin
-                        .from('posts')
-                        .insert([post]);
-
-                    if (!insertError) {
-                        console.log(`[Engine] Added Twitter post to pending: ${post.title}`);
-                        await logSchedulerRun(slot, 'success', `Twitter announcement: ${post.title}`, {
-                            handle: candidate.authorHandle,
-                            tweetId: candidate.id
-                        });
-                    } else {
-                        console.error(`[Engine] Twitter insert error: ${insertError.message}`);
-                    }
-                }
-            } else {
-                console.log('[Engine] No new Twitter announcements');
-            }
-        } catch (twError: any) {
-            console.error('[Engine] Twitter scan error:', twError?.message || twError);
-            await logSchedulerRun(slot, 'error', `Twitter scan failed: ${twError?.message}`, { error: String(twError) }).catch(() => {});
-        }
-    }
-
-    // --- 3b. X API v2 SCAN ---
+    // --- 3. X API v2 SCAN ---
+    // (Nitter fallback removed 2026-03-12 — all Nitter instances are dead)
     {
         console.log('[Engine] Scanning X (Twitter) API for announcements...');
 

@@ -16,19 +16,27 @@ const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
 const X_BEARER_TOKEN = process.env.X_BEARER_TOKEN;
 
 // Default monitored accounts (used when no dynamic config exists)
+// Revised 2026-03-12: Restructured tiers for accuracy
+// T1: Auto-publish worthy (major EN platforms/distributors)
+// T2: Good content, needs review (publishers, news, keyword-filtered)
+// T3: Manual review only (studio accounts — JP-heavy)
+// Removed: @FUNimation (dead brand)
 const MONITORED_ACCOUNTS = [
+    // T1: Major platforms — auto-publish worthy
     { id: '1567507580', handle: 'Crunchyroll', name: 'Crunchyroll', tier: 1 },
-    { id: '18817213', handle: 'FUNimation', name: 'Funimation', tier: 1 },
-    { id: '138176537', handle: 'AniplexUSA', name: 'Aniplex', tier: 1 },
-    { id: '1032494551180222464', handle: 'MAPPA_Info', name: 'MAPPA', tier: 1 },
-    { id: '100507039', handle: 'kyoani', name: 'Kyoto Animation', tier: 1 },
-    { id: '96958501', handle: 'ufotable', name: 'Ufotable', tier: 1 },
-    { id: '294510573', handle: 'toho_animation', name: 'TOHO Animation', tier: 1 },
-    { id: '164224501', handle: 'KadokawaAnime', name: 'Kadokawa', tier: 1 },
+    { id: '80384892', handle: 'NetflixAnime', name: 'Netflix Anime', tier: 1 },
+    { id: '138176537', handle: 'AniplexUSA', name: 'Aniplex USA', tier: 1 },
+    // T2: Publishers, news outlets — needs review
+    { id: '294510573', handle: 'toho_animation', name: 'TOHO Animation', tier: 2 },
+    { id: '164224501', handle: 'KadokawaAnime', name: 'Kadokawa', tier: 2 },
+    { id: '1032494551180222464', handle: 'MAPPA_Info', name: 'MAPPA', tier: 2 },
     { id: '11964382', handle: 'AnimeNewsNet', name: 'Anime News Network', tier: 2 },
     { id: '187460970', handle: 'AniTrendz', name: 'AniTrendz', tier: 2 },
-    { id: '80384892', handle: 'NetflixAnime', name: 'Netflix Anime', tier: 1 },
-    { id: '2762868188', handle: 'HIDIVEofficial', name: 'HIDIVE', tier: 2 },
+    { id: '97aborting', handle: 'VIZMedia', name: 'Viz Media', tier: 2 },  // NOTE: Verify X user ID via API lookup
+    // T3: Studio accounts & niche platforms — manual review only
+    { id: '96958501', handle: 'ufotable', name: 'Ufotable', tier: 3 },
+    { id: '100507039', handle: 'kyoani', name: 'Kyoto Animation', tier: 3 },
+    { id: '2762868188', handle: 'HIDIVEofficial', name: 'HIDIVE', tier: 3 },
 ];
 
 interface XTweet {

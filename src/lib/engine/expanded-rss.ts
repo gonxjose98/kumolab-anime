@@ -13,19 +13,24 @@ interface RSSSource {
     tier: number;
     type: 'NEWS' | 'BLOG' | 'OFFICIAL';
     language: 'EN' | 'JP';
+    keywordFiltered?: boolean;
 }
 
 // Expanded RSS sources — verified working feeds
+// Revised 2026-03-12: Restructured tiers for quality
 const RSS_SOURCES: RSSSource[] = [
-    // English sources
+    // T1: Reliable EN aggregation — auto-publish worthy
     { name: 'MyAnimeList News', url: 'https://myanimelist.net/rss/news.xml', tier: 1, type: 'NEWS', language: 'EN' },
-    { name: 'Anime News Network', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 1, type: 'NEWS', language: 'EN' },
 
-    // Japanese sources (primary sources - earlier news)
-    { name: 'Natalie.mu Anime', url: 'https://natalie.mu/comic/feed/news', tier: 1, type: 'NEWS', language: 'JP' },
+    // T2: Good content, needs keyword filtering or review
+    { name: 'Anime News Network', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2, type: 'NEWS', language: 'EN', keywordFiltered: true },
+    { name: 'Natalie.mu Anime', url: 'https://natalie.mu/comic/feed/news', tier: 2, type: 'NEWS', language: 'JP' },
+    { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 2, type: 'NEWS', language: 'JP' },
 
-    // Additional English sources
-    { name: 'Anime UK News', url: 'https://animeuknews.net/feed/', tier: 2, type: 'BLOG', language: 'EN' },
+    // T3: Supplementary sources — manual review
+    { name: 'OtakuNews', url: 'https://www.otakunews.com/rss/rss.xml', tier: 3, type: 'BLOG', language: 'EN' },
+    { name: 'Anime UK News', url: 'https://animeuknews.net/feed/', tier: 3, type: 'BLOG', language: 'EN' },
+    { name: 'MANTAN Web Anime', url: 'https://mantan-web.jp/rss/anime.xml', tier: 3, type: 'NEWS', language: 'JP' },
 ];
 
 interface RSSItem {

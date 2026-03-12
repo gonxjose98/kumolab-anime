@@ -1,157 +1,174 @@
 /**
  * sources-config.ts
- * strict strict source-of-truth configuration for KumoLab's sourcing engine.
- * 
- * TIERS:
- * 1. Official Origin (Studios)
- * 2. Committees/Publishers (Speed Layer)
- * 3. Official Anime Websites (Source of Truth)
- * 4. Licensors/Streaming Platforms (Verification)
- * 5. Databases (Validation Only)
+ * Strict source-of-truth configuration for KumoLab's sourcing engine.
+ *
+ * TIERS (Revised 2026-03-12):
+ * T1: Auto-publish worthy — Major platforms & distributors with consistent, high-quality EN content
+ * T2: High-quality but needs review — Publishers, committees, keyword-filtered sources
+ * T3: Manual review only — Studio accounts (JP-heavy, inconsistent), niche platforms
+ * T4: Databases (Validation Only)
  */
 
 export const SOURCE_TIERS = {
-    TIER_1_STUDIOS: [
-        'MAPPA_Info', // MAPPA
-        'ToeiAnimation', // Toei Animation
-        'bones_inc', // Bones
-        'Madhouse_News', // Madhouse
-        'a1pictures', // A-1 Pictures
-        'CloverWorks_HQ', // CloverWorks
-        'ufotable', // Ufotable
-        'kyoani', // Kyoto Animation
-        'ProductionIG', // Production I.G
-        'WIT_STUDIO', // Wit Studio
-        'trigger_inc', // Trigger
-        'Sunrise_Inc', // Sunrise / Bandai Namco Filmworks
-        'OLM_Release', // OLM (Need to verify handle, using plausible placeholder or ID)
-        'st_pierrot', // Pierrot
-        'd_visual', // David Production (Placeholder, strict handle needed)
-        'sciencesaru', // Science SARU
-        'silverlink', // Silver Link
-        'studiocolorido', // Studio Colorido
-        'JP_GHIBLI' // Studio Ghibli
+    // T1: Major distributors/platforms — consistent EN announcements, auto-publish worthy
+    TIER_1_PLATFORMS: [
+        'Crunchyroll',       // Primary EN anime platform
+        'NetflixAnime',      // Netflix Anime (EN)
+        'AniplexUSA',        // Aniplex USA (EN distributor)
+        'TOHOanimation',     // TOHO Animation (major distributor)
     ],
-    // For RSS/Text Matching:
     TIER_1_NAMES: [
-        'MAPPA', 'Toei Animation', 'Bones', 'Madhouse', 'A-1 Pictures', 'CloverWorks',
-        'Ufotable', 'Kyoto Animation', 'Production I.G', 'Wit Studio', 'Trigger',
-        'Sunrise', 'Bandai Namco Filmworks', 'OLM', 'Pierrot', 'Studio Deen',
-        'TMS Entertainment', 'LIDENFILMS', 'David Production', 'Science SARU',
-        'Silver Link', 'Studio Colorido', 'Studio Ghibli', 'Aniplex'
+        'Crunchyroll', 'Netflix Anime', 'Aniplex USA', 'TOHO Animation'
     ],
+    // T2: Publishers & committees — good content but needs review or keyword filtering
     TIER_2_COMMITTEES: [
-        'aniplex_exclusive', 'aniplexJB', // Aniplex
-        'kadokawa_anime', // Kadokawa
-        'SHUEISHA_PR', // Shueisha
-        'ShoProWorld', // Shogakukan-Shueisha
-        'KodanshaManga', // Kodansha
-        'bushiroad_global', // Bushiroad
-        'avex_anime_pr', // Avex
-        'pony_canyon', // Pony Canyon
-        'NBCUniversal', // NBCUniversal Japan
-        'KingRecords', // King Records
-        'TOHOanimation', // TOHO
-        'bnam_jp', // Bandai Namco
-        'SquareEnix', // Square Enix
-        'fujitv_anime', // Fuji TV
-        'TVTOKYO_anime' // TV Tokyo
+        'kadokawa_anime',    // Kadokawa
+        'SHUEISHA_PR',       // Shueisha
+        'ShoProWorld',       // Shogakukan-Shueisha
+        'KodanshaManga',     // Kodansha
+        'pony_canyon',       // Pony Canyon (EN-only filter recommended)
+        'VIZMedia',          // Viz Media (keyword-filtered: "anime trailer", "anime")
+        'bushiroad_global',  // Bushiroad
+        'avex_anime_pr',     // Avex
+        'NBCUniversal',      // NBCUniversal Japan
+        'KingRecords',       // King Records
+        'SquareEnix',        // Square Enix
+        'fujitv_anime',      // Fuji TV
+        'TVTOKYO_anime',     // TV Tokyo
     ],
     TIER_2_NAMES: [
-        'Kadokawa', 'Shueisha', 'Shogakukan', 'Kodansha', 'Bushiroad',
-        'Avex', 'Pony Canyon', 'NBCUniversal', 'King Records', 'TOHO Animation',
-        'Bandai Namco', 'Square Enix', 'Fuji TV', 'TV Tokyo'
+        'Kadokawa', 'Shueisha', 'Shogakukan', 'Kodansha', 'Viz Media',
+        'Pony Canyon', 'Bushiroad', 'Avex', 'NBCUniversal', 'King Records',
+        'Square Enix', 'Fuji TV', 'TV Tokyo'
     ],
-    TIER_4_PLATFORMS: [
-        'Crunchyroll',
-        'NetflixAnime',
-        'HIDIVEofficial',
-        'DisneyPlusJP',
-        'PrimeVideo_JP'
+    // T3: Studio accounts — manual review only (JP-heavy, inconsistent quality)
+    TIER_3_STUDIOS: [
+        'MAPPA_Info',        // MAPPA
+        'ufotable',          // Ufotable
+        'a1pictures',        // A-1 Pictures
+        'CloverWorks_HQ',    // CloverWorks
+        'ToeiAnimation',     // Toei Animation
+        'bones_inc',         // Bones
+        'Madhouse_News',     // Madhouse
+        'kyoani',            // Kyoto Animation
+        'ProductionIG',      // Production I.G
+        'WIT_STUDIO',        // Wit Studio
+        'trigger_inc',       // Trigger
+        'Sunrise_Inc',       // Sunrise / Bandai Namco Filmworks
+        'st_pierrot',        // Pierrot
+        'sciencesaru',       // Science SARU
+        'silverlink',        // Silver Link
+        'studiocolorido',    // Studio Colorido
+        'JP_GHIBLI',         // Studio Ghibli
+    ],
+    TIER_3_NAMES: [
+        'MAPPA', 'Toei Animation', 'Bones', 'Madhouse', 'A-1 Pictures', 'CloverWorks',
+        'Ufotable', 'Kyoto Animation', 'Production I.G', 'Wit Studio', 'Trigger',
+        'Sunrise', 'Bandai Namco Filmworks', 'Pierrot', 'Science SARU',
+        'Silver Link', 'Studio Colorido', 'Studio Ghibli'
+    ],
+    // T4: Databases — validation/cross-reference only
+    TIER_4_DATABASES: [
+        'AniList', 'MyAnimeList'
     ]
 };
 
 export const ANILIST_VALIDATION_ONLY = true;
 
 export const CONTENT_RULES = {
-    // Keywords that strongly suggest 'Important' content
+    // Keywords that strongly suggest newsworthy anime content (case-insensitive matching)
     POSITIVE_KEYWORDS: [
-        'New Anime', 'Announcement', 'Season 2', 'Season 3', 'Season 4', 'Season 5',
-        '2nd Season', '3rd Season', '4th Season', '5th Season', 'Final Season',
-        'Movie', 'Key Visual', 'Trailer', 'PV', 'Broadcast Date', 'Premiere',
-        'Delay', 'Postponed', 'Rescheduled', 'Confirmed', 'Annihilated', 'Greenlit',
-        'Production', 'Sequel', 'New Visual', 'Streaming', 'Teaser'
+        // Announcements
+        'announcement', 'announces', 'confirmed', 'greenlit', 'reveals',
+        // Seasons & sequels
+        'season 2', 'season 3', 'season 4', 'season 5',
+        '2nd season', '3rd season', '4th season', '5th season', 'final season',
+        'sequel', 'new anime',
+        // Media releases
+        'trailer', 'teaser', 'pv', 'key visual', 'new visual',
+        // Scheduling
+        'premiere', 'broadcast date', 'coming to', 'streaming',
+        'delay', 'postponed', 'rescheduled',
+        // Production
+        'movie', 'film', 'production',
     ],
-    // Keywords strictly forbidden
+    // Keywords that indicate non-newsworthy content — auto-reject
     NEGATIVE_KEYWORDS: [
-        'Birthday', 'Cafe', 'Merch', 'Figure', 'Goods', 'Collaboration',
-        'Blu-ray', 'DVD', 'Box Set', 'Interview', 'Event', 'Mario', 'AI'
+        'birthday', 'cafe', 'merch', 'figure', 'goods', 'collaboration',
+        'blu-ray', 'dvd', 'box set', 'interview', 'behind the scenes',
+        'event', 'mario', 'concert', 'live event', 'pop-up shop',
+        'giveaway', 'sweepstakes', 'contest', 'quiz', 'poll',
+        'wallpaper', 'ringtone', 'sticker', 'emoji',
     ],
     // Content categories to exclude (for RSS filtering)
     EXCLUDE_CATEGORIES: [
-        'manga', 'light novel', 'novel', 'live-action', 'live action', 
-        'webtoon', 'manhwa', 'comic', 'book', 'movie review'
-    ]
+        'manga', 'light novel', 'novel', 'live-action', 'live action',
+        'webtoon', 'manhwa', 'comic', 'book', 'movie review',
+        'cosplay', 'convention',
+    ],
+    // Keyword filter for sources that need it (e.g., Viz Media)
+    // Only accept content matching these terms from keyword-filtered sources
+    KEYWORD_FILTER_REQUIRED: [
+        'anime', 'anime trailer', 'trailer', 'pv', 'teaser',
+        'season', 'premiere', 'announcement', 'streaming',
+    ],
 };
 
 /**
- * FREE RSS SOURCES — Tier 2-4 quality, no API costs
- * 
- * Last verified: 2026-02-27
- * - ANN: 195 items ✅
- * - OtakuNews: 50 items ✅
- * - MAL: 20 items ✅
- * - ComicBook: 0 items ❌ (dead)
- * - Crunchyroll: 0 items ❌ (dead)
+ * FREE RSS SOURCES — No API costs
+ *
+ * Revised 2026-03-12:
+ * T1: MAL News (reliable, EN, high-quality aggregation)
+ * T2: ANN (keyword-filtered), Natalie.mu, Oricon (JP primary)
+ * T3: OtakuNews, Anime UK News, MANTAN Web (supplementary)
  */
 export const RSS_SOURCES = {
-    // Tier 2: Established anime news (verified working)
+    TIER_1: [
+        { name: 'MyAnimeList News', url: 'https://myanimelist.net/rss/news.xml', tier: 1 },
+    ],
     TIER_2: [
-        { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2 },
-        { name: 'MyAnimeList', url: 'https://myanimelist.net/rss/news.xml', tier: 2 },
-        { name: 'OtakuNews', url: 'https://www.otakunews.com/rss/rss.xml', tier: 2 }
+        { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2, keywordFiltered: true },
+        { name: 'Natalie.mu', url: 'https://natalie.mu/comic/feed/news', tier: 2, lang: 'JP' },
+        { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 2, lang: 'JP' },
     ],
-    // Tier 3: Platform/entertainment news (currently no working sources)
     TIER_3: [
-        // Sources disabled - returning empty/broken
-        // { name: 'ComicBook', url: 'https://comicbook.com/anime/rss', tier: 3 },
-        // { name: 'CrunchyrollNews', url: 'https://www.crunchyroll.com/news/rss', tier: 3 }
+        { name: 'OtakuNews', url: 'https://www.otakunews.com/rss/rss.xml', tier: 3 },
+        { name: 'Anime UK News', url: 'https://animeuknews.net/feed/', tier: 3 },
+        { name: 'MANTAN Web Anime', url: 'https://mantan-web.jp/rss/anime.xml', tier: 3, lang: 'JP' },
     ],
-    // Tier 1: Japanese primary sources (earlier news, requires translation)
-    TIER_1_JP: [
-        { name: 'Natalie.mu', url: 'https://natalie.mu/comic/feed/news', tier: 1 },
-        { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 1 }
-    ]
 };
 
 /**
- * YOUTUBE STUDIO CHANNELS — Free RSS via ytimg feeds
+ * YOUTUBE CHANNELS — Free RSS via ytimg feeds
  * Monitor for trailer drops, PVs, announcements
  * Format: https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID
+ *
+ * Revised 2026-03-12:
+ * T1: Crunchyroll, Netflix Anime, Aniplex USA, TOHO Animation (auto-publish worthy)
+ * T2: Kadokawa, Pony Canyon (EN-only filter), Viz Media (keyword-filtered)
+ * T3: MAPPA, Ufotable, A-1 Pictures, CloverWorks (manual review — JP-heavy)
+ * Removed: Funimation (dead brand), Sentai Filmworks (inactive), Muse Asia (inactive)
  */
 export const YOUTUBE_STUDIO_CHANNELS = {
-    // Tier 1: Major studios — UNIQUE verified channel IDs only
-    // Duplicate/placeholder IDs removed. Add verified IDs via admin Connections panel.
+    // Tier 1: Major platforms/distributors — consistent EN content, auto-publish worthy
     TIER_1: [
-        { name: 'MAPPA', channelId: 'UCZxsdzmU3OoC9Q8Z3swoS6g', tier: 1 },
-        { name: 'Ufotable', channelId: 'UCgHfufyA9n6qMvo3K0XBp2w', tier: 1 },
-        { name: 'A-1 Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 1 },
-        { name: 'CloverWorks', channelId: 'UC3ryC1YkgR0eJ1O4C9jP-Q', tier: 1 },
+        { name: 'Crunchyroll', channelId: 'UC6pGDc4luvCq5w1C9lt0v0g', tier: 1 },
+        { name: 'Netflix Anime', channelId: 'UC0Q6wx_3LTWqWBp3Z6k5V0Q', tier: 1 },
+        { name: 'Aniplex USA', channelId: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', tier: 1 },
+        { name: 'TOHO Animation', channelId: 'UCp8LObSyk0vZ02NF4_7PcWg', tier: 1 },
     ],
-    // Tier 2: Publishers, committees & major licensors
+    // Tier 2: Publishers — good content, needs review or keyword filtering
     TIER_2: [
-        { name: 'Aniplex', channelId: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', tier: 2 },
         { name: 'Kadokawa', channelId: 'UCqmNf2x0c3y9fL8F5xM1A9w', tier: 2 },
-        { name: 'TOHO Animation', channelId: 'UCp8LObSyk0vZ02NF4_7PcWg', tier: 2 },
-        { name: 'Pony Canyon', channelId: 'UCZzMwpW4T56_6fL4U1q8f6w', tier: 2 },
-        { name: 'Sentai Filmworks', channelId: 'UC3Z1wS1J19EiItZgP8b1IgQ', tier: 2 },
+        { name: 'Pony Canyon', channelId: 'UCZzMwpW4T56_6fL4U1q8f6w', tier: 2, enOnly: true },
+        { name: 'Viz Media', channelId: 'UCoh3TqQGIRLSFHE8JiSgHCg', tier: 2, keywordFiltered: true },
     ],
-    // Tier 3: Streaming platforms & licensors
+    // Tier 3: Studio channels — manual review only (JP-heavy, inconsistent uploads)
     TIER_3: [
-        { name: 'Crunchyroll', channelId: 'UC6pGDc4luvCq5w1C9lt0v0g', tier: 3 },
-        { name: 'Netflix Anime', channelId: 'UC0Q6wx_3LTWqWBp3Z6k5V0Q', tier: 3 },
-        { name: 'Funimation', channelId: 'UCF7C8P-qM01hgTCx5qX5Huw', tier: 3 },
-        { name: 'Muse Asia', channelId: 'UCx2x8m47eHqXq6WwR4h8ZFw', tier: 3 },
+        { name: 'MAPPA', channelId: 'UCZxsdzmU3OoC9Q8Z3swoS6g', tier: 3 },
+        { name: 'Ufotable', channelId: 'UCgHfufyA9n6qMvo3K0XBp2w', tier: 3 },
+        { name: 'A-1 Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 3 },
+        { name: 'CloverWorks', channelId: 'UC3ryC1YkgR0eJ1O4C9jP-Q', tier: 3 },
     ],
     // Tier 4: Franchise channels — add verified IDs via admin Connections panel
     TIER_4: [] as { name: string; channelId: string; tier: number }[]
@@ -161,9 +178,9 @@ export const YOUTUBE_STUDIO_CHANNELS = {
  * Combined source list for iteration
  */
 export const ALL_RSS_SOURCES = [
+    ...RSS_SOURCES.TIER_1,
     ...RSS_SOURCES.TIER_2,
     ...RSS_SOURCES.TIER_3,
-    ...(RSS_SOURCES.TIER_1_JP || [])
 ];
 
 // ============================================================
