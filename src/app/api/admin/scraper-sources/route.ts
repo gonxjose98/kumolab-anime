@@ -24,40 +24,43 @@ const DEFAULT_SOURCES = {
         { handle: 'HIDIVEofficial', name: 'HIDIVE', tier: 3, id: '2762868188' },
     ],
     youtube: [
-        // T1: Studios (direct source of trailers/PVs)
-        { name: 'MAPPA', tier: 1 },
-        { name: 'Ufotable', tier: 1 },
-        { name: 'A-1 Pictures', tier: 1 },
-        { name: 'CloverWorks', tier: 1 },
-        // T2: Publishers & committees
-        { name: 'Aniplex', tier: 2 },
+        // T1: Major platforms/distributors — consistent EN content, auto-publish worthy
+        { name: 'Crunchyroll', tier: 1 },
+        { name: 'Netflix Anime', tier: 1 },
+        { name: 'Aniplex USA', tier: 1 },
+        { name: 'TOHO Animation', tier: 1 },
+        // T2: Publishers — good content, needs review or keyword filtering
         { name: 'Kadokawa', tier: 2 },
-        { name: 'TOHO Animation', tier: 2 },
         { name: 'Pony Canyon', tier: 2 },
         { name: 'Viz Media', tier: 2 },
-        // T3: Streaming platforms
-        { name: 'Crunchyroll', tier: 3 },
-        { name: 'Netflix Anime', tier: 3 },
+        // T3: Studio channels — manual review only (JP-heavy)
+        { name: 'MAPPA', tier: 3 },
+        { name: 'Ufotable', tier: 3 },
+        { name: 'A-1 Pictures', tier: 3 },
+        { name: 'CloverWorks', tier: 3 },
     ],
     reddit: [
         { name: 'r/anime', url: 'reddit.com/r/anime', type: 'Top daily posts' },
     ],
     rss: [
-        // T1: Japanese primary sources (earliest news)
-        { name: 'Natalie.mu', url: 'natalie.mu', tier: 1, lang: 'JP' },
-        { name: 'Oricon Anime', url: 'oricon.co.jp', tier: 1, lang: 'JP' },
-        // T2: Established anime news (verified working)
-        { name: 'MyAnimeList News', url: 'myanimelist.net', tier: 2, lang: 'EN' },
+        // T1: High-quality EN aggregation (auto-publish worthy)
+        { name: 'MyAnimeList News', url: 'myanimelist.net', tier: 1, lang: 'EN' },
+        // T2: Good content, needs keyword filtering or review
         { name: 'Anime News Network', url: 'animenewsnetwork.com', tier: 2, lang: 'EN' },
-        { name: 'OtakuNews', url: 'otakunews.com', tier: 2, lang: 'EN' },
-        { name: 'Anime UK News', url: 'animeuknews.net', tier: 2, lang: 'EN' },
-        // T3: Japanese entertainment (broader coverage)
+        { name: 'Natalie.mu', url: 'natalie.mu', tier: 2, lang: 'JP' },
+        { name: 'Oricon Anime', url: 'oricon.co.jp', tier: 2, lang: 'JP' },
+        // T3: Supplementary sources (manual review)
+        { name: 'OtakuNews', url: 'otakunews.com', tier: 3, lang: 'EN' },
+        { name: 'Anime UK News', url: 'animeuknews.net', tier: 3, lang: 'EN' },
         { name: 'MANTAN Web', url: 'mantan-web.jp', tier: 3, lang: 'JP' },
     ],
 };
 
 const STORAGE_KEY = 'scraper-config.json';
 const BUCKET = 'blog-images';
+
+/** Config version — bump to force-reset stale storage configs */
+const CONFIG_VERSION = 2; // Bumped 2026-03-12: restructured tiers
 
 /** Read the scraper config from Supabase Storage, or return defaults */
 async function readConfig(): Promise<typeof DEFAULT_SOURCES> {
@@ -66,7 +69,14 @@ async function readConfig(): Promise<typeof DEFAULT_SOURCES> {
         if (data && !error) {
             const text = await data.text();
             const parsed = JSON.parse(text);
-            return { ...DEFAULT_SOURCES, ...parsed };
+            // If stored config is outdated (no version or old version), use defaults
+            if (!parsed._version || parsed._version < CONFIG_VERSION) {
+                console.log('[ScraperSources] Stale config detected, resetting to defaults');
+                await writeConfig({ ...DEFAULT_SOURCES, _version: CONFIG_VERSION } as any);
+                return DEFAULT_SOURCES;
+            }
+            const { _version, ...config } = parsed;
+            return { ...DEFAULT_SOURCES, ...config };
         }
     } catch {
         // Config doesn't exist yet — will seed on first write
@@ -76,7 +86,8 @@ async function readConfig(): Promise<typeof DEFAULT_SOURCES> {
 
 /** Write the scraper config to Supabase Storage */
 async function writeConfig(config: typeof DEFAULT_SOURCES): Promise<void> {
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const payload = { ...config, _version: CONFIG_VERSION };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     await supabaseAdmin.storage.from(BUCKET).upload(STORAGE_KEY, blob, {
         upsert: true,
         contentType: 'application/json',
@@ -126,6 +137,16 @@ export async function POST(req: NextRequest) {
         await writeConfig(config);
 
         return NextResponse.json({ success: true, config });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}
+
+/** PATCH — Force-reset sources to current defaults (clears stale storage) */
+export async function PATCH() {
+    try {
+        await writeConfig(DEFAULT_SOURCES);
+        return NextResponse.json({ success: true, message: 'Sources reset to defaults', config: DEFAULT_SOURCES });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
