@@ -9,14 +9,14 @@ import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
  * Workers:
  * - detection: Runs every 10 min (lightweight RSS/YouTube checks)
  * - processing: Runs hourly (scoring, deduplication, approvals)
- * - dailydrops: Runs at 8 AM EST (AniList daily episodes)
+ * - dailydrops: Runs at 6 AM EST (AniList daily episodes)
  */
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const worker = searchParams.get('worker');
     const slot = searchParams.get('slot');
-    
+
     console.log(`[Cron] Triggered: worker=${worker || 'legacy'}, slot=${slot || 'none'} at ${new Date().toISOString()}`);
 
     try {
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             error: 'Invalid worker or slot parameter.',
             valid_workers: ['detection', 'processing', 'dailydrops'],
-            valid_slots: ['08:00', '12:00', '16:00', '20:00', 'hourly']
+            valid_slots: ['06:00', '08:00', '12:00', '16:00', '20:00', 'hourly']
         }, { status: 400 });
         
     } catch (error: any) {

@@ -16,10 +16,12 @@ import { publishToSocials } from '../social/publisher';
 import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
 import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
 import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
-// Nitter fallback removed 2026-03-12 — Nitter instances are dead, X API v2 is primary
+// Nitter fallback removed 2026-03-12 — Nitter instances are dead
 // import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
 import { scanRSSFeeds, generateRSSPost } from './expanded-rss';
-import { scanXAccounts, generateXPost } from './x-monitor';
+// X scan removed from hourly cron 2026-03-12 — free tier can't read other users' tweets.
+// X monitoring is now manual-only via /api/admin/twitter endpoint.
+// import { scanXAccounts, generateXPost } from './x-monitor';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
@@ -28,7 +30,7 @@ const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
  * Main engine function to run for a specific slot.
  * Now triggered by a single hourly cron (see vercel.json)
  */
-export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
+export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
     const now = new Date();
     // 1. Convert to EST for "Wall Clock" logic (Sticky Triggering)
     const estFormatter = new Intl.DateTimeFormat('en-US', {
@@ -54,9 +56,9 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
 
     console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
-    // --- 1. DAILY DROPS (STICKY TRIGGER @ 8 AM EST OR LATER) ---
-    // If it's 8 AM or later and we haven't posted today's drops, prioritize them.
-    const isDailyDropsSlot = explicitSlot === '08:00' || (explicitSlot === 'hourly' && currentEstHour >= 8 && !hasDailyDropsToday);
+    // --- 1. DAILY DROPS (SINGLE FIRE @ 6 AM EST) ---
+    // Fires once at 6 AM EST. No sticky trigger — if missed, it won't retry hourly.
+    const isDailyDropsSlot = explicitSlot === '06:00' || (explicitSlot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
 
     if (isDailyDropsSlot) {
         console.log(`[Engine] Slot identified as Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
@@ -137,45 +139,10 @@ export async function runBlogEngine(slot: '08:00' | '12:00' | '16:00' | '20:00' 
     }
 
     // --- 3. X API v2 SCAN ---
-    // (Nitter fallback removed 2026-03-12 — all Nitter instances are dead)
-    {
-        console.log('[Engine] Scanning X (Twitter) API for announcements...');
-
-        try {
-            const xCandidates = await scanXAccounts(6);
-
-            if (xCandidates.length > 0) {
-                for (const candidate of xCandidates.slice(0, 3)) {
-                    const post = generateXPost(candidate, now);
-
-                    const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
-                    if (dupCheck.action === 'BLOCK') {
-                        console.log(`[Engine] BLOCKED duplicate X post: ${post.title}`);
-                        continue;
-                    }
-
-                    const { error: insertError } = await supabaseAdmin
-                        .from('posts')
-                        .insert([post]);
-
-                    if (!insertError) {
-                        console.log(`[Engine] Added X post to pending: ${post.title}`);
-                        await logSchedulerRun(slot, 'success', `X announcement: ${post.title}`, {
-                            handle: candidate.authorHandle,
-                            tweetId: candidate.id
-                        });
-                    } else {
-                        console.error(`[Engine] X insert error: ${insertError.message}`);
-                    }
-                }
-            } else {
-                console.log('[Engine] No new X announcements');
-            }
-        } catch (xError: any) {
-            console.error('[Engine] X API scan error:', xError?.message || xError);
-            await logSchedulerRun(slot, 'error', `X API scan failed: ${xError?.message}`, { error: String(xError) }).catch(() => {});
-        }
-    }
+    // Removed from hourly cron 2026-03-12: Free tier doesn't support reading other users' tweets.
+    // X scanning is now manual-only via /api/admin/twitter endpoint (on-demand button).
+    // RSS + YouTube already cover the same announcements reliably and for free.
+    console.log('[Engine] X scan skipped (manual-only mode — use admin dashboard for on-demand scans)');
 
     // --- 4. EXPANDED RSS SCAN ---
     {
