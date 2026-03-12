@@ -3,49 +3,56 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
-// Default sources (seeded from hardcoded values in the codebase)
+// Default sources — synced with sources-config.ts, x-monitor.ts, expanded-rss.ts
+// Last synced: 2026-03-12
 const DEFAULT_SOURCES = {
     x: [
+        // T1: Platforms (auto-publish worthy)
         { handle: 'Crunchyroll', name: 'Crunchyroll', tier: 1, id: '1567507580' },
-        { handle: 'FUNimation', name: 'Funimation', tier: 1, id: '18817213' },
-        { handle: 'AniplexUSA', name: 'Aniplex', tier: 1, id: '138176537' },
-        { handle: 'MAPPA_Info', name: 'MAPPA', tier: 1, id: '1032494551180222464' },
-        { handle: 'kyoani', name: 'Kyoto Animation', tier: 1, id: '100507039' },
-        { handle: 'ufotable', name: 'Ufotable', tier: 1, id: '96958501' },
-        { handle: 'toho_animation', name: 'TOHO Animation', tier: 1, id: '294510573' },
-        { handle: 'KadokawaAnime', name: 'Kadokawa', tier: 1, id: '164224501' },
+        { handle: 'NetflixAnime', name: 'Netflix Anime', tier: 1, id: '80384892' },
+        { handle: 'AniplexUSA', name: 'Aniplex USA', tier: 1, id: '138176537' },
+        // T2: Publishers & news (needs review)
+        { handle: 'toho_animation', name: 'TOHO Animation', tier: 2, id: '294510573' },
+        { handle: 'KadokawaAnime', name: 'Kadokawa', tier: 2, id: '164224501' },
+        { handle: 'MAPPA_Info', name: 'MAPPA', tier: 2, id: '1032494551180222464' },
         { handle: 'AnimeNewsNet', name: 'Anime News Network', tier: 2, id: '11964382' },
         { handle: 'AniTrendz', name: 'AniTrendz', tier: 2, id: '187460970' },
-        { handle: 'NetflixAnime', name: 'Netflix Anime', tier: 1, id: '80384892' },
-        { handle: 'HIDIVEofficial', name: 'HIDIVE', tier: 2, id: '2762868188' },
+        { handle: 'VIZMedia', name: 'Viz Media', tier: 2, id: '' },
+        // T3: Studios & niche platforms (manual only)
+        { handle: 'ufotable', name: 'Ufotable', tier: 3, id: '96958501' },
+        { handle: 'kyoani', name: 'Kyoto Animation', tier: 3, id: '100507039' },
+        { handle: 'HIDIVEofficial', name: 'HIDIVE', tier: 3, id: '2762868188' },
     ],
     youtube: [
-        { name: 'MAPPA', tier: 1 }, { name: 'Ufotable', tier: 1 }, { name: 'A-1 Pictures', tier: 1 },
-        { name: 'Toei Animation', tier: 1 }, { name: 'CloverWorks', tier: 1 }, { name: 'Kyoto Animation', tier: 1 },
-        { name: 'Wit Studio', tier: 1 }, { name: 'Trigger', tier: 1 }, { name: 'Bones', tier: 1 },
-        { name: 'Madhouse', tier: 1 }, { name: 'Production I.G', tier: 1 }, { name: 'Science SARU', tier: 1 },
-        { name: 'Aniplex', tier: 2 }, { name: 'Kadokawa', tier: 2 }, { name: 'TOHO Animation', tier: 2 },
-        { name: 'Bandai Namco', tier: 2 }, { name: 'Pony Canyon', tier: 2 }, { name: 'Sentai Filmworks', tier: 2 },
-        { name: 'Shueisha', tier: 2 }, { name: 'Crunchyroll', tier: 3 }, { name: 'Netflix Anime', tier: 3 },
-        { name: 'Funimation', tier: 3 }, { name: 'Muse Asia', tier: 3 }, { name: 'HIDIVE', tier: 3 },
-        { name: 'ONE PIECE Official', tier: 4 }, { name: 'Demon Slayer Official', tier: 4 },
-        { name: 'Jujutsu Kaisen Official', tier: 4 }, { name: 'My Hero Academia Official', tier: 4 },
-        { name: 'Attack on Titan Official', tier: 4 }, { name: 'Naruto Official', tier: 4 },
-        { name: 'Dragon Ball Official', tier: 4 },
+        // T1: Studios (direct source of trailers/PVs)
+        { name: 'MAPPA', tier: 1 },
+        { name: 'Ufotable', tier: 1 },
+        { name: 'A-1 Pictures', tier: 1 },
+        { name: 'CloverWorks', tier: 1 },
+        // T2: Publishers & committees
+        { name: 'Aniplex', tier: 2 },
+        { name: 'Kadokawa', tier: 2 },
+        { name: 'TOHO Animation', tier: 2 },
+        { name: 'Pony Canyon', tier: 2 },
+        { name: 'Viz Media', tier: 2 },
+        // T3: Streaming platforms
+        { name: 'Crunchyroll', tier: 3 },
+        { name: 'Netflix Anime', tier: 3 },
     ],
     reddit: [
         { name: 'r/anime', url: 'reddit.com/r/anime', type: 'Top daily posts' },
     ],
     rss: [
-        { name: 'Anime News Network', url: 'animenewsnetwork.com', tier: 2, lang: 'EN' },
-        { name: 'MyAnimeList News', url: 'myanimelist.net', tier: 2, lang: 'EN' },
-        { name: 'OtakuNews', url: 'otakunews.com', tier: 2, lang: 'EN' },
-        { name: 'Crunchyroll News', url: 'crunchyroll.com', tier: 1, lang: 'EN' },
-        { name: 'Anime UK News', url: 'animeuknews.net', tier: 2, lang: 'EN' },
-        { name: 'Anime Herald', url: 'animeherald.com', tier: 2, lang: 'EN' },
+        // T1: Japanese primary sources (earliest news)
         { name: 'Natalie.mu', url: 'natalie.mu', tier: 1, lang: 'JP' },
         { name: 'Oricon Anime', url: 'oricon.co.jp', tier: 1, lang: 'JP' },
-        { name: 'MANTAN Web', url: 'mantan-web.jp', tier: 2, lang: 'JP' },
+        // T2: Established anime news (verified working)
+        { name: 'MyAnimeList News', url: 'myanimelist.net', tier: 2, lang: 'EN' },
+        { name: 'Anime News Network', url: 'animenewsnetwork.com', tier: 2, lang: 'EN' },
+        { name: 'OtakuNews', url: 'otakunews.com', tier: 2, lang: 'EN' },
+        { name: 'Anime UK News', url: 'animeuknews.net', tier: 2, lang: 'EN' },
+        // T3: Japanese entertainment (broader coverage)
+        { name: 'MANTAN Web', url: 'mantan-web.jp', tier: 3, lang: 'JP' },
     ],
 };
 

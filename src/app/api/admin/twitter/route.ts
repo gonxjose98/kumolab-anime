@@ -68,7 +68,7 @@ export async function GET() {
     return NextResponse.json({
         status: 'ok',
         message: 'X (Twitter) monitoring API is active (X API v2)',
-        monitored_accounts: MONITORED_ACCOUNTS.map(a => ({
+        monitored_accounts: MONITORED_ACCOUNTS.map((a: { handle: string; name: string; tier: number }) => ({
             handle: a.handle,
             name: a.name,
             tier: a.tier

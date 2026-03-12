@@ -364,3 +364,5 @@ export function generateXPost(tweet: XTweet, now: Date): any {
         publicMetrics: tweet.publicMetrics
     };
 }
+
+export { MONITORED_ACCOUNTS };
