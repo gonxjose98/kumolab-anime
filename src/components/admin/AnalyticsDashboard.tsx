@@ -174,8 +174,8 @@ export default function AnalyticsDashboard({ websiteData, socialData }: Analytic
                 </div>
             </div>
 
-            {/* Side Metric Cards */}
-            <div className="flex flex-col gap-4">
+            {/* Side Metric Cards - Now side by side */}
+            <div className="flex flex-row gap-4">
                 {/* Likes Card */}
                 <div className="flex-1 relative overflow-hidden rounded-2xl p-5" style={{
                     background: 'rgba(12,12,24,0.5)',
