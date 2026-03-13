@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { logAction } from '@/lib/logging/structured-logger';
 
 export async function POST(req: NextRequest) {
     try {
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
             }
 
             results.push({ id: postId, success: true, method: 'deleted' });
+            await logAction({ action: 'declined', entityId: postId, actor: 'Admin', reason: reason || 'No reason provided' });
         }
 
         // Bust Next.js cache so refresh shows correct data

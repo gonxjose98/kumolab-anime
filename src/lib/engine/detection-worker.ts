@@ -1,27 +1,29 @@
 /**
- * Detection Worker — UNIFIED PIPELINE
+ * Detection Worker — UNIFIED PIPELINE (v2)
  * Single source of truth for all content ingestion.
  * Runs every 10 minutes via GitHub Actions.
  *
- * Scans: RSS feeds, YouTube channels, Newsroom (AniList/MAL trending)
+ * Scans: RSS feeds, YouTube (RSS — no API quota), Newsroom (AniList/MAL trending)
  * Output: detection_candidates table rows (pending_processing)
  *
- * The Processing Worker then scores, deduplicates, and promotes to posts.
+ * v2 changes:
+ * - Cross-references posts table to prevent re-detecting published content
+ * - Persists source health to DB instead of in-memory
+ * - YouTube uses RSS feeds (no API quota) + only scans 6 AM–9 PM EST
+ * - Structured logging for every decision
  */
 
 import { supabaseAdmin } from '../supabase/admin';
 import {
   TIER_2_RSS_SOURCES,
-  TIER_3_SOURCES,
   RELIABILITY_CONFIG,
-  type SourceConfig
 } from './intelligence-config';
 import { logSchedulerRun } from '../logging/scheduler';
+import { logScraperDecision, logError, logAgentAction } from '../logging/structured-logger';
 import { fetchSmartTrendingCandidates } from './fetchers';
 
 // Candidate record interface
 interface DetectionCandidate {
-  id?: string;
   source_name: string;
   source_tier: 1 | 2 | 3;
   source_url: string;
@@ -33,121 +35,83 @@ interface DetectionCandidate {
   media_urls: string[];
   canonical_url?: string;
   extraction_method: 'RSS' | 'YouTube' | 'Nitter' | 'HTML';
-  status: 'pending_processing' | 'processing' | 'processed' | 'discarded';
+  status: 'pending_processing';
   fingerprint?: string;
   metadata?: Record<string, any>;
 }
 
-// Source health tracking
-interface SourceHealth {
-  name: string;
-  healthScore: number;
-  consecutiveFailures: number;
-  lastCheck: Date | null;
-  lastSuccess: Date | null;
-  isEnabled: boolean;
-  skippedUntil?: Date;
-}
+// ─── Source Health (DB-backed) ──────────────────────────────
 
-// In-memory health tracking
-const sourceHealth: Map<string, SourceHealth> = new Map();
+async function loadSourceHealth(sourceName: string): Promise<{ healthScore: number; consecutiveFailures: number; isEnabled: boolean }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('source_health')
+      .select('health_score, consecutive_failures, is_enabled, skipped_until')
+      .eq('source_name', sourceName)
+      .single();
 
-/**
- * Initialize source health tracking
- */
-function initializeSourceHealth() {
-  for (const source of TIER_2_RSS_SOURCES) {
-    sourceHealth.set(source.name, {
-      name: source.name,
-      healthScore: source.healthScore,
-      consecutiveFailures: 0,
-      lastCheck: null,
-      lastSuccess: null,
-      isEnabled: true
-    });
+    if (!data) return { healthScore: 100, consecutiveFailures: 0, isEnabled: true };
+
+    // Check skip window — re-enable after expiry
+    if (!data.is_enabled && data.skipped_until && new Date() > new Date(data.skipped_until)) {
+      await supabaseAdmin.from('source_health').update({ is_enabled: true, skipped_until: null }).eq('source_name', sourceName);
+      return { healthScore: data.health_score, consecutiveFailures: data.consecutive_failures, isEnabled: true };
+    }
+
+    return { healthScore: data.health_score, consecutiveFailures: data.consecutive_failures, isEnabled: data.is_enabled };
+  } catch {
+    return { healthScore: 100, consecutiveFailures: 0, isEnabled: true };
   }
 }
 
-/**
- * Update source health after check
- */
-function updateSourceHealth(sourceName: string, success: boolean, error?: string) {
-  const health = sourceHealth.get(sourceName);
-  if (!health) return;
-  
-  health.lastCheck = new Date();
-  
-  if (success) {
-    health.healthScore = Math.min(100, health.healthScore + RELIABILITY_CONFIG.HEALTH_RECOVERY);
-    health.consecutiveFailures = 0;
-    health.lastSuccess = new Date();
-    health.isEnabled = true;
-  } else {
-    health.healthScore = Math.max(0, health.healthScore - RELIABILITY_CONFIG.HEALTH_DECAY);
-    health.consecutiveFailures++;
-    
-    // Disable source if health too low
-    if (health.healthScore < RELIABILITY_CONFIG.HEALTH_THRESHOLD) {
-      health.isEnabled = false;
-      health.skippedUntil = new Date(Date.now() + RELIABILITY_CONFIG.SKIP_DURATION_MINUTES * 60 * 1000);
-      console.log(`[DetectionWorker] Disabled source ${sourceName} due to low health (${health.healthScore})`);
+async function updateSourceHealthDB(sourceName: string, sourceTier: number, success: boolean) {
+  try {
+    const existing = await loadSourceHealth(sourceName);
+    const newHealth = success
+      ? Math.min(100, existing.healthScore + RELIABILITY_CONFIG.HEALTH_RECOVERY)
+      : Math.max(0, existing.healthScore - RELIABILITY_CONFIG.HEALTH_DECAY);
+    const newFailures = success ? 0 : existing.consecutiveFailures + 1;
+    const shouldDisable = newHealth < RELIABILITY_CONFIG.HEALTH_THRESHOLD;
+
+    const update: Record<string, any> = {
+      source_name: sourceName,
+      source_type: 'rss',
+      tier: sourceTier,
+      health_score: newHealth,
+      consecutive_failures: newFailures,
+      is_enabled: !shouldDisable,
+      last_check: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (success) update.last_success = new Date().toISOString();
+    if (shouldDisable) {
+      update.skipped_until = new Date(Date.now() + RELIABILITY_CONFIG.SKIP_DURATION_MINUTES * 60 * 1000).toISOString();
+      console.log(`[DetectionWorker] Disabled ${sourceName} — health ${newHealth}`);
     }
-    
-    // Log failure
-    if (health.consecutiveFailures >= RELIABILITY_CONFIG.SKIP_AFTER_FAILURES) {
-      console.warn(`[DetectionWorker] Source ${sourceName} failed ${health.consecutiveFailures} times consecutively`);
-    }
+
+    await supabaseAdmin.from('source_health').upsert(update, { onConflict: 'source_name' });
+  } catch (e) {
+    console.error(`[DetectionWorker] Failed to update health for ${sourceName}:`, e);
   }
 }
 
-/**
- * Check if source should be skipped
- */
-function shouldSkipSource(sourceName: string): boolean {
-  const health = sourceHealth.get(sourceName);
-  if (!health) return false;
-  
-  if (!health.isEnabled && health.skippedUntil) {
-    if (new Date() < health.skippedUntil) {
-      return true;
-    }
-    // Re-enable after skip duration
-    health.isEnabled = true;
-    health.skippedUntil = undefined;
-  }
-  
-  return false;
-}
+// ─── RSS Fetch ──────────────────────────────────────────────
 
-/**
- * Fetch RSS feed with retry logic
- */
 async function fetchRSSWithRetry(url: string, retries = 0): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    
     const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/rss+xml, application/xml, text/xml',
-        'User-Agent': 'KumoLab-DetectionWorker/1.0'
-      },
-      signal: controller.signal
+      headers: { 'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml', 'User-Agent': 'KumoLab-DetectionWorker/2.0' },
+      signal: controller.signal,
     });
-    
     clearTimeout(timeout);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.text();
-  } catch (error) {
+  } catch {
     if (retries < RELIABILITY_CONFIG.MAX_RETRIES) {
-      const delay = Math.min(
-        RELIABILITY_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retries),
-        RELIABILITY_CONFIG.RETRY_DELAY_MAX
-      );
+      const delay = Math.min(RELIABILITY_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retries), RELIABILITY_CONFIG.RETRY_DELAY_MAX);
       await new Promise(r => setTimeout(r, delay));
       return fetchRSSWithRetry(url, retries + 1);
     }
@@ -155,41 +119,41 @@ async function fetchRSSWithRetry(url: string, retries = 0): Promise<string | nul
   }
 }
 
-/**
- * Parse RSS items from XML
- */
+// ─── RSS Parsing (supports RSS <item> + Atom <entry>) ───────
+
 function parseRSSItems(xmlText: string, sourceName: string): DetectionCandidate[] {
   const candidates: DetectionCandidate[] = [];
-  
   try {
-    // Extract items using regex (lightweight, no XML parser needed)
     const itemRegex = /<item>[\s\S]*?<\/item>/g;
-    const items = xmlText.match(itemRegex) || [];
-    
-    for (const item of items.slice(0, 10)) { // Process max 10 recent items
+    const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
+    const items = xmlText.match(itemRegex) || xmlText.match(entryRegex) || [];
+
+    for (const item of items.slice(0, 10)) {
       const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
-      const linkMatch = item.match(/<link>(.*?)<\/link>/);
-      const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
-      const descMatch = item.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/);
-      
+      const linkMatch = item.match(/<link[^>]*href="([^"]+)"/) || item.match(/<link>(.*?)<\/link>/);
+      const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/) || item.match(/<published>(.*?)<\/published>/) || item.match(/<updated>(.*?)<\/updated>/);
+      const descMatch = item.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/) ||
+                         item.match(/<summary>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/summary>/) ||
+                         item.match(/<content[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/content/);
+
       const title = titleMatch ? decodeHTMLEntities(titleMatch[1]) : '';
       const link = linkMatch ? linkMatch[1] : '';
       const pubDate = pubDateMatch ? pubDateMatch[1] : '';
       const description = descMatch ? decodeHTMLEntities(descMatch[1]) : '';
-      
+
       if (!title || !link) continue;
-      
-      // Extract media URLs from content
+
       const mediaUrls: string[] = [];
       const imgRegex = /<img[^>]+src="([^"]+)"/g;
       let imgMatch;
-      while ((imgMatch = imgRegex.exec(description)) !== null) {
-        mediaUrls.push(imgMatch[1]);
-      }
-      
-      // Create fingerprint
+      while ((imgMatch = imgRegex.exec(item)) !== null) mediaUrls.push(imgMatch[1]);
+      const enclosureMatch = item.match(/<enclosure[^>]+url="([^"]+)"/);
+      if (enclosureMatch) mediaUrls.push(enclosureMatch[1]);
+      const mediaMatch = item.match(/<media:content[^>]+url="([^"]+)"/);
+      if (mediaMatch) mediaUrls.push(mediaMatch[1]);
+
       const fingerprint = createFingerprint(title, link);
-      
+
       candidates.push({
         source_name: sourceName,
         source_tier: 2,
@@ -203,195 +167,209 @@ function parseRSSItems(xmlText: string, sourceName: string): DetectionCandidate[
         canonical_url: link,
         extraction_method: 'RSS',
         status: 'pending_processing',
-        fingerprint
+        fingerprint,
       });
     }
   } catch (error) {
     console.error(`[DetectionWorker] Error parsing RSS from ${sourceName}:`, error);
   }
-  
   return candidates;
 }
 
-/**
- * Create content fingerprint for deduplication
- */
+// ─── Fingerprint ────────────────────────────────────────────
+
 function createFingerprint(title: string, url: string): string {
-  const normalized = title.toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, 50);
-  
-  // Simple hash
+  const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
+  const domain = url.replace(/^https?:\/\//, '').split('/')[0] || '';
   let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+  const input = normalized + '|' + domain;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash) + input.charCodeAt(i);
     hash = hash & hash;
   }
-  
-  return `${normalized.replace(/\s/g, '_')}_${Math.abs(hash).toString(36).substring(0, 8)}`;
+  return `${normalized.replace(/\s/g, '_').substring(0, 40)}_${Math.abs(hash).toString(36)}`;
 }
 
-/**
- * Decode HTML entities (runs twice to handle double-encoded entities)
- */
+// ─── HTML Utils ─────────────────────────────────────────────
+
 function decodeHTMLEntities(text: string): string {
   let cleaned = text;
-  // Two passes for double-encoded entities like &amp;lt;cite&amp;gt;
   for (let i = 0; i < 2; i++) {
     cleaned = cleaned
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&#x27;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)));
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)));
   }
-  // Strip HTML tags after decoding
   cleaned = cleaned.replace(/<[^>]+>/g, ' ');
   return cleaned.replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Strip HTML tags
- */
 function stripHTML(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Check if candidate already exists in database
- */
-async function isDuplicateCandidate(fingerprint: string, url: string): Promise<boolean> {
-  const { data } = await supabaseAdmin
+// ─── Duplicate Check (candidates + posts) ───────────────────
+
+async function isDuplicateCandidate(fingerprint: string, url: string, title: string): Promise<{ isDup: boolean; reason?: string }> {
+  // 1. Check detection_candidates (72h)
+  const { data: candMatch } = await supabaseAdmin
     .from('detection_candidates')
     .select('id')
     .or(`fingerprint.eq.${fingerprint},source_url.eq.${url}`)
-    .gte('detected_at', new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()) // 72 hours
+    .gte('detected_at', new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString())
     .limit(1);
-  
-  return !!(data && data.length > 0);
-}
 
-/**
- * Save candidates to database
- */
-async function saveCandidates(candidates: DetectionCandidate[]): Promise<number> {
-  let saved = 0;
-  
-  for (const candidate of candidates) {
-    try {
-      // Check for duplicates
-      if (await isDuplicateCandidate(candidate.fingerprint!, candidate.source_url)) {
-        continue;
+  if (candMatch && candMatch.length > 0) {
+    return { isDup: true, reason: 'Already in candidates' };
+  }
+
+  // 2. Check posts by URL (no time limit — never re-detect a published URL)
+  const { data: postUrlMatch } = await supabaseAdmin
+    .from('posts')
+    .select('id')
+    .eq('source_url', url)
+    .limit(1);
+
+  if (postUrlMatch && postUrlMatch.length > 0) {
+    return { isDup: true, reason: 'URL already published' };
+  }
+
+  // 3. Check posts by title similarity (7 day window)
+  const { data: recentPosts } = await supabaseAdmin
+    .from('posts')
+    .select('id, title')
+    .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(100);
+
+  if (recentPosts) {
+    const candidateWords = new Set(title.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    for (const post of recentPosts) {
+      const postWords = new Set(post.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+      const intersection = [...candidateWords].filter((w: string) => postWords.has(w));
+      const union = new Set([...candidateWords, ...postWords]);
+      const similarity = union.size > 0 ? intersection.length / union.size : 0;
+      if (similarity >= 0.70) {
+        return { isDup: true, reason: `Similar to post ${post.id.slice(0, 8)}` };
       }
-      
-      const { error } = await supabaseAdmin
-        .from('detection_candidates')
-        .insert([{
-          ...candidate,
-          created_at: new Date().toISOString()
-        }]);
-      
-      if (!error) {
-        saved++;
-      }
-    } catch (e) {
-      console.error('[DetectionWorker] Error saving candidate:', e);
     }
   }
-  
-  return saved;
+
+  return { isDup: false };
 }
 
-/**
- * Scan YouTube for new uploads
- */
-async function scanYouTubeForDetection(): Promise<DetectionCandidate[]> {
-  const candidates: DetectionCandidate[] = [];
-  const youtubeApiKey = process.env.YOUTUBE_API_KEY;
-  
-  if (!youtubeApiKey) {
-    console.log('[DetectionWorker] YouTube API key not configured');
-    return candidates;
+// ─── YouTube via RSS (no API quota) ─────────────────────────
+
+async function scanYouTubeViaRSS(): Promise<DetectionCandidate[]> {
+  // Only scan between 6 AM and 9 PM EST
+  const estTimeStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false });
+  const estHour = parseInt(estTimeStr);
+  if (estHour < 6 || estHour >= 21) {
+    console.log(`[DetectionWorker] YouTube skipped — outside active hours (${estHour} EST)`);
+    return [];
   }
-  
-  // Tier 1 YouTube channels - VERIFIED IDs
+
+  const candidates: DetectionCandidate[] = [];
+
+  // YouTube RSS feeds — free, unlimited, no API key needed
   const channels = [
-    { id: 'UCjfAEJZdfbIjVHdo5yODfyQ', name: 'MAPPA', tier: 1 },
-    { id: 'UCRc3mprfrE8qaugB1VfQXiA', name: 'Ufotable', tier: 1 },
-    { id: 'UC14Yc2Qv92DMuyNRlHvpo2Q', name: 'TOHO Animation', tier: 1 },
-    { id: 'UCDb0peSmF5rLX7BvuTcJfCw', name: 'Aniplex', tier: 1 },
+    { id: 'UCjfAEJZdfbIjVHdo5yODfyQ', name: 'MAPPA' },
+    { id: 'UCRc3mprfrE8qaugB1VfQXiA', name: 'Ufotable' },
+    { id: 'UC14Yc2Qv92DMuyNRlHvpo2Q', name: 'TOHO Animation' },
+    { id: 'UCDb0peSmF5rLX7BvuTcJfCw', name: 'Aniplex' },
   ];
-  
+
   for (const channel of channels) {
     try {
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&maxResults=3&order=date&publishedAfter=${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}&key=${youtubeApiKey}`;
-      
-      const response = await fetch(url);
-      if (!response.ok) continue;
-      
-      const data = await response.json();
-      
-      for (const item of data.items || []) {
-        const videoId = item.id?.videoId;
-        if (!videoId) continue;
-        
-        const title = item.snippet?.title || '';
-        const description = item.snippet?.description || '';
-        const publishedAt = item.snippet?.publishedAt;
-        
-        // Check for anime-related keywords - EXPANDED for better detection
-        const animeKeywords = ['trailer', 'pv', 'teaser', 'announcement', 'preview', 'key visual', 
-                               'opening', 'ending', 'cm', 'commercial', 'season', 'episode',
-                               'new anime', 'anime adaptation', 'release date', 'broadcast'];
-        const hasAnimeKeyword = animeKeywords.some(kw => 
-          title.toLowerCase().includes(kw) || description.toLowerCase().includes(kw)
-        );
-        
-        console.log(`[YouTube] Video: "${title.substring(0, 50)}..." - Keyword match: ${hasAnimeKeyword}`);
-        
-        if (!hasAnimeKeyword) continue;
-        
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`;
+      const xml = await fetchRSSWithRetry(rssUrl);
+      if (!xml) continue;
+
+      const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
+      const entries = xml.match(entryRegex) || [];
+
+      for (const entry of entries.slice(0, 3)) {
+        const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
+        const videoIdMatch = entry.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/);
+        const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
+
+        const title = titleMatch ? titleMatch[1].trim() : '';
+        const videoId = videoIdMatch ? videoIdMatch[1].trim() : '';
+        if (!title || !videoId) continue;
+
+        const publishedAt = publishedMatch ? publishedMatch[1].trim() : '';
+        // Only videos from last 48 hours
+        if (publishedAt && (Date.now() - new Date(publishedAt).getTime()) > 48 * 60 * 60 * 1000) continue;
+
+        const animeKeywords = ['trailer', 'pv', 'teaser', 'announcement', 'preview', 'key visual',
+          'opening', 'ending', 'cm', 'season', 'episode', 'anime', 'release', 'broadcast', '予告', 'ティザー'];
+        if (!animeKeywords.some(kw => title.toLowerCase().includes(kw.toLowerCase()))) continue;
+
         const fingerprint = createFingerprint(title, videoId);
-        
+
         candidates.push({
           source_name: `YouTube_${channel.name}`,
-          source_tier: channel.tier as 1 | 2 | 3,
+          source_tier: 1,
           source_url: `https://youtube.com/watch?v=${videoId}`,
           title: title.substring(0, 200),
-          content: description.substring(0, 1000),
+          content: `Official upload from ${channel.name}`,
           detected_at: new Date().toISOString(),
-          original_timestamp: publishedAt,
+          original_timestamp: publishedAt || undefined,
           media_urls: [`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`],
           canonical_url: `https://youtube.com/watch?v=${videoId}`,
           extraction_method: 'YouTube',
           status: 'pending_processing',
           fingerprint,
-          metadata: {
-            video_id: videoId,
-            channel_name: channel.name
-          }
+          metadata: { video_id: videoId, channel_name: channel.name },
         });
       }
     } catch (error) {
-      console.error(`[DetectionWorker] YouTube error for ${channel.name}:`, error);
+      console.error(`[DetectionWorker] YouTube RSS error for ${channel.name}:`, error);
     }
   }
-  
+
   return candidates;
 }
 
-/**
- * Main Detection Worker function
- */
+// ─── Save Candidates ────────────────────────────────────────
+
+async function saveCandidates(candidates: DetectionCandidate[]): Promise<number> {
+  let saved = 0;
+
+  for (const candidate of candidates) {
+    try {
+      const dupCheck = await isDuplicateCandidate(candidate.fingerprint!, candidate.source_url, candidate.title);
+
+      if (dupCheck.isDup) {
+        await logScraperDecision({
+          candidateTitle: candidate.title,
+          sourceName: candidate.source_name,
+          sourceTier: candidate.source_tier,
+          sourceUrl: candidate.source_url,
+          decision: 'rejected_duplicate',
+          reason: dupCheck.reason || 'Dup at detection',
+        });
+        continue;
+      }
+
+      const { error } = await supabaseAdmin
+        .from('detection_candidates')
+        .insert([{ ...candidate, created_at: new Date().toISOString() }]);
+
+      if (error) {
+        await logError({ source: 'detection-worker', errorMessage: `Insert failed: ${error.message}`, context: { title: candidate.title } });
+      } else {
+        saved++;
+      }
+    } catch (e: any) {
+      await logError({ source: 'detection-worker', errorMessage: e.message, context: { title: candidate.title } });
+    }
+  }
+
+  return saved;
+}
+
+// ─── Main Entry Point ───────────────────────────────────────
+
 export async function runDetectionWorker(): Promise<{
   totalCandidates: number;
   newCandidates: number;
@@ -400,55 +378,53 @@ export async function runDetectionWorker(): Promise<{
 }> {
   console.log('[DetectionWorker] Starting detection cycle...');
   const startTime = Date.now();
-  
-  // Initialize health tracking if needed
-  if (sourceHealth.size === 0) {
-    initializeSourceHealth();
-  }
-  
+
   const allCandidates: DetectionCandidate[] = [];
   const errors: string[] = [];
   let sourcesChecked = 0;
-  
+
   // 1. Scan RSS feeds (Tier 2)
   console.log('[DetectionWorker] Scanning RSS feeds...');
   for (const source of TIER_2_RSS_SOURCES) {
-    if (shouldSkipSource(source.name)) {
-      console.log(`[DetectionWorker] Skipping ${source.name} (disabled)`);
+    const health = await loadSourceHealth(source.name);
+    if (!health.isEnabled) {
+      console.log(`[DetectionWorker] Skipping ${source.name} (disabled, health=${health.healthScore})`);
       continue;
     }
-    
+
     sourcesChecked++;
-    
     try {
       const xmlText = await fetchRSSWithRetry(source.url);
-      
       if (xmlText) {
         const candidates = parseRSSItems(xmlText, source.name);
         allCandidates.push(...candidates);
-        updateSourceHealth(source.name, true);
+        await updateSourceHealthDB(source.name, source.tier, true);
         console.log(`[DetectionWorker] ${source.name}: ${candidates.length} candidates`);
       } else {
-        updateSourceHealth(source.name, false);
+        await updateSourceHealthDB(source.name, source.tier, false);
         errors.push(`${source.name}: Failed to fetch`);
+        await logError({ source: 'detection-worker', errorMessage: `RSS fetch failed for ${source.name}`, context: { url: source.url } });
       }
     } catch (error: any) {
-      updateSourceHealth(source.name, false, error.message);
+      await updateSourceHealthDB(source.name, source.tier, false);
       errors.push(`${source.name}: ${error.message}`);
+      await logError({ source: 'detection-worker', errorMessage: error.message, context: { source: source.name } });
     }
   }
-  
-  // 2. Scan YouTube (Tier 1)
-  console.log('[DetectionWorker] Scanning YouTube...');
+
+  // 2. Scan YouTube via RSS (Tier 1) — 6 AM to 9 PM EST only
+  console.log('[DetectionWorker] Scanning YouTube (RSS)...');
   try {
-    const youtubeCandidates = await scanYouTubeForDetection();
+    const youtubeCandidates = await scanYouTubeViaRSS();
     allCandidates.push(...youtubeCandidates);
+    sourcesChecked++;
     console.log(`[DetectionWorker] YouTube: ${youtubeCandidates.length} candidates`);
   } catch (error: any) {
     errors.push(`YouTube: ${error.message}`);
+    await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-rss' } });
   }
 
-  // 3. Scan Newsroom (AniList trending, Intel, Reddit, YouTube studio videos)
+  // 3. Scan Newsroom (AniList trending, Reddit)
   console.log('[DetectionWorker] Scanning Newsroom sources...');
   try {
     const { candidates: newsroomItems, telemetry } = await fetchSmartTrendingCandidates();
@@ -462,14 +438,14 @@ export async function runDetectionWorker(): Promise<{
 
       allCandidates.push({
         source_name: item.source || 'KumoLab Newsroom',
-        source_tier: item.verification_tier || 2,
+        source_tier: (item.verification_tier as 1 | 2 | 3) || 2,
         source_url: item.source_url || '',
         title: title.substring(0, 200),
         content: (item.description || item.content || '').substring(0, 1000),
         detected_at: new Date().toISOString(),
         media_urls: item.image ? [item.image] : (item.announcementAssets || []),
         canonical_url: item.source_url || '',
-        extraction_method: 'HTML' as const,
+        extraction_method: 'HTML',
         status: 'pending_processing',
         fingerprint,
         metadata: {
@@ -480,37 +456,35 @@ export async function runDetectionWorker(): Promise<{
           final_score: item.finalScore,
           event_fingerprint: item.event_fingerprint,
           truth_fingerprint: item.truth_fingerprint,
-        }
+        },
       });
     }
-
-    sourcesChecked += 4; // AniList, Reddit, News, YouTube studios
+    sourcesChecked += 4;
   } catch (error: any) {
     console.error('[DetectionWorker] Newsroom error:', error?.message || error);
     errors.push(`Newsroom: ${error.message}`);
+    await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'newsroom' } });
   }
 
-  // 4. Save candidates to database
+  // 4. Save candidates
   console.log(`[DetectionWorker] Saving ${allCandidates.length} candidates...`);
   const saved = await saveCandidates(allCandidates);
-  
-  // 4. Log run
+
+  // 5. Log run
   const duration = Date.now() - startTime;
-  await logSchedulerRun('detection', 'success', `Detection worker complete: ${saved} new candidates`, {
-    totalDetected: allCandidates.length,
-    newSaved: saved,
-    sourcesChecked,
-    durationMs: duration
+  await logSchedulerRun('detection', 'success', `Detection complete: ${saved} new candidates`, {
+    totalDetected: allCandidates.length, newSaved: saved, sourcesChecked, durationMs: duration,
   });
-  
+
+  await logAgentAction({
+    agentName: 'Scraper',
+    action: 'completed detection cycle',
+    details: `${saved} new from ${allCandidates.length} detected across ${sourcesChecked} sources (${duration}ms)`,
+  });
+
   console.log(`[DetectionWorker] Complete: ${saved}/${allCandidates.length} saved in ${duration}ms`);
-  
-  return {
-    totalCandidates: allCandidates.length,
-    newCandidates: saved,
-    sourcesChecked,
-    errors
-  };
+
+  return { totalCandidates: allCandidates.length, newCandidates: saved, sourcesChecked, errors };
 }
 
 // Run if called directly

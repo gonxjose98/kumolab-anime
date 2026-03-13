@@ -30,7 +30,7 @@ export async function detectDuplicate(
         similarityThreshold?: number; // Default: 0.75
     } = {}
 ): Promise<DuplicateCheckResult> {
-    const { checkWindow = 30, similarityThreshold = 0.75 } = options;
+    const { checkWindow = 7, similarityThreshold = 0.65 } = options;
     
     const since = new Date();
     since.setDate(since.getDate() - checkWindow);

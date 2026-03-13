@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { logAction } from '@/lib/logging/structured-logger';
 
 export async function POST(req: NextRequest) {
     try {
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
                 results.push({ id: postId, success: false, error: error.message });
             } else {
                 results.push({ id: postId, success: true });
+                await logAction({ action: 'approved', entityId: postId, actor: 'Admin', reason: `Scheduled for ${scheduledTime.toISOString()}` });
             }
         }
 
