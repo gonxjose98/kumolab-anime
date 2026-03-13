@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import PostManager from '@/components/admin/PostManager';
 import AdminTabs from '@/components/admin/AdminTabs';
+import DailyBriefing from '@/components/admin/DailyBriefing';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -216,6 +217,7 @@ export default async function DashboardPage() {
         <AdminTabs
             dashboardContent={
                 <div className="space-y-8">
+                    <DailyBriefing />
                     <AnalyticsDashboard
                         websiteData={analytics.website}
                         socialData={analytics.social}

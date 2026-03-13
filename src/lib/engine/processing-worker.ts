@@ -16,6 +16,7 @@ import {
 import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logAction, logError, logAgentAction } from '../logging/structured-logger';
 import { detectDuplicate } from './duplicate-prevention';
+import { gradeContent } from './content-grader';
 
 interface ProcessingCandidate {
   id: string;
@@ -175,6 +176,21 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `Score ${score.total}, ${score.confidence}`, score: score.total, scoreBreakdown: score.breakdown });
     }
 
+    // Grade content quality before insertion
+    const gradeResult = gradeContent({
+      source_tier: candidate.source_tier,
+      source: candidate.source_name,
+      image: post.image,
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      type: post.type,
+      claim_type: post.claim_type,
+      relevance_score: score.total,
+      detected_at: candidate.detected_at,
+    });
+    post.quality_grade = gradeResult.grade;
+
     const { data, error } = await supabaseAdmin.from('posts').insert([post]).select();
     if (error) {
       await logError({ source: 'processing-worker', errorMessage: `Insert: ${error.message}`, context: { title: post.title, code: error.code } });
@@ -182,7 +198,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     }
     if (!data?.length) return { success: false, error: 'No data returned' };
 
-    await logAction({ action: 'created', entityType: 'post', entityId: data[0].id, entityTitle: post.title, actor: 'Scraper', reason: `Score ${score.total} from ${candidate.source_name}` });
+    await logAction({ action: 'created', entityType: 'post', entityId: data[0].id, entityTitle: post.title, actor: 'Scraper', reason: `Grade ${gradeResult.grade} (${gradeResult.score}/100), score ${score.total} from ${candidate.source_name}` });
     return { success: true, postId: data[0].id };
   } catch (error: any) {
     await logError({ source: 'processing-worker', errorMessage: error.message, context: { title: candidate.title } });

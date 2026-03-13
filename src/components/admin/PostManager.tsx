@@ -1744,6 +1744,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                         </span>
                                                     );
                                                 })()}
+                                                {(post as any).quality_grade && (
+                                                    <span style={{
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        width: 22, height: 22, borderRadius: 6, fontSize: 11, fontWeight: 900,
+                                                        color: (post as any).quality_grade === 'A' ? '#00ff88' : (post as any).quality_grade === 'B' ? '#00d4ff' : (post as any).quality_grade === 'C' ? '#ffaa00' : '#ff6b35',
+                                                        background: (post as any).quality_grade === 'A' ? 'rgba(0,255,136,0.12)' : (post as any).quality_grade === 'B' ? 'rgba(0,212,255,0.12)' : (post as any).quality_grade === 'C' ? 'rgba(255,170,0,0.12)' : 'rgba(255,107,53,0.12)',
+                                                        border: `1px solid ${(post as any).quality_grade === 'A' ? 'rgba(0,255,136,0.3)' : (post as any).quality_grade === 'B' ? 'rgba(0,212,255,0.3)' : (post as any).quality_grade === 'C' ? 'rgba(255,170,0,0.3)' : 'rgba(255,107,53,0.3)'}`,
+                                                    }}>
+                                                        {(post as any).quality_grade}
+                                                    </span>
+                                                )}
                                                 {post.status === 'approved' && (
                                                     <div className="flex flex-col items-center gap-1.5 pt-1">
                                                         {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (

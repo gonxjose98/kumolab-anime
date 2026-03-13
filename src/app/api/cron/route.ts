@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runDetectionWorker } from '@/lib/engine/detection-worker';
 import { runProcessingWorker } from '@/lib/engine/processing-worker';
 import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
+import { generateDailyReport } from '@/lib/engine/daily-report';
 
 /**
  * Unified Cron Handler
@@ -64,9 +65,23 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (worker === 'daily-report') {
+            console.log('[Cron] Running Daily Pipeline Report...');
+            const report = await generateDailyReport();
+            return NextResponse.json({
+                success: true,
+                worker: 'daily-report',
+                headline: report.headline,
+                grade: report.avg_quality_grade,
+                accepted: report.candidates_accepted,
+                published: report.posts_published,
+                issues: report.issues.length,
+            });
+        }
+
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops']
+            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report']
         }, { status: 400 });
 
     } catch (error: any) {
