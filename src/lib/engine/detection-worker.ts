@@ -18,6 +18,7 @@ import {
   TIER_2_RSS_SOURCES,
   RELIABILITY_CONFIG,
 } from './intelligence-config';
+import { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } from './sources-config';
 import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logError, logAgentAction } from '../logging/structured-logger';
 import { fetchSmartTrendingCandidates } from './fetchers';
@@ -257,7 +258,58 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
   return { isDup: false };
 }
 
-// ─── YouTube via RSS (no API quota) ─────────────────────────
+// ─── Content Importance Grading ─────────────────────────────
+
+interface ContentGrade {
+  score: number;       // 1-10 importance
+  category: string;    // e.g., 'TRAILER', 'KEY_VISUAL', 'CAST', etc.
+  label: string;       // human-readable label
+}
+
+function gradeVideoContent(title: string): ContentGrade {
+  const t = title.toLowerCase();
+
+  // Tier S (10): Full trailers, official PVs
+  if (/\b(official\s+)?trailer\b|本予告|メインpv|main\s+pv/i.test(t))
+    return { score: 10, category: 'TRAILER', label: 'Official Trailer' };
+  if (/\bpv\b|予告|ティザー/i.test(t) && !/character|キャラ/i.test(t))
+    return { score: 9, category: 'TRAILER', label: 'PV / Teaser' };
+
+  // Tier A (8-9): Season announcements, teasers
+  if (/season\s*\d|シーズン|sequel|続編|new\s+season|final\s+season/i.test(t))
+    return { score: 9, category: 'SEASON_ANNOUNCEMENT', label: 'Season Announcement' };
+  if (/teaser/i.test(t))
+    return { score: 8, category: 'TEASER', label: 'Teaser' };
+
+  // Tier B (6-7): Key visuals, release dates, opening/ending
+  if (/key\s*visual|キービジュアル|new\s+visual|ビジュアル/i.test(t))
+    return { score: 7, category: 'KEY_VISUAL', label: 'Key Visual' };
+  if (/opening|ending|op\s+theme|ed\s+theme|主題歌/i.test(t))
+    return { score: 7, category: 'THEME_SONG', label: 'OP/ED Theme' };
+  if (/release\s+date|premiere|broadcast|放送|配信/i.test(t))
+    return { score: 7, category: 'RELEASE_DATE', label: 'Release Date' };
+  if (/announcement|announces|発表/i.test(t))
+    return { score: 7, category: 'ANNOUNCEMENT', label: 'Announcement' };
+
+  // Tier C (4-5): Cast, character reveals, CM
+  if (/cast|キャスト|voice\s+actor|声優|character/i.test(t))
+    return { score: 5, category: 'CAST', label: 'Cast/Character Reveal' };
+  if (/\bcm\b|commercial|spot/i.test(t))
+    return { score: 5, category: 'CM', label: 'CM/Spot' };
+  if (/preview|次回予告/i.test(t))
+    return { score: 4, category: 'PREVIEW', label: 'Episode Preview' };
+
+  // Tier D (2-3): Episode clips, recaps
+  if (/episode|エピソード|第\d+話/i.test(t))
+    return { score: 3, category: 'EPISODE', label: 'Episode Content' };
+  if (/anime/i.test(t))
+    return { score: 3, category: 'GENERAL', label: 'Anime Content' };
+
+  // Default: some relevance but low priority
+  return { score: 1, category: 'OTHER', label: 'Other' };
+}
+
+// ─── YouTube via RSS — ALL channels, no API quota ───────────
 
 async function scanYouTubeViaRSS(): Promise<DetectionCandidate[]> {
   // Only scan between 6 AM and 9 PM EST
@@ -270,140 +322,122 @@ async function scanYouTubeViaRSS(): Promise<DetectionCandidate[]> {
 
   const candidates: DetectionCandidate[] = [];
 
-  // YouTube RSS feeds — free, unlimited, no API key needed
-  const channels = [
-    { id: 'UCjfAEJZdfbIjVHdo5yODfyQ', name: 'MAPPA' },
-    { id: 'UCRc3mprfrE8qaugB1VfQXiA', name: 'Ufotable' },
-    { id: 'UC14Yc2Qv92DMuyNRlHvpo2Q', name: 'TOHO Animation' },
-    { id: 'UCDb0peSmF5rLX7BvuTcJfCw', name: 'Aniplex' },
+  // Combine ALL tiers from sources-config — ALL scanned via free RSS
+  const allChannels = [
+    ...YOUTUBE_STUDIO_CHANNELS.TIER_1.map(c => ({ ...c, tier: 1 as const })),
+    ...YOUTUBE_STUDIO_CHANNELS.TIER_2.map(c => ({ ...c, tier: 2 as const })),
+    ...YOUTUBE_STUDIO_CHANNELS.TIER_3.map(c => ({ ...c, tier: 3 as const })),
+    ...YOUTUBE_STUDIO_CHANNELS.TIER_4.map(c => ({ ...c, tier: 3 as const })),
   ];
 
-  for (const channel of channels) {
-    try {
-      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`;
-      const xml = await fetchRSSWithRetry(rssUrl);
-      if (!xml) continue;
+  console.log(`[DetectionWorker] Scanning ${allChannels.length} YouTube channels via RSS...`);
 
-      const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
-      const entries = xml.match(entryRegex) || [];
+  // Scan all channels in parallel batches of 4 for speed
+  const batchSize = 4;
+  for (let i = 0; i < allChannels.length; i += batchSize) {
+    const batch = allChannels.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map(channel => scanSingleYouTubeChannel(channel))
+    );
 
-      for (const entry of entries.slice(0, 3)) {
-        const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
-        const videoIdMatch = entry.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/);
-        const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
-
-        const title = titleMatch ? titleMatch[1].trim() : '';
-        const videoId = videoIdMatch ? videoIdMatch[1].trim() : '';
-        if (!title || !videoId) continue;
-
-        const publishedAt = publishedMatch ? publishedMatch[1].trim() : '';
-        // Only videos from last 48 hours
-        if (publishedAt && (Date.now() - new Date(publishedAt).getTime()) > 48 * 60 * 60 * 1000) continue;
-
-        const animeKeywords = ['trailer', 'pv', 'teaser', 'announcement', 'preview', 'key visual',
-          'opening', 'ending', 'cm', 'season', 'episode', 'anime', 'release', 'broadcast', '予告', 'ティザー'];
-        if (!animeKeywords.some(kw => title.toLowerCase().includes(kw.toLowerCase()))) continue;
-
-        const fingerprint = createFingerprint(title, videoId);
-
-        candidates.push({
-          source_name: `YouTube_${channel.name}`,
-          source_tier: 1,
-          source_url: `https://youtube.com/watch?v=${videoId}`,
-          title: title.substring(0, 200),
-          content: `Official upload from ${channel.name}`,
-          detected_at: new Date().toISOString(),
-          original_timestamp: publishedAt || undefined,
-          media_urls: [`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`],
-          canonical_url: `https://youtube.com/watch?v=${videoId}`,
-          extraction_method: 'YouTube',
-          status: 'pending_processing',
-          fingerprint,
-          metadata: { video_id: videoId, channel_name: channel.name },
-        });
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        candidates.push(...result.value);
       }
-    } catch (error) {
-      console.error(`[DetectionWorker] YouTube RSS error for ${channel.name}:`, error);
     }
   }
+
+  // Sort by content grade — most important first
+  candidates.sort((a, b) => {
+    const gradeA = (a.metadata?.content_grade as number) || 0;
+    const gradeB = (b.metadata?.content_grade as number) || 0;
+    return gradeB - gradeA;
+  });
 
   return candidates;
 }
 
-// ─── YouTube via Data API (quota-limited) ───────────────────
+async function scanSingleYouTubeChannel(channel: { name: string; channelId: string; tier: number }): Promise<DetectionCandidate[]> {
+  const results: DetectionCandidate[] = [];
 
-const YOUTUBE_API_CHANNELS = [
-  { id: 'UCZxsdzmU3OoC9Q8Z3swoS6g', name: 'MAPPA Official' },
-  { id: 'UCgHfufyA9n6qMvo3K0XBp2w', name: 'Ufotable' },
-  { id: 'UCp8LObSyk0vZ02NF4_7PcWg', name: 'TOHO Animation' },
-  { id: 'UC2xDictxIa66VdNG1PaIyQ', name: 'A-1 Pictures' },
-  { id: 'UC3ryC1YkgR0eJ1O4C9jP-Q', name: 'CloverWorks' },
-  { id: 'UCqmNf2x0c3y9fL8F5xM1A9w', name: 'Kadokawa' },
-];
+  try {
+    const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.channelId}`;
+    const xml = await fetchRSSWithRetry(rssUrl);
+    if (!xml) {
+      await updateSourceHealthDB(`YouTube_${channel.name}`, channel.tier, false);
+      return [];
+    }
 
-async function scanYouTubeAPI(): Promise<DetectionCandidate[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY || '';
-  if (!apiKey) {
-    console.log('[DetectionWorker] YouTube API key not set, skipping');
-    return [];
-  }
+    await updateSourceHealthDB(`YouTube_${channel.name}`, channel.tier, true);
 
-  // Only scan between 6 AM and 9 PM EST
-  const estTimeStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false });
-  const estHour = parseInt(estTimeStr);
-  if (estHour < 6 || estHour >= 21) return [];
+    const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
+    const entries = xml.match(entryRegex) || [];
 
-  const candidates: DetectionCandidate[] = [];
-  // Rotate: pick 2 random channels per run to stay under quota
-  const shuffled = [...YOUTUBE_API_CHANNELS].sort(() => Math.random() - 0.5);
-  const toScan = shuffled.slice(0, 2);
+    for (const entry of entries.slice(0, 5)) {
+      const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
+      const videoIdMatch = entry.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/);
+      const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
 
-  for (const channel of toScan) {
-    try {
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&order=date&maxResults=5&type=video&publishedAfter=${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}&key=${apiKey}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+      const videoId = videoIdMatch ? videoIdMatch[1].trim() : '';
+      if (!title || !videoId) continue;
 
-      if (!response.ok) {
-        console.log(`[DetectionWorker] YouTube API ${channel.name}: HTTP ${response.status}`);
+      const publishedAt = publishedMatch ? publishedMatch[1].trim() : '';
+      // Only videos from last 48 hours
+      if (publishedAt && (Date.now() - new Date(publishedAt).getTime()) > 48 * 60 * 60 * 1000) continue;
+
+      // Grade content importance
+      const grade = gradeVideoContent(title);
+
+      // For T1 channels: accept everything with grade >= 3 (they're official sources)
+      // For T2 channels: accept grade >= 4 (filter out low-value clips)
+      // For T3 channels: accept grade >= 5 (only meaningful content from studios)
+      const minGrade = channel.tier === 1 ? 3 : channel.tier === 2 ? 4 : 5;
+      if (grade.score < minGrade) {
+        console.log(`[DetectionWorker] YouTube skip (grade ${grade.score}/${minGrade}): "${title}" [${channel.name}]`);
         continue;
       }
-      const data = await response.json();
-      if (!data.items?.length) continue;
 
-      for (const video of data.items) {
-        const title = video.snippet?.title || '';
-        const videoId = video.id?.videoId || '';
-        if (!title || !videoId) continue;
+      // Check negative keywords
+      const hasNegative = CONTENT_RULES.NEGATIVE_KEYWORDS.some(kw =>
+        title.toLowerCase().includes(kw.toLowerCase())
+      );
+      if (hasNegative) continue;
 
-        const fingerprint = createFingerprint(title, videoId);
-        candidates.push({
-          source_name: `YouTube_API_${channel.name}`,
-          source_tier: 1,
-          source_url: `https://youtube.com/watch?v=${videoId}`,
-          title: title.substring(0, 200),
-          content: (video.snippet?.description || '').substring(0, 1000),
-          detected_at: new Date().toISOString(),
-          original_timestamp: video.snippet?.publishedAt || undefined,
-          media_urls: [
-            video.snippet?.thumbnails?.maxres?.url || video.snippet?.thumbnails?.high?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-          ],
-          canonical_url: `https://youtube.com/watch?v=${videoId}`,
-          extraction_method: 'YouTube',
-          status: 'pending_processing',
-          fingerprint,
-          metadata: { video_id: videoId, channel_name: channel.name, via: 'api' },
-        });
-      }
-      console.log(`[DetectionWorker] YouTube API ${channel.name}: ${data.items.length} videos`);
-    } catch (error: any) {
-      console.error(`[DetectionWorker] YouTube API ${channel.name} error:`, error.message);
+      const fingerprint = createFingerprint(title, videoId);
+
+      results.push({
+        source_name: `YouTube_${channel.name}`,
+        source_tier: channel.tier as 1 | 2 | 3,
+        source_url: `https://youtube.com/watch?v=${videoId}`,
+        title: title.substring(0, 200),
+        content: `${grade.label} from ${channel.name}`,
+        detected_at: new Date().toISOString(),
+        original_timestamp: publishedAt || undefined,
+        media_urls: [`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`],
+        canonical_url: `https://youtube.com/watch?v=${videoId}`,
+        extraction_method: 'YouTube',
+        status: 'pending_processing',
+        fingerprint,
+        metadata: {
+          video_id: videoId,
+          channel_name: channel.name,
+          channel_tier: channel.tier,
+          content_grade: grade.score,
+          content_category: grade.category,
+          content_label: grade.label,
+        },
+      });
     }
+
+    if (results.length > 0) {
+      console.log(`[DetectionWorker] YouTube ${channel.name} (T${channel.tier}): ${results.length} videos [best: ${results[0]?.metadata?.content_label}]`);
+    }
+  } catch (error: any) {
+    console.error(`[DetectionWorker] YouTube RSS error for ${channel.name}:`, error.message);
   }
 
-  return candidates;
+  return results;
 }
 
 // ─── Save Candidates ────────────────────────────────────────
@@ -488,28 +522,22 @@ export async function runDetectionWorker(): Promise<{
     }
   }
 
-  // 2. Scan YouTube via RSS (Tier 1) — 6 AM to 9 PM EST only
-  console.log('[DetectionWorker] Scanning YouTube (RSS)...');
+  // 2. Scan ALL YouTube channels via RSS (free, no quota) — 6 AM to 9 PM EST
+  console.log('[DetectionWorker] Scanning YouTube (ALL channels via RSS)...');
   try {
     const youtubeCandidates = await scanYouTubeViaRSS();
     allCandidates.push(...youtubeCandidates);
-    sourcesChecked++;
-    console.log(`[DetectionWorker] YouTube RSS: ${youtubeCandidates.length} candidates`);
+    const channelCount = [
+      ...YOUTUBE_STUDIO_CHANNELS.TIER_1,
+      ...YOUTUBE_STUDIO_CHANNELS.TIER_2,
+      ...YOUTUBE_STUDIO_CHANNELS.TIER_3,
+      ...YOUTUBE_STUDIO_CHANNELS.TIER_4,
+    ].length;
+    sourcesChecked += channelCount;
+    console.log(`[DetectionWorker] YouTube RSS: ${youtubeCandidates.length} candidates from ${channelCount} channels`);
   } catch (error: any) {
     errors.push(`YouTube RSS: ${error.message}`);
     await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-rss' } });
-  }
-
-  // 2b. Scan YouTube via Data API (2 channels per run, quota-friendly)
-  console.log('[DetectionWorker] Scanning YouTube API (2 channels)...');
-  try {
-    const ytApiCandidates = await scanYouTubeAPI();
-    allCandidates.push(...ytApiCandidates);
-    sourcesChecked++;
-    console.log(`[DetectionWorker] YouTube API: ${ytApiCandidates.length} candidates`);
-  } catch (error: any) {
-    errors.push(`YouTube API: ${error.message}`);
-    await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-api' } });
   }
 
   // 3. Scan Newsroom (AniList trending, Reddit)
