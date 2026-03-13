@@ -180,6 +180,106 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     }
 
     /**
+     * Translate Japanese (or any non-English) text to English.
+     * Returns { title, content } with translated text, or original if already English.
+     */
+    public async translateToEnglish(title: string, content: string): Promise<{ title: string; content: string }> {
+        const messages = [
+            {
+                role: 'system',
+                content: `You are a professional anime news translator. Translate the following Japanese (or non-English) anime news title and content into natural, fluent English.
+
+RULES:
+- Keep anime titles/names in their commonly known English form (e.g. 鬼滅の刃 → Demon Slayer)
+- If a title is already well-known in English, use that name
+- Keep proper nouns, character names, and studio names accurate
+- Translate naturally — not word-for-word
+- Preserve factual information exactly (dates, episode numbers, seasons)
+- Keep the same tone and meaning
+- Do NOT add commentary or extra information
+
+Respond with ONLY a JSON object:
+{"title": "translated title", "content": "translated content"}`
+            },
+            {
+                role: 'user',
+                content: `Title: ${title}\n\nContent: ${content}`
+            }
+        ];
+
+        const result = await this.sendCompletionRequest(messages, true);
+        const response = result.choices?.[0]?.message?.content;
+        if (!response) throw new Error('Empty translation response');
+
+        try {
+            const parsed = JSON.parse(response);
+            return { title: parsed.title || title, content: parsed.content || content };
+        } catch {
+            // If JSON parse fails, try to extract from response
+            console.warn('[AntigravityAI] Translation JSON parse failed, returning original');
+            return { title, content };
+        }
+    }
+
+    /**
+     * Format a title to KumoLab's two-line standard.
+     * Returns the formatted title string.
+     */
+    public async formatKumoLabTitle(rawTitle: string, rawContent: string): Promise<string> {
+        const messages = [
+            {
+                role: 'system',
+                content: `You format anime news titles for KumoLab. Follow this EXACT format every time.
+
+RULES:
+1. Always use TWO lines.
+2. The first line is the anime title in single quotation marks.
+3. The second line contains the news update.
+4. Keep it short, clean, and factual.
+5. Do NOT add extra sentences, commentary, or emojis.
+6. Do NOT write "TV Anime".
+7. Avoid unnecessary filler words.
+8. Use the separator " • " when including two pieces of info.
+9. Capitalize properly like a headline.
+10. Never exceed two lines.
+
+FORMAT:
+'Anime Title'
+Key Update • Secondary Detail
+
+EXAMPLES:
+
+'Witch Hat Atelier'
+Official Trailer Released • Premieres April 6, 2026
+
+'Agents of the Four Seasons'
+New Anime Announced • Premieres March 28, 2026
+
+'MAO'
+New Anime • Premieres April 4
+
+'Hell's Paradise' Season 2
+New Illustration Released
+
+OUTPUT RULE:
+Return ONLY the formatted title.
+Do not explain anything.
+Do not include extra text.
+Do not wrap in quotes or code blocks.`
+            },
+            {
+                role: 'user',
+                content: `Title: ${rawTitle}\n\nContext: ${rawContent}`
+            }
+        ];
+
+        const result = await this.sendCompletionRequest(messages, false);
+        const response = result.choices?.[0]?.message?.content?.trim();
+        if (!response) return rawTitle;
+        return response;
+    }
+
+    /**
      * Auto Engine: Used by the background automation to generate high-quality posts from raw intel.
      */
     public async generateFromIntel(sourceData: string, type: 'INTEL' | 'TRENDING') {

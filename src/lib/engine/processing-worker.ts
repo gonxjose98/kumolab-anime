@@ -17,6 +17,19 @@ import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logAction, logError, logAgentAction } from '../logging/structured-logger';
 import { detectDuplicate } from './duplicate-prevention';
 import { gradeContent } from './content-grader';
+import { AntigravityAI } from './ai';
+
+// ─── Japanese Detection ────────────────────────────────────────
+// Matches CJK Unified Ideographs, Hiragana, Katakana
+const CJK_REGEX = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/;
+
+function containsJapanese(text: string): boolean {
+  if (!text) return false;
+  // If more than 20% of non-whitespace chars are CJK, treat as Japanese
+  const stripped = text.replace(/\s+/g, '');
+  const cjkCount = (stripped.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/g) || []).length;
+  return cjkCount / stripped.length > 0.2;
+}
 
 interface ProcessingCandidate {
   id: string;
@@ -156,11 +169,23 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     };
 
     const imageUrl = candidate.media_urls?.[0] || null;
-    // Use a placeholder if no image — don't reject the post entirely
+    const hasImage = !!imageUrl && imageUrl !== '/images/placeholder-news.svg';
     post.image = imageUrl || '/images/placeholder-news.svg';
+    post.needs_image = !hasImage;
+
+    // Store translation metadata if applicable
+    if (candidate.metadata?.was_translated) {
+      post.original_title = candidate.metadata.original_title;
+      post.original_content = candidate.metadata.original_content;
+    }
 
     const isT1YouTube = candidate.source_tier === 1 && candidate.source_name?.toLowerCase().includes('youtube');
-    if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
+
+    // NO IMAGE = always force pending, regardless of score/tier
+    if (!hasImage) {
+      post.status = 'pending';
+      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `No image — requires manual review. Score ${score.total}`, score: score.total, scoreBreakdown: score.breakdown });
+    } else if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
       post.status = 'approved'; post.is_published = true; post.published_at = now; post.approved_at = now; post.approved_by = 'system';
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_auto', reason: 'T1 YouTube high confidence', score: score.total, scoreBreakdown: score.breakdown });
       await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}` });
@@ -233,6 +258,41 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
       try {
         stats.processed++;
         const score = calculateContentScore(candidate);
+
+        // ─── Auto-translate Japanese content ────────────────
+        const needsTranslation = containsJapanese(candidate.title) || containsJapanese(candidate.content);
+        if (needsTranslation) {
+          try {
+            const ai = AntigravityAI.getInstance();
+            const translated = await ai.translateToEnglish(candidate.title, candidate.content);
+            console.log(`[ProcessingWorker] Translated: "${candidate.title}" → "${translated.title}"`);
+            // Store originals in metadata, use translated text going forward
+            candidate.metadata = {
+              ...candidate.metadata,
+              original_title: candidate.title,
+              original_content: candidate.content,
+              was_translated: true,
+            };
+            candidate.title = translated.title;
+            candidate.content = translated.content;
+          } catch (err: any) {
+            console.warn(`[ProcessingWorker] Translation failed for "${candidate.title}": ${err.message}`);
+            // Continue with original text rather than blocking
+          }
+        }
+
+        // ─── Format title to KumoLab standard ──────────────
+        try {
+          const ai = AntigravityAI.getInstance();
+          const formattedTitle = await ai.formatKumoLabTitle(candidate.title, candidate.content);
+          if (formattedTitle && formattedTitle.length > 3) {
+            candidate.title = formattedTitle;
+          }
+        } catch (err: any) {
+          console.warn(`[ProcessingWorker] Title formatting failed: ${err.message}`);
+          // Continue with existing title
+        }
+
         const animeName = extractAnimeName(candidate.title, candidate.content);
         const enrichedData = { animeName, claimType: determineClaimType(candidate.title, candidate.content), studio: candidate.source_name?.includes('YouTube') ? candidate.metadata?.channel_name : undefined };
 

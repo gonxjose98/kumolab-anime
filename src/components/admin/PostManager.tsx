@@ -1655,6 +1655,16 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                 {/* Flags Row */}
                                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {(post as any).needs_image && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,100,0,0.15)', color: '#ff6b35', border: '1px solid rgba(255,100,0,0.3)' }}>
+                                                            ⚠ NEEDS IMAGE
+                                                        </span>
+                                                    )}
+                                                    {(post as any).original_title && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,180,255,0.1)', color: '#00b4ff', border: '1px solid rgba(0,180,255,0.2)' }}>
+                                                            Translated
+                                                        </span>
+                                                    )}
                                                     {((post as any).is_duplicate || (post as any).duplicate_of) && (
                                                         <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,60,60,0.1)', color: '#ff4444', border: '1px solid rgba(255,60,60,0.2)' }}>
                                                             DUP {(post as any).duplicate_confidence ? `${Math.round((post as any).duplicate_confidence)}%` : ''}
