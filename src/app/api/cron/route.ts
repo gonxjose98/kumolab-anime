@@ -4,23 +4,21 @@ import { runProcessingWorker } from '@/lib/engine/processing-worker';
 import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
 
 /**
- * NEW 3-Tier Intelligence System Cron Handler
- * 
+ * Unified Cron Handler
+ *
  * Workers:
- * - detection: Runs every 10 min (lightweight RSS/YouTube checks)
- * - processing: Runs hourly (scoring, deduplication, approvals)
- * - dailydrops: Runs at 6 AM EST (AniList daily episodes)
+ * - detection:  Runs every 10 min via GitHub Actions (RSS, YouTube, Newsroom)
+ * - processing: Runs hourly via Vercel cron (scoring, dedup, post creation + scheduled publishing)
+ * - dailydrops: Runs at 6 AM EST via Vercel cron (AniList daily episodes)
  */
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const worker = searchParams.get('worker');
-    const slot = searchParams.get('slot');
 
-    console.log(`[Cron] Triggered: worker=${worker || 'legacy'}, slot=${slot || 'none'} at ${new Date().toISOString()}`);
+    console.log(`[Cron] Triggered: worker=${worker || 'none'} at ${new Date().toISOString()}`);
 
     try {
-        // NEW ARCHITECTURE: Worker-based system
         if (worker === 'detection') {
             console.log('[Cron] Running Detection Worker...');
             const result = await runDetectionWorker();
@@ -35,9 +33,12 @@ export async function GET(req: NextRequest) {
                 }
             });
         }
-        
+
         if (worker === 'processing') {
-            console.log('[Cron] Running Processing Worker...');
+            console.log('[Cron] Running Processing Worker + Scheduled Publisher...');
+            // Publish any approved scheduled posts first
+            await publishScheduledPosts();
+            // Then process new candidates
             const result = await runProcessingWorker();
             return NextResponse.json({
                 success: true,
@@ -51,11 +52,10 @@ export async function GET(req: NextRequest) {
                 }
             });
         }
-        
+
         if (worker === 'dailydrops') {
             console.log('[Cron] Running Daily Drops (6 AM EST)...');
             await publishScheduledPosts();
-            // Pass '06:00' explicitly so Daily Drops always fires regardless of exact UTC timing
             const result = await runBlogEngine('06:00', false);
             return NextResponse.json({
                 success: true,
@@ -63,25 +63,12 @@ export async function GET(req: NextRequest) {
                 post: result ? result.title : null
             });
         }
-        
-        // LEGACY SUPPORT: Old slot-based system (gradual migration)
-        if (slot) {
-            console.log('[Cron] Running legacy engine (slot-based)...');
-            await publishScheduledPosts();
-            const result = await runBlogEngine(slot as any, false);
-            return NextResponse.json({
-                success: true,
-                worker: 'legacy',
-                post: result ? result.title : null
-            });
-        }
-        
+
         return NextResponse.json({
-            error: 'Invalid worker or slot parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops'],
-            valid_slots: ['06:00', '08:00', '12:00', '16:00', '20:00', 'hourly']
+            error: 'Invalid worker parameter.',
+            valid_workers: ['detection', 'processing', 'dailydrops']
         }, { status: 400 });
-        
+
     } catch (error: any) {
         console.error('[Cron] Worker Error:', error);
         return NextResponse.json({

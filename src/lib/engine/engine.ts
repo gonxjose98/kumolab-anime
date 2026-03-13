@@ -1,38 +1,35 @@
 /**
- * engine.ts
- * Orchestrator for the KumoLab Daily Blog Automation
+ * engine.ts — SLIMMED DOWN
+ *
+ * Responsibilities:
+ * 1. Daily Drops (6 AM EST) — fetches AniList airing, auto-publishes
+ * 2. Scheduled Post Publisher — publishes approved posts whose time has come
+ *
+ * All other scanning (RSS, YouTube, Newsroom) is now handled by the
+ * Detection Worker → Processing Worker pipeline. See detection-worker.ts.
  */
 
-import { fetchAniListAiring, verifyOnCrunchyroll, fetchAnimeIntel, fetchTrendingSignals, fetchSmartTrendingCandidates } from './fetchers';
+import { fetchAniListAiring } from './fetchers';
 import { logSchedulerRun } from '../logging/scheduler';
-import { generateDailyDropsPost, generateIntelPost, generateTrendingPost, validatePost } from './generator';
+import { generateDailyDropsPost } from './generator';
 import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
 import fs from 'fs';
 import path from 'path';
 
 import { supabaseAdmin } from '../supabase/admin';
-import { publishToSocials } from '../social/publisher';
-import { getSourceTier, calculateRelevanceScore, checkForDuplicate } from './utils';
-import { detectDuplicate, filterDuplicatesFromQueue } from './duplicate-prevention';
-import { scanYouTubeChannels, generateTrailerPost } from './youtube-monitor';
-// Nitter fallback removed 2026-03-12 — Nitter instances are dead
-// import { scanTwitterAccounts, generateTwitterPost } from './twitter-monitor';
-import { scanRSSFeeds, generateRSSPost } from './expanded-rss';
-// X scan removed from hourly cron 2026-03-12 — free tier can't read other users' tweets.
-// X monitoring is now manual-only via /api/admin/twitter endpoint.
-// import { scanXAccounts, generateXPost } from './x-monitor';
 
 const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
 const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
 
 /**
- * Main engine function to run for a specific slot.
- * Now triggered by a single hourly cron (see vercel.json)
+ * Main engine function — now only handles Daily Drops.
+ * Called by Vercel cron at 6 AM EST (worker=dailydrops).
  */
 export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
     const now = new Date();
-    // 1. Convert to EST for "Wall Clock" logic (Sticky Triggering)
+
+    // Convert to EST wall clock
     const estFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/New_York',
         year: 'numeric', month: '2-digit', day: '2-digit',
@@ -50,300 +47,49 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
     const existingPosts = await getPosts(true);
     const hasDailyDropsToday = existingPosts.some(p => p.type === 'DROP' && p.slug.includes(estDateSlug));
 
-    let newPost: BlogPost | null = null;
-    let explicitSlot = slot;
-    let telemetry: any = null;
-
     console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
-    // --- 1. DAILY DROPS (SINGLE FIRE @ 6 AM EST) ---
-    // Fires when Vercel cron sends worker=dailydrops (which passes slot='06:00').
-    // Also fires if hourly cron happens to hit 6 AM EST and no post exists yet.
-    const isDailyDropsSlot = (explicitSlot === '06:00' && !hasDailyDropsToday) || (explicitSlot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
+    // --- DAILY DROPS (SINGLE FIRE @ 6 AM EST) ---
+    const isDailyDropsSlot = (slot === '06:00' && !hasDailyDropsToday) || (slot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
 
-    if (isDailyDropsSlot) {
-        console.log(`[Engine] Slot identified as Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
-
-        // Create UTC dates representing the start and end of the current EST day
-        // We use the already extracted y, m, d
-        const startLimit = new Date(`${y}-${m}-${d}T00:00:00-05:00`);
-        const endLimit = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
-
-        console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
-
-        const episodes = await fetchAniListAiring(
-            Math.floor(startLimit.getTime() / 1000),
-            Math.floor(endLimit.getTime() / 1000)
-        );
-
-        // Pass the EST date string to ensure the post slug stays consistent with the EST day
-        newPost = generateDailyDropsPost(episodes, now, estDateSlug);
-
-        if (!newPost) {
-            console.log('[Engine] Zero drops found for today. Skipping Daily Drops.');
-            // We don't return here, we let it fall through to Dynamic Newsroom IF it was an hourly trigger
-            // But if it was explicitly '08:00', we might want to stop? 
-            // Better to allow Dynamic Newsroom as a fallback if no drops exist.
-        }
-
-    }
-
-    // --- ALL SCRAPERS RUN INDEPENDENTLY (no gating on newPost) ---
-    // Each scraper runs regardless of what other scrapers found.
-    // This ensures Twitter/X/RSS content always gets picked up.
-
-    // --- 2. YOUTUBE TRAILER SCAN ---
-    {
-        console.log('[Engine] Scanning YouTube for new trailers...');
-
-        const youtubeApiKey = process.env.YOUTUBE_API_KEY;
-        if (youtubeApiKey) {
-            try {
-                const trailerCandidates = await scanYouTubeChannels(youtubeApiKey, 2);
-
-                if (trailerCandidates.length > 0) {
-                    for (const candidate of trailerCandidates.slice(0, 3)) {
-                        const trailerPost = generateTrailerPost(candidate, now);
-
-                        // Send to pending approval (admin reviews before publishing)
-                        console.log(`[Engine] Adding trailer to PENDING: ${trailerPost.title}`);
-
-                        const { error: insertError } = await supabaseAdmin
-                            .from('posts')
-                            .insert([{
-                                ...trailerPost,
-                                timestamp: now.toISOString(),
-                                is_published: false,
-                                status: 'pending'
-                            }]);
-
-                        if (!insertError) {
-                            await logSchedulerRun(slot, 'success', `YouTube trailer → pending: ${trailerPost.title}`, {
-                                videoId: candidate.videoId,
-                                channel: candidate.channelName,
-                                type: candidate.contentType
-                            });
-                        } else {
-                            console.error('[Engine] Failed to insert trailer:', insertError.message);
-                        }
-                    }
-                } else {
-                    console.log('[Engine] No new trailers found');
-                }
-            } catch (ytError: any) {
-                console.error('[Engine] YouTube scan error:', ytError?.message || ytError);
-                await logSchedulerRun(slot, 'error', `YouTube scan failed: ${ytError?.message}`, { error: String(ytError) }).catch(() => {});
-            }
-        } else {
-            console.log('[Engine] YouTube API key not configured, skipping trailer scan');
-        }
-    }
-
-    // --- 3. X API v2 SCAN ---
-    // Removed from hourly cron 2026-03-12: Free tier doesn't support reading other users' tweets.
-    // X scanning is now manual-only via /api/admin/twitter endpoint (on-demand button).
-    // RSS + YouTube already cover the same announcements reliably and for free.
-    console.log('[Engine] X scan skipped (manual-only mode — use admin dashboard for on-demand scans)');
-
-    // --- 4. EXPANDED RSS SCAN ---
-    {
-        console.log('[Engine] Scanning expanded RSS feeds...');
-
-        try {
-            const rssCandidates = await scanRSSFeeds(6);
-
-            if (rssCandidates.length > 0) {
-                for (const candidate of rssCandidates.slice(0, 5)) {
-                    const post = generateRSSPost(candidate, now);
-
-                    const dupCheck = await detectDuplicate(post, { checkWindow: 24 });
-                    if (dupCheck.action === 'BLOCK') {
-                        console.log(`[Engine] BLOCKED duplicate RSS: ${post.title}`);
-                        continue;
-                    }
-
-                    const { error: insertError } = await supabaseAdmin
-                        .from('posts')
-                        .insert([post]);
-
-                    if (!insertError) {
-                        console.log(`[Engine] Added RSS post to pending: ${post.title}`);
-                        await logSchedulerRun(slot, 'success', `RSS article: ${post.title}`, {
-                            source: candidate.sourceName,
-                            language: candidate.language
-                        });
-                    } else {
-                        console.error(`[Engine] RSS insert error: ${insertError.message}`);
-                    }
-                }
-            } else {
-                console.log('[Engine] No new RSS articles');
-            }
-        } catch (rssError: any) {
-            console.error('[Engine] RSS scan error:', rssError?.message || rssError);
-            await logSchedulerRun(slot, 'error', `RSS scan failed: ${rssError?.message}`, { error: String(rssError) }).catch(() => {});
-        }
-    }
-
-    // Only run Dynamic Newsroom if we didn't just generate a Daily Drops or Trailer post
-    if (!newPost) {
-        // --- 5. DYNAMIC NEWSROOM (Original Sources) ---
-        console.log('[Engine] Running Dynamic Newsroom Logic...');
-
-        // RATE LIMIT CHECK:
-        // [TEMP] Disabled for testing (was 55 minutes)
-        /*
-        if (existingPosts.length > 0) {
-            const lastPost = existingPosts[0];
-            const lastPostTime = new Date(lastPost.timestamp);
-            const diffMinutes = (now.getTime() - lastPostTime.getTime()) / (1000 * 60);
-
-            if (diffMinutes < 55 && !force) {
-                console.log(`[Engine] Rate Limit Hit. Last post was ${Math.floor(diffMinutes)} mins ago. Skipping.`);
-                await logSchedulerRun(slot, 'skipped', 'Rate Limit Hit', { lastPost: lastPost.title });
-                return null;
-            }
-        }
-        */
-
-        // 1. Fetch All Candidates (Intel + Trending)
-        const result = await fetchSmartTrendingCandidates();
-        const candidates = result.candidates;
-        telemetry = result.telemetry;
-
-        const abortLogs: any[] = [];
-
-        // 2. Filter & Prioritize (Newsroom Logic)
-        const newPosts: BlogPost[] = [];
-        for (const item of candidates) {
-            // Check for explicit ABORTS identified by fetcher (Reality Checks)
-            if (['STALE_CONFIRMATION_ABORT', 'STALE_OR_DUPLICATE_FACT'].includes(item.claimType)) {
-                abortLogs.push({
-                    anime: item.title,
-                    event_type: item.claimType,
-                    source: item.source || 'KumoLab SmartSync',
-                    reason: `FETCHER_ABORT: ${item.claimType}`
-                });
-                continue;
-            }
-
-            const post = await (item.source === 'KumoLab SmartSync' ? generateTrendingPost(item, now) : generateIntelPost([item], now));
-
-            if (!post) {
-                // If generator returned null, it was an internal abort (e.g. missing visual)
-                abortLogs.push({
-                    anime: item.title,
-                    event_type: item.claimType,
-                    source: item.source || 'KumoLab SmartSync',
-                    reason: 'GENERATOR_ABORT (Likely missing visual or strict rule)'
-                });
-                continue;
-            }
-
-            // VALIDATE
-            const existingPostsForDup = await getPosts(true);
-            
-            // ENHANCED DUPLICATE DETECTION - Pre-filter before pending approval
-            const duplicateCheck = await detectDuplicate(post, { checkWindow: 30 });
-            
-            if (duplicateCheck.action === 'BLOCK') {
-                console.log(`[Engine] BLOCKED DUPLICATE: "${post.title}" - ${duplicateCheck.reason}`);
-                abortLogs.push({
-                    anime: post.title,
-                    event_type: post.claimType,
-                    source: item.source || 'KumoLab SmartSync',
-                    reason: `DUPLICATE_BLOCKED: ${duplicateCheck.reason}`,
-                    duplicate_of: duplicateCheck.duplicateOf
-                });
-                continue;
-            }
-            
-            // Validate post (image check, etc)
-            if (await validatePost(post, [...existingPostsForDup, ...newPosts], false)) {
-                // NEW: Manual Approval Logic
-                if (USE_SUPABASE) {
-                    // Skip if declined before
-                    const declinedCheck = await checkForDuplicate(post.title, supabaseAdmin);
-                    if (declinedCheck === 'DECLINED') {
-                        console.log(`[Engine] Skipping "${post.title}" - Already in declined_posts.`);
-                        continue;
-                    }
-
-                    const sourceTier = await getSourceTier(item.source || 'Unknown', supabaseAdmin);
-                    const relevanceScore = calculateRelevanceScore({ title: post.title, source_tier: sourceTier });
-
-                    post.status = 'pending';
-                    post.isPublished = false;
-                    (post as any).source_tier = sourceTier;
-                    (post as any).relevance_score = relevanceScore;
-                    (post as any).is_duplicate = duplicateCheck.isDuplicate;
-                    (post as any).duplicate_of = duplicateCheck.duplicateOf;
-                    (post as any).duplicate_confidence = duplicateCheck.confidence;
-                    (post as any).duplicate_reason = duplicateCheck.reason;
-                    (post as any).scraped_at = new Date().toISOString();
-                    (post as any).source = item.source || 'Unknown';
-                    
-                    // Flag for review if similar but not exact duplicate
-                    if (duplicateCheck.action === 'REVIEW') {
-                        (post as any).requires_review = true;
-                        (post as any).review_reason = duplicateCheck.reason;
-                        console.log(`[Engine] FLAGGED FOR REVIEW: "${post.title}" - ${duplicateCheck.reason}`);
-                    }
-                }
-
-                newPosts.push(post);
-                console.log(`[Engine] Added to pending queue: "${post.title}"`);
-
-                if (newPosts.length >= 20) {
-                    console.log('[Engine] Hit 20 post limit for this run.');
-                    break;
-                }
-            } else {
-                abortLogs.push({
-                    anime: post.title,
-                    event_type: post.claimType,
-                    source: item.source || 'KumoLab SmartSync',
-                    reason: 'VALIDATION_REJECT (Image Check)',
-                    fingerprint: post.event_fingerprint
-                });
-            }
-        }
-
-        if (newPosts.length > 0) {
-            for (const p of newPosts) {
-                await publishPost(p);
-            }
-            await logSchedulerRun(slot, 'success', `Generated ${newPosts.length} pending posts.`, {
-                count: newPosts.length,
-                titles: newPosts.map(p => p.title)
-            });
-            return newPosts[0]; // Return the first one for compatibility
-        }
-
-        if (abortLogs.length > 0) {
-            console.log(`[Engine] Aborted ${abortLogs.length} candidates. Logging top aborts.`);
-            await logSchedulerRun(slot, 'skipped', `Aborted ${abortLogs.length} candidates`, { aborts: abortLogs.slice(0, 20) });
-        }
-    }
-
-    if (newPost) {
-        await publishPost(newPost);
-        await logSchedulerRun(slot, 'success', `Generated: ${newPost.title}`, { slug: newPost.slug, fingerprint: newPost.event_fingerprint });
-        return newPost;
-    }
-
-    console.log('[Engine] No valid/new content found this hour.');
-
-    // ANOMALY DETECTION: If we found many items but they all got rejected, log a warning instead of a simple skip
-    if (telemetry && telemetry.negativeKeywordsSkipped > 15 && telemetry.candidatesFound === 0) {
-        await logSchedulerRun(slot, 'warning' as any, 'High Content Rejection Rate Detected', {
-            reason: 'Excessive negative keyword filtering. Verify if rules are too strict.',
-            telemetry
+    if (!isDailyDropsSlot) {
+        console.log('[Engine] Not a Daily Drops trigger. Nothing to do.');
+        await logSchedulerRun(slot, 'skipped', 'Not a Daily Drops slot or already posted', {
+            estHour: currentEstHour,
+            hasDailyDropsToday
         });
-    } else {
-        await logSchedulerRun(slot, 'skipped', 'No new content', { reason: 'No candidates met criteria', telemetry });
+        return null;
     }
-    return null;
+
+    console.log(`[Engine] Generating Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
+
+    // EST day window
+    const startLimit = new Date(`${y}-${m}-${d}T00:00:00-05:00`);
+    const endLimit = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
+
+    console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
+
+    const episodes = await fetchAniListAiring(
+        Math.floor(startLimit.getTime() / 1000),
+        Math.floor(endLimit.getTime() / 1000)
+    );
+
+    const newPost = generateDailyDropsPost(episodes, now, estDateSlug);
+
+    if (!newPost) {
+        console.log('[Engine] Zero drops found for today. Skipping Daily Drops.');
+        await logSchedulerRun(slot, 'skipped', 'No airing episodes found for today', { estDateSlug });
+        return null;
+    }
+
+    // Publish Daily Drops immediately
+    await publishPost(newPost);
+    await logSchedulerRun(slot, 'success', `Daily Drops published: ${newPost.title}`, {
+        slug: newPost.slug,
+        episodeCount: episodes.length
+    });
+
+    return newPost;
 }
 
 /**
@@ -351,7 +97,6 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
  */
 async function publishPost(post: BlogPost) {
     if (USE_SUPABASE) {
-        // Map to snake_case for Supabase
         const { error } = await supabaseAdmin
             .from('posts')
             .upsert([{
@@ -368,33 +113,23 @@ async function publishPost(post: BlogPost) {
                 truth_fingerprint: post.truth_fingerprint,
                 anime_id: post.anime_id,
                 season_label: post.season_label,
-                // Provenance Columns
                 verification_tier: post.verification_tier,
                 verification_reason: post.verification_reason,
                 verification_sources: post.verification_sources,
-                // New Approval Columns
                 status: post.status || 'pending',
-                source_tier: (post as any).source_tier || 3,
-                relevance_score: (post as any).relevance_score || 0,
-                is_duplicate: (post as any).is_duplicate || false,
-                duplicate_of: (post as any).duplicate_of || null,
-                scraped_at: (post as any).scraped_at || post.timestamp,
-                source: (post as any).source || 'Unknown',
+                source_tier: (post as any).source_tier || 1,
+                scraped_at: post.timestamp,
+                source: 'AniList',
                 background_image: post.background_image,
                 image_settings: post.image_settings,
-                // Scheduled publishing
-                scheduled_post_time: (post as any).scheduledPostTime || null
             }], { onConflict: 'slug' });
 
         if (error) {
             console.error('Supabase publish error:', error);
             throw error;
-        } else {
-            // [DISABLED] Automation refined. User requested NO auto-social push without approval.
-            // await publishToSocials(post);
-            console.log(`[Engine] Post saved to DB, but Social Publish skipped (Awaiting Manual Approval).`);
-
         }
+
+        console.log(`[Engine] Daily Drops saved to DB.`);
     } else {
         const fileContents = fs.readFileSync(POSTS_PATH, 'utf8');
         const posts: BlogPost[] = JSON.parse(fileContents);
@@ -402,7 +137,7 @@ async function publishPost(post: BlogPost) {
         fs.writeFileSync(POSTS_PATH, JSON.stringify(posts, null, 2));
     }
 
-    // --- REVALIDATION ---
+    // Revalidate
     try {
         const { revalidatePath } = await import('next/cache');
         revalidatePath('/');
@@ -412,11 +147,12 @@ async function publishPost(post: BlogPost) {
         console.warn('[Engine] Revalidation failed:', e);
     }
 
-    console.log(`Successfully published: ${post.title}`);
+    console.log(`[Engine] Published: ${post.title}`);
 }
 
 /**
- * Checks for scheduled posts and publishes them.
+ * Checks for scheduled/approved posts and publishes them.
+ * Called by the processing worker cron (every hour).
  */
 export async function publishScheduledPosts() {
     const now = new Date();
@@ -446,13 +182,12 @@ export async function publishScheduledPosts() {
         try {
             console.log(`[Publisher] Publishing scheduled post: ${post.title}`);
 
-            // Update status and is_published
             const { error: updateError } = await supabaseAdmin
                 .from('posts')
                 .update({
                     status: 'published',
                     is_published: true,
-                    timestamp: now.toISOString() // Update timestamp to now for "Newness"
+                    timestamp: now.toISOString()
                 })
                 .eq('id', post.id);
 
@@ -461,7 +196,6 @@ export async function publishScheduledPosts() {
                 continue;
             }
 
-            // [OPTIONAL] Revalidate
             try {
                 const { revalidatePath } = await import('next/cache');
                 revalidatePath('/');
@@ -477,48 +211,3 @@ export async function publishScheduledPosts() {
         }
     }
 }
-
-// Internal helper for generator consistency
-async function generateTrendsPost(trend: any, date: Date) {
-    if (!trend) return null;
-    return await generateTrendingPost(trend, date);
-}
-
-// Internal helper for Community Night
-async function generateCommunityNightPost(date: Date): Promise<BlogPost | null> {
-    try {
-        // Community Night is conversational and lightweight
-        // It safely skips if no content exists
-        const dateString = date.toISOString().split('T')[0];
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-
-        // Sample community prompts (in production, this could pull from trending topics, user engagement, etc.)
-        const prompts = [
-            `What anime moment made you smile today?`,
-            `Drop your current watch list in the comments 👇`,
-            `Hot take: What's the most underrated anime of the season?`,
-            `Which character would you want as your best friend?`,
-            `What's your comfort anime when you need a pick-me-up?`
-        ];
-
-        const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-
-        const content = `Hey Kumo Fam! 🌙\n\nIt's ${dayOfWeek} night - time to wind down and chat.\n\n${randomPrompt}\n\nLet's hear it! Drop your thoughts below. 💬`;
-
-        return {
-            id: `community-${dateString}`,
-            title: `Community Night - ${dateString}`,
-            slug: `community-night-${dateString}`,
-            type: 'COMMUNITY',
-            content,
-            image: '/hero-bg-final.png', // Fallback image
-            timestamp: date.toISOString(),
-            isPublished: false,
-            status: 'pending'
-        };
-    } catch (error) {
-        console.log('Community Night skipped (no content):', error);
-        return null; // Safe skip
-    }
-}
-

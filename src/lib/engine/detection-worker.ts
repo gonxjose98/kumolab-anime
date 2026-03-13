@@ -1,18 +1,23 @@
 /**
- * Detection Worker
- * Lightweight scraper that runs every 10 minutes
- * Responsibilities: RSS checks, YouTube uploads, lightweight HTML checks
- * Generates candidate records only - NO heavy processing
+ * Detection Worker — UNIFIED PIPELINE
+ * Single source of truth for all content ingestion.
+ * Runs every 10 minutes via GitHub Actions.
+ *
+ * Scans: RSS feeds, YouTube channels, Newsroom (AniList/MAL trending)
+ * Output: detection_candidates table rows (pending_processing)
+ *
+ * The Processing Worker then scores, deduplicates, and promotes to posts.
  */
 
 import { supabaseAdmin } from '../supabase/admin';
-import { 
-  TIER_2_RSS_SOURCES, 
+import {
+  TIER_2_RSS_SOURCES,
   TIER_3_SOURCES,
   RELIABILITY_CONFIG,
-  type SourceConfig 
+  type SourceConfig
 } from './intelligence-config';
 import { logSchedulerRun } from '../logging/scheduler';
+import { fetchSmartTrendingCandidates } from './fetchers';
 
 // Candidate record interface
 interface DetectionCandidate {
@@ -230,19 +235,25 @@ function createFingerprint(title: string, url: string): string {
 }
 
 /**
- * Decode HTML entities
+ * Decode HTML entities (runs twice to handle double-encoded entities)
  */
 function decodeHTMLEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let cleaned = text;
+  // Two passes for double-encoded entities like &amp;lt;cite&amp;gt;
+  for (let i = 0; i < 2; i++) {
+    cleaned = cleaned
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)));
+  }
+  // Strip HTML tags after decoding
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+  return cleaned.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -266,7 +277,7 @@ async function isDuplicateCandidate(fingerprint: string, url: string): Promise<b
     .gte('detected_at', new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()) // 72 hours
     .limit(1);
   
-  return data && data.length > 0;
+  return !!(data && data.length > 0);
 }
 
 /**
@@ -436,8 +447,50 @@ export async function runDetectionWorker(): Promise<{
   } catch (error: any) {
     errors.push(`YouTube: ${error.message}`);
   }
-  
-  // 3. Save candidates to database
+
+  // 3. Scan Newsroom (AniList trending, Intel, Reddit, YouTube studio videos)
+  console.log('[DetectionWorker] Scanning Newsroom sources...');
+  try {
+    const { candidates: newsroomItems, telemetry } = await fetchSmartTrendingCandidates();
+    console.log(`[DetectionWorker] Newsroom: ${newsroomItems.length} candidates (raw: ${telemetry.totalRawItems})`);
+
+    for (const item of newsroomItems.slice(0, 15)) {
+      const title = item.title || '';
+      if (!title || title.length < 5) continue;
+
+      const fingerprint = createFingerprint(title, item.source_url || item.source || 'newsroom');
+
+      allCandidates.push({
+        source_name: item.source || 'KumoLab Newsroom',
+        source_tier: item.verification_tier || 2,
+        source_url: item.source_url || '',
+        title: title.substring(0, 200),
+        content: (item.description || item.content || '').substring(0, 1000),
+        detected_at: new Date().toISOString(),
+        media_urls: item.image ? [item.image] : (item.announcementAssets || []),
+        canonical_url: item.source_url || '',
+        extraction_method: 'HTML' as const,
+        status: 'pending_processing',
+        fingerprint,
+        metadata: {
+          claim_type: item.claimType,
+          anime_id: item.anime_id,
+          season_label: item.season_label,
+          sources: item.sources,
+          final_score: item.finalScore,
+          event_fingerprint: item.event_fingerprint,
+          truth_fingerprint: item.truth_fingerprint,
+        }
+      });
+    }
+
+    sourcesChecked += 4; // AniList, Reddit, News, YouTube studios
+  } catch (error: any) {
+    console.error('[DetectionWorker] Newsroom error:', error?.message || error);
+    errors.push(`Newsroom: ${error.message}`);
+  }
+
+  // 4. Save candidates to database
   console.log(`[DetectionWorker] Saving ${allCandidates.length} candidates...`);
   const saved = await saveCandidates(allCandidates);
   

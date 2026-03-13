@@ -279,11 +279,29 @@ function generateSlug(title: string): string {
 }
 
 /**
- * Sanitize string for database
+ * Sanitize string for database — decodes HTML entities and strips tags
  */
 function sanitizeString(str: string | null | undefined, maxLength: number = 200): string {
   if (!str) return '';
-  return str.substring(0, maxLength).replace(/\x00/g, '');
+  let cleaned = str;
+  // Decode HTML entities (handles double-encoded like &amp;lt; → &lt; → <)
+  for (let i = 0; i < 2; i++) {
+    cleaned = cleaned
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)));
+  }
+  // Strip any remaining HTML tags
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+  // Collapse whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  // Remove null bytes and truncate
+  return cleaned.replace(/\x00/g, '').substring(0, maxLength);
 }
 
 /**
@@ -308,11 +326,18 @@ async function createPendingPost(
     post.claim_type = enrichedData.claimType || 'OTHER';
     post.content = sanitizeString(candidate.content, 5000);
     post.excerpt = sanitizeString(candidate.content, 197) + '...';
-    
-    // Optional fields
-    post.image = candidate.media_urls && candidate.media_urls.length > 0 
-      ? candidate.media_urls[0] 
+
+    // Image is REQUIRED — reject posts without one
+    const imageUrl = candidate.media_urls && candidate.media_urls.length > 0
+      ? candidate.media_urls[0]
       : null;
+
+    if (!imageUrl) {
+      console.log(`[ProcessingWorker] REJECTED (no image): "${candidate.title}"`);
+      return { success: false, error: 'No image available — post rejected' };
+    }
+
+    post.image = imageUrl;
     post.source_url = candidate.canonical_url || candidate.source_url || '';
     post.source = candidate.source_name || 'Unknown';
     post.source_tier = candidate.source_tier || 2;
@@ -326,7 +351,7 @@ async function createPendingPost(
     
     if (isDailyDrop) {
       // Check if this is a Daily Drops scheduled post vs immediate Tier 1 content
-      const isScheduledDailyDrop = candidate.claim_type === 'DAILY_DROP' || 
+      const isScheduledDailyDrop = (candidate.metadata as any)?.claim_type === 'DAILY_DROP' ||
                                    candidate.title?.toLowerCase().includes('daily drop');
       
       if (isScheduledDailyDrop) {
