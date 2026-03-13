@@ -53,9 +53,10 @@ export async function GET(req: NextRequest) {
         }
         
         if (worker === 'dailydrops') {
-            console.log('[Cron] Running Daily Drops...');
+            console.log('[Cron] Running Daily Drops (6 AM EST)...');
             await publishScheduledPosts();
-            const result = await runBlogEngine('hourly', false);
+            // Pass '06:00' explicitly so Daily Drops always fires regardless of exact UTC timing
+            const result = await runBlogEngine('06:00', false);
             return NextResponse.json({
                 success: true,
                 worker: 'dailydrops',

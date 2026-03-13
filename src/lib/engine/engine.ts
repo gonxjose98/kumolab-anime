@@ -57,8 +57,9 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
     console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
     // --- 1. DAILY DROPS (SINGLE FIRE @ 6 AM EST) ---
-    // Fires once at 6 AM EST. No sticky trigger — if missed, it won't retry hourly.
-    const isDailyDropsSlot = explicitSlot === '06:00' || (explicitSlot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
+    // Fires when Vercel cron sends worker=dailydrops (which passes slot='06:00').
+    // Also fires if hourly cron happens to hit 6 AM EST and no post exists yet.
+    const isDailyDropsSlot = (explicitSlot === '06:00' && !hasDailyDropsToday) || (explicitSlot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
 
     if (isDailyDropsSlot) {
         console.log(`[Engine] Slot identified as Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
