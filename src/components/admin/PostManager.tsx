@@ -1511,7 +1511,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 {[
                     { label: 'Create', icon: <Plus size={14} />, color: '#7b61ff', onClick: () => handleGenerateClick() },
-                    { label: 'Logs', icon: <Terminal size={14} />, color: '#00d4ff', onClick: () => { setShowLogsModal(true); handleFetchLogs(); } },
                     { label: 'Add URL', icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>, color: '#ff8c00', onClick: async () => {
                         const url = prompt('Paste YouTube or X (Twitter) URL:');
                         if (!url) return;
@@ -3335,102 +3334,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 );
             })()}
 
-            {/* SCHEDULER LOGS MODAL */}
-            {
-                showLogsModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                            {/* Header */}
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                        <Terminal size={20} className="text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                    <XCircle size={24} />
-                                </button>
-                            </div>
-
-                            {/* Logs Content */}
-                            <div className="flex-1 overflow-auto p-0 md:p-6">
-                                {isLoadingLogs ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Loader2 size={32} className="animate-spin text-blue-500" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                    </div>
-                                ) : schedulerLogs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Terminal size={32} className="opacity-20" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
-                                    </div>
-                                ) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                            <tr>
-                                                <th className="p-4 border-b border-white/5">Time</th>
-                                                <th className="p-4 border-b border-white/5">Slot</th>
-                                                <th className="p-4 border-b border-white/5">Status</th>
-                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                            {schedulerLogs.map((log: any) => (
-                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                    </td>
-                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                    <td className="p-4">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                            }`}>
-                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                            {log.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-neutral-300">
-                                                        {log.message}
-                                                        {log.details && (
-                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                {log.details}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {log.status !== 'success' && (
-                                                            <button
-                                                                onClick={() => handleRegenerateSlot(log.slot)}
-                                                                disabled={isRegenerating === log.slot}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                Regenerate
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                <span>Logs persist for 7 days</span>
-                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                    <RotateCcw size={12} /> Refresh
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {/* Logs moved to /admin/logs */}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
                 <span>KumoLab Admin OS v2.2.5 (UPDATED: 01:00 AM EST)</span>

@@ -330,6 +330,82 @@ async function scanYouTubeViaRSS(): Promise<DetectionCandidate[]> {
   return candidates;
 }
 
+// ─── YouTube via Data API (quota-limited) ───────────────────
+
+const YOUTUBE_API_CHANNELS = [
+  { id: 'UCZxsdzmU3OoC9Q8Z3swoS6g', name: 'MAPPA Official' },
+  { id: 'UCgHfufyA9n6qMvo3K0XBp2w', name: 'Ufotable' },
+  { id: 'UCp8LObSyk0vZ02NF4_7PcWg', name: 'TOHO Animation' },
+  { id: 'UC2xDictxIa66VdNG1PaIyQ', name: 'A-1 Pictures' },
+  { id: 'UC3ryC1YkgR0eJ1O4C9jP-Q', name: 'CloverWorks' },
+  { id: 'UCqmNf2x0c3y9fL8F5xM1A9w', name: 'Kadokawa' },
+];
+
+async function scanYouTubeAPI(): Promise<DetectionCandidate[]> {
+  const apiKey = process.env.YOUTUBE_API_KEY || '';
+  if (!apiKey) {
+    console.log('[DetectionWorker] YouTube API key not set, skipping');
+    return [];
+  }
+
+  // Only scan between 6 AM and 9 PM EST
+  const estTimeStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false });
+  const estHour = parseInt(estTimeStr);
+  if (estHour < 6 || estHour >= 21) return [];
+
+  const candidates: DetectionCandidate[] = [];
+  // Rotate: pick 2 random channels per run to stay under quota
+  const shuffled = [...YOUTUBE_API_CHANNELS].sort(() => Math.random() - 0.5);
+  const toScan = shuffled.slice(0, 2);
+
+  for (const channel of toScan) {
+    try {
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&order=date&maxResults=5&type=video&publishedAfter=${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}&key=${apiKey}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.log(`[DetectionWorker] YouTube API ${channel.name}: HTTP ${response.status}`);
+        continue;
+      }
+      const data = await response.json();
+      if (!data.items?.length) continue;
+
+      for (const video of data.items) {
+        const title = video.snippet?.title || '';
+        const videoId = video.id?.videoId || '';
+        if (!title || !videoId) continue;
+
+        const fingerprint = createFingerprint(title, videoId);
+        candidates.push({
+          source_name: `YouTube_API_${channel.name}`,
+          source_tier: 1,
+          source_url: `https://youtube.com/watch?v=${videoId}`,
+          title: title.substring(0, 200),
+          content: (video.snippet?.description || '').substring(0, 1000),
+          detected_at: new Date().toISOString(),
+          original_timestamp: video.snippet?.publishedAt || undefined,
+          media_urls: [
+            video.snippet?.thumbnails?.maxres?.url || video.snippet?.thumbnails?.high?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+          ],
+          canonical_url: `https://youtube.com/watch?v=${videoId}`,
+          extraction_method: 'YouTube',
+          status: 'pending_processing',
+          fingerprint,
+          metadata: { video_id: videoId, channel_name: channel.name, via: 'api' },
+        });
+      }
+      console.log(`[DetectionWorker] YouTube API ${channel.name}: ${data.items.length} videos`);
+    } catch (error: any) {
+      console.error(`[DetectionWorker] YouTube API ${channel.name} error:`, error.message);
+    }
+  }
+
+  return candidates;
+}
+
 // ─── Save Candidates ────────────────────────────────────────
 
 async function saveCandidates(candidates: DetectionCandidate[]): Promise<number> {
@@ -418,10 +494,22 @@ export async function runDetectionWorker(): Promise<{
     const youtubeCandidates = await scanYouTubeViaRSS();
     allCandidates.push(...youtubeCandidates);
     sourcesChecked++;
-    console.log(`[DetectionWorker] YouTube: ${youtubeCandidates.length} candidates`);
+    console.log(`[DetectionWorker] YouTube RSS: ${youtubeCandidates.length} candidates`);
   } catch (error: any) {
-    errors.push(`YouTube: ${error.message}`);
+    errors.push(`YouTube RSS: ${error.message}`);
     await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-rss' } });
+  }
+
+  // 2b. Scan YouTube via Data API (2 channels per run, quota-friendly)
+  console.log('[DetectionWorker] Scanning YouTube API (2 channels)...');
+  try {
+    const ytApiCandidates = await scanYouTubeAPI();
+    allCandidates.push(...ytApiCandidates);
+    sourcesChecked++;
+    console.log(`[DetectionWorker] YouTube API: ${ytApiCandidates.length} candidates`);
+  } catch (error: any) {
+    errors.push(`YouTube API: ${error.message}`);
+    await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-api' } });
   }
 
   // 3. Scan Newsroom (AniList trending, Reddit)

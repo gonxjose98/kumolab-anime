@@ -157,15 +157,15 @@ export default function TasksPageClient() {
                     <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#00d4ff', borderTopColor: 'transparent' }} />
                 </div>
             ) : (
-                <div className="flex gap-4 overflow-x-auto pb-4">
+                <div className="flex flex-col xl:flex-row gap-4 pb-4">
                     {/* Kanban Columns */}
-                    <div className="flex gap-4 flex-1 min-w-0">
+                    <div className="flex gap-4 flex-1 min-w-0 overflow-x-auto">
                         {COLUMNS.map((col) => {
                             const colTasks = tasks.filter(t => t.status === col.key);
                             return (
                                 <div
                                     key={col.key}
-                                    className="flex-1 min-w-[220px] rounded-xl overflow-hidden"
+                                    className="flex-1 min-w-[200px] rounded-xl overflow-hidden"
                                     style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
                                 >
                                     {/* Column Header */}
@@ -240,9 +240,9 @@ export default function TasksPageClient() {
                         })}
                     </div>
 
-                    {/* Live Activity Sidebar */}
+                    {/* Live Activity Sidebar — stacks below on smaller screens */}
                     <div
-                        className="w-72 flex-shrink-0 rounded-xl overflow-hidden"
+                        className="w-full xl:w-72 xl:flex-shrink-0 rounded-xl overflow-hidden"
                         style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
                     >
                         <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -251,7 +251,7 @@ export default function TasksPageClient() {
                                 Live Activity
                             </span>
                         </div>
-                        <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto hide-scrollbar">
+                        <div className="p-3 space-y-2 max-h-[40vh] xl:max-h-[60vh] overflow-y-auto hide-scrollbar">
                             {/* Completed tasks shown as activity */}
                             {completedTasks.map((task) => (
                                 <div key={`done-${task.id}`} className="flex items-start gap-2 p-2 rounded-lg" style={{ background: 'rgba(0,255,136,0.03)' }}>

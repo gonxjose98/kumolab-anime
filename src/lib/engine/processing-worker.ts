@@ -156,15 +156,8 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     };
 
     const imageUrl = candidate.media_urls?.[0] || null;
-    if (!imageUrl) {
-      await logScraperDecision({
-        candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier,
-        decision: 'rejected_no_image', reason: 'No image available', score: score.total, scoreBreakdown: score.breakdown,
-      });
-      return { success: false, error: 'No image available' };
-    }
-
-    post.image = imageUrl;
+    // Use a placeholder if no image — don't reject the post entirely
+    post.image = imageUrl || '/images/placeholder-news.svg';
 
     const isT1YouTube = candidate.source_tier === 1 && candidate.source_name?.toLowerCase().includes('youtube');
     if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
