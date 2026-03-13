@@ -335,3 +335,9 @@ img {
 .formattedContent p {
   margin-bottom: 1rem;
 }
+
+/* Admin hamburger menu animation */
+@keyframes menuSlideIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
