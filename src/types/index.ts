@@ -1,4 +1,4 @@
-export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT' | 'TRAILER' | 'TEASER';
+export type PostType = 'DROP' | 'INTEL' | 'TRENDING' | 'COMMUNITY' | 'CONFIRMATION_ALERT';
 export type ClaimType =
     | 'NEW_SEASON_CONFIRMED'
     | 'DATE_ANNOUNCED'
@@ -14,9 +14,7 @@ export type ClaimType =
 
 export interface BlogPost {
     id?: string;
-    title: string; // Display title (used on images - keep short/punchy)
-    seoTitle?: string; // SEO-optimized title (HTML <title> tag)
-    metaDescription?: string; // SEO meta description
+    title: string;
     slug: string;
     type: PostType;
     claimType?: ClaimType;
@@ -39,12 +37,11 @@ export interface BlogPost {
         gradientPosition?: 'top' | 'bottom';
         imageScale?: number;
         imagePosition?: { x: number; y: number };
-        verticalOffset?: number;
+        watermarkPosition?: { x: number; y: number };
     };
     is_announcement_tied?: boolean;
     headline?: string;
     timestamp: string; // ISO string
-    updated_at?: string; // ISO string - for cache busting images
     isPublished: boolean;
     status: 'pending' | 'approved' | 'published' | 'declined';
     sourceTier?: number;
@@ -59,24 +56,7 @@ export interface BlogPost {
     verification_tier?: 'streamer' | 'popularity' | 'format_exception' | number;
     verification_reason?: string;
     verification_sources?: any;
-    // Accuracy-First Verification System
-    verification_badge?: string;
-    verification_score?: number;
-    verification_classification?: string;
-    requires_review?: boolean;
-    auto_post_eligible?: boolean;
-    priority_level?: string;
-    // YouTube Integration
-    youtube_video_id?: string;
-    youtube_url?: string;
-    youtube_embed_url?: string;
-    studio_name?: string;
-
-    // Twitter/X Integration
-    twitter_tweet_id?: string;
-    twitter_url?: string;
-
-    // Social IDs & Cache (stored as JSONB in database)
+    // Social IDs & Cache
     socialIds?: {
         twitter?: string;
         instagram?: string;

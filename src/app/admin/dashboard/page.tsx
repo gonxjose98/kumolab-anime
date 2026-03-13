@@ -1,12 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers';
+import { Eye, Calendar } from 'lucide-react';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import PostManager from '@/components/admin/PostManager';
-import AdminTabs from '@/components/admin/AdminTabs';
-import DailyBriefing from '@/components/admin/DailyBriefing';
+import { fromDbPosts } from '@/lib/posts/normalize';
 
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
 
 function formatDate(dateString: string) {
     const d = new Date(dateString);
@@ -14,7 +13,6 @@ function formatDate(dateString: string) {
 }
 
 async function getAnalytics(supabase: any) {
-    try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -127,73 +125,16 @@ async function getAnalytics(supabase: any) {
         },
         social: socialStats
     };
-    } catch (error) {
-        console.error('[Admin Dashboard] Failed to fetch analytics:', error);
-        return {
-            website: { views: 0, chart: [] },
-            social: {
-                views: 0, likes: 0, comments: 0,
-                breakdown: { twitter: { views: 0, likes: 0, comments: 0 }, instagram: { views: 0, likes: 0, comments: 0 }, facebook: { views: 0, likes: 0, comments: 0 } }
-            }
-        };
-    }
 }
 
 async function getPosts(supabase: any) {
-    try {
-        // Force fresh data by adding cache-busting
-        const { data: posts, error } = await supabase
-            .from('posts')
-            .select('*')
-            .order('timestamp', { ascending: false })
-            .limit(100);
-        
-        if (error) {
-            console.error('[Admin Dashboard] Supabase error:', error);
-            return [];
-        }
-        
-        console.log(`[Admin Dashboard] Fetched ${posts?.length || 0} posts`);
-        
-        // Filter out declined posts (fallback path sets status='declined' when delete fails)
-        const activePosts = (posts || []).filter((p: any) => p.status !== 'declined');
+    const { data: posts } = await supabase
+        .from('posts')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
 
-        // Derive status from is_published if status column doesn't exist or is null
-        const normalizedPosts = activePosts.map((p: any) => {
-            let derivedStatus = p.status;
-            
-            // DEBUG: Log first few posts
-            if (posts.indexOf(p) < 3) {
-                console.log(`[Admin Dashboard] Post ${p.id?.slice(0,8)}: status=${p.status}, is_published=${p.is_published}`);
-            }
-            
-            // If status is missing/invalid, derive it from is_published
-            if (!derivedStatus || !['pending', 'approved', 'published', 'declined'].includes(derivedStatus)) {
-                if (p.is_published === true) {
-                    derivedStatus = 'published';
-                } else {
-                    derivedStatus = 'pending';
-                }
-            }
-            
-            return {
-                ...p,
-                status: derivedStatus
-            };
-        });
-        
-        // Count by status
-        const statusCounts = normalizedPosts.reduce((acc: any, p: any) => {
-            acc[p.status] = (acc[p.status] || 0) + 1;
-            return acc;
-        }, {});
-        console.log('[Admin Dashboard] Status counts:', statusCounts);
-        
-        return normalizedPosts;
-    } catch (error) {
-        console.error('[Admin Dashboard] Failed to fetch posts:', error);
-        return [];
-    }
+    return fromDbPosts(posts);
 }
 
 export default async function DashboardPage() {
@@ -214,17 +155,15 @@ export default async function DashboardPage() {
     const posts = await getPosts(supabase);
 
     return (
-        <AdminTabs
-            dashboardContent={
-                <div className="space-y-8">
-                    <DailyBriefing />
-                    <AnalyticsDashboard
-                        websiteData={analytics.website}
-                        socialData={analytics.social}
-                    />
-                    <PostManager initialPosts={posts} />
-                </div>
-            }
-        />
+        <div className="max-w-7xl mx-auto space-y-8">
+            {/* 1. ANALYTICS DASHBOARD */}
+            <AnalyticsDashboard
+                websiteData={analytics.website}
+                socialData={analytics.social}
+            />
+
+            {/* 2. POST MANAGEMENT */}
+            <PostManager initialPosts={posts} />
+        </div>
     );
 }
