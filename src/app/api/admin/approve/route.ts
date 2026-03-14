@@ -14,20 +14,32 @@ export async function POST(req: NextRequest) {
         const now = new Date();
         const results = [];
 
-        // Simple Slot Logic
-        // Slots: 10:00, 14:00, 18:00, 21:00
-        const slots = [10, 14, 18, 21];
+        // Get already-scheduled posts to avoid collisions
+        const threeDaysOut = new Date(now);
+        threeDaysOut.setDate(threeDaysOut.getDate() + 3);
 
-        // Find next available slots
-        // We need to check what's already scheduled to avoid collisions if we want to be perfect,
-        // but the user's rules are simpler. Let's follow them exactly first and then refine.
+        const { data: existingScheduled } = await supabaseAdmin
+            .from('posts')
+            .select('scheduled_post_time')
+            .eq('status', 'approved')
+            .not('scheduled_post_time', 'is', null)
+            .gte('scheduled_post_time', now.toISOString())
+            .lte('scheduled_post_time', threeDaysOut.toISOString());
 
-        // "First approved post -> 10 AM" etc.
-        // This suggests we should keep track of the sequence in the bulk operation.
+        const takenHours = new Set(
+            (existingScheduled || []).map(p => {
+                const d = new Date(p.scheduled_post_time);
+                return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+            })
+        );
 
         for (let i = 0; i < postIds.length; i++) {
             const postId = postIds[i];
-            const scheduledTime = calculateScheduledTime(now, i);
+            const scheduledTime = findNextSlot(now, takenHours);
+
+            // Mark this slot as taken for the next iteration
+            const key = `${scheduledTime.getFullYear()}-${scheduledTime.getMonth()}-${scheduledTime.getDate()}-${scheduledTime.getHours()}`;
+            takenHours.add(key);
 
             const { data, error } = await supabaseAdmin
                 .from('posts')
@@ -36,7 +48,7 @@ export async function POST(req: NextRequest) {
                     is_published: false,
                     scheduled_post_time: scheduledTime.toISOString(),
                     approved_at: now.toISOString(),
-                    approved_by: 'admin' // Placeholder
+                    approved_by: 'admin'
                 })
                 .eq('id', postId)
                 .select();
@@ -44,7 +56,7 @@ export async function POST(req: NextRequest) {
             if (error) {
                 results.push({ id: postId, success: false, error: error.message });
             } else {
-                results.push({ id: postId, success: true });
+                results.push({ id: postId, success: true, scheduledTime: scheduledTime.toISOString() });
                 await logAction({ action: 'approved', entityId: postId, actor: 'Admin', reason: `Scheduled for ${scheduledTime.toISOString()}` });
             }
         }
@@ -55,29 +67,38 @@ export async function POST(req: NextRequest) {
     }
 }
 
-function calculateScheduledTime(baseDate: Date, index: number): Date {
-    const standardSlots = [10, 14, 18, 21];
-    const currentHour = baseDate.getHours();
+/**
+ * Find the next available hourly slot within the publishing window (8 AM – 10 PM EST).
+ * Each post gets its own hour — max 1 post per hour.
+ */
+function findNextSlot(baseDate: Date, takenHours: Set<string>): Date {
+    const EST_OFFSET = -5;
+    const WINDOW_START = 8;  // 8 AM EST
+    const WINDOW_END = 22;   // 10 PM EST
 
-    // Find the next available slot index today
-    let startSlotIndex = standardSlots.findIndex(h => h > currentHour);
-    let startDayOffset = 0;
+    // Start from the next full hour
+    const candidate = new Date(baseDate);
+    candidate.setMinutes(0, 0, 0);
+    candidate.setHours(candidate.getHours() + 1);
 
-    if (startSlotIndex === -1) {
-        // No more slots today, start tomorrow at 10 AM
-        startSlotIndex = 0;
-        startDayOffset = 1;
+    // Search up to 72 hours ahead
+    for (let i = 0; i < 72; i++) {
+        const estHour = new Date(
+            candidate.getTime() + (candidate.getTimezoneOffset() + EST_OFFSET * 60) * 60000
+        ).getHours();
+
+        const key = `${candidate.getFullYear()}-${candidate.getMonth()}-${candidate.getDate()}-${candidate.getHours()}`;
+
+        if (estHour >= WINDOW_START && estHour < WINDOW_END && !takenHours.has(key)) {
+            return new Date(candidate);
+        }
+        candidate.setHours(candidate.getHours() + 1);
     }
 
-    // Calculate absolute slot position
-    const absoluteSlotPosition = startSlotIndex + index;
-    const dayOffset = startDayOffset + Math.floor(absoluteSlotPosition / 4);
-    const slotIndex = absoluteSlotPosition % 4;
-    const slotHour = standardSlots[slotIndex];
-
-    const targetDate = new Date(baseDate);
-    targetDate.setDate(targetDate.getDate() + dayOffset);
-    targetDate.setHours(slotHour, 0, 0, 0);
-
-    return targetDate;
+    // Fallback: next day 8 AM EST
+    const fallback = new Date(baseDate);
+    fallback.setDate(fallback.getDate() + 1);
+    // Convert 8 AM EST to UTC
+    fallback.setHours(WINDOW_START - EST_OFFSET, 0, 0, 0);
+    return fallback;
 }
