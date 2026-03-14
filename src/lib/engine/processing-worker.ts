@@ -20,13 +20,12 @@ import { gradeContent } from './content-grader';
 import { AntigravityAI } from './ai';
 
 // ─── Japanese Detection ────────────────────────────────────────
-// Matches CJK Unified Ideographs, Hiragana, Katakana
-const CJK_REGEX = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/;
 
 function containsJapanese(text: string): boolean {
   if (!text) return false;
-  // If more than 20% of non-whitespace chars are CJK, treat as Japanese
   const stripped = text.replace(/\s+/g, '');
+  if (stripped.length === 0) return false;
+  // Create fresh regex each call to avoid lastIndex state issues with /g flag
   const cjkCount = (stripped.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/g) || []).length;
   return cjkCount / stripped.length > 0.2;
 }
