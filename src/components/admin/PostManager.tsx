@@ -1255,6 +1255,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         selectedIds.forEach(id => {
             initStatus[id] = {};
+            if ((socialPlatforms as any).website) initStatus[id]['website'] = 'idle';
             if (socialPlatforms.x) initStatus[id]['x'] = 'idle';
             if (socialPlatforms.instagram) initStatus[id]['instagram'] = 'idle';
             if (socialPlatforms.facebook) initStatus[id]['facebook'] = 'idle';
