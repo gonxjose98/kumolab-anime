@@ -1231,6 +1231,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Social Publish Modal State
     const [showSocialModal, setShowSocialModal] = useState(false);
     const [socialPlatforms, setSocialPlatforms] = useState({
+        website: false,
         x: true,
         instagram: true,
         facebook: true
@@ -1279,55 +1280,96 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     return next;
                 });
 
-                // Call API
-                const res = await fetch('/api/admin/social/publish-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        postId: id,
-                        platforms: platformsList
-                    })
-                });
-
-                const data = await res.json();
-
-                // Parse Results
-                setPublishStatus(prev => {
-                    const next = { ...prev };
-                    const results = data.results || {};
-
-                    platformsList.forEach(p => {
-                        const platformKey = p === 'x' ? 'twitter' : p;
-                        if (results[p] && results[p].success) {
-                            next[id][p] = 'success';
-                        } else {
-                            next[id][p] = 'error';
-                        }
+                // Handle website publish first (if selected)
+                if (platformsList.includes('website')) {
+                    setPublishStatus(prev => {
+                        const next = { ...prev };
+                        next[id]['website'] = 'loading';
+                        return next;
                     });
 
-                    // Update local post state with social IDs if success
-                    const anySuccess = Object.values(results).some((r: any) => r && r.success);
-                    if (anySuccess) {
-                        setPosts(current => current.map(curr => {
-                            if (curr.id === id) {
-                                const newSocialIds = { ...curr.socialIds };
-                                if (results.x?.success) newSocialIds.twitter = results.x.id;
-                                if (results.facebook?.success) newSocialIds.facebook = results.facebook.id;
-                                if (results.instagram?.success) newSocialIds.instagram = results.instagram.id;
-
-                                return {
-                                    ...curr,
-                                    isPublished: true,
-                                    is_published: true,
-                                    socialIds: newSocialIds
-                                };
-                            }
-                            return curr;
-                        }));
+                    try {
+                        const webRes = await fetch('/api/posts', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id,
+                                status: 'published',
+                                is_published: true,
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+                        const webData = await webRes.json();
+                        setPublishStatus(prev => {
+                            const next = { ...prev };
+                            next[id]['website'] = webData.success ? 'success' : 'error';
+                            return next;
+                        });
+                        if (webData.success) {
+                            setPosts(current => current.map(curr =>
+                                curr.id === id ? { ...curr, isPublished: true, status: 'published' } : curr
+                            ));
+                        }
+                    } catch {
+                        setPublishStatus(prev => {
+                            const next = { ...prev };
+                            next[id]['website'] = 'error';
+                            return next;
+                        });
                     }
+                }
 
-                    return next;
-                });
+                // Call social media API (skip 'website' from the social platforms list)
+                const socialOnly = platformsList.filter(p => p !== 'website');
+                if (socialOnly.length > 0) {
+                    const res = await fetch('/api/admin/social/publish-all', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            postId: id,
+                            platforms: socialOnly
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    // Parse Results
+                    setPublishStatus(prev => {
+                        const next = { ...prev };
+                        const results = data.results || {};
+
+                        socialOnly.forEach(p => {
+                            if (results[p] && results[p].success) {
+                                next[id][p] = 'success';
+                            } else {
+                                next[id][p] = 'error';
+                            }
+                        });
+
+                        // Update local post state with social IDs if success
+                        const anySuccess = Object.values(results).some((r: any) => r && r.success);
+                        if (anySuccess) {
+                            setPosts(current => current.map(curr => {
+                                if (curr.id === id) {
+                                    const newSocialIds = { ...curr.socialIds };
+                                    if (results.x?.success) newSocialIds.twitter = results.x.id;
+                                    if (results.facebook?.success) newSocialIds.facebook = results.facebook.id;
+                                    if (results.instagram?.success) newSocialIds.instagram = results.instagram.id;
+
+                                    return {
+                                        ...curr,
+                                        isPublished: true,
+                                        is_published: true,
+                                        socialIds: newSocialIds
+                                    };
+                                }
+                                return curr;
+                            }));
+                        }
+
+                        return next;
+                    });
+                }
             }
         } catch (e: any) {
             console.error('Broadcast protocol failure:', e);
@@ -1785,23 +1827,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         {schedulingPostId === post.id ? (
                                                             <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-1.5 rounded-lg border border-blue-500/20 animate-in fade-in zoom-in-95">
-                                                                {[10, 14, 18, 21].map(h => (
-                                                                    <button
-                                                                        key={h}
-                                                                        onClick={() => {
-                                                                            const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
-                                                                            const d = new Date(sched);
-                                                                            d.setHours(h, 0, 0, 0);
-                                                                            handleUpdateSchedule(post.id!, d);
-                                                                        }}
-                                                                        className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors text-left uppercase"
-                                                                    >
-                                                                        {h > 12 ? `${h - 12}:00 PM` : h === 12 ? '12:00 PM' : `${h}:00 AM`}
-                                                                    </button>
-                                                                ))}
+                                                                <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest">Quick Select</label>
+                                                                <div className="grid grid-cols-3 gap-0.5">
+                                                                    {[8, 10, 12, 14, 16, 18, 20, 22].map(h => (
+                                                                        <button
+                                                                            key={h}
+                                                                            onClick={() => {
+                                                                                const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
+                                                                                const d = new Date(sched);
+                                                                                // If the hour already passed today, move to tomorrow
+                                                                                if (d.getHours() >= h && new Date(d).toDateString() === new Date().toDateString()) {
+                                                                                    d.setDate(d.getDate() + 1);
+                                                                                }
+                                                                                d.setHours(h, 0, 0, 0);
+                                                                                handleUpdateSchedule(post.id!, d);
+                                                                            }}
+                                                                            className="text-[7px] font-black py-1 px-1.5 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors text-center uppercase"
+                                                                        >
+                                                                            {h > 12 ? `${h - 12}PM` : h === 12 ? '12PM' : `${h}AM`}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                                <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest mt-1">Custom</label>
                                                                 <input
                                                                     type="datetime-local"
-                                                                    className="text-center text-[8px] font-bold bg-black/40 border border-white/10 rounded p-1 text-white outline-none focus:border-blue-500/50 mt-1"
+                                                                    className="text-center text-[8px] font-bold bg-black/40 border border-white/10 rounded p-1 text-white outline-none focus:border-blue-500/50"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) handleUpdateSchedule(post.id!, new Date(e.target.value));
                                                                     }}
@@ -2121,22 +2171,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                 {schedulingPostId === post.id && (
                                                     <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-2 rounded-lg border border-blue-500/20 mt-2">
-                                                        <div className="grid grid-cols-2 gap-1">
-                                                            {[10, 14, 18, 21].map(h => (
+                                                        <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest">Quick Select</label>
+                                                        <div className="grid grid-cols-4 gap-0.5">
+                                                            {[8, 10, 12, 14, 16, 18, 20, 22].map(h => (
                                                                 <button
                                                                     key={h}
                                                                     onClick={() => {
-                                                                        const sched = post.scheduledPostTime || (post as any).scheduled_post_time;
+                                                                        const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
                                                                         const d = new Date(sched);
+                                                                        if (d.getHours() >= h && new Date(d).toDateString() === new Date().toDateString()) {
+                                                                            d.setDate(d.getDate() + 1);
+                                                                        }
                                                                         d.setHours(h, 0, 0, 0);
                                                                         handleUpdateSchedule(post.id!, d);
                                                                     }}
-                                                                    className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors uppercase"
+                                                                    className="text-[7px] font-black py-1 px-1 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors uppercase text-center"
                                                                 >
-                                                                    {h > 12 ? `${h - 12} PM` : h === 12 ? '12 PM' : `${h} AM`}
+                                                                    {h > 12 ? `${h - 12}PM` : h === 12 ? '12PM' : `${h}AM`}
                                                                 </button>
                                                             ))}
                                                         </div>
+                                                        <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest mt-1">Custom</label>
                                                         <input
                                                             type="datetime-local"
                                                             className="text-center text-[10px] font-bold bg-black/40 border border-white/10 rounded p-1.5 text-white outline-none focus:border-blue-500/50 mt-1"
@@ -2186,22 +2241,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         {/* Platform Selectors */}
                         <div className="p-6 space-y-4">
                             <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Select Target Networks</label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {(['x', 'instagram', 'facebook', 'threads'] as const).map(p => (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                {(['website', 'x', 'instagram', 'facebook', 'threads'] as const).map(p => (
                                     <button
                                         key={p}
                                         onClick={() => setSocialPlatforms(prev => ({ ...prev, [p]: !(prev as any)[p] }))}
                                         disabled={isPublishing}
                                         className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${(socialPlatforms as any)[p]
-                                            ? 'bg-white/10 border-white/20 text-white'
+                                            ? p === 'website' ? 'bg-green-500/15 border-green-500/30 text-green-400' : 'bg-white/10 border-white/20 text-white'
                                             : 'bg-black border-white/5 text-neutral-600 opacity-40 hover:opacity-100'
                                             }`}
                                     >
+                                        {p === 'website' && <Zap size={20} />}
                                         {p === 'x' && <Twitter size={20} />}
                                         {p === 'instagram' && <Instagram size={20} />}
                                         {p === 'facebook' && <Facebook size={20} />}
                                         {p === 'threads' && <Share2 size={20} />}
-                                        <span className="text-[10px] font-bold uppercase mt-2">{p === 'x' ? 'X / Twitter' : p}</span>
+                                        <span className="text-[10px] font-bold uppercase mt-2">{p === 'website' ? 'Website' : p === 'x' ? 'X / Twitter' : p}</span>
                                     </button>
                                 ))}
                             </div>

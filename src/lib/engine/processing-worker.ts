@@ -147,6 +147,62 @@ function sanitizeString(str: string | null | undefined, maxLength = 200): string
   return cleaned.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().replace(/\x00/g, '').substring(0, maxLength);
 }
 
+// ─── Staggered Scheduling ───────────────────────────────────
+// Find the next available hourly slot that doesn't already have a scheduled post.
+// Posts are spread at least 1 hour apart within the active window (8 AM – 10 PM EST).
+
+async function getNextAvailableSlot(): Promise<Date> {
+  const now = new Date();
+  // Convert to EST
+  const estOffset = -5; // EST (not daylight saving aware — adjust if needed)
+  const estNow = new Date(now.getTime() + (now.getTimezoneOffset() + estOffset * 60) * 60000);
+
+  // Active publishing window: 8 AM – 10 PM EST
+  const WINDOW_START = 8;
+  const WINDOW_END = 22;
+
+  // Get all currently scheduled posts for the next 3 days
+  const threeDaysOut = new Date(now);
+  threeDaysOut.setDate(threeDaysOut.getDate() + 3);
+
+  const { data: scheduled } = await supabaseAdmin
+    .from('posts')
+    .select('scheduled_post_time')
+    .eq('status', 'approved')
+    .not('scheduled_post_time', 'is', null)
+    .gte('scheduled_post_time', now.toISOString())
+    .lte('scheduled_post_time', threeDaysOut.toISOString());
+
+  const takenHours = new Set(
+    (scheduled || []).map(p => {
+      const d = new Date(p.scheduled_post_time);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+    })
+  );
+
+  // Start from the next full hour
+  const candidate = new Date(now);
+  candidate.setMinutes(0, 0, 0);
+  candidate.setHours(candidate.getHours() + 1);
+
+  // Search up to 72 hours ahead
+  for (let i = 0; i < 72; i++) {
+    const estHour = new Date(candidate.getTime() + (candidate.getTimezoneOffset() + estOffset * 60) * 60000).getHours();
+    const key = `${candidate.getFullYear()}-${candidate.getMonth()}-${candidate.getDate()}-${candidate.getHours()}`;
+
+    if (estHour >= WINDOW_START && estHour < WINDOW_END && !takenHours.has(key)) {
+      return candidate;
+    }
+    candidate.setHours(candidate.getHours() + 1);
+  }
+
+  // Fallback: next day 8 AM EST
+  const fallback = new Date(now);
+  fallback.setDate(fallback.getDate() + 1);
+  fallback.setHours(WINDOW_START - estOffset, 0, 0, 0);
+  return fallback;
+}
+
 // ─── Create Post ────────────────────────────────────────────
 
 async function createPendingPost(candidate: ProcessingCandidate, score: ContentScore, enrichedData: any): Promise<{ success: boolean; error?: string; postId?: string }> {
@@ -186,9 +242,15 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       post.status = 'pending';
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `No image — requires manual review. Score ${score.total}`, score: score.total, scoreBreakdown: score.breakdown });
     } else if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
-      post.status = 'approved'; post.is_published = true; post.published_at = now; post.approved_at = now; post.approved_by = 'system';
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_auto', reason: 'T1 YouTube high confidence', score: score.total, scoreBreakdown: score.breakdown });
-      await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}` });
+      // T1 auto-approved: schedule for next available slot, don't publish immediately
+      const nextSlot = await getNextAvailableSlot();
+      post.status = 'approved';
+      post.is_published = false;
+      post.approved_at = now;
+      post.approved_by = 'system';
+      post.scheduled_post_time = nextSlot.toISOString();
+      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_auto', reason: `T1 YouTube high confidence — scheduled for ${nextSlot.toISOString()}`, score: score.total, scoreBreakdown: score.breakdown });
+      await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}, scheduled ${nextSlot.toISOString()}` });
     } else {
       post.status = 'pending';
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `Score ${score.total}, ${score.confidence}`, score: score.total, scoreBreakdown: score.breakdown });
