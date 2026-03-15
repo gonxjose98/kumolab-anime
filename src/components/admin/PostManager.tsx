@@ -24,12 +24,32 @@ export interface LayoutMetadata {
 }
 
 export default function PostManager({ initialPosts }: PostManagerProps) {
-    // Posts are normalized server-side (admin/dashboard) via lib/posts/normalize.
-    // Keep this lightweight to avoid diverging contracts between the quick editor (modal)
-    // and the full editor (route).
-    const normalizedPosts = initialPosts;
+    // Normalize posts to ensure isPublished and social stats are present
+    const normalizedPosts = initialPosts.map(p => {
+        const scheduledTime = (p as any).scheduled_post_time ?? p.scheduledPostTime;
+        const sourceTier = (p as any).source_tier ?? p.sourceTier ?? 3;
+        const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
+        const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
+        const source = (p as any).source ?? p.source ?? 'Unknown';
 
-    console.log('[PostManager] Posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: (p as any).source, score: (p as any).relevanceScore, tier: (p as any).sourceTier })));
+        const headline = (p as any).headline ?? (p as any).excerpt ?? p.headline ?? p.excerpt;
+
+        return {
+            ...p,
+            // Normalize common DB snake_case -> client expectations
+            isPublished: (p as any).is_published ?? p.isPublished,
+            scheduledPostTime: scheduledTime,
+            socialIds: (p as any).social_ids ?? (p.socialIds || {}),
+            sourceTier,
+            relevanceScore,
+            scrapedAt,
+            source,
+            // In this codebase, the DB uses `excerpt` to store the short headline/tag used on images.
+            headline: headline ?? ''
+        };
+    });
+
+    console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: p.source, score: p.relevanceScore, tier: p.sourceTier })));
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
@@ -356,8 +376,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        // Canonical DB field is `excerpt` (overlay tag)
-        setOverlayTag(((post as any).excerpt || '') as string);
+        // DB stores this value as `excerpt` for many posts. Normalize to avoid blank overlay on edit.
+        setOverlayTag((post.headline || post.excerpt || '') as string);
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
@@ -1264,26 +1284,6 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform">
                         <Terminal size={16} />
                         <span className="text-[10px] font-black uppercase tracking-widest">Logs</span>
-                    </div>
-                </button>
-
-                {/* Select All / Deselect All */}
-                <button
-                    onClick={() => {
-                        if (selectedIds.length === filteredPosts.length && filteredPosts.length > 0) {
-                            setSelectedIds([]);
-                        } else {
-                            setSelectedIds(filteredPosts.map(p => p.id!).filter(Boolean));
-                        }
-                    }}
-                    className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                >
-                    <div className="flex items-center justify-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                        <CheckCircle2 size={14} />
-                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>
-                            {selectedIds.length === filteredPosts.length && filteredPosts.length > 0 ? 'Deselect All' : `Select All (${filteredPosts.length})`}
-                        </span>
                     </div>
                 </button>
 
