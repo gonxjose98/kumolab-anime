@@ -124,6 +124,32 @@ export async function DELETE(req: NextRequest) {
         // Use supabaseAdmin to ensure service_role key (bypasses RLS)
         const { supabaseAdmin } = await import('@/lib/supabase/admin');
 
+        // Fetch post BEFORE deleting to track it
+        const { data: post } = await supabaseAdmin
+            .from('posts')
+            .select('id, title, slug, source, source_url')
+            .eq('id', id)
+            .single();
+
+        // Record in declined_posts so the scraper doesn't re-detect it
+        if (post) {
+            await supabaseAdmin
+                .from('declined_posts')
+                .insert([{
+                    original_post_id: post.id,
+                    title: post.title || '',
+                    slug: post.slug || '',
+                    source: post.source || 'Unknown',
+                    source_url: post.source_url || '',
+                    declined_at: new Date().toISOString(),
+                    declined_by: 'admin',
+                    reason: 'deleted'
+                }])
+                .then(({ error }) => {
+                    if (error) console.warn('[API] Could not track deleted post:', error.message);
+                });
+        }
+
         const { data: deleted, error } = await supabaseAdmin
             .from('posts')
             .delete()

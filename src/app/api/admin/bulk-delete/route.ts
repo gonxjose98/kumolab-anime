@@ -14,11 +14,36 @@ export async function POST(req: NextRequest) {
 
         console.log(`[API] Bulk deleting ${ids.length} posts`);
 
-        // Get slugs for revalidation
+        // Fetch posts BEFORE deleting — we need title, slug, source, source_url for tracking
         const { data: posts } = await supabaseAdmin
             .from('posts')
-            .select('slug')
+            .select('id, title, slug, source, source_url')
             .in('id', ids);
+
+        // Record in declined_posts so the scraper doesn't re-detect them
+        if (posts && posts.length > 0) {
+            const now = new Date().toISOString();
+            const declinedRecords = posts.map((post: any) => ({
+                original_post_id: post.id,
+                title: post.title || '',
+                slug: post.slug || '',
+                source: post.source || 'Unknown',
+                source_url: post.source_url || '',
+                declined_at: now,
+                declined_by: 'admin',
+                reason: 'bulk_deleted'
+            }));
+
+            const { error: trackError } = await supabaseAdmin
+                .from('declined_posts')
+                .insert(declinedRecords);
+
+            if (trackError) {
+                console.warn(`[API] Could not track ${declinedRecords.length} deleted posts in declined_posts:`, trackError.message);
+            } else {
+                console.log(`[API] Tracked ${declinedRecords.length} posts in declined_posts`);
+            }
+        }
 
         // Delete posts
         const { error } = await supabaseAdmin
@@ -46,10 +71,10 @@ export async function POST(req: NextRequest) {
             console.error('[API] Revalidation error (non-critical):', revError);
         }
 
-        return NextResponse.json({ 
-            success: true, 
+        return NextResponse.json({
+            success: true,
             message: `Deleted ${ids.length} posts`,
-            deleted: ids.length 
+            deleted: ids.length
         });
     } catch (err: any) {
         console.error('[API] Bulk delete exception:', err);
