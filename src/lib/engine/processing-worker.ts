@@ -89,6 +89,8 @@ function calculateContentScore(candidate: ProcessingCandidate): ContentScore {
   if (/\bfigure\b|\bfigurine\b|\bstatue\b|\bcollectible/.test(combined)) penalties += SCORING_PENALTIES.FIGURES_TOYS;
   if (/rumor|speculation|reportedly|allegedly|might|could|possibly/.test(combined)) penalties += SCORING_PENALTIES.FAN_SPECULATION;
   if (/\bgame\b(?!.*\banime\b).*\bannouncement\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
+  if (/\bcosplay\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
+  if (/\breview\b|\bopinion\b|\branking\b|\btop\s*\d+\b|\bbest anime\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
 
   const total = breakdown.sourceAuthority + breakdown.contentType + breakdown.visualEvidence + breakdown.temporalRelevance + penalties;
   const confidence: 'high' | 'medium' | 'low' = total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE ? 'high' : total >= SCORING_THRESHOLDS.PUBLISH_MINIMUM ? 'medium' : 'low';
@@ -326,8 +328,11 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           try {
             const ai = AntigravityAI.getInstance();
             const translated = await ai.translateToEnglish(candidate.title, candidate.content);
+            // Verify translation actually produced English
+            if (containsJapanese(translated.title) || containsJapanese(translated.content)) {
+              throw new Error('Translation output still contains Japanese');
+            }
             console.log(`[ProcessingWorker] Translated: "${candidate.title}" → "${translated.title}"`);
-            // Store originals in metadata, use translated text going forward
             candidate.metadata = {
               ...candidate.metadata,
               original_title: candidate.title,
@@ -337,8 +342,15 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
             candidate.title = translated.title;
             candidate.content = translated.content;
           } catch (err: any) {
-            console.warn(`[ProcessingWorker] Translation failed for "${candidate.title}": ${err.message}`);
-            // Continue with original text rather than blocking
+            // BLOCK: Do not create posts with Japanese text — reject the candidate
+            console.error(`[ProcessingWorker] Translation FAILED for "${candidate.title}": ${err.message} — skipping`);
+            await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'rejected_error', reason: `Translation failed: ${err.message.substring(0, 60)}`, score: score.total });
+            await markCandidateProcessed(candidate.id, 'discarded', {
+              candidate, score, action: 'reject', error: `Translation failed: ${err.message}`,
+              enrichedData: { animeName: undefined, claimType: 'OTHER' },
+            });
+            stats.rejected++;
+            continue;
           }
         }
 
@@ -351,7 +363,7 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           }
         } catch (err: any) {
           console.warn(`[ProcessingWorker] Title formatting failed: ${err.message}`);
-          // Continue with existing title
+          // Non-critical — continue with unformatted title
         }
 
         const animeName = extractAnimeName(candidate.title, candidate.content);

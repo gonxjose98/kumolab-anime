@@ -235,22 +235,49 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
     return { isDup: true, reason: 'URL already published' };
   }
 
-  // 3. Check posts by title similarity (7 day window)
+  // 3. Check declined/deleted posts by URL (48h minimum protection)
+  if (url) {
+    const { data: declinedUrlMatch } = await supabaseAdmin
+      .from('declined_posts')
+      .select('id')
+      .eq('source_url', url)
+      .limit(1);
+
+    if (declinedUrlMatch && declinedUrlMatch.length > 0) {
+      return { isDup: true, reason: 'URL previously deleted/declined' };
+    }
+  }
+
+  // 4. Check declined/deleted posts by title similarity (30 day window)
+  const { data: declinedPosts } = await supabaseAdmin
+    .from('declined_posts')
+    .select('id, title')
+    .gte('declined_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(200);
+
+  // 5. Check posts by title similarity (7 day window)
   const { data: recentPosts } = await supabaseAdmin
     .from('posts')
     .select('id, title')
     .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
     .limit(100);
 
-  if (recentPosts) {
+  // Combine both lists for title similarity check
+  const allToCheck = [
+    ...(recentPosts || []).map(p => ({ id: p.id, title: p.title, source: 'post' })),
+    ...(declinedPosts || []).map(p => ({ id: p.id, title: p.title, source: 'declined' })),
+  ];
+
+  if (allToCheck.length > 0) {
     const candidateWords = new Set(title.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-    for (const post of recentPosts) {
-      const postWords = new Set(post.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
-      const intersection = [...candidateWords].filter((w: string) => postWords.has(w));
-      const union = new Set([...candidateWords, ...postWords]);
+    for (const entry of allToCheck) {
+      if (!entry.title) continue;
+      const entryWords = new Set(entry.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+      const intersection = [...candidateWords].filter((w: string) => entryWords.has(w));
+      const union = new Set([...candidateWords, ...entryWords]);
       const similarity = union.size > 0 ? intersection.length / union.size : 0;
-      if (similarity >= 0.70) {
-        return { isDup: true, reason: `Similar to post ${post.id.slice(0, 8)}` };
+      if (similarity >= 0.65) {
+        return { isDup: true, reason: `Similar to ${entry.source === 'declined' ? 'deleted/declined' : 'post'} ${entry.id.slice(0, 8)}` };
       }
     }
   }
@@ -389,10 +416,10 @@ async function scanSingleYouTubeChannel(channel: { name: string; channelId: stri
       // Grade content importance
       const grade = gradeVideoContent(title);
 
-      // For T1 channels: accept everything with grade >= 3 (they're official sources)
-      // For T2 channels: accept grade >= 4 (filter out low-value clips)
-      // For T3 channels: accept grade >= 5 (only meaningful content from studios)
-      const minGrade = channel.tier === 1 ? 3 : channel.tier === 2 ? 4 : 5;
+      // For T1 channels: accept grade >= 5 (trailers, key visuals, major announcements)
+      // For T2 channels: accept grade >= 6 (trailers, season announcements, key visuals)
+      // For T3 channels: accept grade >= 7 (only trailers and major announcements)
+      const minGrade = channel.tier === 1 ? 5 : channel.tier === 2 ? 6 : 7;
       if (grade.score < minGrade) {
         console.log(`[DetectionWorker] YouTube skip (grade ${grade.score}/${minGrade}): "${title}" [${channel.name}]`);
         continue;

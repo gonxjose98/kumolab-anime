@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron?worker=detection",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron?worker=dailydrops",

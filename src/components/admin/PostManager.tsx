@@ -1267,6 +1267,26 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 </button>
 
+                {/* Select All / Deselect All */}
+                <button
+                    onClick={() => {
+                        if (selectedIds.length === filteredPosts.length && filteredPosts.length > 0) {
+                            setSelectedIds([]);
+                        } else {
+                            setSelectedIds(filteredPosts.map(p => p.id!).filter(Boolean));
+                        }
+                    }}
+                    className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                    <div className="flex items-center justify-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        <CheckCircle2 size={14} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>
+                            {selectedIds.length === filteredPosts.length && filteredPosts.length > 0 ? 'Deselect All' : `Select All (${filteredPosts.length})`}
+                        </span>
+                    </div>
+                </button>
+
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
                         <button
