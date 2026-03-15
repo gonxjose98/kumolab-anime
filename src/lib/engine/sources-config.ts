@@ -99,6 +99,7 @@ export const CONTENT_RULES = {
         'event', 'mario', 'concert', 'live event', 'pop-up shop',
         'giveaway', 'sweepstakes', 'contest', 'quiz', 'poll',
         'wallpaper', 'ringtone', 'sticker', 'emoji',
+        'cosplay', 'review', 'opinion', 'ranking', 'top 10', 'best anime',
     ],
     // Content categories to exclude (for RSS filtering)
     EXCLUDE_CATEGORIES: [
@@ -128,13 +129,10 @@ export const RSS_SOURCES = {
     ],
     TIER_2: [
         { name: 'AnimeNewsNetwork', url: 'https://www.animenewsnetwork.com/all/rss.xml', tier: 2, keywordFiltered: true },
-        { name: 'Natalie.mu', url: 'https://natalie.mu/comic/feed/news', tier: 2, lang: 'JP' },
-        { name: 'Oricon Anime', url: 'https://www.oricon.co.jp/rss/news_anime.xml', tier: 2, lang: 'JP' },
     ],
     TIER_3: [
         { name: 'OtakuNews', url: 'https://www.otakunews.com/rss/rss.xml', tier: 3 },
         { name: 'Anime UK News', url: 'https://animeuknews.net/feed/', tier: 3 },
-        { name: 'MANTAN Web Anime', url: 'https://mantan-web.jp/rss/anime.xml', tier: 3, lang: 'JP' },
     ],
 };
 

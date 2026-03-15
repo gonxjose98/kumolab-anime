@@ -416,10 +416,10 @@ async function scanSingleYouTubeChannel(channel: { name: string; channelId: stri
       // Grade content importance
       const grade = gradeVideoContent(title);
 
-      // For T1 channels: accept everything with grade >= 3 (they're official sources)
-      // For T2 channels: accept grade >= 4 (filter out low-value clips)
-      // For T3 channels: accept grade >= 5 (only meaningful content from studios)
-      const minGrade = channel.tier === 1 ? 3 : channel.tier === 2 ? 4 : 5;
+      // For T1 channels: accept grade >= 5 (trailers, key visuals, major announcements)
+      // For T2 channels: accept grade >= 6 (trailers, season announcements, key visuals)
+      // For T3 channels: accept grade >= 7 (only trailers and major announcements)
+      const minGrade = channel.tier === 1 ? 5 : channel.tier === 2 ? 6 : 7;
       if (grade.score < minGrade) {
         console.log(`[DetectionWorker] YouTube skip (grade ${grade.score}/${minGrade}): "${title}" [${channel.name}]`);
         continue;

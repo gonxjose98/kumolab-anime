@@ -64,80 +64,51 @@ export const TIER_1_SOURCES = {
 
 export const TIER_2_RSS_SOURCES = [
   // Core English Sources
-  { 
-    name: 'AnimeNewsNetwork', 
-    url: 'https://www.animenewsnetwork.com/all/rss.xml', 
-    tier: 2, 
+  {
+    name: 'AnimeNewsNetwork',
+    url: 'https://www.animenewsnetwork.com/all/rss.xml',
+    tier: 2,
     weight: 8,
     language: 'EN',
-    checkInterval: 10, // minutes
+    checkInterval: 30,
     healthScore: 100
   },
-  { 
-    name: 'MyAnimeList', 
-    url: 'https://myanimelist.net/rss/news.xml', 
-    tier: 2, 
+  {
+    name: 'MyAnimeList',
+    url: 'https://myanimelist.net/rss/news.xml',
+    tier: 2,
     weight: 7,
     language: 'EN',
-    checkInterval: 10,
+    checkInterval: 30,
     healthScore: 100
   },
-  { 
-    name: 'AnimeUKNews', 
-    url: 'https://animeuknews.net/feed/', 
-    tier: 2, 
+  {
+    name: 'AnimeUKNews',
+    url: 'https://animeuknews.net/feed/',
+    tier: 2,
     weight: 6,
     language: 'EN',
-    checkInterval: 15,
+    checkInterval: 30,
     healthScore: 100
   },
-  { 
-    name: 'Anime Herald', 
-    url: 'https://www.animeherald.com/feed/', 
-    tier: 2, 
+  {
+    name: 'Anime Herald',
+    url: 'https://www.animeherald.com/feed/',
+    tier: 2,
     weight: 6,
     language: 'EN',
-    checkInterval: 15,
+    checkInterval: 30,
     healthScore: 100
   },
-  
-  // Japanese Primary Sources
-  { 
-    name: 'Natalie.mu', 
-    url: 'https://natalie.mu/comic/feed/news', 
-    tier: 1, 
-    weight: 9,
-    language: 'JP',
-    checkInterval: 10,
-    healthScore: 100
-  },
-  { 
-    name: 'Oricon Anime', 
-    url: 'https://www.oricon.co.jp/rss/news_anime.xml', 
-    tier: 1, 
-    weight: 8,
-    language: 'JP',
-    checkInterval: 10,
-    healthScore: 100
-  },
-  { 
-    name: 'Mantan Web', 
-    url: 'https://mantan-web.jp/rss.xml', 
-    tier: 2, 
-    weight: 7,
-    language: 'JP',
-    checkInterval: 15,
-    healthScore: 100
-  },
-  
+
   // Platform News
-  { 
-    name: 'Crunchyroll News', 
-    url: 'https://cr-news-api-service.prd.crunchyrollsvc.com/v1/en-US/rss', 
-    tier: 2, 
+  {
+    name: 'Crunchyroll News',
+    url: 'https://cr-news-api-service.prd.crunchyrollsvc.com/v1/en-US/rss',
+    tier: 2,
     weight: 7,
     language: 'EN',
-    checkInterval: 15,
+    checkInterval: 30,
     healthScore: 100
   },
 ];
@@ -245,7 +216,7 @@ export const QUALITY_SIGNALS = {
 
 // Thresholds
 export const SCORING_THRESHOLDS = {
-  PUBLISH_MINIMUM: 2,      // Score >= 2 → pending approval (lowered for more content)
+  PUBLISH_MINIMUM: 4,      // Score >= 4 → pending approval (raised to reduce noise)
   AUTO_REJECT: -2,         // Score < -2 → discard
   HIGH_CONFIDENCE: 7,      // Score >= 7 → high confidence
 };
@@ -279,15 +250,6 @@ export const DEFAULT_SOURCE_CONFIG: Record<string, SourceConfig> = {
     name: 'MyAnimeList',
     tier: 2,
     weight: 7,
-    checkInterval: 10,
-    healthScore: 100,
-    consecutiveFailures: 0,
-    enabled: true
-  },
-  'Natalie.mu': {
-    name: 'Natalie.mu',
-    tier: 1,
-    weight: 9,
     checkInterval: 10,
     healthScore: 100,
     consecutiveFailures: 0,
@@ -373,7 +335,7 @@ export const RELIABILITY_CONFIG = {
 export const EXECUTION_SCHEDULE = {
   // Detection Worker (frequent, lightweight)
   DETECTION: {
-    interval: 10, // minutes
+    interval: 30, // minutes
     maxRuntime: 5, // minutes
     sources: ['RSS', 'YouTube', 'Nitter'],
   },

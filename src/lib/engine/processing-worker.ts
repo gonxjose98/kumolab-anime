@@ -89,6 +89,8 @@ function calculateContentScore(candidate: ProcessingCandidate): ContentScore {
   if (/\bfigure\b|\bfigurine\b|\bstatue\b|\bcollectible/.test(combined)) penalties += SCORING_PENALTIES.FIGURES_TOYS;
   if (/rumor|speculation|reportedly|allegedly|might|could|possibly/.test(combined)) penalties += SCORING_PENALTIES.FAN_SPECULATION;
   if (/\bgame\b(?!.*\banime\b).*\bannouncement\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
+  if (/\bcosplay\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
+  if (/\breview\b|\bopinion\b|\branking\b|\btop\s*\d+\b|\bbest anime\b/.test(combined)) penalties += SCORING_PENALTIES.OFF_TOPIC;
 
   const total = breakdown.sourceAuthority + breakdown.contentType + breakdown.visualEvidence + breakdown.temporalRelevance + penalties;
   const confidence: 'high' | 'medium' | 'low' = total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE ? 'high' : total >= SCORING_THRESHOLDS.PUBLISH_MINIMUM ? 'medium' : 'low';
