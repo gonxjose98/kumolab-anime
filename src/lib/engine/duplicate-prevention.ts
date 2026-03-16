@@ -120,17 +120,44 @@ export async function detectDuplicate(
         }
     }
     
-    // LAYER 3: Title similarity check
+    // LAYER 2.5: Semantic anime+claim dedup (catches different sources reporting same news)
+    // e.g. "Chainsaw Man Season 2 announced" vs "MAPPA confirms Chainsaw Man season 2"
+    if (candidate.title) {
+        const candidateAnime = extractAnimeFromTitle(candidate.title);
+        const candidateClaim = extractClaimFromTitle(candidate.title);
+
+        if (candidateAnime && candidateClaim) {
+            for (const existing of allPosts) {
+                if (!existing.title) continue;
+                const existingAnime = extractAnimeFromTitle(existing.title);
+                const existingClaim = extractClaimFromTitle(existing.title);
+
+                if (existingAnime && existingClaim && existingAnime === candidateAnime && existingClaim === candidateClaim) {
+                    return {
+                        isDuplicate: true,
+                        duplicateOf: existing.id,
+                        duplicateType: 'CLAIM',
+                        confidence: 92,
+                        existingPost: existing,
+                        action: 'BLOCK',
+                        reason: `Same anime "${candidateAnime}" + claim "${candidateClaim}" already exists`
+                    };
+                }
+            }
+        }
+    }
+
+    // LAYER 3: Title similarity check (lowered threshold to 0.55 for better catch rate)
     if (candidate.title) {
         for (const existing of allPosts) {
             const similarity = calculateTitleSimilarity(candidate.title, existing.title);
-            
-            if (similarity >= similarityThreshold) {
+
+            if (similarity >= 0.55) {
                 // Check if it's the same claim type
-                const sameClaimType = candidate.claimType && 
+                const sameClaimType = candidate.claimType &&
                     existing.claimType === candidate.claimType;
-                
-                if (sameClaimType) {
+
+                if (sameClaimType || similarity >= similarityThreshold) {
                     return {
                         isDuplicate: true,
                         duplicateOf: existing.id,
@@ -138,7 +165,7 @@ export async function detectDuplicate(
                         confidence: Math.round(similarity * 100),
                         existingPost: existing,
                         action: 'BLOCK',
-                        reason: `Similar title (${Math.round(similarity * 100)}% match) with same claim type`
+                        reason: `Similar title (${Math.round(similarity * 100)}% match)${sameClaimType ? ' with same claim type' : ''}`
                     };
                 } else {
                     // Different claim type but similar title - flag for review
@@ -187,6 +214,45 @@ export async function detectDuplicate(
         action: 'ALLOW',
         reason: 'No duplicates detected'
     };
+}
+
+/**
+ * Extract anime name from title for semantic dedup
+ */
+function extractAnimeFromTitle(title: string): string | null {
+    const t = title.trim();
+    const patterns = [
+        /^(.+?)\s+(?:Season|Movie|Film|Anime|Part)\s*\d/i,
+        /^(?:New|Latest|Official)\s+(.+?)\s+(?:Trailer|PV|Teaser|Visual|Key Visual|Announced)/i,
+        /^(.+?)\s+(?:Announces?|Reveals?|Confirms?|Gets?|Receives?)/i,
+        /(?:MAPPA|Ufotable|A-1 Pictures|CloverWorks|Trigger|Bones|Madhouse|WIT Studio|Production I\.G|Toei)\s+(?:Reveals?|Announces?|Confirms?)\s+(.+?)(?:\s+(?:Season|Key Visual|Trailer|PV|Release|Premiere))/i,
+        /['"](.+?)['"]\s+(?:Season|Movie|Film|Part|Gets|Receives|Anime)/i,
+        /(?:TV Anime|Anime)\s+['"]?(.+?)['"]?\s+(?:Season|Movie|Reveals|Announces|Gets|Receives|New|PV|Trailer)/i,
+        /^(.+?)\s*(?:[-–—:|])\s+(?:Season|Trailer|PV|Teaser|Key Visual|Release|New|Official)/i,
+    ];
+    for (const pattern of patterns) {
+        const match = t.match(pattern);
+        if (match?.[1]) {
+            const name = match[1].trim().replace(/[^\w\s]/g, '').toLowerCase().trim();
+            if (name.length >= 3 && !/^(new|the|a|an|this|that|more|first|latest|official|anime)$/i.test(name)) return name;
+        }
+    }
+    return null;
+}
+
+/**
+ * Extract claim type from title for semantic dedup
+ */
+function extractClaimFromTitle(title: string): string | null {
+    const t = title.toLowerCase();
+    if (/trailer|pv|promotional video|teaser/.test(t)) return 'TRAILER';
+    if (/season\s*\d+|new season|sequel|2nd season|3rd season|final season|returns for season/.test(t)) return 'SEASON';
+    if (/key visual|main visual|visual revealed|new visual/.test(t)) return 'KEY_VISUAL';
+    if (/release date|premiere|air date|broadcast/.test(t)) return 'RELEASE_DATE';
+    if (/delay|postpone|reschedule/.test(t)) return 'DELAY';
+    if (/cast|voice actor|seiyuu|staff|director/.test(t)) return 'CAST';
+    if (/announce|confirm|greenlit|green-lit/.test(t)) return 'ANNOUNCEMENT';
+    return null;
 }
 
 /**

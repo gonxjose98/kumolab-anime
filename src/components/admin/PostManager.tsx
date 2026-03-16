@@ -9,6 +9,18 @@ interface PostManagerProps {
     initialPosts: BlogPost[];
 }
 
+/** Detect if a post has embedded video (YouTube or X/Twitter) */
+function getPostVideoInfo(post: BlogPost): { type: 'youtube'; id: string } | { type: 'twitter'; id: string } | null {
+    if (post.youtube_video_id) {
+        return { type: 'youtube', id: post.youtube_video_id };
+    }
+    const match = post.content?.match(/Tweet ID:\s*(\d+)/);
+    if (match) {
+        return { type: 'twitter', id: match[1] };
+    }
+    return null;
+}
+
 const WIDTH = 1080;
 const HEIGHT = 1350;
 
@@ -31,34 +43,59 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         const relevanceScore = (p as any).relevance_score ?? p.relevanceScore ?? 0;
         const scrapedAt = (p as any).scraped_at ?? p.scrapedAt;
         const source = (p as any).source ?? p.source ?? 'Unknown';
-
-        const headline = (p as any).headline ?? (p as any).excerpt ?? p.headline ?? p.excerpt;
+        
+        // Derive status from multiple sources
+        let derivedStatus = (p as any).status ?? p.status;
+        const isPublished = (p as any).is_published ?? p.isPublished;
+        
+        // If no valid status, derive from is_published
+        if (!derivedStatus || !['pending', 'approved', 'published', 'declined'].includes(derivedStatus)) {
+            if (isPublished === true) {
+                derivedStatus = 'published';
+            } else {
+                // New posts (X/YouTube added via URL) are pending
+                derivedStatus = 'pending';
+            }
+        }
 
         return {
             ...p,
-            // Normalize common DB snake_case -> client expectations
-            isPublished: (p as any).is_published ?? p.isPublished,
+            isPublished: isPublished,
+            status: derivedStatus,
             scheduledPostTime: scheduledTime,
             socialIds: (p as any).social_ids ?? (p.socialIds || {}),
             sourceTier,
             relevanceScore,
             scrapedAt,
-            source,
-            // In this codebase, the DB uses `excerpt` to store the short headline/tag used on images.
-            headline: headline ?? ''
+            source
         };
     });
+    
+    // DEBUG: Log normalized posts
+    console.log('[PostManager] Normalized posts:', normalizedPosts.slice(0, 5).map((p: any) => ({ 
+        id: p.id?.slice(0,8), 
+        title: p.title?.substring(0, 30),
+        status: p.status, 
+        isPublished: p.isPublished 
+    })));
 
-    console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 1).map(p => ({ title: p.title, source: p.source, score: p.relevanceScore, tier: p.sourceTier })));
+    console.log('[PostManager] Normalized posts sample:', normalizedPosts.slice(0, 3).map(p => ({ 
+        title: p.title, 
+        status: p.status, 
+        isPublished: p.isPublished,
+        type: p.type,
+        source: p.source 
+    })));
 
 
     const [posts, setPosts] = useState<BlogPost[]>(normalizedPosts);
     const [filter, setFilter] = useState<'ALL' | 'LIVE' | 'HIDDEN' | 'PENDING' | 'APPROVED'>('PENDING'); // Default to PENDING for admin review
+    const [pendingSort, setPendingSort] = useState<'newest' | 'oldest' | 'top_scored'>('newest');
     const [isGenerating, setIsGenerating] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
     // Modal State
-    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT' | null>(null);
+    const [genType, setGenType] = useState<'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT' | 'TRAILER' | null>(null);
     const [topic, setTopic] = useState('');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -85,6 +122,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Text Manipulation State
     const [textScale, setTextScale] = useState(1);
     const [textPosition, setTextPosition] = useState<{ x: number, y: number }>({ x: WIDTH / 2, y: 1113.75 }); // Regional Control Center (35% zone center)
+    const [verticalOffset, setVerticalOffset] = useState(0); // NEW: Manual vertical adjustment in pixels
     const [isTextLocked, setIsTextLocked] = useState(false);
     const [gradientPosition, setGradientPosition] = useState<'top' | 'bottom'>('bottom');
     const [purpleWordIndices, setPurpleWordIndices] = useState<number[]>([]);
@@ -95,6 +133,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isApplyWatermark, setIsApplyWatermark] = useState(true);
     const [watermarkPosition, setWatermarkPosition] = useState<{ x: number, y: number } | null>(null);
     const [isWatermarkLocked, setIsWatermarkLocked] = useState(false);
+
+    // Website Publication State
+    const [isWebsitePublished, setIsWebsitePublished] = useState(false);
+
+    // Video Preview State
+    const [videoPreviewPost, setVideoPreviewPost] = useState<BlogPost | null>(null);
+    const twitterWidgetRef = useRef<HTMLDivElement>(null);
 
     const [showExpandedPreview, setShowExpandedPreview] = useState(false);
     const [isAutoSnap, setIsAutoSnap] = useState(false);
@@ -108,13 +153,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const stageContainerRef = useCallback((node: HTMLDivElement | null) => {
         if (node !== null) {
             const updateScale = () => {
-                const width = node.getBoundingClientRect().width;
-                const newScale = width / 1080;
-                setContainerScale(newScale > 0 ? newScale : 1);
+                try {
+                    const rect = node.getBoundingClientRect();
+                    const width = rect.width;
+                    const newScale = width / WIDTH; // Use WIDTH constant (1080)
+                    const finalScale = newScale > 0 ? newScale : 1;
+                    console.log('[DEBUG] Container scale updated:', finalScale, 'width:', width);
+                    setContainerScale(finalScale);
+                } catch (err) {
+                    console.error('[DEBUG] Error calculating container scale:', err);
+                    setContainerScale(1); // Fallback to 1
+                }
             };
-            updateScale();
-            const observer = new ResizeObserver(updateScale);
+            
+            // Initial calculation with slight delay to ensure layout is complete
+            setTimeout(updateScale, 0);
+            
+            const observer = new ResizeObserver(() => {
+                updateScale();
+            });
             observer.observe(node);
+            
+            // Cleanup
+            return () => {
+                observer.disconnect();
+            };
         }
     }, []);
 
@@ -125,6 +188,32 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         });
         (window as any).debugPosts = posts;
     }, [posts]);
+
+    // Load Twitter widget when video preview opens
+    useEffect(() => {
+        if (videoPreviewPost) {
+            const videoInfo = getPostVideoInfo(videoPreviewPost);
+            if (videoInfo?.type === 'twitter') {
+                if (!document.getElementById('twitter-widget-script')) {
+                    const script = document.createElement('script');
+                    script.id = 'twitter-widget-script';
+                    script.src = 'https://platform.twitter.com/widgets.js';
+                    script.async = true;
+                    script.charset = 'utf-8';
+                    document.body.appendChild(script);
+                    script.onload = () => {
+                        if ((window as any).twttr && twitterWidgetRef.current) {
+                            (window as any).twttr.widgets.load(twitterWidgetRef.current);
+                        }
+                    };
+                } else if ((window as any).twttr && twitterWidgetRef.current) {
+                    setTimeout(() => {
+                        (window as any).twttr.widgets.load(twitterWidgetRef.current);
+                    }, 100);
+                }
+            }
+        }
+    }, [videoPreviewPost]);
 
     const [layoutMetadata, setLayoutMetadata] = useState<LayoutMetadata | null>(null);
 
@@ -145,10 +234,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState<string | null>(null);
 
+    // Scan Sources Modal State
+    const [showScanModal, setShowScanModal] = useState(false);
+    const [scanSources, setScanSources] = useState({
+        youtube: true,
+        twitter: true,
+        rss: true
+    });
+    const [scanResults, setScanResults] = useState<any>(null);
+
     // AI Assistant State
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
+    const [showAiPromptModal, setShowAiPromptModal] = useState(false);
+    const [aiGeneratedDraft, setAiGeneratedDraft] = useState<any>(null);
     const lastRequestTimestamp = useRef<number>(0);
 
     const handleFetchLogs = async () => {
@@ -224,10 +324,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
             const result = await resp.json();
             if (result.success) {
-                // Fetch updated posts or update locally
-                // For simplicity, update locally with estimated times (or refresh)
+                // Update local state — move posts to approved status
+                setPosts(prev => prev.map(p =>
+                    postIds.includes(p.id!)
+                        ? { ...p, status: 'approved', isPublished: false }
+                        : p
+                ));
+                setSelectedIds([]);
                 setFilter('APPROVED');
-                window.location.reload(); // Reliable sync
             } else {
                 alert('Approve failed: ' + result.error);
             }
@@ -296,33 +400,57 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 body: JSON.stringify({ postIds, reason })
             });
             const result = await resp.json();
-            if (result.success) {
-                setPosts(prev => prev.filter(p => !postIds.includes(p.id!)));
-                setSelectedIds([]);
-            } else {
-                alert('Decline failed: ' + result.error);
+
+            // Always remove successfully processed posts from local state
+            const successIds = (result.results || [])
+                .filter((r: any) => r.success)
+                .map((r: any) => r.id);
+
+            if (successIds.length > 0) {
+                setPosts(prev => prev.filter(p => !successIds.includes(p.id!)));
+                setSelectedIds(prev => prev.filter(id => !successIds.includes(id)));
             }
-        } catch (e) {
-            console.error(e);
+
+            const failedResults = (result.results || []).filter((r: any) => !r.success);
+            if (failedResults.length > 0) {
+                const errors = failedResults.map((r: any) => `${r.id?.slice(0, 8)}: ${r.error}`).join('\n');
+                alert(`${successIds.length} declined, ${failedResults.length} failed:\n${errors}`);
+            } else if (successIds.length === 0 && !result.success) {
+                alert('Decline failed: ' + (result.error || 'Unknown error'));
+            }
+        } catch (e: any) {
+            console.error('[PostManager] Decline error:', e);
+            alert('Decline failed: ' + e.message);
         } finally {
             setIsPublishing(false);
         }
     };
 
     const filteredPosts = posts.filter((post) => {
+        // Derive effective status from multiple sources
+        const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
+
+        // Never show declined posts (fallback state when delete fails)
+        if (effectiveStatus === 'declined') return false;
+
         if (filter === 'ALL') return true;
         if (filter === 'LIVE') return post.isPublished === true;
-        if (filter === 'HIDDEN') return post.isPublished === false && post.status !== 'pending' && post.status !== 'approved';
-        if (filter === 'PENDING') return post.status === 'pending';
-        if (filter === 'APPROVED') return post.status === 'approved';
+        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
+        if (filter === 'PENDING') return effectiveStatus === 'pending' && post.isPublished !== true;
+        if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
-        if (filter === 'PENDING') {
+        // Apply user-selected sort on all tabs
+        if (pendingSort === 'top_scored') {
             if ((a.relevanceScore || 0) !== (b.relevanceScore || 0)) {
                 return (b.relevanceScore || 0) - (a.relevanceScore || 0);
             }
             return (a.sourceTier || 3) - (b.sourceTier || 3);
         }
+        if (pendingSort === 'oldest') {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        }
+        // 'newest' — default
         if (filter === 'APPROVED') {
             return new Date(a.scheduledPostTime || 0).getTime() - new Date(b.scheduledPostTime || 0).getTime();
         }
@@ -332,9 +460,9 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const pendingCount = posts.filter(p => p.status === 'pending').length;
     const approvedCount = posts.filter(p => p.status === 'approved').length;
 
-    const handleGenerateClick = (type: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
+    const handleGenerateClick = (type?: 'INTEL' | 'TRENDING' | 'CUSTOM' | 'CONFIRMATION_ALERT') => {
         setEditingPostId(null);
-        setGenType(type);
+        setGenType(type || null);
         setTopic('');
         setTitle('');
         setContent('');
@@ -364,6 +492,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsApplyWatermark(true);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        
+        // Reset website publication state for new posts (default to not published)
+        setIsWebsitePublished(false);
+        
         // AI Reset
         setAiPrompt('');
         setAiChatHistory([]);
@@ -376,8 +508,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setTopic(post.title);
         setTitle(post.title);
         setContent(post.content);
-        // DB stores this value as `excerpt` for many posts. Normalize to avoid blank overlay on edit.
-        setOverlayTag((post.headline || post.excerpt || '') as string);
+        
+        // FIX: Use title as fallback for overlayTag if headline is empty
+        // This ensures text is always visible by default when editing
+        const headlineText = post.headline || post.title || '';
+        setOverlayTag(headlineText);
+        console.log('[DEBUG] Edit modal opening - overlayTag set to:', headlineText);
+        
         setCustomImage(null);
 
         // SOURCE IMAGE PRIORITIZATION: Use background_image for raw editing
@@ -403,9 +540,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setImagePosition(settings.imagePosition || { x: 0, y: 0 });
         setTextScale(settings.textScale || 1);
         setTextPosition(settings.textPosition || { x: WIDTH / 2, y: 1113.75 });
-        setIsApplyText(settings.isApplyText ?? !!(post.headline || post.title));
+        setVerticalOffset(settings.verticalOffset || 0); // NEW: Load vertical offset
+        
+        // FIX: Default isApplyText to true if there's a headline or title
+        const shouldApplyText = settings.isApplyText ?? !!(post.headline || post.title);
+        setIsApplyText(shouldApplyText);
+        console.log('[DEBUG] isApplyText set to:', shouldApplyText);
+        
         setIsApplyGradient(settings.isApplyGradient ?? !!(post.headline || post.title));
         setIsApplyWatermark(settings.isApplyWatermark ?? true);
+        
+        // Load website publication status
+        setIsWebsitePublished((post as any).is_published ?? post.isPublished ?? false);
         setPurpleWordIndices(settings.purpleWordIndices || []);
         setGradientPosition(settings.gradientPosition || 'bottom');
 
@@ -416,7 +562,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setShowExpandedPreview(false);
         setWatermarkPosition(null);
         setIsWatermarkLocked(false);
+        
+        // FIX: Reset layoutMetadata to ensure fresh text positioning calculation
+        setLayoutMetadata(null);
+        
         setShowModal(true);
+        
+        console.log('[DEBUG] Modal opened - Text should be visible:', {
+            overlayTag: headlineText,
+            isApplyText: shouldApplyText,
+            hasHeadline: !!post.headline,
+            hasTitle: !!post.title
+        });
     };
 
 
@@ -507,7 +664,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         }
     };
 
-    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean, manualTextScale?: number): Promise<string | null> => {
+    const handleApplyText = async (manualScale?: number, manualPos?: { x: number, y: number }, forcedApplyText?: boolean, forcedApplyGradient?: boolean, manualPurpleIndices?: number[], manualGradientPos?: 'top' | 'bottom', forcedApplyWatermark?: boolean, manualTextScale?: number, manualVerticalOffset?: number): Promise<string | null> => {
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
@@ -552,7 +709,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     purpleIndex: manualPurpleIndices ?? purpleWordIndices,
                     applyWatermark: forcedApplyWatermark ?? isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
+                    disableAutoScaling: false, // ALLOW ENGINE TO SCALE
+                    verticalOffset: manualVerticalOffset ?? verticalOffset // NEW: Pass vertical offset
                 })
             });
             const data = await res.json();
@@ -665,10 +823,28 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             setImageScale(newScale);
             setIsStageDirty(true);
         } else {
-            const newScale = Math.max(0.1, textScale + delta);
-            setTextScale(newScale);
-            setIsStageDirty(true);
-            // Debounced sync for layout math if needed, but UI is live
+            // HARD CONSTRAINT: Text scale cannot exceed zone boundaries
+            // Calculate max scale based on current text content and zone height
+            const zoneHeight = HEIGHT * 0.35; // 35% zone
+            const lineHeightFactor = 0.88;
+            const words = (overlayTag || '').trim().split(/\s+/).filter(Boolean);
+            // Estimate lines needed at current scale
+            const charsPerLine = 25; // Approximate at base scale
+            const estimatedLines = Math.max(2, Math.ceil(words.length / 4));
+            const currentFontSize = 120 * textScale; // Base 120px
+            const textHeight = estimatedLines * currentFontSize * lineHeightFactor;
+            
+            // Only allow zoom if it won't overflow zone (with 5% buffer)
+            const proposedNewScale = textScale + delta;
+            const proposedTextHeight = estimatedLines * (120 * proposedNewScale) * lineHeightFactor;
+            
+            if (proposedTextHeight <= zoneHeight * 0.95 || delta < 0) {
+                const newScale = Math.max(0.5, Math.min(3, proposedNewScale)); // Constrain between 0.5x and 3x
+                setTextScale(newScale);
+                setIsStageDirty(true);
+            } else {
+                console.log('[DEBUG] Text zoom blocked: would exceed zone height');
+            }
         }
     };
 
@@ -681,6 +857,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsStageDirty(true);
         setTextScale(1);
         setTextPosition({ x: WIDTH / 2, y: 1113.75 });
+        setVerticalOffset(0); // Reset vertical offset
         setIsTextLocked(false);
         setPurpleWordIndices([]);
         setPurpleCursorIndex(0);
@@ -696,9 +873,18 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         setIsStageDirty(true);
         if (type === 'text') {
             const newVal = !isApplyText;
+            console.log('[DEBUG] Text toggle clicked, new value:', newVal);
             setIsApplyText(newVal);
-            // In strict mode, we do NOT trigger backend. We rely on content length mostly, 
-            // but if we keep this toggle for UI, it should just be local.
+            
+            // FIX: When turning text ON, ensure we have layoutMetadata for positioning
+            // When turning text OFF, clear layoutMetadata
+            if (!newVal) {
+                setLayoutMetadata(null);
+            } else if (newVal && !layoutMetadata && overlayTag.trim().length > 0) {
+                // If turning text on and no layout, trigger text application
+                console.log('[DEBUG] Text turned ON, triggering handleApplyText');
+                handleApplyText();
+            }
         } else {
             const newVal = !isApplyGradient;
             setIsApplyGradient(newVal);
@@ -714,21 +900,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     const handleSavePost = async (autoClose: boolean = false) => {
         setIsGenerating(true);
 
-        // FORCE REGENERATION: To ensure the latest text (Topic/Title) is applied
-        // We cannot rely solely on cached 'processedImage' because the user might have just typed 
-        // in the Topic box without triggering 'isStageDirty' if onBlur didn't fire yet.
-        // So we ALWAYS regenerate if we have a source image.
-        let finalImageToSave: string | null = null;
+        // USE EXISTING PROCESSED IMAGE: If user clicked "Show Preview", we already have the processed image.
+        // Only regenerate if we don't have a processed image yet.
+        let finalImageToSave: string | null = processedImage;
 
         const imageUrl = (searchedImages.length > 0 && selectedImageIndex !== null)
             ? searchedImages[selectedImageIndex]
             : customImagePreview;
 
-        if (imageUrl) {
-            // 3. forcedApplyText: Respect isApplyText (Do NOT force true)
-            // 7. forcedApplyWatermark: TRUE (Always force watermark on save)
-            console.log(`[Admin] Generating FINAL save image (Text: ${isApplyText ? 'ON' : 'OFF'})...`);
+        if (!finalImageToSave && imageUrl) {
+            // No processed image yet - generate it now
+            console.log(`[Admin] No processed image exists, generating... (Text: ${isApplyText ? 'ON' : 'OFF'})`);
             finalImageToSave = await handleApplyText(undefined, undefined, isApplyText, undefined, undefined, undefined, true);
+            console.log(`[Admin] Image generation result:`, finalImageToSave ? `Base64 length: ${finalImageToSave.length}` : 'NULL');
+        } else if (finalImageToSave) {
+            console.log(`[Admin] Using existing processed image, length: ${finalImageToSave.length}`);
         } else {
             console.warn('[Admin] No image found to process for save.');
         }
@@ -764,8 +950,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             // 2. Use the cached "Preview" image (Next best)
             // 3. ERROR if strictly needed.
             const targetImageString = finalImageToSave || processedImage;
+            console.log(`[Admin] Target image string:`, targetImageString ? `Length: ${targetImageString.length}, starts with: ${targetImageString.substring(0, 50)}...` : 'NULL');
 
             if (targetImageString && targetImageString.startsWith('data:')) {
+                console.log(`[Admin] Converting base64 to blob...`);
                 const parts = targetImageString.split(',');
                 const byteString = atob(parts[1]);
                 const mimeString = parts[0].split(':')[1].split(';')[0];
@@ -776,33 +964,45 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 }
                 const blob = new Blob([ab], { type: mimeString });
                 imageFileToUpload = blob;
+                console.log(`[Admin] Blob created, size: ${blob.size} bytes`);
             } else if (customImage && (genType === null || !isApplyText)) {
                 // ONLY fall back to raw custom image if we are NOT applying text
                 // or if it's a simple Community post.
                 imageFileToUpload = customImage;
                 imageFileName = customImage.name;
-            } else if (!editingPostId) {
-                // If new post and no processed image...
-                alert('CRITICAL: Visual processing failed. Text overlay was not generated. Retrying...');
-                setIsGenerating(false);
-                return;
+            } else {
+                // Check if this is a video post (no image needed)
+                const isVideoPost = content?.match(/Tweet ID:\s*(\d+)/) || (editingPostId && posts.find(p => p.id === editingPostId)?.youtube_video_id);
+                if (!isVideoPost) {
+                    console.error('[Admin] Save failed: No valid processed image');
+                    alert('ERROR: No processed image available. Click "Show Preview" first to generate the image, then save.');
+                    setIsGenerating(false);
+                    return;
+                }
+                console.log('[Admin] Video post detected — saving without image.');
             }
 
             const formData = new FormData();
             formData.append('title', finalTitle);
             formData.append('content', content || `Transmission for ${finalTitle}.`);
-            formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : 'COMMUNITY');
+            formData.append('type', genType === 'TRENDING' ? 'TRENDING' : genType === 'INTEL' ? 'INTEL' : genType === 'CONFIRMATION_ALERT' ? 'CONFIRMATION_ALERT' : genType === 'TRAILER' ? 'TRAILER' : 'COMMUNITY');
             formData.append('headline', (overlayTag || 'FEATURED').toUpperCase());
+            formData.append('isWebsitePublished', isWebsitePublished ? 'true' : 'false');
 
             if (imageFileToUpload) {
                 formData.append('image', imageFileToUpload, imageFileName);
                 formData.append('skipProcessing', 'true');
             } else if (editingPostId) {
-                formData.append('skipProcessing', 'true');
+                // Editing an existing post — if no new image, that's OK (video posts have no image, or keeping existing)
+                console.log('[Admin] Editing post without new image — preserving existing.');
             } else {
-                alert('Visual asset is required for new transmissions.');
-                setIsGenerating(false);
-                return;
+                // New post — check if video post (no image needed)
+                const isVideoPost = content?.match(/Tweet ID:\s*(\d+)/);
+                if (!isVideoPost) {
+                    alert('Visual asset is required for new transmissions.');
+                    setIsGenerating(false);
+                    return;
+                }
             }
 
             if (editingPostId) {
@@ -813,6 +1013,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             const imageSettings = {
                 textScale,
                 textPosition,
+                verticalOffset, // NEW: Save vertical offset
                 isApplyText,
                 isApplyGradient,
                 isApplyWatermark,
@@ -838,8 +1039,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             });
 
             const data = await response.json();
+            console.log(`[Admin] Save response:`, data.success ? 'SUCCESS' : 'FAILED', data.post ? `Post image: ${data.post.image?.substring(0, 100)}...` : 'No post data');
             if (data.success && data.post) {
                 if (editingPostId) {
+                    console.log(`[Admin] Updating post ${editingPostId} in local state`);
                     setPosts(current => current.map(p => p.id === editingPostId ? data.post : p));
                 } else {
                     setPosts(current => [data.post, ...current]);
@@ -848,7 +1051,12 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                 if (autoClose) {
                     setShowModal(false);
                     setPreviewPost(null);
-                    setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+                    // Smart filter switching: stay on current view for edits, switch for new posts
+                    if (!editingPostId) {
+                        // New post - switch to appropriate filter
+                        setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'PENDING');
+                    }
+                    // For edits, stay on current filter so user sees the updated post
                     alert(`Transmission ${editingPostId ? 'updated' : 'deployed'} successfully.`);
                 } else {
                     // CRITICAL: Ensure we use the processed image for the preview if we saved one
@@ -883,7 +1091,11 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         } else {
             setShowModal(false);
             setPreviewPost(null);
-            setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+            // FIX: Don't switch filter on edit - stay on current view
+            // Only new posts should potentially switch filters
+            if (!editingPostId) {
+                setFilter(genType === 'CONFIRMATION_ALERT' ? 'LIVE' : 'HIDDEN');
+            }
         }
     };
 
@@ -934,13 +1146,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     applyText: isApplyText,
                     applyGradient: isApplyGradient,
                     textPos: textPosition,
-
                     textScale,
                     gradientPos: gradientPosition,
                     purpleIndex: purpleWordIndices,
                     applyWatermark: isApplyWatermark,
                     watermarkPosition,
-                    disableAutoScaling: false // ALLOW ENGINE TO SCALE
+                    disableAutoScaling: false, // ALLOW ENGINE TO SCALE
+                    verticalOffset // NEW: Include vertical offset
                 })
             });
 
@@ -1019,6 +1231,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
     // Social Publish Modal State
     const [showSocialModal, setShowSocialModal] = useState(false);
     const [socialPlatforms, setSocialPlatforms] = useState({
+        website: false,
         x: true,
         instagram: true,
         facebook: true
@@ -1042,6 +1255,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
         selectedIds.forEach(id => {
             initStatus[id] = {};
+            if ((socialPlatforms as any).website) initStatus[id]['website'] = 'idle';
             if (socialPlatforms.x) initStatus[id]['x'] = 'idle';
             if (socialPlatforms.instagram) initStatus[id]['instagram'] = 'idle';
             if (socialPlatforms.facebook) initStatus[id]['facebook'] = 'idle';
@@ -1067,55 +1281,96 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     return next;
                 });
 
-                // Call API
-                const res = await fetch('/api/admin/social/publish-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        postId: id,
-                        platforms: platformsList
-                    })
-                });
-
-                const data = await res.json();
-
-                // Parse Results
-                setPublishStatus(prev => {
-                    const next = { ...prev };
-                    const results = data.results || {};
-
-                    platformsList.forEach(p => {
-                        const platformKey = p === 'x' ? 'twitter' : p;
-                        if (results[p] && results[p].success) {
-                            next[id][p] = 'success';
-                        } else {
-                            next[id][p] = 'error';
-                        }
+                // Handle website publish first (if selected)
+                if (platformsList.includes('website')) {
+                    setPublishStatus(prev => {
+                        const next = { ...prev };
+                        next[id]['website'] = 'loading';
+                        return next;
                     });
 
-                    // Update local post state with social IDs if success
-                    const anySuccess = Object.values(results).some((r: any) => r && r.success);
-                    if (anySuccess) {
-                        setPosts(current => current.map(curr => {
-                            if (curr.id === id) {
-                                const newSocialIds = { ...curr.socialIds };
-                                if (results.x?.success) newSocialIds.twitter = results.x.id;
-                                if (results.facebook?.success) newSocialIds.facebook = results.facebook.id;
-                                if (results.instagram?.success) newSocialIds.instagram = results.instagram.id;
-
-                                return {
-                                    ...curr,
-                                    isPublished: true,
-                                    is_published: true,
-                                    socialIds: newSocialIds
-                                };
-                            }
-                            return curr;
-                        }));
+                    try {
+                        const webRes = await fetch('/api/posts', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id,
+                                status: 'published',
+                                is_published: true,
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+                        const webData = await webRes.json();
+                        setPublishStatus(prev => {
+                            const next = { ...prev };
+                            next[id]['website'] = webData.success ? 'success' : 'error';
+                            return next;
+                        });
+                        if (webData.success) {
+                            setPosts(current => current.map(curr =>
+                                curr.id === id ? { ...curr, isPublished: true, status: 'published' } : curr
+                            ));
+                        }
+                    } catch {
+                        setPublishStatus(prev => {
+                            const next = { ...prev };
+                            next[id]['website'] = 'error';
+                            return next;
+                        });
                     }
+                }
 
-                    return next;
-                });
+                // Call social media API (skip 'website' from the social platforms list)
+                const socialOnly = platformsList.filter(p => p !== 'website');
+                if (socialOnly.length > 0) {
+                    const res = await fetch('/api/admin/social/publish-all', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            postId: id,
+                            platforms: socialOnly
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    // Parse Results
+                    setPublishStatus(prev => {
+                        const next = { ...prev };
+                        const results = data.results || {};
+
+                        socialOnly.forEach(p => {
+                            if (results[p] && results[p].success) {
+                                next[id][p] = 'success';
+                            } else {
+                                next[id][p] = 'error';
+                            }
+                        });
+
+                        // Update local post state with social IDs if success
+                        const anySuccess = Object.values(results).some((r: any) => r && r.success);
+                        if (anySuccess) {
+                            setPosts(current => current.map(curr => {
+                                if (curr.id === id) {
+                                    const newSocialIds = { ...curr.socialIds };
+                                    if (results.x?.success) newSocialIds.twitter = results.x.id;
+                                    if (results.facebook?.success) newSocialIds.facebook = results.facebook.id;
+                                    if (results.instagram?.success) newSocialIds.instagram = results.instagram.id;
+
+                                    return {
+                                        ...curr,
+                                        isPublished: true,
+                                        is_published: true,
+                                        socialIds: newSocialIds
+                                    };
+                                }
+                                return curr;
+                            }));
+                        }
+
+                        return next;
+                    });
+                }
             }
         } catch (e: any) {
             console.error('Broadcast protocol failure:', e);
@@ -1181,166 +1436,213 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-6 animate-in fade-in duration-700">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-2">
-                    <h2 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 tracking-tighter uppercase drop-shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+                <div className="space-y-1">
+                    <h2 className="text-2xl md:text-3xl font-black tracking-tight uppercase" style={{ fontFamily: 'var(--font-display)', background: 'linear-gradient(135deg, #00d4ff 0%, #7b61ff 40%, #ff3cac 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         Mission Control
                     </h2>
-                    <p className="text-neutral-500 text-xs md:text-sm font-mono tracking-widest uppercase">
-                        Admin Intelligence System v2.0
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                        Intelligence System v2.0
                     </p>
                 </div>
 
                 {/* Filters */}
-                <div className="flex bg-white/60 dark:bg-black/40 p-1.5 rounded-xl border border-gray-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-none overflow-x-auto">
-                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => (
-                        <button
-                            key={f}
-                            onClick={() => setFilter(f)}
-                            className={`relative px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest rounded-lg transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${filter === f
-                                ? 'text-white shadow-[0_4px_10px_rgba(168,85,247,0.3)]'
-                                : 'text-slate-500 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                                }`}
-                        >
-                            {filter === f && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg -z-10" />
-                            )}
-                            <span>{f}</span>
-                            {f === 'PENDING' && pendingCount > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-purple-600' : 'bg-purple-600 text-white'}`}>
-                                    {pendingCount}
-                                </span>
-                            )}
-                            {f === 'APPROVED' && approvedCount > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${filter === f ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'}`}>
-                                    {approvedCount}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+                <div className="flex p-1 rounded-xl overflow-x-auto" style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+                    {(['PENDING', 'APPROVED', 'LIVE', 'HIDDEN', 'ALL'] as const).map((f) => {
+                        const tabColors: Record<string, string> = { PENDING: '#ff3cac', APPROVED: '#00d4ff', LIVE: '#00ff88', HIDDEN: '#7b61ff', ALL: '#7b61ff' };
+                        const c = tabColors[f];
+                        return (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
+                                style={{
+                                    color: filter === f ? '#fff' : 'var(--text-muted)',
+                                    background: filter === f ? `${c}18` : 'transparent',
+                                    border: filter === f ? `1px solid ${c}35` : '1px solid transparent',
+                                    fontFamily: 'var(--font-display)',
+                                    boxShadow: filter === f ? `0 4px 15px ${c}15` : 'none',
+                                }}
+                            >
+                                <span>{f}</span>
+                                {f === 'PENDING' && pendingCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#ff3cac' : 'rgba(255,60,172,0.2)', color: filter === f ? '#fff' : '#ff3cac' }}>
+                                        {pendingCount}
+                                    </span>
+                                )}
+                                {f === 'APPROVED' && approvedCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ background: filter === f ? '#00d4ff' : 'rgba(0,212,255,0.2)', color: filter === f ? '#fff' : '#00d4ff' }}>
+                                        {approvedCount}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Action Bar */}
-            {/* Action Bar - Modern Glass Cards */}
-            {/* Action Bar - Modern Aesthetic Compact */}
-            <div className="flex flex-wrap gap-3 items-center">
+            {/* Sort Buttons — visible on all tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-bold uppercase tracking-[0.15em] mr-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Sort:</span>
+                {([
+                    { key: 'newest' as const, label: 'Most Recent' },
+                    { key: 'oldest' as const, label: 'Oldest' },
+                    { key: 'top_scored' as const, label: 'Top Scored' },
+                ]).map(({ key, label }) => (
+                    <button
+                        key={key}
+                        onClick={() => setPendingSort(key)}
+                        className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                        style={{
+                            fontFamily: 'var(--font-display)',
+                            color: pendingSort === key ? '#fff' : 'var(--text-muted)',
+                            background: pendingSort === key ? 'rgba(255,60,172,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: pendingSort === key ? '1px solid rgba(255,60,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                    >
+                        {label}
+                    </button>
+                ))}
+
+                {/* Purge Duplicates — quick mass cleanup */}
                 <button
-                    onClick={() => handleGenerateClick('CUSTOM' as any)}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 border border-purple-400 backdrop-blur-xl shadow-lg shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 min-w-[120px]"
+                    onClick={async () => {
+                        if (!confirm('This will DELETE all duplicate posts from the database, keeping only the first instance of each article.\n\nThis action cannot be undone. Proceed?')) return;
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/purge-duplicates', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(`Purge complete!\n\nDeleted: ${data.deleted} duplicates\nRemaining: ${data.remaining} unique posts`);
+                                window.location.reload();
+                            } else {
+                                alert('Purge failed: ' + (data.error || 'Unknown error'));
+                            }
+                        } catch (e: any) {
+                            alert('Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }}
+                    disabled={isPublishing}
+                    className="ml-auto px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-200"
+                    style={{
+                        fontFamily: 'var(--font-display)',
+                        color: '#ff4444',
+                        background: 'rgba(255,60,60,0.06)',
+                        border: '1px solid rgba(255,60,60,0.15)',
+                    }}
+                >
+                    {isPublishing ? 'Purging...' : 'Purge Duplicates'}
+                </button>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex flex-wrap gap-2 items-center">
+                <button
+                    onClick={() => setShowAiPromptModal(true)}
+                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[110px]"
+                    style={{ background: 'linear-gradient(135deg, rgba(123,97,255,0.2), rgba(255,60,172,0.2))', border: '1px solid rgba(123,97,255,0.3)', boxShadow: '0 4px 15px rgba(123,97,255,0.15)' }}
                 >
                     <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                        <Sparkles size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">AI Assist</span>
+                        <Sparkles size={14} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>AI Assist</span>
                     </div>
                 </button>
 
-                <button
-                    onClick={() => handleGenerateClick('INTEL')}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-blue-950/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-blue-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
-                        <Newspaper size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Intel</span>
-                    </div>
-                </button>
+                {[
+                    { label: 'Create', icon: <Plus size={14} />, color: '#7b61ff', onClick: () => handleGenerateClick() },
+                    { label: 'Add URL', icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>, color: '#ff8c00', onClick: async () => {
+                        const url = prompt('Paste YouTube or X (Twitter) URL:');
+                        if (!url) return;
+                        setIsPublishing(true);
+                        try {
+                            const res = await fetch('/api/admin/custom-url', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ url: url })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(`${data.post.platform || 'Post'} Added!\n\nTitle: ${data.post.title}\nType: ${data.post.type}\nSource: ${data.post.channel || data.post.platform}\n\nCheck the Pending tab to approve it.`);
+                                window.location.reload();
+                            } else {
+                                alert('Failed: ' + (data.error || 'Failed to add post'));
+                            }
+                        } catch (e: any) {
+                            alert('Error: ' + e.message);
+                        } finally {
+                            setIsPublishing(false);
+                        }
+                    }},
+                    { label: 'Scan', icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>, color: '#00d4ff', onClick: () => { setShowScanModal(true); setScanResults(null); } },
+                ].map((btn) => (
+                    <button
+                        key={btn.label}
+                        onClick={btn.onClick}
+                        disabled={isPublishing}
+                        className="flex-1 md:flex-none group relative overflow-hidden px-3 py-2.5 rounded-xl hover:-translate-y-0.5 transition-all duration-300 min-w-[90px]"
+                        style={{ background: `${btn.color}08`, border: `1px solid ${btn.color}20`, backdropFilter: 'blur(10px)' }}
+                    >
+                        <div className="flex items-center justify-center gap-1.5 group-hover:scale-105 transition-transform" style={{ color: btn.color }}>
+                            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : btn.icon}
+                            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>{btn.label}</span>
+                        </div>
+                    </button>
+                ))}
 
+                {/* Select All / Deselect All */}
                 <button
-                    onClick={() => handleGenerateClick('TRENDING')}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-purple-950/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-purple-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
+                    onClick={() => {
+                        if (selectedIds.length === filteredPosts.length && filteredPosts.length > 0) {
+                            setSelectedIds([]);
+                        } else {
+                            setSelectedIds(filteredPosts.map(p => p.id!).filter(Boolean));
+                        }
+                    }}
+                    className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
-                    <div className="flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
-                        <Zap size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Trending</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => handleGenerateClick('CUSTOM' as any)}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-900/20 border border-gray-200 dark:border-green-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
-                        <Plus size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Create</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => handleGenerateClick('CONFIRMATION_ALERT')}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-orange-950/10 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-orange-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
-                        <CheckCircle2 size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Alert</span>
-                    </div>
-                </button>
-
-                <button
-                    onClick={() => { setShowLogsModal(true); handleFetchLogs(); }}
-                    className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-950/10 hover:bg-slate-50 dark:hover:bg-slate-900/20 border border-gray-200 dark:border-slate-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-slate-500/10 hover:-translate-y-0.5 transition-all duration-300 min-w-[100px]"
-                >
-                    <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform">
-                        <Terminal size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Logs</span>
+                    <div className="flex items-center justify-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        <CheckCircle2 size={14} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>
+                            {selectedIds.length === filteredPosts.length && filteredPosts.length > 0 ? 'Deselect All' : `Select All (${filteredPosts.length})`}
+                        </span>
                     </div>
                 </button>
 
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-red-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-red-500/10 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Delete</span>
+                        <button onClick={handleBulkDelete} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.15)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: '#ff4444' }}>
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider hidden md:inline" style={{ fontFamily: 'var(--font-display)' }}>Delete</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={handleBulkHide}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-neutral-900/40 hover:bg-gray-50 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-neutral-400 group-hover:scale-105 transition-transform">
-                                <EyeOff size={16} />
-                                <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Hide</span>
+                        <button onClick={handleBulkHide} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                                <EyeOff size={14} />
+                                <span className="text-[9px] font-bold uppercase tracking-wider hidden md:inline" style={{ fontFamily: 'var(--font-display)' }}>Hide</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={() => handleApprove(selectedIds)}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 border border-green-400 backdrop-blur-xl shadow-lg shadow-green-500/20 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Approve ({selectedIds.length})</span>
+                        <button onClick={() => handleApprove(selectedIds)} disabled={isPublishing} className="flex-1 md:flex-none group px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5" style={{ background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.3)', boxShadow: '0 4px 15px rgba(0,255,136,0.1)' }}>
+                            <div className="flex items-center justify-center gap-1.5 text-white">
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} style={{ color: '#00ff88' }} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#00ff88' }}>Approve ({selectedIds.length})</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={() => handleDecline(selectedIds)}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 border border-red-400 backdrop-blur-xl shadow-lg shadow-red-500/20 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-white group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Decline ({selectedIds.length})</span>
+                        <button onClick={() => handleDecline(selectedIds)} disabled={isPublishing} className="flex-1 md:flex-none group px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5" style={{ background: 'rgba(255,60,60,0.12)', border: '1px solid rgba(255,60,60,0.3)', boxShadow: '0 4px 15px rgba(255,60,60,0.1)' }}>
+                            <div className="flex items-center justify-center gap-1.5 text-white">
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} style={{ color: '#ff4444' }} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#ff4444' }}>Decline ({selectedIds.length})</span>
                             </div>
                         </button>
-
-                        <button
-                            onClick={handlePublishToSocials}
-                            disabled={isPublishing}
-                            className="flex-1 md:flex-none group relative overflow-hidden px-4 py-3 rounded-xl bg-white/60 dark:bg-pink-950/10 hover:bg-pink-50 dark:hover:bg-pink-900/20 border border-gray-200 dark:border-pink-500/20 backdrop-blur-xl shadow-sm hover:shadow-lg hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                            <div className="flex items-center justify-center gap-2 text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform">
-                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-                                <span className="text-[10px] font-black uppercase tracking-widest">Broadcast ({selectedIds.length})</span>
+                        <button onClick={handlePublishToSocials} disabled={isPublishing} className="flex-1 md:flex-none group px-3 py-2.5 rounded-xl transition-all" style={{ background: 'rgba(255,60,172,0.08)', border: '1px solid rgba(255,60,172,0.2)' }}>
+                            <div className="flex items-center justify-center gap-1.5" style={{ color: '#ff3cac' }}>
+                                {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>Broadcast ({selectedIds.length})</span>
                             </div>
                         </button>
                     </div>
@@ -1348,63 +1650,183 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             </div>
 
             {/* Content Display - Hybrid Table (Desktop) / Cards (Mobile) */}
-            <div className="bg-white/60 dark:bg-black/20 backdrop-blur-xl border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl">
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(12,12,24,0.4)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
                 {/* Desktop Table View */}
                 <div className="hidden md:block">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50/50 dark:bg-white/5 text-slate-500 dark:text-neutral-400 border-b border-gray-200 dark:border-white/5">
+                        <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <tr>
                                 <th className="p-4 pl-6 w-[40px]">
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.length === filteredPosts.length && filteredPosts.length > 0}
                                         onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                        className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider">
-                                    {filter === 'PENDING' ? 'Metadata' : 'Signal Status'}
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                                    {filter === 'PENDING' ? 'Metadata' : 'Status'}
                                 </th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider">Visual</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider w-full">Intel</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-wider text-right pr-6">Controls</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Visual</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em] w-full" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Intel</th>
+                                <th className="p-4 text-[9px] font-bold uppercase tracking-[0.2em] text-right pr-6" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>Controls</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                        <tbody style={{ borderTop: 'none' }}>
                             {filteredPosts.map((post) => (
-                                <tr key={post.id} className={`group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${post.id && selectedIds.includes(post.id) ? 'bg-purple-50 dark:bg-purple-900/10' : ''}`}>
+                                <tr key={post.id} className="group transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: post.id && selectedIds.includes(post.id) ? 'rgba(123,97,255,0.06)' : 'transparent' }} onMouseEnter={(e) => { if (!(post.id && selectedIds.includes(post.id))) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = post.id && selectedIds.includes(post.id) ? 'rgba(123,97,255,0.06)' : 'transparent'; }}>
                                     <td className="p-4 pl-6 align-top">
                                         <input
                                             type="checkbox"
                                             checked={!!post.id && selectedIds.includes(post.id)}
                                             onChange={() => post.id && toggleSelect(post.id)}
-                                            className="rounded border-gray-300 dark:border-neutral-700 bg-white dark:bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                            className="rounded border-neutral-700 bg-black/50 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-4 align-top w-[140px]">
+                                    <td className="p-4 align-top w-[180px]">
                                         {filter === 'PENDING' ? (
                                             <div className="flex flex-col gap-1.5">
-                                                {/* LOUD VERIFICATION LOG */}
                                                 {(() => {
-                                                    const logMsg = `[V3-REFRESH] METADATA RENDERING: Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier} | Time=${new Date().toISOString()}`;
-                                                    console.log(`%c ${logMsg}`, 'background: #222; color: #bada55; font-size: 10px; font-weight: bold;');
+                                                    console.log(`[V3] Source=${post.source} | Score=${post.relevanceScore} | Tier=${post.sourceTier}`);
                                                     return null;
                                                 })()}
-                                                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">
-                                                    Source: <span className="text-white/60">{post.source || 'Unknown'}</span> | Score: <span className="text-white/60">{post.relevanceScore || 0}</span> | Tier <span className="text-white/60">{post.sourceTier || 3}</span>
+
+                                                {/* Source + Tier + Score Row */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[9px] font-bold uppercase tracking-tight" style={{ color: '#00d4ff', fontFamily: 'var(--font-display)' }}>
+                                                        {post.source || 'Unknown'}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(123,97,255,0.1)', color: '#7b61ff', border: '1px solid rgba(123,97,255,0.2)' }}>
+                                                        T{post.sourceTier || 3}
+                                                    </span>
+                                                    <span className="text-[8px] px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(0,212,255,0.08)', color: '#00d4ff', border: '1px solid rgba(0,212,255,0.15)' }}>
+                                                        {post.relevanceScore || 0}
+                                                    </span>
                                                 </div>
-                                                <div className="text-[8px] font-mono text-neutral-600">
-                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Manual'}
+
+                                                {/* Verification Badge */}
+                                                {(post as any).verification_badge && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold uppercase" style={{ color: (post as any).verification_color || 'var(--text-muted)' }}>
+                                                            {(post as any).verification_badge}
+                                                        </span>
+                                                        <span className="text-[7px] px-1 py-0.5 rounded font-mono" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
+                                                            {(post as any).verification_score || 0}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Flags Row */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {(post as any).needs_image && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,100,0,0.15)', color: '#ff6b35', border: '1px solid rgba(255,100,0,0.3)' }}>
+                                                            ⚠ NEEDS IMAGE
+                                                        </span>
+                                                    )}
+                                                    {(post as any).original_title && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,180,255,0.1)', color: '#00b4ff', border: '1px solid rgba(0,180,255,0.2)' }}>
+                                                            Translated
+                                                        </span>
+                                                    )}
+                                                    {((post as any).is_duplicate || (post as any).duplicate_of) && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,60,60,0.1)', color: '#ff4444', border: '1px solid rgba(255,60,60,0.2)' }}>
+                                                            DUP {(post as any).duplicate_confidence ? `${Math.round((post as any).duplicate_confidence)}%` : ''}
+                                                        </span>
+                                                    )}
+                                                    {(post as any).requires_review && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,180,0,0.1)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.2)' }}>
+                                                            Review
+                                                        </span>
+                                                    )}
+                                                    {(post as any).verification_classification && (
+                                                        <span className="text-[7px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: (post as any).auto_post_eligible ? 'rgba(0,255,136,0.08)' : 'rgba(255,180,0,0.08)', color: (post as any).auto_post_eligible ? '#00ff88' : '#ffb400', border: `1px solid ${(post as any).auto_post_eligible ? 'rgba(0,255,136,0.15)' : 'rgba(255,180,0,0.15)'}` }}>
+                                                            {(post as any).auto_post_eligible ? 'Auto' : 'Manual'}
+                                                        </span>
+                                                    )}
                                                 </div>
+
+                                                {/* Claim Type */}
+                                                {post.claimType && (() => {
+                                                    const claimColors: Record<string, string> = {
+                                                        'NEW_SEASON_CONFIRMED': '#00ff88',
+                                                        'DELAY': '#ff4444',
+                                                        'TRAILER_DROP': '#00d4ff',
+                                                        'NEW_KEY_VISUAL': '#ff3cac',
+                                                        'DATE_ANNOUNCED': '#ffb400',
+                                                    };
+                                                    const cc = claimColors[post.claimType] || 'var(--text-muted)';
+                                                    return (
+                                                        <span className="text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit" style={{ background: `${cc}10`, color: cc, border: `1px solid ${cc}25` }}>
+                                                            {post.claimType.replace(/_/g, ' ')}
+                                                        </span>
+                                                    );
+                                                })()}
+
+                                                {/* Timestamp */}
+                                                <div className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                                    {post.scrapedAt ? new Date(post.scrapedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Manual'}
+                                                </div>
+
+                                                {/* Verify Link */}
+                                                {(post as any).verification_sources?.source_url && (
+                                                    <a
+                                                        href={(post as any).verification_sources.source_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider group/link"
+                                                        style={{ color: '#00d4ff' }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <span className="w-1 h-1 rounded-full" style={{ background: '#00d4ff' }} />
+                                                        Verify
+                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
-                                                <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.type === 'CONFIRMATION_ALERT' ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' : post.isPublished
-                                                    ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
-                                                    : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
-                                                    }`}>
-                                                    {post.status === 'approved' ? 'SCHEDULED' : post.type === 'CONFIRMATION_ALERT' ? 'ALERT' : post.isPublished ? 'LIVE SIGNAL' : 'HIDDEN'}
-                                                </span>
+                                                {/* CRITICAL FIX: Derive effective status for display */}
+                                                {(() => {
+                                                    const effectiveStatus = post.status || (post.isPublished ? 'published' : 'pending');
+                                                    const badgeClass = effectiveStatus === 'approved' 
+                                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
+                                                        : effectiveStatus === 'pending'
+                                                        ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                                                        : post.type === 'CONFIRMATION_ALERT'
+                                                        ? 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20'
+                                                        : post.isPublished
+                                                        ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
+                                                        : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20';
+                                                    
+                                                    const badgeText = effectiveStatus === 'approved' 
+                                                        ? 'SCHEDULED' 
+                                                        : effectiveStatus === 'pending' 
+                                                        ? 'PENDING' 
+                                                        : post.type === 'CONFIRMATION_ALERT' 
+                                                        ? 'ALERT' 
+                                                        : post.isPublished 
+                                                        ? 'LIVE SIGNAL' 
+                                                        : 'HIDDEN';
+                                                    
+                                                    return (
+                                                        <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-black tracking-wider border shadow-sm ${badgeClass}`}>
+                                                            {badgeText}
+                                                        </span>
+                                                    );
+                                                })()}
+                                                {(post as any).quality_grade && (
+                                                    <span style={{
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        width: 22, height: 22, borderRadius: 6, fontSize: 11, fontWeight: 900,
+                                                        color: (post as any).quality_grade === 'A' ? '#00ff88' : (post as any).quality_grade === 'B' ? '#00d4ff' : (post as any).quality_grade === 'C' ? '#ffaa00' : '#ff6b35',
+                                                        background: (post as any).quality_grade === 'A' ? 'rgba(0,255,136,0.12)' : (post as any).quality_grade === 'B' ? 'rgba(0,212,255,0.12)' : (post as any).quality_grade === 'C' ? 'rgba(255,170,0,0.12)' : 'rgba(255,107,53,0.12)',
+                                                        border: `1px solid ${(post as any).quality_grade === 'A' ? 'rgba(0,255,136,0.3)' : (post as any).quality_grade === 'B' ? 'rgba(0,212,255,0.3)' : (post as any).quality_grade === 'C' ? 'rgba(255,170,0,0.3)' : 'rgba(255,107,53,0.3)'}`,
+                                                    }}>
+                                                        {(post as any).quality_grade}
+                                                    </span>
+                                                )}
                                                 {post.status === 'approved' && (
                                                     <div className="flex flex-col items-center gap-1.5 pt-1">
                                                         {(post.scheduledPostTime || (post as any).scheduled_post_time) ? (
@@ -1426,23 +1848,31 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                         {schedulingPostId === post.id ? (
                                                             <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-1.5 rounded-lg border border-blue-500/20 animate-in fade-in zoom-in-95">
-                                                                {[10, 14, 18, 21].map(h => (
-                                                                    <button
-                                                                        key={h}
-                                                                        onClick={() => {
-                                                                            const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
-                                                                            const d = new Date(sched);
-                                                                            d.setHours(h, 0, 0, 0);
-                                                                            handleUpdateSchedule(post.id!, d);
-                                                                        }}
-                                                                        className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors text-left uppercase"
-                                                                    >
-                                                                        {h > 12 ? `${h - 12}:00 PM` : h === 12 ? '12:00 PM' : `${h}:00 AM`}
-                                                                    </button>
-                                                                ))}
+                                                                <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest">Quick Select</label>
+                                                                <div className="grid grid-cols-3 gap-0.5">
+                                                                    {[8, 10, 12, 14, 16, 18, 20, 22].map(h => (
+                                                                        <button
+                                                                            key={h}
+                                                                            onClick={() => {
+                                                                                const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
+                                                                                const d = new Date(sched);
+                                                                                // If the hour already passed today, move to tomorrow
+                                                                                if (d.getHours() >= h && new Date(d).toDateString() === new Date().toDateString()) {
+                                                                                    d.setDate(d.getDate() + 1);
+                                                                                }
+                                                                                d.setHours(h, 0, 0, 0);
+                                                                                handleUpdateSchedule(post.id!, d);
+                                                                            }}
+                                                                            className="text-[7px] font-black py-1 px-1.5 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors text-center uppercase"
+                                                                        >
+                                                                            {h > 12 ? `${h - 12}PM` : h === 12 ? '12PM' : `${h}AM`}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                                <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest mt-1">Custom</label>
                                                                 <input
                                                                     type="datetime-local"
-                                                                    className="text-center text-[8px] font-bold bg-black/40 border border-white/10 rounded p-1 text-white outline-none focus:border-blue-500/50 mt-1"
+                                                                    className="text-center text-[8px] font-bold bg-black/40 border border-white/10 rounded p-1 text-white outline-none focus:border-blue-500/50"
                                                                     onChange={(e) => {
                                                                         if (e.target.value) handleUpdateSchedule(post.id!, new Date(e.target.value));
                                                                     }}
@@ -1485,70 +1915,120 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </td>
 
                                     <td className="p-4 align-top w-[100px]">
-                                        <div className="w-16 h-20 rounded-lg bg-gray-200 dark:bg-black/50 border border-gray-200 dark:border-white/10 overflow-hidden relative group-hover:border-purple-300 dark:group-hover:border-white/30 transition-colors">
-                                            {post.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img
-                                                    src={post.image}
-                                                    alt=""
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        const target = e.target as HTMLImageElement;
-                                                        console.error(`[PostManager] Image failed to load: ${post.image}. Falling back to /hero-bg-final.png`);
-                                                        target.onerror = null; // Prevent infinite loop
-                                                        target.src = '/hero-bg-final.png';
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-neutral-800">
-                                                    <ImageIcon size={16} />
+                                        {(() => {
+                                            const videoInfo = getPostVideoInfo(post);
+                                            const ytThumb = videoInfo?.type === 'youtube' ? `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg` : null;
+                                            const thumbSrc = post.image || ytThumb;
+                                            return (
+                                                <div
+                                                    className="w-16 h-20 rounded-lg overflow-hidden relative transition-all cursor-pointer group/thumb"
+                                                    style={{ background: 'rgba(12,12,24,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}
+                                                    onClick={(e) => { if (videoInfo) { e.stopPropagation(); setVideoPreviewPost(post); } }}
+                                                    title={videoInfo ? 'Click to watch video' : ''}
+                                                >
+                                                    {thumbSrc ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img
+                                                            src={thumbSrc}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                            style={{ animation: 'none', opacity: 1 }}
+                                                            onError={(e) => {
+                                                                const target = e.target as HTMLImageElement;
+                                                                target.onerror = null;
+                                                                target.src = '/hero-bg-final.png';
+                                                            }}
+                                                        />
+                                                    ) : videoInfo?.type === 'twitter' ? (
+                                                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'rgba(29,155,240,0.1)' }}>
+                                                            <Twitter size={16} style={{ color: '#1d9bf0' }} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
+                                                            <ImageIcon size={16} />
+                                                        </div>
+                                                    )}
+                                                    {/* Play overlay for video posts */}
+                                                    {videoInfo && (
+                                                        <div className="absolute inset-0 flex items-center justify-center opacity-80 group-hover/thumb:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                                                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                                                <svg viewBox="0 0 24 24" fill="white" width="10" height="10"><path d="M8 5v14l11-7z"/></svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="p-4 align-top">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
+                                            <h3 className="text-sm font-bold transition-colors" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-main)' }}>
                                                 {post.title}
                                             </h3>
+                                            {getPostVideoInfo(post) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setVideoPreviewPost(post); }}
+                                                    className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest rounded flex items-center gap-1 transition-all hover:scale-105"
+                                                    style={{ background: 'rgba(255,60,172,0.1)', color: '#ff3cac', border: '1px solid rgba(255,60,172,0.2)' }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="currentColor" width="8" height="8"><path d="M8 5v14l11-7z"/></svg>
+                                                    Watch
+                                                </button>
+                                            )}
                                             {post.isDuplicate && (
-                                                <span className="px-1.5 py-0.5 bg-yellow-400/10 border border-yellow-400/20 text-yellow-500 text-[8px] font-black uppercase tracking-widest rounded flex items-center gap-1">
-                                                    <AlertTriangle size={8} /> DUPLICATE
+                                                <span className="px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest rounded flex items-center gap-1" style={{ background: 'rgba(255,180,0,0.08)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.15)' }}>
+                                                    <AlertTriangle size={8} /> DUP
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-neutral-500 font-mono tracking-wide">
+
+                                        {filter === 'PENDING' && post.content && (
+                                            <p className="text-[10px] mt-1 line-clamp-2 max-w-[400px]" style={{ color: 'var(--text-tertiary)' }}>
+                                                {post.content.replace(/\n/g, ' ').substring(0, 150)}{post.content.length > 150 ? '...' : ''}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center gap-2 text-[9px] font-mono tracking-wide mt-1.5" style={{ color: 'var(--text-muted)' }}>
                                             <span>{new Date(post.timestamp).toLocaleDateString()}</span>
-                                            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-neutral-700" />
+                                            <span className="w-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
                                             <span className="truncate max-w-[200px]">{post.slug}</span>
+                                            {post.anime_id && (
+                                                <>
+                                                    <span className="w-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                                                    <span>{post.anime_id}</span>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="p-4 align-top text-right pr-6">
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex justify-end gap-1.5">
                                             {filter === 'PENDING' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleApprove([post.id!])}
-                                                        title="Approve Transmission"
-                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 hover:bg-green-500 text-green-500 hover:text-white border border-green-500/20 transition-all"
+                                                        title="Approve"
+                                                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                        style={{ background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', color: '#00ff88' }}
                                                     >
-                                                        <Check size={14} />
+                                                        <Check size={13} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDecline([post.id!])}
-                                                        title="Decline Transmission"
-                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 transition-all"
+                                                        title="Decline"
+                                                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                        style={{ background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.2)', color: '#ff4444' }}
                                                     >
-                                                        <X size={14} />
+                                                        <X size={13} />
                                                     </button>
                                                 </>
                                             )}
                                             <button
                                                 onClick={() => handleEditClick(post)}
-                                                title="Edit Post"
-                                                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-500/10 hover:bg-purple-500 text-purple-500 hover:text-white border border-purple-500/20 transition-all"
+                                                title="Edit"
+                                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-110"
+                                                style={{ background: 'rgba(123,97,255,0.08)', border: '1px solid rgba(123,97,255,0.2)', color: '#7b61ff' }}
                                             >
-                                                <Edit2 size={14} />
+                                                <Edit2 size={13} />
                                             </button>
                                         </div>
                                     </td>
@@ -1593,17 +2073,59 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex flex-col gap-1">
-                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.status === 'approved' ? 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' : post.isPublished
+                                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${post.status === 'pending'
+                                                ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                                                : post.status === 'approved'
+                                                ? 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
+                                                : post.isPublished
                                                 ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'
                                                 : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-500 border-red-200 dark:border-red-500/20'
                                                 }`}>
-                                                {post.status === 'approved' ? 'SCHEDULED' : post.isPublished ? 'LIVE' : 'HIDDEN'}
+                                                {post.status === 'pending' ? 'PENDING' : post.status === 'approved' ? 'SCHEDULED' : post.isPublished ? 'LIVE' : 'HIDDEN'}
                                             </span>
                                             {filter === 'PENDING' && (
-                                                <div className="flex flex-col gap-1 border-l border-white/10 pl-2">
-                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">
-                                                        Source: {post.source || 'Unknown'} | Score: {post.relevanceScore || 0} | Tier {post.sourceTier || 3}
-                                                    </span>
+                                                <div className="flex flex-col gap-1.5 border-l border-white/10 pl-2">
+                                                    {/* Verification Badge Mobile */}
+                                                    {(post as any).verification_badge && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[8px] font-black uppercase" style={{ color: (post as any).verification_color || '#9ca3af' }}>
+                                                                {(post as any).verification_badge}
+                                                            </span>
+                                                            <span className={`text-[7px] px-1 py-0.5 rounded ${(post as any).auto_post_eligible ? 'bg-green-900/30 text-green-400' : 'bg-amber-900/30 text-amber-400'}`}>
+                                                                {(post as any).auto_post_eligible ? '✓ Auto' : '⚠ Review'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[8px] font-bold text-neutral-500 uppercase">
+                                                            {post.source || 'Unknown'}
+                                                        </span>
+                                                        <span className="text-[7px] px-1 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono">
+                                                            T{post.sourceTier || 3} | {post.relevanceScore || 0}
+                                                        </span>
+                                                        {post.claimType && (
+                                                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                                post.claimType === 'NEW_SEASON_CONFIRMED' ? 'bg-green-900/30 text-green-400' :
+                                                                post.claimType === 'DELAY' ? 'bg-red-900/30 text-red-400' :
+                                                                post.claimType === 'TRAILER_DROP' ? 'bg-blue-900/30 text-blue-400' :
+                                                                'bg-neutral-800 text-neutral-400'
+                                                            }`}>
+                                                                {post.claimType.replace(/_/g, ' ')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {(post as any).verification_sources?.source_url && (
+                                                        <a 
+                                                            href={(post as any).verification_sources.source_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[8px] font-bold text-blue-400 uppercase"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <span className="w-1 h-1 rounded-full bg-blue-400"></span>
+                                                            Verify Signal →
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1624,9 +2146,17 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight mb-1 line-clamp-2">
                                         {post.title}
                                     </h3>
+                                    
+                                    {/* Content Preview for Pending Mobile */}
+                                    {filter === 'PENDING' && post.content && (
+                                        <p className="text-[9px] text-neutral-500 dark:text-neutral-400 mb-2 line-clamp-2">
+                                            {post.content.replace(/\n/g, ' ').substring(0, 100)}{post.content.length > 100 ? '...' : ''}
+                                        </p>
+                                    )}
+                                    
                                     <div className="flex items-center justify-between">
                                         <p className="text-[10px] text-slate-500 dark:text-neutral-500 font-mono">
                                             {new Date(post.timestamp).toLocaleDateString()}
@@ -1666,22 +2196,27 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                                 {schedulingPostId === post.id && (
                                                     <div className="flex flex-col gap-1 w-full bg-blue-500/5 p-2 rounded-lg border border-blue-500/20 mt-2">
-                                                        <div className="grid grid-cols-2 gap-1">
-                                                            {[10, 14, 18, 21].map(h => (
+                                                        <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest">Quick Select</label>
+                                                        <div className="grid grid-cols-4 gap-0.5">
+                                                            {[8, 10, 12, 14, 16, 18, 20, 22].map(h => (
                                                                 <button
                                                                     key={h}
                                                                     onClick={() => {
-                                                                        const sched = post.scheduledPostTime || (post as any).scheduled_post_time;
+                                                                        const sched = post.scheduledPostTime || (post as any).scheduled_post_time || new Date().toISOString();
                                                                         const d = new Date(sched);
+                                                                        if (d.getHours() >= h && new Date(d).toDateString() === new Date().toDateString()) {
+                                                                            d.setDate(d.getDate() + 1);
+                                                                        }
                                                                         d.setHours(h, 0, 0, 0);
                                                                         handleUpdateSchedule(post.id!, d);
                                                                     }}
-                                                                    className="text-[8px] font-black py-1 px-2 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors uppercase"
+                                                                    className="text-[7px] font-black py-1 px-1 hover:bg-blue-500 text-blue-400 hover:text-white rounded transition-colors uppercase text-center"
                                                                 >
-                                                                    {h > 12 ? `${h - 12} PM` : h === 12 ? '12 PM' : `${h} AM`}
+                                                                    {h > 12 ? `${h - 12}PM` : h === 12 ? '12PM' : `${h}AM`}
                                                                 </button>
                                                             ))}
                                                         </div>
+                                                        <label className="text-[7px] font-bold text-neutral-500 uppercase tracking-widest mt-1">Custom</label>
                                                         <input
                                                             type="datetime-local"
                                                             className="text-center text-[10px] font-bold bg-black/40 border border-white/10 rounded p-1.5 text-white outline-none focus:border-blue-500/50 mt-1"
@@ -1708,10 +2243,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                 {filteredPosts.length === 0 && (
                     <div className="p-12 text-center">
-                        <div className="inline-flex p-4 rounded-full bg-slate-100 dark:bg-neutral-900/50 text-slate-400 dark:text-neutral-700 mb-4">
-                            <Newspaper size={24} />
+                        <div className="inline-flex p-4 rounded-full mb-4" style={{ background: 'rgba(123,97,255,0.06)', border: '1px solid rgba(123,97,255,0.1)' }}>
+                            <Newspaper size={24} style={{ color: 'var(--text-muted)' }} />
                         </div>
-                        <p className="text-neutral-500 text-sm font-medium">No transmissions found in this sector.</p>
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>No transmissions in this sector.</p>
                     </div>
                 )}
             </div>
@@ -1731,22 +2266,23 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         {/* Platform Selectors */}
                         <div className="p-6 space-y-4">
                             <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Select Target Networks</label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {(['x', 'instagram', 'facebook', 'threads'] as const).map(p => (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                {(['website', 'x', 'instagram', 'facebook', 'threads'] as const).map(p => (
                                     <button
                                         key={p}
                                         onClick={() => setSocialPlatforms(prev => ({ ...prev, [p]: !(prev as any)[p] }))}
                                         disabled={isPublishing}
                                         className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${(socialPlatforms as any)[p]
-                                            ? 'bg-white/10 border-white/20 text-white'
+                                            ? p === 'website' ? 'bg-green-500/15 border-green-500/30 text-green-400' : 'bg-white/10 border-white/20 text-white'
                                             : 'bg-black border-white/5 text-neutral-600 opacity-40 hover:opacity-100'
                                             }`}
                                     >
+                                        {p === 'website' && <Zap size={20} />}
                                         {p === 'x' && <Twitter size={20} />}
                                         {p === 'instagram' && <Instagram size={20} />}
                                         {p === 'facebook' && <Facebook size={20} />}
                                         {p === 'threads' && <Share2 size={20} />}
-                                        <span className="text-[10px] font-bold uppercase mt-2">{p === 'x' ? 'X / Twitter' : p}</span>
+                                        <span className="text-[10px] font-bold uppercase mt-2">{p === 'website' ? 'Website' : p === 'x' ? 'X / Twitter' : p}</span>
                                     </button>
                                 ))}
                             </div>
@@ -1822,37 +2358,420 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
             )
             }
 
+            {/* SCAN SOURCES MODAL */}
+            {showScanModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isPublishing && setShowScanModal(false)} />
+                    <div className="relative bg-[#0a0a0a]/90 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+                        
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-tighter">Scan Sources</h3>
+                            <p className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase mt-1">Select sources to scan for new content</p>
+                        </div>
+
+                        {/* Source Selection */}
+                        <div className="p-6 space-y-4">
+                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Select Sources</label>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, youtube: !prev.youtube }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.youtube
+                                        ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">YouTube</span>
+                                        <span className="text-[10px] text-neutral-500 block">Trailers & official content</span>
+                                    </div>
+                                    {scanSources.youtube && <Check size={16} className="text-red-400" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, twitter: !prev.twitter }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.twitter
+                                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">X / Twitter</span>
+                                        <span className="text-[10px] text-neutral-500 block">Anime news & updates</span>
+                                    </div>
+                                    {scanSources.twitter && <Check size={16} className="text-blue-400" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setScanSources(prev => ({ ...prev, rss: !prev.rss }))}
+                                    disabled={isPublishing}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${scanSources.rss
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-black border-white/5 text-neutral-600 opacity-60'
+                                        }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">RSS Feeds</span>
+                                        <span className="text-[10px] text-neutral-500 block">News sites & blogs</span>
+                                    </div>
+                                    {scanSources.rss && <Check size={16} className="text-green-400" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Results Display */}
+                        {scanResults && (
+                            <div className="px-6 pb-4 space-y-2">
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Results</label>
+                                <div className="p-4 bg-white/[0.03] border border-white/10 rounded-xl space-y-2 max-h-40 overflow-y-auto">
+                                    {scanResults.youtube && (
+                                        <div className="text-xs">
+                                            <span className="text-red-400 font-bold">YouTube:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.youtube.found}, Published {scanResults.youtube.published}</span>
+                                        </div>
+                                    )}
+                                    {scanResults.twitter && (
+                                        <div className="text-xs">
+                                            <span className="text-blue-400 font-bold">X/Twitter:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.twitter.found}, Added {scanResults.twitter.added}</span>
+                                        </div>
+                                    )}
+                                    {scanResults.rss && (
+                                        <div className="text-xs">
+                                            <span className="text-green-400 font-bold">RSS:</span>{' '}
+                                            <span className="text-neutral-300">Found {scanResults.rss.found}, Added {scanResults.rss.added}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-4">
+                            <button
+                                onClick={() => setShowScanModal(false)}
+                                disabled={isPublishing}
+                                className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white disabled:opacity-50"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setIsPublishing(true);
+                                    setScanResults(null);
+                                    const results: any = {};
+                                    
+                                    if (scanSources.youtube) {
+                                        try {
+                                            const res = await fetch('/api/admin/youtube', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-trailers', hoursBack: 6 })
+                                            });
+                                            results.youtube = await res.json();
+                                        } catch (e) {
+                                            results.youtube = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    if (scanSources.twitter) {
+                                        try {
+                                            const res = await fetch('/api/admin/twitter', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-twitter', hoursBack: 6 })
+                                            });
+                                            results.twitter = await res.json();
+                                        } catch (e) {
+                                            results.twitter = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    if (scanSources.rss) {
+                                        try {
+                                            const res = await fetch('/api/admin/rss', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'scan-rss', hoursBack: 6 })
+                                            });
+                                            results.rss = await res.json();
+                                        } catch (e) {
+                                            results.rss = { success: false, error: 'Failed' };
+                                        }
+                                    }
+                                    
+                                    setScanResults(results);
+                                    setIsPublishing(false);
+                                    
+                                    // Count total added
+                                    const totalAdded = (results.youtube?.published || 0) + (results.twitter?.added || 0) + (results.rss?.added || 0);
+                                    if (totalAdded > 0) {
+                                        setTimeout(() => window.location.reload(), 1500);
+                                    }
+                                }}
+                                disabled={isPublishing || (!scanSources.youtube && !scanSources.twitter && !scanSources.rss)}
+                                className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg shadow-cyan-500/20 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>}
+                                {isPublishing ? 'Scanning...' : 'Start Scan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI PROMPT MODAL */}
+            {showAiPromptModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isAiLoading && setShowAiPromptModal(false)} />
+                    <div className="relative bg-[#0a0a0a]/90 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+                        
+                        {/* Header */}
+                        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase tracking-tighter">AI Assist</h3>
+                            <p className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase mt-1">Describe what you want to create</p>
+                        </div>
+
+                        {/* Prompt Input */}
+                        <div className="p-6 space-y-4">
+                            <div className="group">
+                                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">
+                                    Your Prompt
+                                </label>
+                                <textarea
+                                    placeholder="e.g., Write a post about the new Jujutsu Kaisen season announcement..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-32 resize-none transition-all"
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    disabled={isAiLoading}
+                                />
+                            </div>
+
+                            {/* Example Prompts */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Examples</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        "Jujutsu Kaisen Season 3 announcement",
+                                        "Top trending anime this week",
+                                        "New trailer for Demon Slayer",
+                                        "Solo Leveling premiere date"
+                                    ].map((example) => (
+                                        <button
+                                            key={example}
+                                            onClick={() => setAiPrompt(example)}
+                                            disabled={isAiLoading}
+                                            className="text-[10px] px-3 py-1.5 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-full border border-white/10 transition-all"
+                                        >
+                                            {example}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Loading State */}
+                            {isAiLoading && (
+                                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center gap-3">
+                                    <Loader2 size={20} className="text-purple-400 animate-spin" />
+                                    <div>
+                                        <div className="text-purple-400 text-xs font-bold">Generating...</div>
+                                        <div className="text-[10px] text-neutral-500">AI is crafting your post</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-4">
+                            <button
+                                onClick={() => setShowAiPromptModal(false)}
+                                disabled={isAiLoading}
+                                className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-white disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!aiPrompt.trim()) return;
+                                    setIsAiLoading(true);
+                                    try {
+                                        const res = await fetch('/api/admin/ai-assistant', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                prompt: aiPrompt,
+                                                history: aiChatHistory
+                                            })
+                                        });
+                                        const data = await res.json();
+                                        
+                                        if (data.success && data.draft) {
+                                            setAiGeneratedDraft(data.draft);
+                                            setAiChatHistory(prev => [...prev, 
+                                                { role: 'user', content: aiPrompt },
+                                                { role: 'assistant', content: data.draft }
+                                            ]);
+                                            
+                                            // Close prompt modal and open edit modal with draft
+                                            setShowAiPromptModal(false);
+                                            
+                                            // Pre-fill the editing modal
+                                            setEditingPostId(null);
+                                            setGenType(data.draft.type || 'INTEL');
+                                            setTopic(data.draft.title || '');
+                                            setTitle(data.draft.title || '');
+                                            setContent(data.draft.content || '');
+                                            setOverlayTag(data.draft.title || '');
+                                            
+                                            // Search for image
+                                            if (data.draft.imageSearchTerm || data.draft.title) {
+                                                setIsSearchingImages(true);
+                                                try {
+                                                    const imgRes = await fetch(`/api/admin/image-search?q=${encodeURIComponent(data.draft.imageSearchTerm || data.draft.title)}`);
+                                                    const imgData = await imgRes.json();
+                                                    if (imgData.images && imgData.images.length > 0) {
+                                                        setSearchedImages(imgData.images);
+                                                        setSelectedImageIndex(0);
+                                                        setCustomImagePreview(imgData.images[0]);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Image search failed:', e);
+                                                } finally {
+                                                    setIsSearchingImages(false);
+                                                }
+                                            }
+                                            
+                                            setShowModal(true);
+                                            setAiPrompt(''); // Reset prompt
+                                        } else {
+                                            alert('❌ AI generation failed: ' + (data.error || 'Unknown error'));
+                                        }
+                                    } catch (e: any) {
+                                        alert('❌ Error: ' + e.message);
+                                    } finally {
+                                        setIsAiLoading(false);
+                                    }
+                                }}
+                                disabled={isAiLoading || !aiPrompt.trim()}
+                                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                {isAiLoading ? 'Generating...' : 'Generate Post'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {
                 showModal && (
-                    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 sm:p-6">
-                        <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
-                        <div className="relative bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden">
+                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="absolute inset-0 backdrop-blur-md animate-in fade-in duration-300" style={{ background: 'rgba(6,6,14,0.95)' }} onClick={() => setShowModal(false)} />
+                        <div className="relative rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 overflow-hidden" style={{ background: 'rgba(12,12,24,0.95)', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(40px)' }}>
 
                             {/* Modal Header */}
-                            <div className="p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
-                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                            <div className="p-3 sm:p-4 flex justify-between items-center flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
+                                <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', background: 'linear-gradient(135deg, #00d4ff, #7b61ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                     Edit Post
                                 </h3>
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400 dark:text-neutral-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                                    className="p-2 rounded-full transition-colors touch-manipulation"
+                                    style={{ color: 'var(--text-muted)' }}
+                                    aria-label="Close"
                                 >
                                     <Plus size={20} className="rotate-45" />
                                 </button>
                             </div>
 
                             {/* Modal Content */}
-                            <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6">
+                                {/* Video Preview (for video posts being edited) */}
+                                {editingPostId && (() => {
+                                    const editPost = posts.find(p => p.id === editingPostId);
+                                    if (!editPost) return null;
+                                    const videoInfo = getPostVideoInfo(editPost);
+                                    if (!videoInfo) return null;
+                                    return (
+                                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                                            <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ background: videoInfo.type === 'youtube' ? '#ff0000' : '#1d9bf0' }} />
+                                                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-muted)' }}>
+                                                    {videoInfo.type === 'youtube' ? 'YouTube' : 'X'} Video Preview
+                                                </span>
+                                                <button
+                                                    className="ml-auto text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded transition-colors"
+                                                    style={{ color: '#00d4ff', background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)' }}
+                                                    onClick={() => setVideoPreviewPost(editPost)}
+                                                >
+                                                    Expand
+                                                </button>
+                                            </div>
+                                            {videoInfo.type === 'youtube' ? (
+                                                <div className="relative w-full" style={{ paddingBottom: '56.25%', background: '#000' }}>
+                                                    <iframe
+                                                        src={`https://www.youtube.com/embed/${videoInfo.id}?rel=0`}
+                                                        title="Video preview"
+                                                        frameBorder="0"
+                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                                        allowFullScreen
+                                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="p-3 flex justify-center" style={{ background: 'rgba(0,0,0,0.2)', minHeight: '100px' }}>
+                                                    <a
+                                                        href={`https://x.com/i/status/${videoInfo.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs font-bold flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                                                        style={{ color: '#1d9bf0', background: 'rgba(29,155,240,0.1)', border: '1px solid rgba(29,155,240,0.2)' }}
+                                                    >
+                                                        <Twitter size={14} />
+                                                        View on X
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 <div className="space-y-4">
+                                    {/* 0. POST TYPE (Optional) */}
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                                            Post Type (Optional)
+                                        </label>
+                                        <select
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none transition-all cursor-pointer"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                                            value={genType || ''}
+                                            onChange={(e) => setGenType(e.target.value as any || null)}
+                                        >
+                                            <option value="">— Select Type —</option>
+                                            <option value="INTEL">Intel (News/Announcements)</option>
+                                            <option value="TRENDING">Trending (Community Buzz)</option>
+                                            <option value="CONFIRMATION_ALERT">Alert (Breaking News)</option>
+                                            <option value="TRAILER">Trailer / Video</option>
+                                            <option value="CUSTOM">Custom</option>
+                                        </select>
+                                    </div>
+
                                     {/* 1. TITLE */}
                                     <div className="group">
-                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             1. Title
                                         </label>
                                         <input
                                             type="text"
                                             placeholder="Transmission Title..."
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none transition-all"
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none transition-all"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                             value={title}
                                             onChange={(e) => {
                                                 setTitle(e.target.value);
@@ -1863,12 +2782,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                     {/* 2. CONTENT/BODY */}
                                     <div className="group">
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-2 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             2. Content / Body
                                         </label>
                                         <textarea
                                             placeholder="Enter transmission content..."
-                                            className="w-full bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-slate-900 dark:text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 outline-none h-40 resize-none transition-all"
+                                            className="w-full rounded-xl p-3 text-white text-sm outline-none h-40 resize-none transition-all"
+                                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                         />
@@ -1876,20 +2796,21 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
 
                                     {/* 3. IMAGE PREVIEW & CONTROLS */}
                                     <div className="space-y-4">
-                                        <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-0 group-focus-within:text-purple-500 transition-colors">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest mb-0 transition-colors" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
                                             3. Image Preview & Controls
                                         </label>
-                                        <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-4 space-y-4">
+                                        <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <button
                                                     onClick={() => handleSearchImages(true)}
                                                     disabled={isSearchingImages || !title}
-                                                    className="text-[10px] font-bold bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-50"
+                                                    className="text-[10px] font-bold text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 disabled:opacity-50"
+                                                    style={{ background: 'rgba(0,255,136,0.15)', border: '1px solid rgba(0,255,136,0.3)' }}
                                                 >
                                                     {isSearchingImages ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                                     Regenerate Image
                                                 </button>
-                                                <label className="text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 cursor-pointer">
+                                                <label className="text-[10px] font-bold text-white px-4 py-2 rounded-lg transition-all shadow-lg flex items-center gap-1.5 cursor-pointer" style={{ background: 'rgba(123,97,255,0.15)', border: '1px solid rgba(123,97,255,0.3)' }}>
                                                     <Upload size={12} />
                                                     Upload
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -1915,14 +2836,14 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                     </div>
 
                                     {searchedImages.length > 0 ? (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                             {/* --- THE PRO EDITOR STAGE --- */}
-                                            <div className="flex flex-col lg:flex-row gap-6">
+                                            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                                                 <div
                                                     ref={stageContainerRef}
                                                     onPointerMove={handleImagePointerMove}
                                                     onPointerUp={handleImagePointerUp}
-                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none z-0"
+                                                    className="flex-1 relative group/editor bg-slate-900 dark:bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border border-white/5 aspect-[4/5] flex items-center justify-center touch-none z-0 max-h-[50vh] sm:max-h-none"
                                                 >
                                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(157,123,255,0.05)_0%,transparent_100%)] pointer-events-none" />
 
@@ -1999,34 +2920,50 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             />
                                                         )}
 
-                                                        {/* 3. Text Layer - Authoritative & Live */}
+                                                        {/* 3. Text Layer - Bounded Rectangle Layout */}
                                                         {isApplyText && overlayTag && overlayTag.trim().length > 0 && (
                                                             <div className="absolute inset-0 pointer-events-none z-10">
+                                                                {/* TEXT CONTAINER: Strict bounded box 30px margins */}
                                                                 <div
                                                                     className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing select-none group/text transition-all ${isTextLocked ? 'ring-0' : 'ring-1 ring-white/20 hover:ring-purple-500/50'}`}
                                                                     onPointerDown={(e) => handleImagePointerDown(e, 'text')}
                                                                     style={{
-                                                                        left: 0,
-                                                                        top: 0,
-                                                                        transformOrigin: 'top center',
-                                                                        transform: `translate(${(WIDTH / 2) * containerScale}px, ${(layoutMetadata?.y ?? (gradientPosition === 'top' ? 202.5 : 1147.5)) * containerScale}px) scale(${containerScale}) translate(-50%, -50%)`,
-                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)'
+                                                                        left: `${30 * containerScale}px`,
+                                                                        top: ((layoutMetadata?.y ?? (gradientPosition === 'top' ? 236.25 : 1113.75)) + verticalOffset) * containerScale,
+                                                                        transformOrigin: 'left center',
+                                                                        transform: `translateY(-50%) scale(${containerScale})`,
+                                                                        transition: isDragging && dragTarget === 'text' ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0, 0, 1)',
+                                                                        // HARD BOUNDED WIDTH - 1020px max (1080 - 30 - 30)
+                                                                        width: `${WIDTH - 60}px`,
+                                                                        maxWidth: `${WIDTH - 60}px`,
+                                                                        overflow: 'visible',
                                                                     }}
+                                                                    data-text-layer="true"
                                                                 >
-                                                                    <div className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
+                                                                    <div 
+                                                                        style={{ 
+                                                                            filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.9))',
+                                                                        }}
+                                                                    >
                                                                         <div
                                                                             ref={textContainerRef}
-                                                                            className="text-white font-[900] uppercase tracking-tighter flex flex-col items-center justify-center break-words whitespace-pre-wrap transition-all duration-300 opacity-100"
+                                                                            className="text-white font-black uppercase"
                                                                             style={{
-                                                                                fontFamily: 'Outfit, var(--font-outfit), sans-serif',
-                                                                                fontSize: layoutMetadata?.fontSize ? `${layoutMetadata.fontSize * textScale * containerScale}px` : `${135 * textScale * containerScale}px`,
-                                                                                lineHeight: '0.92',
-                                                                                width: `${WIDTH * (WIDTH / HEIGHT) * containerScale}px`,
-                                                                                maxWidth: `${WIDTH * 0.9 * containerScale}px`,
-                                                                                textAlign: 'center'
+                                                                                fontFamily: 'Outfit, sans-serif',
+                                                                                // Font size: large enough to fill width, small enough to wrap
+                                                                                fontSize: layoutMetadata?.fontSize 
+                                                                                    ? `${layoutMetadata.fontSize * textScale}px` 
+                                                                                    : `${Math.min(90, Math.max(56, (WIDTH - 60) / 14)) * textScale}px`,
+                                                                                lineHeight: '1.1',
+                                                                                textAlign: 'center',
+                                                                                // FORCE WRAPPING
+                                                                                whiteSpace: 'normal',
+                                                                                overflowWrap: 'break-word',
+                                                                                wordBreak: 'break-word',
                                                                             }}
                                                                         >
-                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx) => (
+                                                                            {/* Words with regular spaces so browser wraps naturally */}
+                                                                            {(overlayTag || '').trim().split(/\s+/).filter(Boolean).map((word, idx, arr) => (
                                                                                 <span
                                                                                     key={idx}
                                                                                     onClick={(e) => {
@@ -2037,9 +2974,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                                                         setPurpleWordIndices(newIndices);
                                                                                         setIsStageDirty(true);
                                                                                     }}
-                                                                                    className={`inline-block mx-[0.1em] transition-colors duration-200 ${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'} cursor-pointer hover:opacity-80`}
+                                                                                    className={`${purpleWordIndices.includes(idx) ? 'text-purple-400' : 'text-white'}`}
+                                                                                    style={{ cursor: 'pointer' }}
                                                                                 >
-                                                                                    {word}
+                                                                                    {word}{idx < arr.length - 1 ? ' ' : ''}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
@@ -2079,10 +3017,10 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                     </div>
                                                 </div>
 
-                                                {/* Side Control Panel */}
-                                                <div className="w-full lg:w-48 flex flex-col gap-4">
+                                                {/* Side Control Panel - Mobile Optimized */}
+                                                <div className="w-full lg:w-48 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
                                                     {/* Text Tools */}
-                                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-3">
+                                                    <div className="p-3 sm:p-4 bg-white/[0.03] border border-white/5 rounded-xl sm:rounded-2xl space-y-3 min-w-[140px] lg:min-w-0 flex-1 lg:flex-none">
                                                         <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center">
                                                             <span>Text Size</span>
                                                             <span className="font-mono text-white/50">{Math.round(textScale * 100)}%</span>
@@ -2098,19 +3036,77 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                             </button>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-2 pt-2">
+                                                        {/* NEW: Vertical Position Adjustment - HARD CONSTRAINED TO ZONE */}
+                                                        <div className="text-[9px] font-black text-neutral-500 uppercase tracking-widest flex justify-between items-center pt-2">
+                                                            <span>Vertical Position</span>
+                                                            <span className="font-mono text-white/50">{verticalOffset}px</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    // HARD CONSTRAINT: Calculate max allowed offset to stay in zone
+                                                                    const zoneHeight = HEIGHT * 0.35;
+                                                                    const zoneCenter = gradientPosition === 'top' ? 236.25 : 1113.75;
+                                                                    const textHeight = layoutMetadata?.totalHeight || (zoneHeight * 0.5); // Estimate if unknown
+                                                                    const maxOffsetUp = -(zoneHeight / 2) + (textHeight / 2) + 15; // 15px margin
+                                                                    
+                                                                    const newOffset = Math.max(maxOffsetUp, verticalOffset - 10);
+                                                                    setVerticalOffset(newOffset);
+                                                                    setIsStageDirty(true);
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
+                                                                    }
+                                                                }} 
+                                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
+                                                                title="Move text up (constrained to zone)"
+                                                            >
+                                                                ▲
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    // HARD CONSTRAINT: Calculate max allowed offset to stay in zone
+                                                                    const zoneHeight = HEIGHT * 0.35;
+                                                                    const zoneCenter = gradientPosition === 'top' ? 236.25 : 1113.75;
+                                                                    const textHeight = layoutMetadata?.totalHeight || (zoneHeight * 0.5);
+                                                                    const maxOffsetDown = (zoneHeight / 2) - (textHeight / 2) - 15; // 15px margin
+                                                                    
+                                                                    const newOffset = Math.min(maxOffsetDown, verticalOffset + 10);
+                                                                    setVerticalOffset(newOffset);
+                                                                    setIsStageDirty(true);
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, newOffset);
+                                                                    }
+                                                                }} 
+                                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/10 flex items-center justify-center"
+                                                                title="Move text down (constrained to zone)"
+                                                            >
+                                                                ▼
+                                                            </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    setIsApplyText(!isApplyText);
-                                                                    if (isApplyText) setLayoutMetadata(null);
+                                                                    setVerticalOffset(0);
+                                                                    setIsStageDirty(true);
+                                                                    if (isApplyText && overlayTag.trim().length > 0) {
+                                                                        handleApplyText(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0);
+                                                                    }
                                                                 }}
+                                                                className="px-3 py-2 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg border border-white/10 text-[10px]"
+                                                                title="Reset position"
+                                                            >
+                                                                ↺
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex flex-col gap-2 pt-2">
+                                                            <button
+                                                                onClick={() => toggleFX('text')}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyText ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Text</span>
                                                                 <span className="text-[8px]">{isApplyText ? 'ON' : 'OFF'}</span>
                                                             </button>
                                                             <button
-                                                                onClick={() => setIsApplyGradient(!isApplyGradient)}
+                                                                onClick={() => toggleFX('gradient')}
                                                                 className={`w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-between transition-all ${isApplyGradient ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-neutral-500'}`}
                                                             >
                                                                 <span>Gradient</span>
@@ -2143,7 +3139,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                             </div>
 
                                             {/* --- PURPLE SIGNAL TARGETING --- */}
-                                            <div className="bg-slate-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-5 space-y-4">
+                                            <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className="w-5 h-5 rounded-full bg-purple-600/20 flex items-center justify-center">
                                                         <Sparkles size={12} className="text-purple-400" />
@@ -2187,36 +3183,35 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                                                 </div>
                                             </div>
 
-                                            {/* Preview Section */}
-                                            <div className="mt-8 pt-8 border-t border-white/5">
-                                                <button
-                                                    onClick={async () => {
-                                                        const result = await handleCommitToPreview();
-                                                        if (result) setShowExpandedPreview(true);
-                                                    }}
-                                                    disabled={isProcessingImage}
-                                                    className="w-full py-4 bg-neutral-900 border border-white/10 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all hover:bg-neutral-800 active:scale-[0.98] flex items-center justify-center gap-3"
-                                                >
-                                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
-                                                    Show Preview
-                                                </button>
-                                            </div>
-
-                                            {/* Fullscreen Preview Modal */}
+                                            {/* Fullscreen Preview Modal - Mobile Optimized */}
                                             {showExpandedPreview && processedImage && (
-                                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+                                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
                                                     <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setShowExpandedPreview(false)} />
-                                                    <div className="relative w-full max-w-4xl aspect-[4/5] bg-neutral-900 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(157,123,255,0.2)] border border-white/10">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={processedImage} alt="Large Preview" className="w-full h-full object-contain" />
+                                                    <div className="relative w-full max-w-[calc(100vh*0.8)] max-h-[90vh] aspect-[4/5] bg-neutral-900 rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(157,123,255,0.15)] border border-white/10 flex flex-col">
+                                                        {/* Close Button - Larger for mobile */}
                                                         <button
                                                             onClick={() => setShowExpandedPreview(false)}
-                                                            className="absolute top-6 right-6 p-4 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/10 transition-all shadow-2xl z-[201]"
+                                                            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-3 bg-black/70 hover:bg-red-500 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl z-[201] touch-manipulation"
+                                                            aria-label="Close preview"
                                                         >
-                                                            <XCircle size={28} />
+                                                            <XCircle size={24} className="sm:w-7 sm:h-7" />
                                                         </button>
-                                                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl text-[10px] font-black text-white/50 uppercase tracking-[0.5em]">
-                                                            MASTER VISUAL INSPECTION
+                                                        
+                                                        {/* Image Container */}
+                                                        <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img 
+                                                                src={processedImage} 
+                                                                alt="Preview" 
+                                                                className="w-full h-full object-contain max-h-[calc(90vh-80px)]" 
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Footer */}
+                                                        <div className="p-3 sm:p-4 bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-center">
+                                                            <span className="text-[9px] sm:text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">
+                                                                PREVIEW MODE
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2248,27 +3243,49 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                             </div>
 
                             {/* Action Footer */}
-                            <div className="p-5 border-t border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex items-center gap-4">
+                            <div className="p-3 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
+                                {/* Website Publication Toggle */}
+                                <div className="flex items-center gap-3 order-1 sm:order-1 px-2 py-2 bg-white/5 rounded-lg border border-white/10">
+                                    <button
+                                        onClick={() => setIsWebsitePublished(!isWebsitePublished)}
+                                        className={`relative w-12 h-6 rounded-full transition-colors ${isWebsitePublished ? 'bg-green-500' : 'bg-neutral-700'}`}
+                                    >
+                                        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${isWebsitePublished ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </button>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                                            {isWebsitePublished ? 'Published' : 'Hidden'}
+                                        </span>
+                                        <span className="text-[9px] text-neutral-500">
+                                            {isWebsitePublished ? 'Live on website' : 'Not visible on site'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 order-2 sm:order-2" />
+
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors"
+                                    className="px-4 sm:px-6 py-3 sm:py-4 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors order-3 sm:order-3"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleCommitToPreview}
                                     disabled={isProcessingImage || isApplyingEffect}
-                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 flex items-center justify-center gap-3"
+                                    className="flex-1 py-3 sm:py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 sm:gap-3 order-2"
                                 >
-                                    {isProcessingImage ? <Loader2 className="animate-spin" size={18} /> : <Eye size={18} />}
-                                    Show Preview
+                                    {isProcessingImage ? <Loader2 className="animate-spin" size={16} /> : <Eye size={16} />}
+                                    <span className="hidden sm:inline">Show Preview</span>
+                                    <span className="sm:hidden">Preview</span>
                                 </button>
                                 <button
                                     onClick={() => handleSavePost(true)}
                                     disabled={isGenerating || isApplyingEffect}
-                                    className="flex-[1.5] py-4 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+                                    className="flex-[1.5] py-3 sm:py-4 text-white font-black uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 sm:gap-3 order-1 sm:order-3"
+                                    style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,97,255,0.3))', border: '1px solid rgba(123,97,255,0.4)', boxShadow: '0 4px 20px rgba(123,97,255,0.2)', fontFamily: 'var(--font-display)' }}
                                 >
-                                    {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+                                    {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
                                     Save Changes
                                 </button>
                             </div>
@@ -2334,102 +3351,81 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </div>
                 )} a
 
-            {/* SCHEDULER LOGS MODAL */}
-            {
-                showLogsModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* VIDEO PREVIEW MODAL */}
+            {videoPreviewPost && (() => {
+                const videoInfo = getPostVideoInfo(videoPreviewPost);
+                if (!videoInfo) return null;
+                return (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setVideoPreviewPost(null)}>
+                        <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(6,6,14,0.95)' }} />
+                        <div
+                            className="relative w-full max-w-3xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-300"
+                            style={{ background: 'rgba(12,12,24,0.95)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 0 60px rgba(0,212,255,0.1)' }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             {/* Header */}
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                        <Terminal size={20} className="text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">System Logs</h3>
-                                        <p className="text-xs text-neutral-500 font-mono tracking-widest uppercase">Automation History</p>
-                                    </div>
+                                    <div className="w-2 h-2 rounded-full" style={{ background: videoInfo.type === 'youtube' ? '#ff0000' : '#1d9bf0', boxShadow: `0 0 8px ${videoInfo.type === 'youtube' ? 'rgba(255,0,0,0.4)' : 'rgba(29,155,240,0.4)'}` }} />
+                                    <span className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                                        {videoInfo.type === 'youtube' ? 'YouTube Video' : 'X / Twitter Post'}
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(255,60,172,0.1)', color: '#ff3cac', border: '1px solid rgba(255,60,172,0.2)' }}>
+                                        VIDEO
+                                    </span>
                                 </div>
-                                <button onClick={() => setShowLogsModal(false)} className="p-2 hover:bg-white/5 rounded-full text-neutral-500 hover:text-white transition-colors">
-                                    <XCircle size={24} />
+                                <button
+                                    onClick={() => setVideoPreviewPost(null)}
+                                    className="p-2 rounded-full transition-colors hover:bg-white/5"
+                                    style={{ color: 'var(--text-muted)' }}
+                                >
+                                    <Plus size={20} className="rotate-45" />
                                 </button>
                             </div>
 
-                            {/* Logs Content */}
-                            <div className="flex-1 overflow-auto p-0 md:p-6">
-                                {isLoadingLogs ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Loader2 size={32} className="animate-spin text-blue-500" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">Fetching Telemetry...</span>
-                                    </div>
-                                ) : schedulerLogs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 gap-4 text-neutral-600">
-                                        <Terminal size={32} className="opacity-20" />
-                                        <span className="text-xs font-mono uppercase tracking-widest">No Logs Available</span>
+                            {/* Video Content */}
+                            <div className="p-4">
+                                {videoInfo.type === 'youtube' ? (
+                                    <div className="relative w-full" style={{ paddingBottom: '56.25%', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+                                        <iframe
+                                            src={`https://www.youtube.com/embed/${videoInfo.id}?rel=0&modestbranding=1`}
+                                            title={videoPreviewPost.title}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                            allowFullScreen
+                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                        />
                                     </div>
                                 ) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-white/[0.02] text-neutral-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
-                                            <tr>
-                                                <th className="p-4 border-b border-white/5">Time</th>
-                                                <th className="p-4 border-b border-white/5">Slot</th>
-                                                <th className="p-4 border-b border-white/5">Status</th>
-                                                <th className="p-4 border-b border-white/5 w-full">Message</th>
-                                                <th className="p-4 border-b border-white/5 text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 text-xs font-mono">
-                                            {schedulerLogs.map((log: any) => (
-                                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-4 text-neutral-400 whitespace-nowrap">
-                                                        {new Date(log.timestamp).toLocaleDateString()} <span className="text-neutral-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                                    </td>
-                                                    <td className="p-4 text-white font-bold">{log.slot}</td>
-                                                    <td className="p-4">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${log.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                            log.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                            }`}>
-                                                            {log.status === 'success' ? <CheckCircle2 size={10} /> : log.status === 'error' ? <XCircle size={10} /> : <RotateCcw size={10} />}
-                                                            {log.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-neutral-300">
-                                                        {log.message}
-                                                        {log.details && (
-                                                            <div className="mt-1 text-[10px] text-neutral-600 truncate max-w-[300px] group-hover:whitespace-normal group-hover:max-w-none transition-all">
-                                                                {log.details}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {log.status !== 'success' && (
-                                                            <button
-                                                                onClick={() => handleRegenerateSlot(log.slot)}
-                                                                disabled={isRegenerating === log.slot}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 text-neutral-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 rounded transition-all text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {isRegenerating === log.slot ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                                                                Regenerate
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                    <div ref={twitterWidgetRef} className="flex justify-center min-h-[300px] py-4" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                                        <blockquote className="twitter-tweet" data-theme="dark" data-conversation="none" data-media-max-width="560">
+                                            <a href={`https://twitter.com/i/status/${videoInfo.id}`}>Loading tweet...</a>
+                                        </blockquote>
+                                    </div>
                                 )}
                             </div>
-                            <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-neutral-600 font-mono">
-                                <span>Logs persist for 7 days</span>
-                                <button onClick={handleFetchLogs} className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest">
-                                    <RotateCcw size={12} /> Refresh
-                                </button>
+
+                            {/* Post Info Footer */}
+                            <div className="px-4 pb-4">
+                                <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                                    {videoPreviewPost.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                    <span>{videoPreviewPost.source || 'Unknown'}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                    <span>{new Date(videoPreviewPost.timestamp).toLocaleDateString()}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                    <span className="uppercase font-bold" style={{ color: videoPreviewPost.status === 'pending' ? '#ff3cac' : videoPreviewPost.status === 'approved' ? '#00d4ff' : '#00ff88' }}>
+                                        {videoPreviewPost.status}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                )
-            }
+                );
+            })()}
+
+            {/* Logs moved to /admin/logs */}
 
             <div className="pt-12 pb-8 flex justify-between items-center text-[10px] text-neutral-600 font-mono uppercase tracking-widest mt-auto border-t border-white/5">
                 <span>KumoLab Admin OS v2.2.5 (UPDATED: 01:00 AM EST)</span>

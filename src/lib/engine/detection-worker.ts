@@ -209,33 +209,84 @@ function stripHTML(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// ─── Duplicate Check (candidates + posts) ───────────────────
+// ─── Anime Name Extraction (for semantic dedup) ─────────────
+
+function extractAnimeNameFromTitle(title: string): string | null {
+  const t = title.trim();
+  const patterns = [
+    /^(.+?)\s+(?:Season|Movie|Film|Anime|Part)\s*\d/i,
+    /^(?:New|Latest|Official)\s+(.+?)\s+(?:Trailer|PV|Teaser|Visual|Key Visual|Announced)/i,
+    /^(.+?)\s+(?:Announces?|Reveals?|Confirms?|Gets?|Receives?)/i,
+    /(?:MAPPA|Ufotable|A-1 Pictures|CloverWorks|Trigger|Bones|Madhouse|WIT Studio|Production I\.G|Toei)\s+(?:Reveals?|Announces?|Confirms?)\s+(.+?)(?:\s+(?:Season|Key Visual|Trailer|PV|Release|Premiere))/i,
+    /['"](.+?)['"]\s+(?:Season|Movie|Film|Part|Gets|Receives|Anime)/i,
+    /(?:TV Anime|Anime)\s+['"]?(.+?)['"]?\s+(?:Season|Movie|Reveals|Announces|Gets|Receives|New|PV|Trailer)/i,
+    /^(.+?)\s*(?:[-–—:|])\s+(?:Season|Trailer|PV|Teaser|Key Visual|Release|New|Official)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = t.match(pattern);
+    if (match?.[1]) {
+      const name = match[1].trim().replace(/[^\w\s]/g, '').toLowerCase();
+      if (name.length >= 3 && !/^(new|the|a|an|this|that|more|first|latest|official|anime)$/i.test(name)) return name;
+    }
+  }
+  return null;
+}
+
+function extractClaimTypeFromTitle(title: string): string | null {
+  const t = title.toLowerCase();
+  if (/trailer|pv|promotional video|teaser/.test(t)) return 'TRAILER';
+  if (/season\s*\d+|new season|sequel|2nd season|3rd season|final season|returns for season/.test(t)) return 'SEASON';
+  if (/key visual|main visual|visual revealed|new visual/.test(t)) return 'KEY_VISUAL';
+  if (/release date|premiere|air date|broadcast/.test(t)) return 'RELEASE_DATE';
+  if (/delay|postpone|reschedule/.test(t)) return 'DELAY';
+  if (/cast|voice actor|seiyuu|staff|director/.test(t)) return 'CAST';
+  if (/announce|confirm|greenlit|green-lit/.test(t)) return 'ANNOUNCEMENT';
+  return null;
+}
+
+// ─── Duplicate Check (candidates + posts + declined) ─────────
 
 async function isDuplicateCandidate(fingerprint: string, url: string, title: string): Promise<{ isDup: boolean; reason?: string }> {
-  // 1. Check detection_candidates (72h)
-  const { data: candMatch } = await supabaseAdmin
+  // 1. Check detection_candidates by fingerprint (30 day window — extended from 72h)
+  const { data: candFPMatch } = await supabaseAdmin
     .from('detection_candidates')
     .select('id')
-    .or(`fingerprint.eq.${fingerprint},source_url.eq.${url}`)
-    .gte('detected_at', new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString())
+    .eq('fingerprint', fingerprint)
+    .gte('detected_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     .limit(1);
 
-  if (candMatch && candMatch.length > 0) {
-    return { isDup: true, reason: 'Already in candidates' };
+  if (candFPMatch && candFPMatch.length > 0) {
+    return { isDup: true, reason: 'Fingerprint already in candidates' };
   }
 
-  // 2. Check posts by URL (no time limit — never re-detect a published URL)
-  const { data: postUrlMatch } = await supabaseAdmin
-    .from('posts')
-    .select('id')
-    .eq('source_url', url)
-    .limit(1);
+  // 2. Check detection_candidates by URL (30 day window)
+  if (url) {
+    const { data: candUrlMatch } = await supabaseAdmin
+      .from('detection_candidates')
+      .select('id')
+      .eq('source_url', url)
+      .gte('detected_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(1);
 
-  if (postUrlMatch && postUrlMatch.length > 0) {
-    return { isDup: true, reason: 'URL already published' };
+    if (candUrlMatch && candUrlMatch.length > 0) {
+      return { isDup: true, reason: 'URL already in candidates' };
+    }
   }
 
-  // 3. Check declined/deleted posts by URL (48h minimum protection)
+  // 3. Check posts by URL (permanent — never re-detect a published URL)
+  if (url) {
+    const { data: postUrlMatch } = await supabaseAdmin
+      .from('posts')
+      .select('id')
+      .eq('source_url', url)
+      .limit(1);
+
+    if (postUrlMatch && postUrlMatch.length > 0) {
+      return { isDup: true, reason: 'URL already in posts' };
+    }
+  }
+
+  // 4. Check declined/deleted posts by URL (permanent protection)
   if (url) {
     const { data: declinedUrlMatch } = await supabaseAdmin
       .from('declined_posts')
@@ -244,25 +295,78 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
       .limit(1);
 
     if (declinedUrlMatch && declinedUrlMatch.length > 0) {
-      return { isDup: true, reason: 'URL previously deleted/declined' };
+      return { isDup: true, reason: 'URL previously declined/deleted' };
     }
   }
 
-  // 4. Check declined/deleted posts by title similarity (30 day window)
+  // 5. Semantic dedup: same anime + same claim type = duplicate
+  //    This catches: "Chainsaw Man Season 2 announced" vs "MAPPA confirms Chainsaw Man season 2"
+  const animeName = extractAnimeNameFromTitle(title);
+  const claimType = extractClaimTypeFromTitle(title);
+
+  if (animeName && claimType) {
+    // Check posts (7 day window)
+    const { data: recentPosts } = await supabaseAdmin
+      .from('posts')
+      .select('id, title')
+      .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(200);
+
+    for (const post of recentPosts || []) {
+      if (!post.title) continue;
+      const postAnime = extractAnimeNameFromTitle(post.title);
+      const postClaim = extractClaimTypeFromTitle(post.title);
+      if (postAnime && postClaim && postAnime === animeName && postClaim === claimType) {
+        return { isDup: true, reason: `Same anime+claim: "${animeName}" ${claimType} (post ${post.id.slice(0, 8)})` };
+      }
+    }
+
+    // Check declined posts (30 day window)
+    const { data: declinedPosts } = await supabaseAdmin
+      .from('declined_posts')
+      .select('id, title')
+      .gte('declined_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(200);
+
+    for (const dp of declinedPosts || []) {
+      if (!dp.title) continue;
+      const dpAnime = extractAnimeNameFromTitle(dp.title);
+      const dpClaim = extractClaimTypeFromTitle(dp.title);
+      if (dpAnime && dpClaim && dpAnime === animeName && dpClaim === claimType) {
+        return { isDup: true, reason: `Same anime+claim declined: "${animeName}" ${claimType} (declined ${dp.id.slice(0, 8)})` };
+      }
+    }
+
+    // Check candidates (7 day window)
+    const { data: recentCandidates } = await supabaseAdmin
+      .from('detection_candidates')
+      .select('id, title')
+      .gte('detected_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(200);
+
+    for (const cand of recentCandidates || []) {
+      if (!cand.title) continue;
+      const candAnime = extractAnimeNameFromTitle(cand.title);
+      const candClaim = extractClaimTypeFromTitle(cand.title);
+      if (candAnime && candClaim && candAnime === animeName && candClaim === claimType) {
+        return { isDup: true, reason: `Same anime+claim in candidates: "${animeName}" ${claimType}` };
+      }
+    }
+  }
+
+  // 6. Title similarity check (Jaccard) against posts (7 day) + declined (30 day)
   const { data: declinedPosts } = await supabaseAdmin
     .from('declined_posts')
     .select('id, title')
     .gte('declined_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     .limit(200);
 
-  // 5. Check posts by title similarity (7 day window)
   const { data: recentPosts } = await supabaseAdmin
     .from('posts')
     .select('id, title')
     .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
     .limit(100);
 
-  // Combine both lists for title similarity check
   const allToCheck = [
     ...(recentPosts || []).map(p => ({ id: p.id, title: p.title, source: 'post' })),
     ...(declinedPosts || []).map(p => ({ id: p.id, title: p.title, source: 'declined' })),
@@ -276,8 +380,8 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
       const intersection = [...candidateWords].filter((w: string) => entryWords.has(w));
       const union = new Set([...candidateWords, ...entryWords]);
       const similarity = union.size > 0 ? intersection.length / union.size : 0;
-      if (similarity >= 0.65) {
-        return { isDup: true, reason: `Similar to ${entry.source === 'declined' ? 'deleted/declined' : 'post'} ${entry.id.slice(0, 8)}` };
+      if (similarity >= 0.55) {
+        return { isDup: true, reason: `Title similar (${Math.round(similarity * 100)}%) to ${entry.source === 'declined' ? 'declined' : 'post'} ${entry.id.slice(0, 8)}` };
       }
     }
   }
