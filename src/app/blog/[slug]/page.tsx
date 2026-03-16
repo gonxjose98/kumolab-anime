@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { BlogPost } from '@/types';
+import { ArticleJsonLd } from '@/components/seo/JsonLd';
+import ShareButtons from '@/components/blog/ShareButtons';
 import styles from './post.module.css';
 
 /** Get the tweet ID from a BlogPost (via field or content fallback) */
@@ -110,6 +112,12 @@ export default function BlogPostPage() {
                 } else {
                     setPost(data);
                     document.title = data.seoTitle || `${data.title} | KumoLab`;
+
+                    // Update meta description dynamically
+                    const metaDesc = document.querySelector('meta[name="description"]');
+                    if (metaDesc && data.metaDescription) {
+                        metaDesc.setAttribute('content', data.metaDescription);
+                    }
                 }
             } catch (e) {
                 console.error('[BlogPost] Error fetching post:', e);
@@ -148,8 +156,12 @@ export default function BlogPostPage() {
     const isTwitterPost = !!tweetId;
     const cleanedContent = cleanContent(post.content);
 
+    const postUrl = `https://kumolab-anime.com/blog/${post.slug}`;
+
     return (
         <article className={styles.container}>
+            <ArticleJsonLd post={post} />
+
             {/* Hero image (skip for Twitter posts — the embed IS the hero) */}
             {post.image && !isTwitterPost && (
                 <div className={styles.heroImage}>
@@ -266,6 +278,8 @@ export default function BlogPostPage() {
                     </div>
                 )}
             </div>
+
+            <ShareButtons url={postUrl} title={post.title} />
         </article>
     );
 }

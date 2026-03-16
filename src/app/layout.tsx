@@ -6,6 +6,7 @@ import Footer from '@/components/layout/Footer';
 import GalaxyBackground from '@/components/shared/GalaxyBackground';
 import ConditionalLayout from '@/components/shared/ConditionalLayout';
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
+import { OrganizationJsonLd, WebSiteJsonLd } from '@/components/seo/JsonLd';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' });
@@ -79,6 +80,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <OrganizationJsonLd />
+        <WebSiteJsonLd />
+      </head>
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AnalyticsTracker />
