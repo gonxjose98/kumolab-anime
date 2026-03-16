@@ -84,7 +84,7 @@ export class AntigravityAI {
             const requestBody: any = {
                 model: this.model,
                 messages: messages,
-                temperature: 0.7,
+                temperature: 1,
             };
             
             // Only add response_format for OpenAI models that support it
