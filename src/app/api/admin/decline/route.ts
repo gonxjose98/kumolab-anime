@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
                     title: post.title,
                     slug: post.slug,
                     source: post.source || 'Unknown',
+                    source_url: post.source_url || '',
                     declined_at: now.toISOString(),
                     declined_by: 'admin',
                     reason: reason || ''

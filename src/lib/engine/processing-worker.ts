@@ -241,6 +241,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     // NO IMAGE = always force pending, regardless of score/tier
     if (!hasImage) {
       post.status = 'pending';
+      post.is_published = false;
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `No image — requires manual review. Score ${score.total}`, score: score.total, scoreBreakdown: score.breakdown });
     } else if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
       // T1 auto-approved: schedule for next available slot, don't publish immediately
@@ -254,6 +255,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}, scheduled ${nextSlot.toISOString()}` });
     } else {
       post.status = 'pending';
+      post.is_published = false;
       await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `Score ${score.total}, ${score.confidence}`, score: score.total, scoreBreakdown: score.breakdown });
     }
 
