@@ -168,8 +168,8 @@ export const SCORING_WEIGHTS = {
   // Content Type (+)
   TRAILER_VIDEO: 4,
   SEASON_CONFIRMATION: 4,
-  KEY_VISUAL: 3,
-  RELEASE_DATE: 3,
+  KEY_VISUAL: 4,
+  RELEASE_DATE: 4,
   CAST_STAFF_UPDATE: 2,
   PRODUCTION_NEWS: 2,
   
@@ -216,7 +216,7 @@ export const QUALITY_SIGNALS = {
 
 // Thresholds
 export const SCORING_THRESHOLDS = {
-  PUBLISH_MINIMUM: 4,      // Score >= 4 → pending approval (raised to reduce noise)
+  PUBLISH_MINIMUM: 6,      // Score >= 6 → pending approval (raised from 4 to reduce noise)
   AUTO_REJECT: -2,         // Score < -2 → discard
   HIGH_CONFIDENCE: 7,      // Score >= 7 → high confidence
 };
