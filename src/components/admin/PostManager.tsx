@@ -433,10 +433,13 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
         // Never show declined posts (fallback state when delete fails)
         if (effectiveStatus === 'declined') return false;
 
-        if (filter === 'ALL') return true;
-        if (filter === 'LIVE') return post.isPublished === true;
-        if (filter === 'HIDDEN') return post.isPublished === false && effectiveStatus !== 'pending' && effectiveStatus !== 'approved';
-        if (filter === 'PENDING') return effectiveStatus === 'pending' && post.isPublished !== true;
+        // Pending posts ONLY appear in the PENDING tab — nowhere else
+        const isPending = effectiveStatus === 'pending' && post.isPublished !== true;
+
+        if (filter === 'ALL') return !isPending;
+        if (filter === 'LIVE') return post.isPublished === true && !isPending;
+        if (filter === 'HIDDEN') return post.isPublished === false && !isPending && effectiveStatus !== 'approved';
+        if (filter === 'PENDING') return isPending;
         if (filter === 'APPROVED') return effectiveStatus === 'approved';
         return true;
     }).sort((a, b) => {
@@ -1456,7 +1459,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         return (
                             <button
                                 key={f}
-                                onClick={() => setFilter(f)}
+                                onClick={() => { setFilter(f); setSelectedIds([]); }}
                                 className="relative px-3 md:px-4 py-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap"
                                 style={{
                                     color: filter === f ? '#fff' : 'var(--text-muted)',
@@ -1593,7 +1596,8 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                     </button>
                 ))}
 
-                {/* Select All / Deselect All */}
+                {/* Select All / Deselect All — only on PENDING and HIDDEN tabs */}
+                {(filter === 'PENDING' || filter === 'HIDDEN') && (
                 <button
                     onClick={() => {
                         if (selectedIds.length === filteredPosts.length && filteredPosts.length > 0) {
@@ -1612,6 +1616,7 @@ export default function PostManager({ initialPosts }: PostManagerProps) {
                         </span>
                     </div>
                 </button>
+                )}
 
                 {selectedIds.length > 0 && (
                     <div className="flex gap-2 ml-auto w-full md:w-auto">
