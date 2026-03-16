@@ -78,6 +78,12 @@ function calculateContentScore(candidate: ProcessingCandidate): ContentScore {
     breakdown.visualEvidence = /key visual|main visual/.test(combined) ? SCORING_WEIGHTS.KEY_VISUAL_IMAGE : SCORING_WEIGHTS.OFFICIAL_IMAGE;
   }
 
+  // Video bonus: YouTube sources with actual video content get +2
+  const isYouTube = candidate.source_name?.toLowerCase().includes('youtube');
+  if (isYouTube) {
+    breakdown.visualEvidence += 2;
+  }
+
   if (candidate.original_timestamp) {
     const hours = (Date.now() - new Date(candidate.original_timestamp).getTime()) / 3600000;
     if (hours <= 1) breakdown.temporalRelevance = SCORING_WEIGHTS.BREAKING_WITHIN_HOUR;

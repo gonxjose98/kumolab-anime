@@ -21,7 +21,18 @@ import {
 import { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } from './sources-config';
 import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logError, logAgentAction } from '../logging/structured-logger';
-import { fetchSmartTrendingCandidates } from './fetchers';
+
+// RSS positive keyword filter — only accept RSS items matching these terms
+const RSS_REQUIRED_KEYWORDS = [
+  'trailer', 'teaser', 'pv',
+  'announced', 'announces', 'announcement', 'confirmed', 'confirms', 'reveals', 'greenlit',
+  'season 2', 'season 3', 'season 4', 'season 5', '2nd season', '3rd season', '4th season',
+  'new season', 'final season', 'sequel', 'new anime',
+  'key visual', 'new visual', 'main visual',
+  'premiere', 'release date', 'broadcast date',
+  'delay', 'postponed', 'rescheduled',
+  'streaming', 'coming to',
+];
 
 // Candidate record interface
 interface DetectionCandidate {
@@ -143,6 +154,26 @@ function parseRSSItems(xmlText: string, sourceName: string): DetectionCandidate[
       const description = descMatch ? decodeHTMLEntities(descMatch[1]) : '';
 
       if (!title || !link) continue;
+
+      // Skip RSS items older than 24h — not breaking news
+      if (pubDate) {
+        const itemAge = Date.now() - new Date(pubDate).getTime();
+        if (itemAge > 24 * 60 * 60 * 1000) continue;
+      }
+
+      // Require at least one positive keyword — filters out reviews, interviews, merch, opinion pieces
+      const titleLower = title.toLowerCase();
+      const descLower = description.toLowerCase();
+      const hasPositiveKeyword = RSS_REQUIRED_KEYWORDS.some(kw =>
+        titleLower.includes(kw.toLowerCase()) || descLower.includes(kw.toLowerCase())
+      );
+      if (!hasPositiveKeyword) continue;
+
+      // Check negative keywords
+      const hasNegative = CONTENT_RULES.NEGATIVE_KEYWORDS.some(kw =>
+        titleLower.includes(kw.toLowerCase())
+      );
+      if (hasNegative) continue;
 
       const mediaUrls: string[] = [];
       const imgRegex = /<img[^>]+src="([^"]+)"/g;
@@ -412,13 +443,13 @@ function gradeVideoContent(title: string): ContentGrade {
   if (/teaser/i.test(t))
     return { score: 8, category: 'TEASER', label: 'Teaser' };
 
-  // Tier B (6-7): Key visuals, release dates, opening/ending
+  // Tier B (7-8): Key visuals, release dates, opening/ending
   if (/key\s*visual|キービジュアル|new\s+visual|ビジュアル/i.test(t))
-    return { score: 7, category: 'KEY_VISUAL', label: 'Key Visual' };
+    return { score: 8, category: 'KEY_VISUAL', label: 'Key Visual' };
+  if (/release\s+date|premiere|broadcast|放送|配信/i.test(t))
+    return { score: 8, category: 'RELEASE_DATE', label: 'Release Date' };
   if (/opening|ending|op\s+theme|ed\s+theme|主題歌/i.test(t))
     return { score: 7, category: 'THEME_SONG', label: 'OP/ED Theme' };
-  if (/release\s+date|premiere|broadcast|放送|配信/i.test(t))
-    return { score: 7, category: 'RELEASE_DATE', label: 'Release Date' };
   if (/announcement|announces|発表/i.test(t))
     return { score: 7, category: 'ANNOUNCEMENT', label: 'Announcement' };
 
@@ -522,8 +553,8 @@ async function scanSingleYouTubeChannel(channel: { name: string; channelId: stri
 
       // For T1 channels: accept grade >= 5 (trailers, key visuals, major announcements)
       // For T2 channels: accept grade >= 6 (trailers, season announcements, key visuals)
-      // For T3 channels: accept grade >= 7 (only trailers and major announcements)
-      const minGrade = channel.tier === 1 ? 5 : channel.tier === 2 ? 6 : 7;
+      // For T3 channels: accept grade >= 8 (only trailers, key visuals, release dates)
+      const minGrade = channel.tier === 1 ? 5 : channel.tier === 2 ? 6 : 8;
       if (grade.score < minGrade) {
         console.log(`[DetectionWorker] YouTube skip (grade ${grade.score}/${minGrade}): "${title}" [${channel.name}]`);
         continue;
@@ -671,49 +702,7 @@ export async function runDetectionWorker(): Promise<{
     await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-rss' } });
   }
 
-  // 3. Scan Newsroom (AniList trending, Reddit)
-  console.log('[DetectionWorker] Scanning Newsroom sources...');
-  try {
-    const { candidates: newsroomItems, telemetry } = await fetchSmartTrendingCandidates();
-    console.log(`[DetectionWorker] Newsroom: ${newsroomItems.length} candidates (raw: ${telemetry.totalRawItems})`);
-
-    for (const item of newsroomItems.slice(0, 15)) {
-      const title = item.title || '';
-      if (!title || title.length < 5) continue;
-
-      const fingerprint = createFingerprint(title, item.source_url || item.source || 'newsroom');
-
-      allCandidates.push({
-        source_name: item.source || 'KumoLab Newsroom',
-        source_tier: (item.verification_tier as 1 | 2 | 3) || 2,
-        source_url: item.source_url || '',
-        title: title.substring(0, 200),
-        content: (item.description || item.content || '').substring(0, 1000),
-        detected_at: new Date().toISOString(),
-        media_urls: item.image ? [item.image] : (item.announcementAssets || []),
-        canonical_url: item.source_url || '',
-        extraction_method: 'HTML',
-        status: 'pending_processing',
-        fingerprint,
-        metadata: {
-          claim_type: item.claimType,
-          anime_id: item.anime_id,
-          season_label: item.season_label,
-          sources: item.sources,
-          final_score: item.finalScore,
-          event_fingerprint: item.event_fingerprint,
-          truth_fingerprint: item.truth_fingerprint,
-        },
-      });
-    }
-    sourcesChecked += 4;
-  } catch (error: any) {
-    console.error('[DetectionWorker] Newsroom error:', error?.message || error);
-    errors.push(`Newsroom: ${error.message}`);
-    await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'newsroom' } });
-  }
-
-  // 4. Save candidates
+  // 3. Save candidates
   console.log(`[DetectionWorker] Saving ${allCandidates.length} candidates...`);
   const saved = await saveCandidates(allCandidates);
 
