@@ -90,7 +90,7 @@ Deploy: push to `main` → Vercel auto-deploys. Redeploy after any change to `ve
 
 **Read `ROADMAP.md` before starting any feature work.**
 
-**Current Phase:** Phase 1 — Pipeline Rebuild. Storage + automation layers complete. Platform publishers (X, TikTok, YT Shorts) + production cutover remain.
+**Current Phase:** Phase 1 — Pipeline Rebuild. All code complete on `claude/storage-rebuild`. Old Supabase deleted 2026-04-21. Production cutover (Vercel env vars + branch merge) is the last remaining step.
 
 ---
 

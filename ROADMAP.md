@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-21 | **Status:** 🔴 Active — Phase 1 in progress (platform scaffolds built, awaiting cutover + approvals)
+**Last updated:** 2026-04-21 | **Status:** 🔴 Active — Phase 1 awaiting production cutover (all code merged-ready on `claude/storage-rebuild`; old Supabase deleted 2026-04-21)
 
 ---
 
@@ -59,12 +59,12 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - Translate-once — Japanese source fields no longer persisted
 - Fork 2 retention via `expires_at` (env-driven, default 60 days, unset = evergreen)
 
-### Milestone 1.3 — Platform Publishers 🟡 Partial
+### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 
-Scaffolds built and wired into `publishToSocials()`. Each publisher no-ops gracefully when credentials are missing so the cutover doesn't wait on platform approvals.
+All code scaffolds built and wired into `publishToSocials()` on commit `136de23`. Each publisher no-ops gracefully when its credentials are missing so cutover doesn't wait on platform approvals.
 
-- ✅ Instagram — live (Meta Suite cross-posts → Facebook + Threads)
-- ✅ TikTok — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. Awaits TikTok Developer App approval (Jose).
+- ✅ Instagram — live in code (Meta Suite cross-posts → Facebook + Threads)
+- ✅ TikTok — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. Awaits TikTok Developer App approval (Jose, ~2-4 weeks).
 - ✅ YouTube Shorts — scaffold complete (`src/lib/social/youtube-publisher.ts`). OAuth 2.0 refresh-token auth, `videos.insert` multipart upload. Awaits Jose's one-time OAuth consent + refresh token.
 - ✅ Trailer re-upload pipeline — `trailer-fetcher.ts` downloads YouTube video via `@distube/ytdl-core`, stages in `blog-videos` bucket. Scoped to `TRAILER_DROP` claims only.
 - ⬜ X (Twitter) — **deferred** until revenue starts (Jose's call, 2026-04-21).
@@ -75,14 +75,18 @@ Scaffolds built and wired into `publishToSocials()`. Each publisher no-ops grace
 
 Folded into Jose's upcoming admin dashboard redesign (separate project). No readiness work happening in Phase 1.
 
-### Milestone 1.5 — Production Cutover 🟡 Ready to execute
+### Milestone 1.5 — Production Cutover 🟡 In motion
 
-All code is on `claude/storage-rebuild`. Jose's manual steps:
+**Old Supabase: DELETED by Jose on 2026-04-21** (ahead of the staged teardown plan). Without the old DB, production is running against a non-existent backend until the swap completes.
 
-- Swap Vercel production env vars to new Supabase (+ optional platform creds)
-- Merge `claude/storage-rebuild` → `main` → auto-deploys
-- Watch 48h on new infra
-- After 2 weeks clean → pause old Supabase; after 4 weeks → delete
+Remaining manual steps (Jose):
+
+- Swap Vercel production env vars to new Supabase (`xzoqsldtcoeaegxcdsia`) — URL + anon key + service role key + `KUMOLAB_DEFAULT_RETENTION_DAYS=60`, and remove the dead `NEXT_PUBLIC_USE_SUPABASE` var
+- Merge `claude/storage-rebuild` → `main` → Vercel auto-deploys
+- First-48h watch: cron logs + Supabase dashboard + admin approvals queue
+- Add TikTok + YouTube credentials as they become available (optional, incremental)
+
+Phase 5 old-Supabase teardown plan is now moot — deletion already done.
 
 ---
 
