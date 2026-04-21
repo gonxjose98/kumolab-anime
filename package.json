@@ -13,6 +13,7 @@
     "engine:hourly": "tsx scripts/run-engine.ts hourly"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@napi-rs/canvas": "^0.1.88",
     "@supabase/auth-helpers-react": "^0.15.0",
     "@supabase/ssr": "^0.8.0",

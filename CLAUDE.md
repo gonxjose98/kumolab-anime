@@ -127,9 +127,14 @@ Scheduled Publisher (hourly, piggy-backs on processing worker)
   → Checks circuit-breaker pause state; skips cycle if tripped
   → For each approved post past scheduled_post_time:
       ▸ set status='published', published_at, expires_at (+60d by default)
-      ▸ publishToSocials(post) → Instagram Graph API only
-        (Meta Suite cross-posts IG → FB + Threads automatically)
-      ▸ capture returned IG ID into posts.social_ids
+      ▸ publishToSocials(post):
+          • Instagram always (Meta Suite cross-posts → FB + Threads)
+          • If claim_type=TRAILER_DROP + YouTube source_url:
+              - trailer-fetcher.ts downloads MP4 to blog-videos bucket
+              - TikTok PULL_FROM_URL publish (if approved + token set)
+              - YouTube Shorts multipart upload (if OAuth refresh token set)
+          • X deferred until revenue
+      ▸ capture returned platform IDs + URLs into posts.social_ids
       ▸ record fingerprint in seen_fingerprints (origin='published')
 
 Cleanup Worker (daily @ 03:00 UTC)
@@ -179,7 +184,10 @@ All routed through `src/app/api/cron/route.ts`.
 | `engine/sources-config.ts` | RSS feeds, YouTube channels, content rules |
 | `engine/intelligence-config.ts` | Source tiers and reliability scoring |
 | `engine/fetchers.ts` | AniList GraphQL API, RSS parsing |
-| `social/publisher.ts` | Instagram Graph API only (Meta Suite handles IG → FB + Threads) |
+| `social/publisher.ts` | Orchestrator — IG always, TikTok + YT Shorts for TRAILER_DROP, X deferred |
+| `social/trailer-fetcher.ts` | Downloads YouTube MP4 via @distube/ytdl-core → blog-videos bucket |
+| `social/tiktok-publisher.ts` | TikTok Content Posting API, PULL_FROM_URL mode, no-ops without token |
+| `social/youtube-publisher.ts` | YouTube Data API videos.insert, OAuth refresh-token auth, Shorts-ready |
 | `blog.ts` | Post fetching + expired-slug redirect lookup (Supabase only; JSON fallback removed) |
 
 ---
@@ -212,11 +220,19 @@ Required in Vercel for production (after Phase 1 cutover):
 **Meta (IG + Meta Suite cross-post):**
 - `META_ACCESS_TOKEN`, `META_IG_ID`, `AUTO_PUBLISH_SOCIALS=true`
 
+**TikTok (awaits developer app approval):**
+- `TIKTOK_ACCESS_TOKEN` — user-scoped OAuth token from Content Posting API
+- `TIKTOK_OPEN_ID` — user's open_id from OAuth (optional, for logging)
+
+**YouTube Shorts (one-time OAuth consent required):**
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — from Google Cloud project
+- `YOUTUBE_REFRESH_TOKEN` — long-lived, generated via one-time OAuth consent flow
+
 **AI:**
 - `KIMI_API_KEY` (primary) — or `OPENAI_API_KEY` as fallback
 - Optional: `KIMI_MODEL` (default `kimi-k2.5`), `OPENAI_MODEL`
 
-**Other (existing):** `PRINTFUL_ACCESS_TOKEN`, `STRIPE_SECRET_KEY`, `YOUTUBE_API_KEY`, `X_BEARER_TOKEN`
+**Other (existing):** `PRINTFUL_ACCESS_TOKEN`, `STRIPE_SECRET_KEY`, `YOUTUBE_API_KEY`, `X_BEARER_TOKEN` (X publish is deferred; these stay for other uses)
 
 Local dev: keys live in `.env.local` (gitignored). Human-readable reference at `.credentials/supabase.md` (also gitignored).
 
@@ -247,9 +263,9 @@ No daily caps. Spacing (25-min min gap) does the pacing. Platforms fall out of t
 | --- | --- | --- |
 | Website/blog | ✅ Live | Every auto-approved post |
 | Instagram | ✅ Live | Meta Suite cross-posts → Facebook + Threads |
-| X (Twitter) | ⬜ Pending (M1.3) | Publisher not yet wired |
-| TikTok | ⬜ Pending (M1.3) | Auto-post pipeline pending |
-| YouTube Shorts | ⬜ Pending (M1.3) | Requires video generation |
+| TikTok | 🟡 Scaffold | Code ready, awaits TikTok developer app approval. Scoped to TRAILER_DROP via trailer re-upload. |
+| YouTube Shorts | 🟡 Scaffold | Code ready, awaits one-time OAuth consent + refresh token. Scoped to TRAILER_DROP. |
+| X (Twitter) | ⬜ Deferred | Until revenue starts (Jose's call 2026-04-21) |
 
 ---
 

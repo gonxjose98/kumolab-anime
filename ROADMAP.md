@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-21 | **Status:** 🔴 Active — Phase 1 in progress
+**Last updated:** 2026-04-21 | **Status:** 🔴 Active — Phase 1 in progress (platform scaffolds built, awaiting cutover + approvals)
 
 ---
 
@@ -59,25 +59,28 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - Translate-once — Japanese source fields no longer persisted
 - Fork 2 retention via `expires_at` (env-driven, default 60 days, unset = evergreen)
 
-### Milestone 1.3 — Platform Publishers ⬜ Open
+### Milestone 1.3 — Platform Publishers 🟡 Partial
 
-Meta surface consolidated to IG-only (Meta Suite cross-posts → FB + Threads automatically on Jose's side). Remaining:
+Scaffolds built and wired into `publishToSocials()`. Each publisher no-ops gracefully when credentials are missing so the cutover doesn't wait on platform approvals.
 
-- X (Twitter) API v2 publisher
-- TikTok auto-post pipeline
-- YouTube Shorts publishing pipeline
-- Video pipeline: AI-generated short video from news → auto-publish to TikTok + YT Shorts
+- ✅ Instagram — live (Meta Suite cross-posts → Facebook + Threads)
+- ✅ TikTok — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. Awaits TikTok Developer App approval (Jose).
+- ✅ YouTube Shorts — scaffold complete (`src/lib/social/youtube-publisher.ts`). OAuth 2.0 refresh-token auth, `videos.insert` multipart upload. Awaits Jose's one-time OAuth consent + refresh token.
+- ✅ Trailer re-upload pipeline — `trailer-fetcher.ts` downloads YouTube video via `@distube/ytdl-core`, stages in `blog-videos` bucket. Scoped to `TRAILER_DROP` claims only.
+- ⬜ X (Twitter) — **deferred** until revenue starts (Jose's call, 2026-04-21).
+- ⬜ Video generation infrastructure — **deferred** entirely (Jose's call, 2026-04-21). Re-upload path covers trailers; non-trailer news skips video platforms until this is built.
+- ⬜ Visible KumoLab branding on re-uploaded videos — **deferred**; accepting occasional DMCA takedowns.
 
-### Milestone 1.4 — Admin Readiness ⬜ Open
+### Milestone 1.4 — Admin Readiness ⬜ Deferred
 
-- Verify approvals queue works against new slim schema (stale columns like `quality_grade`, `verification_sources` show gracefully)
-- Verify `/admin` API routes against new schema (most use `(post as any)` so tolerate missing columns)
-- Confirm circuit-breaker manual reset is reachable from the admin UI (or add)
+Folded into Jose's upcoming admin dashboard redesign (separate project). No readiness work happening in Phase 1.
 
-### Milestone 1.5 — Production Cutover ⬜ Open
+### Milestone 1.5 — Production Cutover 🟡 Ready to execute
 
-- Swap Vercel production env vars to new Supabase
-- Merge `claude/storage-rebuild` → `main`
+All code is on `claude/storage-rebuild`. Jose's manual steps:
+
+- Swap Vercel production env vars to new Supabase (+ optional platform creds)
+- Merge `claude/storage-rebuild` → `main` → auto-deploys
 - Watch 48h on new infra
 - After 2 weeks clean → pause old Supabase; after 4 weeks → delete
 
@@ -95,7 +98,7 @@ Meta surface consolidated to IG-only (Meta Suite cross-posts → FB + Threads au
 - Set up analytics tracking
 - Announce relaunch (Jose-directed — timing and copy his call)
 
-**Cadence at launch:** Website/blog: uncapped | X: spaced 25+ min | Instagram (cross-posted to FB + Threads via Meta Suite): spaced 25+ min | TikTok: daily | YouTube Shorts: daily. Per-platform daily caps were removed by design — spacing does the pacing, not count limits.
+**Cadence at launch:** Website/blog: uncapped | Instagram (cross-posted to FB + Threads via Meta Suite): spaced 25+ min | TikTok + YouTube Shorts: firing only for `TRAILER_DROP` claims via trailer re-upload | X: deferred until revenue. Per-platform daily caps removed by design — spacing does the pacing, not count limits.
 
 ---
 
