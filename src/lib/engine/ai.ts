@@ -280,6 +280,61 @@ Do not wrap in quotes or code blocks.`
     }
 
     /**
+     * Tone + safety gate for auto-publish. Runs AFTER the post copy is drafted,
+     * BEFORE it enters the scheduled queue. Returns structured booleans so the
+     * auto-approval engine can decide to publish or defer to human review.
+     *
+     * Cheap enough to run on every auto-candidate — uses the same Kimi/OpenAI backend.
+     */
+    public async checkToneAndSafety(title: string, content: string): Promise<{
+        on_brand: boolean;
+        safe: boolean;
+        factually_hedged: boolean;
+        confidence: number;
+        reason: string;
+    }> {
+        const messages = [
+            {
+                role: 'system',
+                content: `You are the KumoLab brand guardrail. KumoLab is an anime news brand that asserts claims in its own voice — sharp, culturally fluent, never corporate, never cringe. It never hedges with "per @Crunchyroll" — it verifies and states the fact.
+
+Evaluate the given post title + content on four dimensions:
+- on_brand: tone is KumoLab-appropriate (not corporate, not cringe, not generic, no filler)
+- safe: no profanity, slurs, NSFW, conspiracy theories, unverifiable gossip, or attacks on individuals
+- factually_hedged: the copy does NOT overstate unverified claims (e.g. "CONFIRMED" when only one source reported it loosely). This is about accuracy, not attribution.
+- confidence: 0-100, your confidence that this post is safe to publish without human review
+
+RESPOND WITH STRICT JSON:
+{"on_brand": true|false, "safe": true|false, "factually_hedged": true|false, "confidence": 0-100, "reason": "one-line explanation"}`
+            },
+            { role: 'user', content: `Title: ${title}\n\nContent: ${content}` }
+        ];
+
+        try {
+            const result = await this.sendCompletionRequest(messages, true);
+            const raw = result.choices?.[0]?.message?.content;
+            if (!raw) throw new Error('empty');
+            const parsed = JSON.parse(raw);
+            return {
+                on_brand: !!parsed.on_brand,
+                safe: !!parsed.safe,
+                factually_hedged: parsed.factually_hedged !== false,
+                confidence: Number(parsed.confidence) || 0,
+                reason: String(parsed.reason || ''),
+            };
+        } catch (e: any) {
+            // Fail closed — if the safety pass can't run, treat as not safe for auto.
+            return {
+                on_brand: false,
+                safe: false,
+                factually_hedged: false,
+                confidence: 0,
+                reason: `safety check error: ${e.message || 'unknown'}`,
+            };
+        }
+    }
+
+    /**
      * Auto Engine: Used by the background automation to generate high-quality posts from raw intel.
      */
     public async generateFromIntel(sourceData: string, type: 'INTEL' | 'TRENDING') {

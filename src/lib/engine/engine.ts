@@ -19,6 +19,7 @@ import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
 import { supabaseAdmin } from '../supabase/admin';
 import { publishToSocials, SocialPublishResult } from '../social/publisher';
+import { isAutoPublishPaused } from './circuit-breaker';
 
 // Retention window for Fork 2. Unset / null / NaN → evergreen (Fork 1) behavior.
 function getRetentionExpiry(now: Date): string | null {
@@ -197,6 +198,14 @@ async function publishPost(post: BlogPost) {
 export async function publishScheduledPosts() {
     const now = new Date();
     console.log(`[Publisher] Checking for scheduled posts at ${now.toISOString()}`);
+
+    // Circuit breaker: if auto-publish is paused, skip this cycle entirely.
+    const breaker = await isAutoPublishPaused();
+    if (breaker.paused) {
+        console.warn(`[Publisher] Auto-publish paused: ${breaker.reason || 'unknown'} (until ${breaker.pausedUntil || 'manual reset'})`);
+        await logSchedulerRun('processing', 'skipped', `auto-publish paused: ${breaker.reason}`, breaker);
+        return;
+    }
 
     const { data: scheduledPosts, error } = await supabaseAdmin
         .from('posts')

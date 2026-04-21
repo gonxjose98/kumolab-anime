@@ -18,6 +18,9 @@ import { logScraperDecision, logAction, logError, logAgentAction } from '../logg
 import { detectDuplicate } from './duplicate-prevention';
 import { gradeContent } from './content-grader';
 import { AntigravityAI } from './ai';
+import { decideAutoApproval } from './auto-approval';
+import { assignScheduledSlot } from './scheduler';
+import { evaluateCircuitBreaker } from './circuit-breaker';
 
 // ─── Japanese Detection ────────────────────────────────────────
 
@@ -212,7 +215,7 @@ async function getNextAvailableSlot(): Promise<Date> {
 
 // ─── Create Post ────────────────────────────────────────────
 
-async function createPendingPost(candidate: ProcessingCandidate, score: ContentScore, enrichedData: any): Promise<{ success: boolean; error?: string; postId?: string }> {
+async function createPendingPost(candidate: ProcessingCandidate, score: ContentScore, enrichedData: any): Promise<{ success: boolean; error?: string; postId?: string; policyReject?: boolean }> {
   try {
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
@@ -235,26 +238,76 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     const hasImage = !!imageUrl && imageUrl !== '/images/placeholder-news.svg';
     post.image = imageUrl || '/images/placeholder-news.svg';
 
-    const isT1YouTube = candidate.source_tier === 1 && candidate.source_name?.toLowerCase().includes('youtube');
+    const isT1YouTube = candidate.source_tier === 1 && !!candidate.source_name?.toLowerCase().includes('youtube');
 
-    // NO IMAGE = always force pending, regardless of score/tier
-    if (!hasImage) {
-      post.status = 'pending';
-      post.is_published = false;
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `No image — requires manual review. Score ${score.total}`, score: score.total, scoreBreakdown: score.breakdown });
-    } else if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
-      const nextSlot = await getNextAvailableSlot();
+    // ── v2 decision pipeline ────────────────────────────────
+    const decision = await decideAutoApproval({
+      title: post.title,
+      content: post.content,
+      anime_id: candidate.metadata?.anime_id ?? null,
+      claim_type: post.claim_type,
+      source_tier: candidate.source_tier,
+      source_name: candidate.source_name,
+      score: score.total,
+      hasImage,
+      isT1YouTube,
+    });
+
+    if (decision.verdict === 'REJECT') {
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'rejected_policy',
+        reason: decision.reason.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: score.breakdown,
+      });
+      return { success: false, error: `POLICY_REJECT: ${decision.reason}`, policyReject: true };
+    }
+
+    if (decision.verdict === 'AUTO_APPROVE') {
+      const slot = await assignScheduledSlot({
+        detected_at: candidate.detected_at,
+        claim_type: post.claim_type,
+        source_tier: candidate.source_tier,
+        source: candidate.source_name,
+        anime_id: candidate.metadata?.anime_id ?? null,
+        isT1YouTube,
+      });
       post.status = 'approved';
       post.is_published = false;
       post.approved_at = now;
       post.approved_by = 'system';
-      post.scheduled_post_time = nextSlot.toISOString();
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_auto', reason: `T1 YouTube high confidence — scheduled for ${nextSlot.toISOString()}`, score: score.total, scoreBreakdown: score.breakdown });
-      await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}, scheduled ${nextSlot.toISOString()}` });
+      post.scheduled_post_time = slot.scheduled_at;
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'accepted_auto',
+        reason: `${slot.lane} | ${decision.reason}`.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: { ...score.breakdown, signals: decision.signals, scheduler: slot },
+      });
+      await logAction({
+        action: 'auto_approved',
+        entityTitle: candidate.title,
+        actor: 'Scraper',
+        reason: `${slot.lane} lane, scheduled ${slot.scheduled_at}, ${slot.platforms.length} platform(s)`,
+      });
     } else {
+      // QUEUE_FOR_REVIEW
       post.status = 'pending';
       post.is_published = false;
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `Score ${score.total}, ${score.confidence}`, score: score.total, scoreBreakdown: score.breakdown });
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'accepted_pending',
+        reason: decision.reason.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: { ...score.breakdown, signals: decision.signals },
+      });
     }
 
     // Grade content quality for the scraper log only — quality_grade is not persisted on the post
@@ -314,6 +367,16 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
   console.log('[ProcessingWorker] Starting processing cycle...');
   const startTime = Date.now();
   const stats = { processed: 0, accepted: 0, rejected: 0, duplicates: 0, errors: [] as string[] };
+
+  // Circuit breaker check — evaluates correction velocity. If it trips, auto-publish pauses.
+  try {
+    const breaker = await evaluateCircuitBreaker();
+    if (breaker.tripped) {
+      console.warn(`[ProcessingWorker] CIRCUIT BREAKER TRIPPED: ${breaker.corrections} corrections in window`);
+    }
+  } catch (e: any) {
+    console.warn('[ProcessingWorker] Circuit breaker eval failed:', e.message);
+  }
 
   try {
     // FIFO: oldest first
@@ -398,6 +461,10 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           if (createResult.success) {
             result = { candidate, score, action: 'accept', enrichedData };
             stats.accepted++;
+          } else if (createResult.policyReject) {
+            // Decision engine rejected — don't retry, route straight to reject.
+            result = { candidate, score, action: 'reject', enrichedData, error: createResult.error };
+            stats.rejected++;
           } else {
             // Retry logic: 1 retry for transient failures (not "no image")
             const isRetryable = !createResult.error?.includes('No image');
