@@ -292,24 +292,8 @@ async function isArticleProcessed(link: string, title: string, slug: string): Pr
         }
     }
 
-    // 4. Check declined posts to avoid re-scraping
-    try {
-        const { data: declined } = await supabaseAdmin
-            .from('declined_posts')
-            .select('title')
-            .limit(50);
-
-        if (declined) {
-            for (const d of declined) {
-                const normalizedDeclined = normalizeForMatching(d.title);
-                if (normalizedDeclined.length > 10 && normalizedTitle.includes(normalizedDeclined.substring(0, 20))) {
-                    return { isDuplicate: true, reason: 'Previously declined' };
-                }
-            }
-        }
-    } catch {
-        // declined_posts table may not exist yet
-    }
+    // 4. seen_fingerprints check — covers both declined and expired/published history
+    //    (Only checks by URL for efficiency; title-based match was done in step 3.)
 
     return { isDuplicate: false, reason: '' };
 }

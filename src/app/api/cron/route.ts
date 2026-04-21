@@ -3,14 +3,17 @@ import { runDetectionWorker } from '@/lib/engine/detection-worker';
 import { runProcessingWorker } from '@/lib/engine/processing-worker';
 import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
 import { generateDailyReport } from '@/lib/engine/daily-report';
+import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
 
 /**
  * Unified Cron Handler
  *
  * Workers:
- * - detection:  Runs every 10 min via GitHub Actions (RSS, YouTube, Newsroom)
- * - processing: Runs hourly via Vercel cron (scoring, dedup, post creation + scheduled publishing)
- * - dailydrops: Runs at 6 AM EST via Vercel cron (AniList daily episodes)
+ * - detection:  RSS + YouTube scan
+ * - processing: scoring, dedup, post creation + scheduled publishing
+ * - dailydrops: 6 AM EST AniList daily episodes
+ * - daily-report: end-of-day pipeline summary
+ * - cleanup: 03:00 UTC retention sweep (expired posts, bucket orphans, log TTL)
  */
 
 export async function GET(req: NextRequest) {
@@ -79,9 +82,19 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (worker === 'cleanup') {
+            console.log('[Cron] Running Cleanup Worker...');
+            const result = await runCleanupWorker();
+            return NextResponse.json({
+                success: result.errors.length === 0,
+                worker: 'cleanup',
+                result,
+            });
+        }
+
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report']
+            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup']
         }, { status: 400 });
 
     } catch (error: any) {

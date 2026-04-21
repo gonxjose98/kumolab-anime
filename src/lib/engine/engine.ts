@@ -5,8 +5,11 @@
  * 1. Daily Drops (6 AM EST) — fetches AniList airing, auto-publishes
  * 2. Scheduled Post Publisher — publishes approved posts whose time has come
  *
- * All other scanning (RSS, YouTube, Newsroom) is now handled by the
+ * All other scanning (RSS, YouTube, Newsroom) is handled by the
  * Detection Worker → Processing Worker pipeline. See detection-worker.ts.
+ *
+ * v2 storage rules: on publish we set expires_at for Fork 2 retention,
+ * capture returned social IDs, and record the fingerprint in seen_fingerprints.
  */
 
 import { fetchAniListAiring } from './fetchers';
@@ -14,22 +17,55 @@ import { logSchedulerRun } from '../logging/scheduler';
 import { generateDailyDropsPost } from './generator';
 import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
-import fs from 'fs';
-import path from 'path';
-
 import { supabaseAdmin } from '../supabase/admin';
+import { publishToSocials, SocialPublishResult } from '../social/publisher';
 
-const POSTS_PATH = path.join(process.cwd(), 'src/data/posts.json');
-const USE_SUPABASE = process.env.NEXT_PUBLIC_USE_SUPABASE === 'true';
+// Retention window for Fork 2. Unset / null / NaN → evergreen (Fork 1) behavior.
+function getRetentionExpiry(now: Date): string | null {
+    const raw = process.env.KUMOLAB_DEFAULT_RETENTION_DAYS;
+    if (raw === undefined || raw === '' || raw === 'null') return null;
+    const days = parseInt(raw, 10);
+    if (!Number.isFinite(days) || days <= 0) return null;
+    return new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function buildSocialIds(result: SocialPublishResult): Record<string, string> {
+    const entries = Object.entries(result).filter(([, v]) => !!v) as [string, string][];
+    return Object.fromEntries(entries);
+}
+
+function computeFingerprint(title: string, url?: string): string {
+    const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
+    const domain = (url || '').replace(/^https?:\/\//, '').split('/')[0] || '';
+    let hash = 0;
+    const input = normalized + '|' + domain;
+    for (let i = 0; i < input.length; i++) {
+        hash = ((hash << 5) - hash) + input.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return `${normalized.replace(/\s/g, '_').substring(0, 40)}_${Math.abs(hash).toString(36)}`;
+}
+
+async function recordPublishedFingerprint(post: { title: string; source_url?: string | null; anime_id?: string | null; claim_type?: string | null; }) {
+    if (!post.title) return;
+    const fp = computeFingerprint(post.title, post.source_url || undefined);
+    await supabaseAdmin.from('seen_fingerprints').upsert({
+        fingerprint: fp,
+        anime_id: post.anime_id ?? null,
+        claim_type: post.claim_type ?? null,
+        origin: 'published',
+        source_url: post.source_url ?? null,
+        seen_at: new Date().toISOString(),
+    }, { onConflict: 'fingerprint' });
+}
 
 /**
  * Main engine function — now only handles Daily Drops.
  * Called by Vercel cron at 6 AM EST (worker=dailydrops).
  */
-export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', force: boolean = false) {
+export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' | '20:00' | '15:00' | 'hourly', _force: boolean = false) {
     const now = new Date();
 
-    // Convert to EST wall clock
     const estFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/New_York',
         year: 'numeric', month: '2-digit', day: '2-digit',
@@ -49,7 +85,6 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
 
     console.log(`[Engine] Running at ${now.toISOString()} | EST: ${estDateSlug} ${currentEstHour}:00 | Trigger: ${slot}`);
 
-    // --- DAILY DROPS (SINGLE FIRE @ 6 AM EST) ---
     const isDailyDropsSlot = (slot === '06:00' && !hasDailyDropsToday) || (slot === 'hourly' && currentEstHour === 6 && !hasDailyDropsToday);
 
     if (!isDailyDropsSlot) {
@@ -63,11 +98,8 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
 
     console.log(`[Engine] Generating Daily Drops. (EST Hour: ${currentEstHour}, Already Posted: ${hasDailyDropsToday})`);
 
-    // EST day window
     const startLimit = new Date(`${y}-${m}-${d}T00:00:00-05:00`);
     const endLimit = new Date(`${y}-${m}-${d}T23:59:59-05:00`);
-
-    console.log(`[Engine] Filtering airing from ${startLimit.toISOString()} to ${endLimit.toISOString()} (EST Window)`);
 
     const episodes = await fetchAniListAiring(
         Math.floor(startLimit.getTime() / 1000),
@@ -82,7 +114,6 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
         return null;
     }
 
-    // Publish Daily Drops immediately
     await publishPost(newPost);
     await logSchedulerRun(slot, 'success', `Daily Drops published: ${newPost.title}`, {
         slug: newPost.slug,
@@ -93,51 +124,60 @@ export async function runBlogEngine(slot: '06:00' | '08:00' | '12:00' | '16:00' 
 }
 
 /**
- * Publishes a post to either Supabase or the local JSON file.
+ * Upserts a post to Supabase as "published," broadcasts it to socials,
+ * captures returned IDs, and sets Fork-2 expiry. Used by Daily Drops.
  */
 async function publishPost(post: BlogPost) {
-    if (USE_SUPABASE) {
-        const { error } = await supabaseAdmin
-            .from('posts')
-            .upsert([{
-                title: post.title,
-                slug: post.slug,
-                type: post.type,
-                content: post.content,
-                image: post.image,
-                timestamp: post.timestamp,
-                is_published: post.status === 'published' && post.isPublished === true,
-                claim_type: post.claimType,
-                premiere_date: post.premiereDate,
-                event_fingerprint: post.event_fingerprint,
-                truth_fingerprint: post.truth_fingerprint,
-                anime_id: post.anime_id,
-                season_label: post.season_label,
-                verification_tier: post.verification_tier,
-                verification_reason: post.verification_reason,
-                verification_sources: post.verification_sources,
-                status: post.status || 'pending',
-                source_tier: (post as any).source_tier || 1,
-                scraped_at: post.timestamp,
-                source: 'AniList',
-                background_image: post.background_image,
-                image_settings: post.image_settings,
-            }], { onConflict: 'slug' });
+    const now = new Date();
+    const expiresAt = getRetentionExpiry(now);
 
-        if (error) {
-            console.error('Supabase publish error:', error);
-            throw error;
-        }
+    // First write — get a post row so we have something to update if socials succeed.
+    const { error: insertError } = await supabaseAdmin
+        .from('posts')
+        .upsert([{
+            title: post.title,
+            slug: post.slug,
+            type: post.type,
+            content: post.content,
+            image: post.image,
+            timestamp: post.timestamp,
+            is_published: true,
+            claim_type: post.claimType ?? null,
+            anime_id: post.anime_id ?? null,
+            status: 'published',
+            source_tier: (post as any).source_tier ?? 1,
+            source: 'AniList',
+            published_at: now.toISOString(),
+            expires_at: expiresAt,
+        }], { onConflict: 'slug' });
 
-        console.log(`[Engine] Daily Drops saved to DB.`);
-    } else {
-        const fileContents = fs.readFileSync(POSTS_PATH, 'utf8');
-        const posts: BlogPost[] = JSON.parse(fileContents);
-        posts.unshift(post);
-        fs.writeFileSync(POSTS_PATH, JSON.stringify(posts, null, 2));
+    if (insertError) {
+        console.error('[Engine] Supabase publish error:', insertError);
+        throw insertError;
     }
 
-    // Revalidate
+    // Social broadcast — non-blocking for post existence but we do await for IDs.
+    let social: SocialPublishResult = {};
+    try {
+        social = await publishToSocials(post);
+    } catch (e) {
+        console.warn('[Engine] Social broadcast failed:', e);
+    }
+
+    if (Object.keys(social).length > 0) {
+        await supabaseAdmin
+            .from('posts')
+            .update({ social_ids: buildSocialIds(social) })
+            .eq('slug', post.slug);
+    }
+
+    await recordPublishedFingerprint({
+        title: post.title,
+        source_url: (post as any).source_url ?? null,
+        anime_id: post.anime_id ?? null,
+        claim_type: post.claimType ?? null,
+    });
+
     try {
         const { revalidatePath } = await import('next/cache');
         revalidatePath('/');
@@ -158,8 +198,6 @@ export async function publishScheduledPosts() {
     const now = new Date();
     console.log(`[Publisher] Checking for scheduled posts at ${now.toISOString()}`);
 
-    if (!USE_SUPABASE) return;
-
     const { data: scheduledPosts, error } = await supabaseAdmin
         .from('posts')
         .select('*')
@@ -177,17 +215,21 @@ export async function publishScheduledPosts() {
     }
 
     console.log(`[Publisher] Found ${scheduledPosts.length} posts to publish.`);
+    const expiresAt = getRetentionExpiry(now);
 
     for (const post of scheduledPosts) {
         try {
             console.log(`[Publisher] Publishing scheduled post: ${post.title}`);
 
+            // Flip status up-front so a concurrent run can't double-publish.
             const { error: updateError } = await supabaseAdmin
                 .from('posts')
                 .update({
                     status: 'published',
                     is_published: true,
-                    timestamp: now.toISOString()
+                    timestamp: now.toISOString(),
+                    published_at: now.toISOString(),
+                    expires_at: expiresAt,
                 })
                 .eq('id', post.id);
 
@@ -195,6 +237,28 @@ export async function publishScheduledPosts() {
                 console.error(`[Publisher] Failed to update post ${post.id}:`, updateError);
                 continue;
             }
+
+            // Broadcast to socials, capture IDs.
+            let social: SocialPublishResult = {};
+            try {
+                social = await publishToSocials(post as BlogPost);
+            } catch (e) {
+                console.warn(`[Publisher] Social broadcast failed for ${post.title}:`, e);
+            }
+
+            if (Object.keys(social).length > 0) {
+                await supabaseAdmin
+                    .from('posts')
+                    .update({ social_ids: buildSocialIds(social) })
+                    .eq('id', post.id);
+            }
+
+            await recordPublishedFingerprint({
+                title: post.title,
+                source_url: post.source_url ?? null,
+                anime_id: post.anime_id ?? null,
+                claim_type: post.claim_type ?? null,
+            });
 
             try {
                 const { revalidatePath } = await import('next/cache');

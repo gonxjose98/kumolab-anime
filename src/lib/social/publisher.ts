@@ -1,34 +1,38 @@
-
 import { BlogPost } from '@/types';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const PAGE_ID = process.env.META_PAGE_ID;
 const IG_USER_ID = process.env.META_IG_ID;
 
-export async function publishToSocials(post: BlogPost) {
+export interface SocialPublishResult {
+    facebook_id?: string;
+    facebook_url?: string;
+    instagram_id?: string;
+    instagram_url?: string;
+}
+
+export async function publishToSocials(post: BlogPost): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+
     if (!META_ACCESS_TOKEN) {
         console.warn('⚠️ Skipping Social Publish: No META_ACCESS_TOKEN');
-        return;
+        return result;
     }
 
     if (process.env.AUTO_PUBLISH_SOCIALS !== 'true') {
-        console.warn(`⚠️ [Social] Auto-publish is currently DISABLED. Skipping broadcast for: ${post.title}`);
-        return;
+        console.warn(`⚠️ [Social] Auto-publish disabled. Skipping broadcast for: ${post.title}`);
+        return result;
     }
 
     console.log(`[Social] Starting broadcast for: ${post.title}`);
 
-
-    // 1. Facebook Page Publish
     if (PAGE_ID) {
         try {
-            // Get Page Token first (Best Practice)
             const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${META_ACCESS_TOKEN}`;
             const accRes = await fetch(accountsUrl);
             const accData = await accRes.json();
             const pageData = accData.data?.find((p: any) => p.id === PAGE_ID);
-
-            const tokenToUse = pageData?.access_token || META_ACCESS_TOKEN; // Fallback to User Token if Page fetch fails
+            const tokenToUse = pageData?.access_token || META_ACCESS_TOKEN;
 
             const fbUrl = `https://graph.facebook.com/v18.0/${PAGE_ID}/photos`;
             const fbParams = new URLSearchParams({
@@ -41,7 +45,9 @@ export async function publishToSocials(post: BlogPost) {
             const fbData = await fbRes.json();
 
             if (fbData.id) {
-                console.log(`✅ [Facebook] Published: ${fbData.post_id}`);
+                result.facebook_id = fbData.post_id || fbData.id;
+                result.facebook_url = `https://facebook.com/${result.facebook_id}`;
+                console.log(`✅ [Facebook] Published: ${result.facebook_id}`);
             } else {
                 console.error(`❌ [Facebook] Failed:`, fbData);
             }
@@ -50,10 +56,8 @@ export async function publishToSocials(post: BlogPost) {
         }
     }
 
-    // 2. Instagram Publish
     if (IG_USER_ID) {
         try {
-            // A. Container
             const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
             const containerParams = new URLSearchParams({
                 image_url: post.image || '',
@@ -65,20 +69,20 @@ export async function publishToSocials(post: BlogPost) {
             const containerData = await containerRes.json();
 
             if (containerData.id) {
-                // B. Publish
                 const publishUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media_publish`;
                 const publishParams = new URLSearchParams({
                     creation_id: containerData.id,
                     access_token: META_ACCESS_TOKEN || ''
                 });
 
-                // Wait 4s for processing
                 await new Promise(r => setTimeout(r, 4000));
 
                 const publishRes = await fetch(`${publishUrl}?${publishParams}`, { method: 'POST' });
                 const publishData = await publishRes.json();
 
                 if (publishData.id) {
+                    result.instagram_id = publishData.id;
+                    result.instagram_url = `https://instagram.com/p/${publishData.id}`;
                     console.log(`✅ [Instagram] Published: ${publishData.id}`);
                 } else {
                     console.error(`❌ [Instagram] Failed Publish Phase:`, publishData);
@@ -90,4 +94,6 @@ export async function publishToSocials(post: BlogPost) {
             console.error(`❌ [Instagram] Network Error:`, e);
         }
     }
+
+    return result;
 }

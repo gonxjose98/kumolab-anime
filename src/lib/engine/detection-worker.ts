@@ -41,7 +41,6 @@ interface DetectionCandidate {
   source_url: string;
   title: string;
   content: string;
-  raw_content?: string;
   detected_at: string;
   original_timestamp?: string;
   media_urls: string[];
@@ -192,7 +191,6 @@ function parseRSSItems(xmlText: string, sourceName: string): DetectionCandidate[
         source_url: link,
         title: title.substring(0, 200),
         content: stripHTML(description).substring(0, 1000),
-        raw_content: description,
         detected_at: new Date().toISOString(),
         original_timestamp: pubDate ? new Date(pubDate).toISOString() : undefined,
         media_urls: mediaUrls.slice(0, 5),
@@ -275,36 +273,46 @@ function extractClaimTypeFromTitle(title: string): string | null {
   return null;
 }
 
-// ─── Duplicate Check (candidates + posts + declined) ─────────
+// ─── Duplicate Check (seen_fingerprints + candidates + posts) ─────────
+// v2: declined_posts is gone — seen_fingerprints is the unified historical memory.
 
 async function isDuplicateCandidate(fingerprint: string, url: string, title: string): Promise<{ isDup: boolean; reason?: string }> {
-  // 1. Check detection_candidates by fingerprint (30 day window — extended from 72h)
+  // 1. Permanent fingerprint memory — covers every candidate ever processed/declined/published.
+  const { data: fpMatch } = await supabaseAdmin
+    .from('seen_fingerprints')
+    .select('origin')
+    .eq('fingerprint', fingerprint)
+    .maybeSingle();
+
+  if (fpMatch) {
+    return { isDup: true, reason: `Fingerprint already seen (origin: ${fpMatch.origin})` };
+  }
+
+  // 2. In-flight check: same fingerprint currently in the queue
   const { data: candFPMatch } = await supabaseAdmin
     .from('detection_candidates')
     .select('id')
     .eq('fingerprint', fingerprint)
-    .gte('detected_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     .limit(1);
 
   if (candFPMatch && candFPMatch.length > 0) {
-    return { isDup: true, reason: 'Fingerprint already in candidates' };
+    return { isDup: true, reason: 'Fingerprint already in candidate queue' };
   }
 
-  // 2. Check detection_candidates by URL (30 day window)
+  // 3. In-flight URL match
   if (url) {
     const { data: candUrlMatch } = await supabaseAdmin
       .from('detection_candidates')
       .select('id')
       .eq('source_url', url)
-      .gte('detected_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .limit(1);
 
     if (candUrlMatch && candUrlMatch.length > 0) {
-      return { isDup: true, reason: 'URL already in candidates' };
+      return { isDup: true, reason: 'URL already in candidate queue' };
     }
   }
 
-  // 3. Check posts by URL (permanent — never re-detect a published URL)
+  // 4. Live post URL match — we already published this URL
   if (url) {
     const { data: postUrlMatch } = await supabaseAdmin
       .from('posts')
@@ -317,26 +325,25 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
     }
   }
 
-  // 4. Check declined/deleted posts by URL (permanent protection)
+  // 5. Historical URL match in seen_fingerprints (declined/expired posts)
   if (url) {
-    const { data: declinedUrlMatch } = await supabaseAdmin
-      .from('declined_posts')
-      .select('id')
+    const { data: seenUrlMatch } = await supabaseAdmin
+      .from('seen_fingerprints')
+      .select('origin')
       .eq('source_url', url)
       .limit(1);
 
-    if (declinedUrlMatch && declinedUrlMatch.length > 0) {
-      return { isDup: true, reason: 'URL previously declined/deleted' };
+    if (seenUrlMatch && seenUrlMatch.length > 0) {
+      return { isDup: true, reason: `URL previously seen (origin: ${seenUrlMatch[0].origin})` };
     }
   }
 
-  // 5. Semantic dedup: same anime + same claim type = duplicate
-  //    This catches: "Chainsaw Man Season 2 announced" vs "MAPPA confirms Chainsaw Man season 2"
+  // 6. Semantic anime + claim — catches rephrased reports of the same event.
   const animeName = extractAnimeNameFromTitle(title);
   const claimType = extractClaimTypeFromTitle(title);
 
   if (animeName && claimType) {
-    // Check posts (7 day window)
+    // Live posts (7 day window)
     const { data: recentPosts } = await supabaseAdmin
       .from('posts')
       .select('id, title')
@@ -352,27 +359,10 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
       }
     }
 
-    // Check declined posts (30 day window)
-    const { data: declinedPosts } = await supabaseAdmin
-      .from('declined_posts')
-      .select('id, title')
-      .gte('declined_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-      .limit(200);
-
-    for (const dp of declinedPosts || []) {
-      if (!dp.title) continue;
-      const dpAnime = extractAnimeNameFromTitle(dp.title);
-      const dpClaim = extractClaimTypeFromTitle(dp.title);
-      if (dpAnime && dpClaim && dpAnime === animeName && dpClaim === claimType) {
-        return { isDup: true, reason: `Same anime+claim declined: "${animeName}" ${claimType} (declined ${dp.id.slice(0, 8)})` };
-      }
-    }
-
-    // Check candidates (7 day window)
+    // Candidates in flight (no window — they're all <7 days by cleanup)
     const { data: recentCandidates } = await supabaseAdmin
       .from('detection_candidates')
       .select('id, title')
-      .gte('detected_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .limit(200);
 
     for (const cand of recentCandidates || []) {
@@ -380,39 +370,28 @@ async function isDuplicateCandidate(fingerprint: string, url: string, title: str
       const candAnime = extractAnimeNameFromTitle(cand.title);
       const candClaim = extractClaimTypeFromTitle(cand.title);
       if (candAnime && candClaim && candAnime === animeName && candClaim === claimType) {
-        return { isDup: true, reason: `Same anime+claim in candidates: "${animeName}" ${claimType}` };
+        return { isDup: true, reason: `Same anime+claim in candidate queue: "${animeName}" ${claimType}` };
       }
     }
   }
 
-  // 6. Title similarity check (Jaccard) against posts (7 day) + declined (30 day)
-  const { data: declinedPosts } = await supabaseAdmin
-    .from('declined_posts')
-    .select('id, title')
-    .gte('declined_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-    .limit(200);
-
-  const { data: recentPosts } = await supabaseAdmin
+  // 7. Title-similarity Jaccard against live posts only (seen_fingerprints doesn't store titles)
+  const { data: recentPostsForSim } = await supabaseAdmin
     .from('posts')
     .select('id, title')
     .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
     .limit(100);
 
-  const allToCheck = [
-    ...(recentPosts || []).map(p => ({ id: p.id, title: p.title, source: 'post' })),
-    ...(declinedPosts || []).map(p => ({ id: p.id, title: p.title, source: 'declined' })),
-  ];
-
-  if (allToCheck.length > 0) {
+  if (recentPostsForSim && recentPostsForSim.length > 0) {
     const candidateWords = new Set(title.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-    for (const entry of allToCheck) {
+    for (const entry of recentPostsForSim) {
       if (!entry.title) continue;
       const entryWords = new Set(entry.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
       const intersection = [...candidateWords].filter((w: string) => entryWords.has(w));
       const union = new Set([...candidateWords, ...entryWords]);
       const similarity = union.size > 0 ? intersection.length / union.size : 0;
       if (similarity >= 0.55) {
-        return { isDup: true, reason: `Title similar (${Math.round(similarity * 100)}%) to ${entry.source === 'declined' ? 'declined' : 'post'} ${entry.id.slice(0, 8)}` };
+        return { isDup: true, reason: `Title similar (${Math.round(similarity * 100)}%) to post ${entry.id.slice(0, 8)}` };
       }
     }
   }

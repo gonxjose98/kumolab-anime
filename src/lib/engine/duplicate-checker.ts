@@ -17,7 +17,7 @@ export async function checkExistingDuplicates() {
     // Fetch all posts
     const { data: posts, error } = await supabaseAdmin
         .from('posts')
-        .select('id, title, slug, type, claimType, anime_id, timestamp, status, is_published')
+        .select('id, title, slug, type, claim_type, anime_id, timestamp, status, is_published')
         .order('timestamp', { ascending: false });
     
     if (error || !posts) {
@@ -87,14 +87,14 @@ export async function checkExistingDuplicates() {
         console.log('   Declined posts are already filtered from the main feed.\n');
     }
     
-    // Also check for exact anime_id + claimType duplicates
+    // Also check for exact anime_id + claim_type duplicates
     console.log('\n🔍 Checking for exact claim duplicates...\n');
     
     const claimGroups = new Map<string, any[]>();
     
     posts.forEach(post => {
-        if (post.anime_id && post.claimType) {
-            const key = `${post.anime_id}:${post.claimType}`;
+        if (post.anime_id && post.claim_type) {
+            const key = `${post.anime_id}:${post.claim_type}`;
             if (!claimGroups.has(key)) {
                 claimGroups.set(key, []);
             }

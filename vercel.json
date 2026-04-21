@@ -15,6 +15,10 @@
     {
       "path": "/api/cron?worker=daily-report",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron?worker=cleanup",
+      "schedule": "0 3 * * *"
     }
   ],
   "build": {
