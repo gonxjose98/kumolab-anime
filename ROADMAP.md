@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-21 | **Status:** 🔴 Active — Phase 1 awaiting production cutover (all code merged-ready on `claude/storage-rebuild`; old Supabase deleted 2026-04-21)
+**Last updated:** 2026-04-21 | **Status:** 🟡 Active — Phase 1 partial cutover (code live on prod `workspace-kumolab`, DB layer healthy, Supabase storage API restricted with `exceed_storage_size_quota`; waiting for restriction to clear)
 
 ---
 
@@ -75,18 +75,31 @@ All code scaffolds built and wired into `publishToSocials()` on commit `136de23`
 
 Folded into Jose's upcoming admin dashboard redesign (separate project). No readiness work happening in Phase 1.
 
-### Milestone 1.5 — Production Cutover 🟡 In motion
+### Milestone 1.5 — Production Cutover 🟡 Partial
 
-**Old Supabase: DELETED by Jose on 2026-04-21** (ahead of the staged teardown plan). Without the old DB, production is running against a non-existent backend until the swap completes.
+**Timeline:**
+- 2026-04-21 ~00:00 — Old Supabase deleted by Jose (ahead of staged teardown plan)
+- 2026-04-21 05:00 — Env vars set on the `workspace-kumolab` Vercel project (not `kumolab-anime`, which is a 36-day-old stale project)
+- 2026-04-21 06:08 — PR #4 (`v2 storage + automation rebuild`) squash-merged to main
+- 2026-04-21 06:10 — New code deployed to production on `workspace-kumolab.vercel.app`, serving requests
+- 2026-04-21 06:18 — `/api/cron?worker=cleanup` returns HTTP 200 with new v2 JSON shape — DB layer confirmed healthy
 
-Remaining manual steps (Jose):
+**Blocker:** Supabase flagged kumolab project with `exceed_storage_size_quota` despite DB being 11 MB and both buckets empty. Likely stale restriction from the recent deletion of the old kumolab project. Decision: **wait and retry** (Jose 2026-04-21) rather than upgrade to Pro or file a support ticket immediately. Backend runs — only `storage.objects` API is restricted, meaning canvas image generation and trailer staging are blocked until it clears. Decision engine gracefully routes image-less posts to manual review.
 
-- Swap Vercel production env vars to new Supabase (`xzoqsldtcoeaegxcdsia`) — URL + anon key + service role key + `KUMOLAB_DEFAULT_RETENTION_DAYS=60`, and remove the dead `NEXT_PUBLIC_USE_SUPABASE` var
-- Merge `claude/storage-rebuild` → `main` → Vercel auto-deploys
-- First-48h watch: cron logs + Supabase dashboard + admin approvals queue
-- Add TikTok + YouTube credentials as they become available (optional, incremental)
+**What's fully working now:**
+- New code live on prod
+- Detection → processing → cleanup crons functional
+- Database reads/writes clean
+- Admin dashboard reachable
 
-Phase 5 old-Supabase teardown plan is now moot — deletion already done.
+**What's waiting:**
+- Supabase storage restriction clears
+- TikTok developer app approval (2-4 wk async)
+- YouTube OAuth refresh token generation (Jose's manual step when ready)
+
+**Stale project note:** `kumolab-anime` Vercel project is a 36-day-old ghost from before the rebuild. Ignore for now; can be deleted during a future cleanup pass.
+
+Phase 5 old-Supabase teardown is moot — deletion already done on 2026-04-21.
 
 ---
 
