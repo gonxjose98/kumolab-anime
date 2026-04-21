@@ -1,6 +1,14 @@
 /**
  * duplicate-prevention.ts
- * Enhanced duplicate detection and prevention system
+ * v2 — unified dedup via the seen_fingerprints table.
+ *
+ * Layers:
+ *  1. Primary fingerprint — seen_fingerprints PK lookup (covers every row that was
+ *     ever processed/declined/published for as long as seen_fingerprints retains it).
+ *  2. Semantic anime+claim — (anime_id, claim_type) lookup in seen_fingerprints
+ *     catches different sources reporting the same event with different phrasings.
+ *  3. Title similarity — Jaccard over recent LIVE posts (posts table, last N days).
+ *     Defense-in-depth for cases where fingerprint hashing differs but content is near-identical.
  */
 
 import { supabaseAdmin } from '../supabase/admin';
@@ -8,203 +16,134 @@ import { BlogPost } from '@/types';
 
 export interface DuplicateCheckResult {
     isDuplicate: boolean;
-    duplicateOf: string | null; // Post ID of original
+    duplicateOf: string | null;
     duplicateType: 'EXACT' | 'SIMILAR' | 'CLAIM' | 'NONE';
-    confidence: number; // 0-100
+    confidence: number;
     existingPost: any | null;
     action: 'BLOCK' | 'ALLOW' | 'REVIEW';
     reason: string;
 }
 
-/**
- * Multi-layer duplicate detection
- * Layer 1: Exact fingerprint match (event_fingerprint)
- * Layer 2: Truth fingerprint match (same anime + claim type + season)
- * Layer 3: Title similarity (75%+ similar words)
- * Layer 4: Image hash comparison (future enhancement)
- */
+interface DuplicateInput extends Partial<BlogPost> {
+    fingerprint?: string;
+}
+
+function computeFingerprint(title: string, url?: string): string {
+    const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
+    const domain = (url || '').replace(/^https?:\/\//, '').split('/')[0] || '';
+    let hash = 0;
+    const input = normalized + '|' + domain;
+    for (let i = 0; i < input.length; i++) {
+        hash = ((hash << 5) - hash) + input.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return `${normalized.replace(/\s/g, '_').substring(0, 40)}_${Math.abs(hash).toString(36)}`;
+}
+
 export async function detectDuplicate(
-    candidate: Partial<BlogPost>,
-    options: { 
-        checkWindow?: number; // Days to look back (default: 30)
-        similarityThreshold?: number; // Default: 0.75
+    candidate: DuplicateInput,
+    options: {
+        checkWindow?: number; // Days to look back for title similarity (default: 7)
+        similarityThreshold?: number; // Default: 0.65
     } = {}
 ): Promise<DuplicateCheckResult> {
     const { checkWindow = 7, similarityThreshold = 0.65 } = options;
-    
-    const since = new Date();
-    since.setDate(since.getDate() - checkWindow);
-    
-    // Fetch recent posts for comparison
-    const { data: recentPosts, error } = await supabaseAdmin
-        .from('posts')
-        .select('*')
-        .gte('timestamp', since.toISOString())
-        .order('timestamp', { ascending: false });
-    
-    if (error || !recentPosts) {
-        console.error('[Duplicate Detection] Failed to fetch posts:', error);
-        return {
-            isDuplicate: false,
-            duplicateOf: null,
-            duplicateType: 'NONE',
-            confidence: 0,
-            existingPost: null,
-            action: 'ALLOW',
-            reason: 'Error fetching comparison data'
-        };
-    }
-    
-    // Also check declined posts
-    const { data: declinedPosts } = await supabaseAdmin
-        .from('declined_posts')
-        .select('*')
-        .gte('created_at', since.toISOString());
-    
-    const allPosts = [...recentPosts, ...(declinedPosts || [])];
-    
-    // LAYER 1: Exact fingerprint match (same source event)
-    if (candidate.event_fingerprint) {
-        const exactMatch = allPosts.find(p => 
-            p.event_fingerprint === candidate.event_fingerprint
-        );
-        
-        if (exactMatch) {
+
+    // Derive a fingerprint from title + source if the caller didn't supply one.
+    const fp = candidate.fingerprint ||
+        (candidate.title ? computeFingerprint(candidate.title, candidate.source_url || (candidate as any).source) : null);
+
+    // ── LAYER 1: Primary fingerprint lookup ────────────────────────
+    if (fp) {
+        const { data: fpMatch } = await supabaseAdmin
+            .from('seen_fingerprints')
+            .select('fingerprint, origin, anime_id, claim_type')
+            .eq('fingerprint', fp)
+            .maybeSingle();
+
+        if (fpMatch) {
             return {
                 isDuplicate: true,
-                duplicateOf: exactMatch.id,
+                duplicateOf: null,
                 duplicateType: 'EXACT',
                 confidence: 100,
-                existingPost: exactMatch,
+                existingPost: null,
                 action: 'BLOCK',
-                reason: 'Exact event fingerprint match - same source notification'
+                reason: `Fingerprint already seen (origin: ${fpMatch.origin})`,
             };
         }
     }
-    
-    // LAYER 2: Truth fingerprint match (same anime + claim + season)
-    if (candidate.truth_fingerprint) {
-        const truthMatch = allPosts.find(p => 
-            p.truth_fingerprint === candidate.truth_fingerprint &&
-            p.id !== candidate.id
-        );
-        
-        if (truthMatch) {
-            // Check if this adds new information (e.g., different source with higher tier)
-            const isNewInformation = candidate.verification_tier && 
-                truthMatch.verification_tier &&
-                candidate.verification_tier < truthMatch.verification_tier;
-            
-            if (!isNewInformation) {
-                return {
-                    isDuplicate: true,
-                    duplicateOf: truthMatch.id,
-                    duplicateType: 'CLAIM',
-                    confidence: 95,
-                    existingPost: truthMatch,
-                    action: 'BLOCK',
-                    reason: 'Same anime claim already exists (no new information)'
-                };
-            } else {
-                // Higher tier source - allow but flag for review
-                return {
-                    isDuplicate: false,
-                    duplicateOf: truthMatch.id,
-                    duplicateType: 'CLAIM',
-                    confidence: 80,
-                    existingPost: truthMatch,
-                    action: 'REVIEW',
-                    reason: 'Similar claim exists but from lower-tier source - review for upgrade'
-                };
-            }
-        }
-    }
-    
-    // LAYER 2.5: Semantic anime+claim dedup (catches different sources reporting same news)
-    // e.g. "Chainsaw Man Season 2 announced" vs "MAPPA confirms Chainsaw Man season 2"
-    if (candidate.title) {
-        const candidateAnime = extractAnimeFromTitle(candidate.title);
-        const candidateClaim = extractClaimFromTitle(candidate.title);
 
-        if (candidateAnime && candidateClaim) {
-            for (const existing of allPosts) {
-                if (!existing.title) continue;
-                const existingAnime = extractAnimeFromTitle(existing.title);
-                const existingClaim = extractClaimFromTitle(existing.title);
+    // ── LAYER 2: Semantic anime + claim lookup ─────────────────────
+    const claim = (candidate as any).claimType || (candidate as any).claim_type;
+    if (candidate.anime_id && claim) {
+        const { data: semMatch } = await supabaseAdmin
+            .from('seen_fingerprints')
+            .select('fingerprint, origin')
+            .eq('anime_id', candidate.anime_id)
+            .eq('claim_type', claim)
+            .limit(1)
+            .maybeSingle();
 
-                if (existingAnime && existingClaim && existingAnime === candidateAnime && existingClaim === candidateClaim) {
-                    return {
-                        isDuplicate: true,
-                        duplicateOf: existing.id,
-                        duplicateType: 'CLAIM',
-                        confidence: 92,
-                        existingPost: existing,
-                        action: 'BLOCK',
-                        reason: `Same anime "${candidateAnime}" + claim "${candidateClaim}" already exists`
-                    };
-                }
-            }
-        }
-    }
-
-    // LAYER 3: Title similarity check (lowered threshold to 0.55 for better catch rate)
-    if (candidate.title) {
-        for (const existing of allPosts) {
-            const similarity = calculateTitleSimilarity(candidate.title, existing.title);
-
-            if (similarity >= 0.55) {
-                // Check if it's the same claim type
-                const sameClaimType = candidate.claimType &&
-                    existing.claimType === candidate.claimType;
-
-                if (sameClaimType || similarity >= similarityThreshold) {
-                    return {
-                        isDuplicate: true,
-                        duplicateOf: existing.id,
-                        duplicateType: 'SIMILAR',
-                        confidence: Math.round(similarity * 100),
-                        existingPost: existing,
-                        action: 'BLOCK',
-                        reason: `Similar title (${Math.round(similarity * 100)}% match)${sameClaimType ? ' with same claim type' : ''}`
-                    };
-                } else {
-                    // Different claim type but similar title - flag for review
-                    return {
-                        isDuplicate: false,
-                        duplicateOf: existing.id,
-                        duplicateType: 'SIMILAR',
-                        confidence: Math.round(similarity * 100),
-                        existingPost: existing,
-                        action: 'REVIEW',
-                        reason: `Similar title but different claim type - manual review needed`
-                    };
-                }
-            }
-        }
-    }
-    
-    // LAYER 4: Anime ID + Time proximity check (catches rapid duplicates)
-    if (candidate.anime_id && candidate.claimType) {
-        const recentSameAnime = allPosts.find(p => 
-            p.anime_id === candidate.anime_id &&
-            p.claimType === candidate.claimType &&
-            new Date(p.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000) // Within 24 hours
-        );
-        
-        if (recentSameAnime) {
+        if (semMatch) {
             return {
                 isDuplicate: true,
-                duplicateOf: recentSameAnime.id,
+                duplicateOf: null,
                 duplicateType: 'CLAIM',
-                confidence: 90,
-                existingPost: recentSameAnime,
+                confidence: 95,
+                existingPost: null,
                 action: 'BLOCK',
-                reason: 'Same anime claim posted within last 24 hours'
+                reason: `Same anime + claim already recorded (origin: ${semMatch.origin})`,
             };
         }
     }
-    
-    // No duplicates found
+
+    // ── LAYER 3: Title similarity vs. live posts in the window ─────
+    if (candidate.title) {
+        const since = new Date();
+        since.setDate(since.getDate() - checkWindow);
+
+        const { data: recentPosts } = await supabaseAdmin
+            .from('posts')
+            .select('id, title, claim_type, anime_id, timestamp')
+            .gte('timestamp', since.toISOString())
+            .order('timestamp', { ascending: false })
+            .limit(200);
+
+        if (recentPosts) {
+            for (const existing of recentPosts) {
+                if (!existing.title || existing.id === (candidate as any).id) continue;
+                const similarity = calculateTitleSimilarity(candidate.title, existing.title);
+
+                if (similarity >= 0.55) {
+                    const sameClaim = !!claim && existing.claim_type === claim;
+
+                    if (sameClaim || similarity >= similarityThreshold) {
+                        return {
+                            isDuplicate: true,
+                            duplicateOf: existing.id,
+                            duplicateType: 'SIMILAR',
+                            confidence: Math.round(similarity * 100),
+                            existingPost: existing,
+                            action: 'BLOCK',
+                            reason: `Similar title (${Math.round(similarity * 100)}%)${sameClaim ? ' + same claim' : ''}`,
+                        };
+                    } else {
+                        return {
+                            isDuplicate: false,
+                            duplicateOf: existing.id,
+                            duplicateType: 'SIMILAR',
+                            confidence: Math.round(similarity * 100),
+                            existingPost: existing,
+                            action: 'REVIEW',
+                            reason: `Similar title but different claim type — review`,
+                        };
+                    }
+                }
+            }
+        }
+    }
+
     return {
         isDuplicate: false,
         duplicateOf: null,
@@ -212,137 +151,58 @@ export async function detectDuplicate(
         confidence: 0,
         existingPost: null,
         action: 'ALLOW',
-        reason: 'No duplicates detected'
+        reason: 'No duplicates detected',
     };
 }
 
-/**
- * Extract anime name from title for semantic dedup
- */
-function extractAnimeFromTitle(title: string): string | null {
-    const t = title.trim();
-    const patterns = [
-        /^(.+?)\s+(?:Season|Movie|Film|Anime|Part)\s*\d/i,
-        /^(?:New|Latest|Official)\s+(.+?)\s+(?:Trailer|PV|Teaser|Visual|Key Visual|Announced)/i,
-        /^(.+?)\s+(?:Announces?|Reveals?|Confirms?|Gets?|Receives?)/i,
-        /(?:MAPPA|Ufotable|A-1 Pictures|CloverWorks|Trigger|Bones|Madhouse|WIT Studio|Production I\.G|Toei)\s+(?:Reveals?|Announces?|Confirms?)\s+(.+?)(?:\s+(?:Season|Key Visual|Trailer|PV|Release|Premiere))/i,
-        /['"](.+?)['"]\s+(?:Season|Movie|Film|Part|Gets|Receives|Anime)/i,
-        /(?:TV Anime|Anime)\s+['"]?(.+?)['"]?\s+(?:Season|Movie|Reveals|Announces|Gets|Receives|New|PV|Trailer)/i,
-        /^(.+?)\s*(?:[-–—:|])\s+(?:Season|Trailer|PV|Teaser|Key Visual|Release|New|Official)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = t.match(pattern);
-        if (match?.[1]) {
-            const name = match[1].trim().replace(/[^\w\s]/g, '').toLowerCase().trim();
-            if (name.length >= 3 && !/^(new|the|a|an|this|that|more|first|latest|official|anime)$/i.test(name)) return name;
-        }
-    }
-    return null;
-}
-
-/**
- * Extract claim type from title for semantic dedup
- */
-function extractClaimFromTitle(title: string): string | null {
-    const t = title.toLowerCase();
-    if (/trailer|pv|promotional video|teaser/.test(t)) return 'TRAILER';
-    if (/season\s*\d+|new season|sequel|2nd season|3rd season|final season|returns for season/.test(t)) return 'SEASON';
-    if (/key visual|main visual|visual revealed|new visual/.test(t)) return 'KEY_VISUAL';
-    if (/release date|premiere|air date|broadcast/.test(t)) return 'RELEASE_DATE';
-    if (/delay|postpone|reschedule/.test(t)) return 'DELAY';
-    if (/cast|voice actor|seiyuu|staff|director/.test(t)) return 'CAST';
-    if (/announce|confirm|greenlit|green-lit/.test(t)) return 'ANNOUNCEMENT';
-    return null;
-}
-
-/**
- * Calculate similarity between two titles
- * Uses word overlap with significant word weighting
- */
 export function calculateTitleSimilarity(title1: string, title2: string): number {
     const normalize = (s: string) => s.toLowerCase().trim();
-    const extractWords = (s: string) => {
-        return normalize(s)
+    const extractWords = (s: string) =>
+        normalize(s)
             .split(/\s+/)
-            .filter(word => word.length > 2) // Ignore very short words
+            .filter(word => word.length > 2)
             .map(word => word.replace(/[^\w]/g, ''))
             .filter(Boolean);
-    };
-    
-    // Extract significant words (anime names are important)
-    const significantWords1 = extractWords(title1);
-    const significantWords2 = extractWords(title2);
-    
-    if (significantWords1.length === 0 || significantWords2.length === 0) {
-        return 0;
-    }
-    
-    // Count matches
-    const matches = significantWords1.filter(w1 => 
-        significantWords2.some(w2 => w1 === w2 || (w1.length > 5 && w2.includes(w1)) || (w2.length > 5 && w1.includes(w2)))
+
+    const words1 = extractWords(title1);
+    const words2 = extractWords(title2);
+    if (words1.length === 0 || words2.length === 0) return 0;
+
+    const matches = words1.filter(w1 =>
+        words2.some(w2 => w1 === w2 || (w1.length > 5 && w2.includes(w1)) || (w2.length > 5 && w1.includes(w2)))
     );
-    
-    // Calculate Jaccard similarity
-    const union = new Set([...significantWords1, ...significantWords2]).size;
-    const intersection = matches.length;
-    
-    return union > 0 ? intersection / union : 0;
+
+    const union = new Set([...words1, ...words2]).size;
+    return union > 0 ? matches.length / union : 0;
 }
 
-/**
- * Quick check for pending approval queue
- * Used to filter duplicates before they reach your dashboard
- */
-export async function filterDuplicatesFromQueue(candidates: Partial<BlogPost>[]): Promise<{
+export async function filterDuplicatesFromQueue(
+    candidates: Partial<BlogPost>[],
+): Promise<{
     unique: Partial<BlogPost>[];
     duplicates: { candidate: Partial<BlogPost>; reason: DuplicateCheckResult }[];
 }> {
     const unique: Partial<BlogPost>[] = [];
     const duplicates: { candidate: Partial<BlogPost>; reason: DuplicateCheckResult }[] = [];
-    
+
     for (const candidate of candidates) {
         const result = await detectDuplicate(candidate);
-        
         if (result.action === 'BLOCK') {
             duplicates.push({ candidate, reason: result });
-            console.log(`[Duplicate Filter] BLOCKED: "${candidate.title}" - ${result.reason}`);
-        } else if (result.action === 'REVIEW') {
-            // Allow but mark for review
-            (candidate as any).duplicate_check = result;
-            unique.push(candidate);
         } else {
+            if (result.action === 'REVIEW') (candidate as any).duplicate_check = result;
             unique.push(candidate);
         }
     }
-    
-    console.log(`[Duplicate Filter] Processed ${candidates.length} candidates:`);
-    console.log(`  - Unique/Allowed: ${unique.length}`);
-    console.log(`  - Blocked: ${duplicates.length}`);
-    
+
     return { unique, duplicates };
 }
 
 /**
- * Mark a post as a duplicate in the database
- */
-export async function markAsDuplicate(
-    duplicateId: string, 
-    originalId: string,
-    reason: string
-): Promise<void> {
-    await supabaseAdmin
-        .from('posts')
-        .update({
-            is_duplicate: true,
-            duplicate_of: originalId,
-            status: 'declined',
-            decline_reason: `Duplicate: ${reason}`
-        })
-        .eq('id', duplicateId);
-}
-
-/**
- * Get duplicate statistics for dashboard
+ * Legacy admin-dashboard stats shim.
+ * The old columns (is_duplicate, duplicate_of) are gone — the new design records
+ * duplicates by their absence (fingerprint in seen_fingerprints, no post row).
+ * We still return a compatible shape so the admin UI renders without 500ing.
  */
 export async function getDuplicateStats(): Promise<{
     totalDuplicates: number;
@@ -351,20 +211,17 @@ export async function getDuplicateStats(): Promise<{
 }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const { data: duplicates } = await supabaseAdmin
-        .from('posts')
-        .select('*')
-        .eq('is_duplicate', true)
-        .order('timestamp', { ascending: false });
-    
-    const blockedToday = duplicates?.filter(d => 
-        new Date(d.timestamp) >= today
-    ).length || 0;
-    
+
+    // Count blocked-duplicate decisions recorded in scraper_logs today.
+    const { data: blocked } = await supabaseAdmin
+        .from('scraper_logs')
+        .select('id')
+        .eq('decision', 'rejected_duplicate')
+        .gte('created_at', today.toISOString());
+
     return {
-        totalDuplicates: duplicates?.length || 0,
-        blockedToday,
-        recentDuplicates: duplicates?.slice(0, 10) || []
+        totalDuplicates: 0,
+        blockedToday: blocked?.length || 0,
+        recentDuplicates: [],
     };
 }

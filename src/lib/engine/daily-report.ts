@@ -75,19 +75,13 @@ export async function generateDailyReport(): Promise<DailyReport> {
     const declined = actions.filter(a => a.action === 'declined').length;
     const created = actions.filter(a => a.action === 'created').length;
 
-    // ── Posts quality grades ──
-    const { data: gradedPosts } = await supabaseAdmin
-        .from('posts')
-        .select('quality_grade')
-        .not('quality_grade', 'is', null)
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd);
-
+    // quality_grade was removed from posts in the storage rebuild (v2). The daily report
+    // now derives quality from scraper_logs scores instead of a persistent per-post grade.
     const gradeDistribution: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0 };
-    for (const p of (gradedPosts || [])) {
-        if (p.quality_grade && gradeDistribution[p.quality_grade] !== undefined) {
-            gradeDistribution[p.quality_grade]++;
-        }
+    for (const l of logs) {
+        const s = l.score ?? 0;
+        const g = s >= 85 ? 'A' : s >= 70 ? 'B' : s >= 55 ? 'C' : s >= 40 ? 'D' : 'F';
+        gradeDistribution[g]++;
     }
 
     const totalGraded = Object.values(gradeDistribution).reduce((a, b) => a + b, 0);

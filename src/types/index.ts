@@ -52,7 +52,18 @@ export interface BlogPost {
     approvedAt?: string;
     approvedBy?: string;
     scheduledPostTime?: string;
+    published_at?: string;
+    expires_at?: string;
     source?: string;
+    source_url?: string;
+    // Platform-native post IDs — populated after publisher fires
+    twitter_tweet_id?: string;
+    twitter_url?: string;
+    youtube_video_id?: string;
+    youtube_url?: string;
+    youtube_embed_url?: string;
+    social_ids?: Record<string, string>;
+    social_metrics?: Record<string, any>;
     verification_tier?: 'streamer' | 'popularity' | 'format_exception' | number;
     verification_reason?: string;
     verification_sources?: any;

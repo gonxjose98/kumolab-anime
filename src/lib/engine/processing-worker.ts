@@ -18,6 +18,9 @@ import { logScraperDecision, logAction, logError, logAgentAction } from '../logg
 import { detectDuplicate } from './duplicate-prevention';
 import { gradeContent } from './content-grader';
 import { AntigravityAI } from './ai';
+import { decideAutoApproval } from './auto-approval';
+import { assignScheduledSlot } from './scheduler';
+import { evaluateCircuitBreaker } from './circuit-breaker';
 
 // ─── Japanese Detection ────────────────────────────────────────
 
@@ -212,7 +215,7 @@ async function getNextAvailableSlot(): Promise<Date> {
 
 // ─── Create Post ────────────────────────────────────────────
 
-async function createPendingPost(candidate: ProcessingCandidate, score: ContentScore, enrichedData: any): Promise<{ success: boolean; error?: string; postId?: string }> {
+async function createPendingPost(candidate: ProcessingCandidate, score: ContentScore, enrichedData: any): Promise<{ success: boolean; error?: string; postId?: string; policyReject?: boolean }> {
   try {
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
@@ -222,50 +225,92 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       slug: `${slug}-${Date.now().toString(36)}`,
       type: 'INTEL',
       claim_type: enrichedData.claimType || 'OTHER',
+      anime_id: candidate.metadata?.anime_id ?? null,
       content: sanitizeString(candidate.content, 5000),
       excerpt: sanitizeString(candidate.content, 197) + '...',
       source_url: candidate.canonical_url || candidate.source_url || '',
       source: candidate.source_name || 'Unknown',
       source_tier: candidate.source_tier || 2,
       timestamp: now,
-      scraped_at: candidate.detected_at || now,
     };
 
     const imageUrl = candidate.media_urls?.[0] || null;
     const hasImage = !!imageUrl && imageUrl !== '/images/placeholder-news.svg';
     post.image = imageUrl || '/images/placeholder-news.svg';
-    post.needs_image = !hasImage;
 
-    // Store translation metadata if applicable
-    if (candidate.metadata?.was_translated) {
-      post.original_title = candidate.metadata.original_title;
-      post.original_content = candidate.metadata.original_content;
+    const isT1YouTube = candidate.source_tier === 1 && !!candidate.source_name?.toLowerCase().includes('youtube');
+
+    // ── v2 decision pipeline ────────────────────────────────
+    const decision = await decideAutoApproval({
+      title: post.title,
+      content: post.content,
+      anime_id: candidate.metadata?.anime_id ?? null,
+      claim_type: post.claim_type,
+      source_tier: candidate.source_tier,
+      source_name: candidate.source_name,
+      score: score.total,
+      hasImage,
+      isT1YouTube,
+    });
+
+    if (decision.verdict === 'REJECT') {
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'rejected_policy',
+        reason: decision.reason.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: score.breakdown,
+      });
+      return { success: false, error: `POLICY_REJECT: ${decision.reason}`, policyReject: true };
     }
 
-    const isT1YouTube = candidate.source_tier === 1 && candidate.source_name?.toLowerCase().includes('youtube');
-
-    // NO IMAGE = always force pending, regardless of score/tier
-    if (!hasImage) {
-      post.status = 'pending';
-      post.is_published = false;
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `No image — requires manual review. Score ${score.total}`, score: score.total, scoreBreakdown: score.breakdown });
-    } else if (isT1YouTube && score.total >= SCORING_THRESHOLDS.HIGH_CONFIDENCE) {
-      // T1 auto-approved: schedule for next available slot, don't publish immediately
-      const nextSlot = await getNextAvailableSlot();
+    if (decision.verdict === 'AUTO_APPROVE') {
+      const slot = await assignScheduledSlot({
+        detected_at: candidate.detected_at,
+        claim_type: post.claim_type,
+        source_tier: candidate.source_tier,
+        source: candidate.source_name,
+        anime_id: candidate.metadata?.anime_id ?? null,
+        isT1YouTube,
+      });
       post.status = 'approved';
       post.is_published = false;
       post.approved_at = now;
       post.approved_by = 'system';
-      post.scheduled_post_time = nextSlot.toISOString();
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_auto', reason: `T1 YouTube high confidence — scheduled for ${nextSlot.toISOString()}`, score: score.total, scoreBreakdown: score.breakdown });
-      await logAction({ action: 'auto_approved', entityTitle: candidate.title, actor: 'Scraper', reason: `T1 YouTube, score ${score.total}, scheduled ${nextSlot.toISOString()}` });
+      post.scheduled_post_time = slot.scheduled_at;
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'accepted_auto',
+        reason: `${slot.lane} | ${decision.reason}`.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: { ...score.breakdown, signals: decision.signals, scheduler: slot },
+      });
+      await logAction({
+        action: 'auto_approved',
+        entityTitle: candidate.title,
+        actor: 'Scraper',
+        reason: `${slot.lane} lane, scheduled ${slot.scheduled_at}, ${slot.platforms.length} platform(s)`,
+      });
     } else {
+      // QUEUE_FOR_REVIEW
       post.status = 'pending';
       post.is_published = false;
-      await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'accepted_pending', reason: `Score ${score.total}, ${score.confidence}`, score: score.total, scoreBreakdown: score.breakdown });
+      await logScraperDecision({
+        candidateTitle: candidate.title,
+        sourceName: candidate.source_name,
+        sourceTier: candidate.source_tier,
+        decision: 'accepted_pending',
+        reason: decision.reason.substring(0, 200),
+        score: score.total,
+        scoreBreakdown: { ...score.breakdown, signals: decision.signals },
+      });
     }
 
-    // Grade content quality before insertion
+    // Grade content quality for the scraper log only — quality_grade is not persisted on the post
     const gradeResult = gradeContent({
       source_tier: candidate.source_tier,
       source: candidate.source_name,
@@ -278,7 +323,6 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       relevance_score: score.total,
       detected_at: candidate.detected_at,
     });
-    post.quality_grade = gradeResult.grade;
 
     const { data, error } = await supabaseAdmin.from('posts').insert([post]).select();
     if (error) {
@@ -295,13 +339,26 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
   }
 }
 
-async function markCandidateProcessed(candidateId: string, status: 'processed' | 'discarded', result: ProcessedResult) {
-  const update: Record<string, any> = {
-    status, processed_at: new Date().toISOString(), score: result.score.total,
-    score_breakdown: result.score.breakdown, action_taken: result.action, duplicate_of: result.duplicateOf || null,
-  };
-  if (result.error) update.error_message = result.error;
-  await supabaseAdmin.from('detection_candidates').update(update).eq('id', candidateId);
+// Records the candidate's fingerprint in the permanent dedup memory and deletes
+// the candidate row. Replaces the old "status-flag and keep forever" pattern — the
+// detection_candidates table is now a true queue, not an archive.
+async function finishCandidate(
+  candidate: ProcessingCandidate,
+  outcome: 'accepted' | 'rejected' | 'duplicate',
+  claimType?: string
+): Promise<void> {
+  // Duplicates already have a fingerprint row — that's why they're flagged as dups.
+  if (candidate.fingerprint && outcome !== 'duplicate') {
+    await supabaseAdmin.from('seen_fingerprints').upsert({
+      fingerprint: candidate.fingerprint,
+      anime_id: candidate.metadata?.anime_id ?? null,
+      claim_type: claimType ?? null,
+      origin: outcome === 'accepted' ? 'processed' : 'declined',
+      source_url: candidate.source_url,
+      seen_at: new Date().toISOString(),
+    }, { onConflict: 'fingerprint' });
+  }
+  await supabaseAdmin.from('detection_candidates').delete().eq('id', candidate.id);
 }
 
 // ─── Main Worker ────────────────────────────────────────────
@@ -310,6 +367,16 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
   console.log('[ProcessingWorker] Starting processing cycle...');
   const startTime = Date.now();
   const stats = { processed: 0, accepted: 0, rejected: 0, duplicates: 0, errors: [] as string[] };
+
+  // Circuit breaker check — evaluates correction velocity. If it trips, auto-publish pauses.
+  try {
+    const breaker = await evaluateCircuitBreaker();
+    if (breaker.tripped) {
+      console.warn(`[ProcessingWorker] CIRCUIT BREAKER TRIPPED: ${breaker.corrections} corrections in window`);
+    }
+  } catch (e: any) {
+    console.warn('[ProcessingWorker] Circuit breaker eval failed:', e.message);
+  }
 
   try {
     // FIFO: oldest first
@@ -341,22 +408,14 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
               throw new Error('Translation output still contains Japanese');
             }
             console.log(`[ProcessingWorker] Translated: "${candidate.title}" → "${translated.title}"`);
-            candidate.metadata = {
-              ...candidate.metadata,
-              original_title: candidate.title,
-              original_content: candidate.content,
-              was_translated: true,
-            };
+            // Translate-once: replace in-memory fields and discard the source — no Japanese persistence
             candidate.title = translated.title;
             candidate.content = translated.content;
           } catch (err: any) {
             // BLOCK: Do not create posts with Japanese text — reject the candidate
             console.error(`[ProcessingWorker] Translation FAILED for "${candidate.title}": ${err.message} — skipping`);
             await logScraperDecision({ candidateTitle: candidate.title, sourceName: candidate.source_name, sourceTier: candidate.source_tier, decision: 'rejected_error', reason: `Translation failed: ${err.message.substring(0, 60)}`, score: score.total });
-            await markCandidateProcessed(candidate.id, 'discarded', {
-              candidate, score, action: 'reject', error: `Translation failed: ${err.message}`,
-              enrichedData: { animeName: undefined, claimType: 'OTHER' },
-            });
+            await finishCandidate(candidate, 'rejected', 'OTHER');
             stats.rejected++;
             continue;
           }
@@ -402,6 +461,10 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           if (createResult.success) {
             result = { candidate, score, action: 'accept', enrichedData };
             stats.accepted++;
+          } else if (createResult.policyReject) {
+            // Decision engine rejected — don't retry, route straight to reject.
+            result = { candidate, score, action: 'reject', enrichedData, error: createResult.error };
+            stats.rejected++;
           } else {
             // Retry logic: 1 retry for transient failures (not "no image")
             const isRetryable = !createResult.error?.includes('No image');
@@ -419,14 +482,14 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           }
         }
 
-        await markCandidateProcessed(candidate.id, result.action === 'accept' ? 'processed' : 'discarded', result);
+        const outcome: 'accepted' | 'rejected' | 'duplicate' =
+          result.action === 'accept' ? 'accepted' :
+          result.action === 'duplicate' ? 'duplicate' : 'rejected';
+        await finishCandidate(candidate, outcome, enrichedData.claimType);
       } catch (error: any) {
         stats.errors.push(`${candidate.id}: ${error.message}`);
         await logError({ source: 'processing-worker', errorMessage: error.message, context: { candidateId: candidate.id } });
-        await markCandidateProcessed(candidate.id, 'discarded', {
-          candidate, score: { total: 0, breakdown: { sourceAuthority: 0, contentType: 0, visualEvidence: 0, temporalRelevance: 0 }, confidence: 'low', publishThreshold: false },
-          action: 'reject', error: error.message,
-        });
+        await finishCandidate(candidate, 'rejected');
       }
     }
 
