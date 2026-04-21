@@ -59,32 +59,32 @@ export function claimRisk(claim_type: string | undefined, source_tier: number | 
 }
 
 // ── Scheduler config ───────────────────────────────────────────
-export type Platform = 'website' | 'x' | 'threads' | 'facebook' | 'instagram' | 'instagram_stories' | 'tiktok' | 'youtube_shorts';
+// Meta Suite cross-posts IG → Facebook + Threads automatically on Jose's side,
+// so 'instagram' below represents the whole Meta surface. Don't publish to FB or
+// Threads directly — that would duplicate the IG cross-post.
+export type Platform = 'website' | 'x' | 'instagram' | 'tiktok' | 'youtube_shorts';
 
 export type Lane = 'BREAKING' | 'STANDARD' | 'FILL';
 
-// Daily caps for the STANDARD lane. BREAKING bypasses these; FILL only runs if STANDARD didn't fill the day.
+// Per-platform daily caps were removed — Jose's ask. Trailers are meant to be
+// uncapped, Meta is one pipe (not three), and spacing via MIN_GAP_MINUTES is
+// what actually protects algorithm health. Kept the export signature in case
+// a future cap needs to come back.
 export const PLATFORM_DAILY_CAP: Record<Platform, number> = {
-    website:           9999,
-    x:                 25,
-    threads:           20,
-    facebook:          5,
-    instagram:         4,
-    instagram_stories: 15,
-    tiktok:            3,
-    youtube_shorts:    3,
+    website:        Infinity,
+    x:              Infinity,
+    instagram:      Infinity,
+    tiktok:         Infinity,
+    youtube_shorts: Infinity,
 };
 
 // Active posting windows per platform, expressed in ET hours (0-23). Scheduler avoids off-hours.
 export const PLATFORM_PEAK_WINDOWS: Record<Platform, Array<[number, number]>> = {
-    website:           [[0, 24]],
-    x:                 [[6, 23]],
-    threads:           [[6, 23]],
-    facebook:          [[8, 22]],
-    instagram:         [[11, 14], [19, 22]],
-    instagram_stories: [[7, 23]],
-    tiktok:            [[18, 23], [6, 9]],
-    youtube_shorts:    [[10, 22]],
+    website:        [[0, 24]],
+    x:              [[6, 23]],
+    instagram:      [[7, 23]],
+    tiktok:         [[18, 23], [6, 9]],
+    youtube_shorts: [[10, 22]],
 };
 
 // Breaking lane: if detected_at < N minutes ago and claim_type is time-sensitive, go immediate.

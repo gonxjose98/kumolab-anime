@@ -1,16 +1,19 @@
 import { BlogPost } from '@/types';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const PAGE_ID = process.env.META_PAGE_ID;
 const IG_USER_ID = process.env.META_IG_ID;
 
 export interface SocialPublishResult {
-    facebook_id?: string;
-    facebook_url?: string;
     instagram_id?: string;
     instagram_url?: string;
 }
 
+/**
+ * Publishes a post to Instagram only. Meta Suite is configured on Jose's side
+ * to cross-post IG → Facebook + Threads automatically, so publishing to FB or
+ * Threads directly from here would duplicate every post. Do NOT add a direct
+ * FB or Threads publish path.
+ */
 export async function publishToSocials(post: BlogPost): Promise<SocialPublishResult> {
     const result: SocialPublishResult = {};
 
@@ -24,75 +27,50 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         return result;
     }
 
-    console.log(`[Social] Starting broadcast for: ${post.title}`);
+    console.log(`[Social] Starting IG broadcast for: ${post.title}`);
 
-    if (PAGE_ID) {
-        try {
-            const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${META_ACCESS_TOKEN}`;
-            const accRes = await fetch(accountsUrl);
-            const accData = await accRes.json();
-            const pageData = accData.data?.find((p: any) => p.id === PAGE_ID);
-            const tokenToUse = pageData?.access_token || META_ACCESS_TOKEN;
-
-            const fbUrl = `https://graph.facebook.com/v18.0/${PAGE_ID}/photos`;
-            const fbParams = new URLSearchParams({
-                url: post.image || '',
-                message: `${post.title}\n\n${post.content}\n\nRead more at KumoLab.`,
-                access_token: tokenToUse
-            });
-
-            const fbRes = await fetch(`${fbUrl}?${fbParams}`, { method: 'POST' });
-            const fbData = await fbRes.json();
-
-            if (fbData.id) {
-                result.facebook_id = fbData.post_id || fbData.id;
-                result.facebook_url = `https://facebook.com/${result.facebook_id}`;
-                console.log(`✅ [Facebook] Published: ${result.facebook_id}`);
-            } else {
-                console.error(`❌ [Facebook] Failed:`, fbData);
-            }
-        } catch (e) {
-            console.error(`❌ [Facebook] Network Error:`, e);
-        }
+    if (!IG_USER_ID) {
+        console.warn('[Social] META_IG_ID not set — skipping IG broadcast');
+        return result;
     }
 
-    if (IG_USER_ID) {
-        try {
-            const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
-            const containerParams = new URLSearchParams({
-                image_url: post.image || '',
-                caption: `${post.title}\n\n${post.content.substring(0, 2100)}\n\n#anime #kumolab #animenews`,
-                access_token: META_ACCESS_TOKEN || ''
-            });
+    try {
+        const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
+        const containerParams = new URLSearchParams({
+            image_url: post.image || '',
+            caption: `${post.title}\n\n${post.content.substring(0, 2100)}\n\n#anime #kumolab #animenews`,
+            access_token: META_ACCESS_TOKEN || ''
+        });
 
-            const containerRes = await fetch(`${containerUrl}?${containerParams}`, { method: 'POST' });
-            const containerData = await containerRes.json();
+        const containerRes = await fetch(`${containerUrl}?${containerParams}`, { method: 'POST' });
+        const containerData = await containerRes.json();
 
-            if (containerData.id) {
-                const publishUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media_publish`;
-                const publishParams = new URLSearchParams({
-                    creation_id: containerData.id,
-                    access_token: META_ACCESS_TOKEN || ''
-                });
-
-                await new Promise(r => setTimeout(r, 4000));
-
-                const publishRes = await fetch(`${publishUrl}?${publishParams}`, { method: 'POST' });
-                const publishData = await publishRes.json();
-
-                if (publishData.id) {
-                    result.instagram_id = publishData.id;
-                    result.instagram_url = `https://instagram.com/p/${publishData.id}`;
-                    console.log(`✅ [Instagram] Published: ${publishData.id}`);
-                } else {
-                    console.error(`❌ [Instagram] Failed Publish Phase:`, publishData);
-                }
-            } else {
-                console.error(`❌ [Instagram] Failed Container Phase:`, containerData);
-            }
-        } catch (e) {
-            console.error(`❌ [Instagram] Network Error:`, e);
+        if (!containerData.id) {
+            console.error(`❌ [Instagram] Failed Container Phase:`, containerData);
+            return result;
         }
+
+        const publishUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media_publish`;
+        const publishParams = new URLSearchParams({
+            creation_id: containerData.id,
+            access_token: META_ACCESS_TOKEN || ''
+        });
+
+        // IG needs ~4s to process the media container before publish.
+        await new Promise(r => setTimeout(r, 4000));
+
+        const publishRes = await fetch(`${publishUrl}?${publishParams}`, { method: 'POST' });
+        const publishData = await publishRes.json();
+
+        if (publishData.id) {
+            result.instagram_id = publishData.id;
+            result.instagram_url = `https://instagram.com/p/${publishData.id}`;
+            console.log(`✅ [Instagram] Published: ${publishData.id} (Meta Suite will cross-post to FB + Threads)`);
+        } else {
+            console.error(`❌ [Instagram] Failed Publish Phase:`, publishData);
+        }
+    } catch (e) {
+        console.error(`❌ [Instagram] Network Error:`, e);
     }
 
     return result;

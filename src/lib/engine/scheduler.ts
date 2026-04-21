@@ -15,7 +15,6 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import {
-    PLATFORM_DAILY_CAP,
     PLATFORM_PEAK_WINDOWS,
     BREAKING_CLAIM_TYPES,
     BREAKING_MAX_AGE_MINUTES,
@@ -61,19 +60,20 @@ function inWindow(hour: number, windows: Array<[number, number]>): boolean {
 }
 
 // ── Platform targeting ─────────────────────────────────────────
+// 'instagram' here represents the entire Meta surface (IG + FB + Threads) because
+// Meta Suite cross-posts from IG automatically. Never fan out to FB or Threads directly.
 function targetPlatforms(isT1YouTube: boolean, claimType: string | null | undefined): Platform[] {
-    // Website always gets every auto-approved post.
     const base: Platform[] = ['website'];
-    // Trailers go everywhere including TikTok + YT Shorts.
+    // Trailers go everywhere: website + X + Meta cross-post + TikTok + YT Shorts.
     if (isT1YouTube || claimType === 'TRAILER_DROP') {
-        return [...base, 'x', 'threads', 'facebook', 'instagram', 'instagram_stories', 'tiktok', 'youtube_shorts'];
+        return [...base, 'x', 'instagram', 'tiktok', 'youtube_shorts'];
     }
-    // Visual drops: strong fit for IG/X/Threads/FB, skip video-first platforms.
+    // Visual drops: strong fit for IG/X, skip video-first platforms.
     if (claimType === 'NEW_KEY_VISUAL') {
-        return [...base, 'x', 'threads', 'facebook', 'instagram', 'instagram_stories'];
+        return [...base, 'x', 'instagram'];
     }
-    // News (dates, seasons, staff) — text-friendly platforms.
-    return [...base, 'x', 'threads', 'facebook', 'instagram_stories'];
+    // News (dates, seasons, staff) — text-friendly destinations.
+    return [...base, 'x', 'instagram'];
 }
 
 // ── Lane classifier ────────────────────────────────────────────
@@ -87,23 +87,6 @@ function classifyLane(input: SchedulerInput): Lane {
 }
 
 // ── Slot finder ────────────────────────────────────────────────
-async function countScheduledToday(nowUtc: Date): Promise<number> {
-    const dayStart = new Date(nowUtc);
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(24, 0, 0, 0);
-
-    const { count } = await supabaseAdmin
-        .from('posts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved')
-        .not('scheduled_post_time', 'is', null)
-        .gte('scheduled_post_time', dayStart.toISOString())
-        .lt('scheduled_post_time', dayEnd.toISOString());
-
-    return count ?? 0;
-}
-
 async function recentScheduledSlots(nowUtc: Date, lookAheadHours: number = 48): Promise<Date[]> {
     const endBound = new Date(nowUtc.getTime() + lookAheadHours * 3600 * 1000).toISOString();
     const { data } = await supabaseAdmin
@@ -166,21 +149,8 @@ export async function assignScheduledSlot(input: SchedulerInput): Promise<Schedu
         };
     }
 
-    // STANDARD: respect website daily cap (effectively unbounded) but still check it.
-    const todayCount = await countScheduledToday(now);
-    if (todayCount >= PLATFORM_DAILY_CAP.website) {
-        // Push to tomorrow's first peak slot
-        const tomorrow = new Date(now);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-        tomorrow.setUTCHours(13, 0, 0, 0); // ~9 AM ET, safe default
-        return {
-            lane: 'FILL',
-            scheduled_at: tomorrow.toISOString(),
-            platforms,
-            reason: `website daily cap reached; deferred to next day`,
-        };
-    }
-
+    // STANDARD: daily caps removed per Jose. Spacing is enforced by findStandardSlot
+    // via DIVERSITY.MIN_GAP_MINUTES. Posts flow freely; spacing protects algo health.
     const slot = await findStandardSlot(now);
     return {
         lane,
