@@ -37,16 +37,25 @@ export interface AutoApprovalDecision {
 const SCORE_AUTO_MIN = 6;              // Below this we never auto-publish
 const SCORE_AUTO_HIGH = 7;              // T1-YouTube shortcut kicks in at this score (matches SCORING_THRESHOLDS.HIGH_CONFIDENCE)
 
+// Claim types whose content IS the visual artifact — a TRAILER post doesn't need a
+// separate generated card image because the trailer itself is the content. Same for
+// key-visual reveals where the visual ships with the post.
+const VIDEO_OR_VISUAL_CLAIMS = new Set(['TRAILER_DROP', 'NEW_KEY_VISUAL']);
+
 export async function decideAutoApproval(input: AutoApprovalInput): Promise<AutoApprovalDecision> {
     const signals: Record<string, any> = {};
 
+    const claim = (input.claim_type || '').toUpperCase();
+    const isVideoOrVisualClaim = VIDEO_OR_VISUAL_CLAIMS.has(claim);
+
     // Hard gates that apply to every candidate
-    if (!input.hasImage) {
+    if (!input.hasImage && !isVideoOrVisualClaim) {
         return { verdict: 'QUEUE_FOR_REVIEW', reason: 'no image — requires manual image selection', signals };
     }
     if (input.score < SCORE_AUTO_MIN) {
         return { verdict: 'QUEUE_FOR_REVIEW', reason: `score ${input.score} below auto threshold ${SCORE_AUTO_MIN}`, signals };
     }
+    signals.imageGate = input.hasImage ? 'has_image' : (isVideoOrVisualClaim ? 'bypassed_video_visual' : 'blocked_no_image');
 
     // Claim-type + tier risk matrix
     const risk = claimRisk(input.claim_type, input.source_tier);
