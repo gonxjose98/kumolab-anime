@@ -602,9 +602,11 @@ async function saveCandidates(candidates: DetectionCandidate[]): Promise<number>
         continue;
       }
 
+      // detection_candidates uses `detected_at` (in candidate). The schema has no
+      // `created_at` column on this table, so we must not spread one in.
       const { error } = await supabaseAdmin
         .from('detection_candidates')
-        .insert([{ ...candidate, created_at: new Date().toISOString() }]);
+        .insert([candidate]);
 
       if (error) {
         await logError({ source: 'detection-worker', errorMessage: `Insert failed: ${error.message}`, context: { title: candidate.title } });
