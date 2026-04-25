@@ -99,7 +99,7 @@ Folded into Jose's upcoming admin dashboard redesign (separate project). No read
 - All cron workers responding 200, writing data to new Supabase
 - All 16 historical error_logs trace to the pre-fix detection runs; zero new errors
 
-**Stale project note:** `kumolab-anime` Vercel project is a 36-day-old ghost from before the rebuild. Production runs on `workspace-kumolab`. Safe to delete kumolab-anime during a cleanup pass.
+**Stale project note:** `kumolab-anime` Vercel project is a 40-day-old ghost from before the rebuild. As of 2026-04-25, the custom domain `kumolabanime.com` (and `www.kumolabanime.com`) was repointed from `kumolab-anime` → `workspace-kumolab` via `vercel alias set`. The stale project now has no aliases and is safe to delete. Production runs entirely on `workspace-kumolab`.
 
 **Still pending (not blocking):**
 - TikTok developer app approval (2-4 wk async)
