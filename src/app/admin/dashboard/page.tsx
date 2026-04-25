@@ -1,9 +1,12 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers';
 import { Eye, Calendar } from 'lucide-react';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import PostManager from '@/components/admin/PostManager';
 import { fromDbPosts } from '@/lib/posts/normalize';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+// Auth is enforced at the layout level; dashboard reads go through the service-
+// role admin client because RLS is enabled on every table with no anon policies
+// (service role bypasses RLS). Reading via the anon SSR client returns nothing.
 
 export const dynamic = 'force-dynamic';
 
@@ -138,21 +141,8 @@ async function getPosts(supabase: any) {
 }
 
 export default async function DashboardPage() {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-            },
-        }
-    );
-
-    const analytics = await getAnalytics(supabase);
-    const posts = await getPosts(supabase);
+    const analytics = await getAnalytics(supabaseAdmin);
+    const posts = await getPosts(supabaseAdmin);
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
