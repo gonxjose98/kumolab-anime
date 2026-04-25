@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-25 | **Status:** 🟢 Active — Phase 1 cutover RESOLVED. Production end-to-end verified on new Supabase (`xzoqsldtcoeaegxcdsia`). Detection → processing → posts pipeline writing data. 5 first posts in pending queue.
+**Last updated:** 2026-04-25 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish flow live for video/visual claims (T1/T2 trailers + key visuals → website). Social broadcasting deliberately off (Jose: website-only focus until everything else is fixed).
 
 ---
 
@@ -58,6 +58,7 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - Circuit breaker (`circuit-breaker.ts`) — 3+ declines in 24h pauses auto-publish for 6h
 - Translate-once — Japanese source fields no longer persisted
 - Fork 2 retention via `expires_at` (env-driven, default 60 days, unset = evergreen)
+- **TRAILER_DROP + NEW_KEY_VISUAL bypass the no-image gate** (PR #11, 2026-04-25) — the trailer/visual itself is the post's content; no separate card image needed. T1/T2 video/visual claims now actually auto-publish to the website per the risk matrix.
 
 ### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 
