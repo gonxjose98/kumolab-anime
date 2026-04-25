@@ -1,15 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pytehpdxophkhuxnnqzj.supabase.co';
-
-// CRITICAL: Admin client MUST use service_role key to bypass RLS.
-// Previously this fell back to NEXT_PUBLIC_SUPABASE_ANON_KEY which caused
-// silent delete failures — Supabase returns {error: null} even when RLS blocks the operation.
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dGVocGR4b3Boa2h1eG5ucXpqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODE3Mjc1OSwiZXhwIjoyMDgzNzQ4NzU5fQ.oXPumZ99rcY4hfiaQ4qEMLBd5-34bd6N9_oA7n1pCH0';
+// No fallback URL/key — production must supply these via env. A previous version
+// fell back to a hardcoded URL that pointed at a since-deleted Supabase project,
+// which silently routed all writes into the void while workers reported success.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    throw new Error(`Supabase Init Failed. URL: ${supabaseUrl ? 'OK' : 'MISSING'}, KEY: ${supabaseKey ? 'OK' : 'MISSING'}`);
+    throw new Error(
+        `Supabase admin init failed — env vars missing. ` +
+        `URL: ${supabaseUrl ? 'OK' : 'MISSING NEXT_PUBLIC_SUPABASE_URL'}, ` +
+        `KEY: ${supabaseKey ? 'OK' : 'MISSING SUPABASE_SERVICE_ROLE_KEY'}`
+    );
 }
 
-// Server-side admin client — bypasses RLS for all operations (insert, update, delete)
+// Service role bypasses RLS — never expose this client to the browser.
 export const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
