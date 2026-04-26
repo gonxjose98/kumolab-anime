@@ -22,6 +22,12 @@ import { decideAutoApproval } from './auto-approval';
 import { assignScheduledSlot } from './scheduler';
 import { evaluateCircuitBreaker } from './circuit-breaker';
 import { extractYouTubeVideo } from './video-extractor';
+import { isTrailerTrustedSource } from './automation-config';
+import { selectBestImage } from './image-selector';
+
+// Branded fallback URL returned by selectBestImage when nothing usable is
+// found — we treat that as "no image" since it's not actual anime artwork.
+const KUMOLAB_BRAND_FALLBACK = '/hero-bg-final.png';
 
 // ─── Japanese Detection ────────────────────────────────────────
 
@@ -134,9 +140,14 @@ function extractAnimeName(title: string, content: string): string | undefined {
   return undefined;
 }
 
-function determineClaimType(title: string, content: string): string {
+function determineClaimType(title: string, content: string, sourceName?: string): string {
   const combined = (title + ' ' + content).toLowerCase();
-  if (/trailer|pv|promotional video|teaser/.test(combined)) return 'TRAILER_DROP';
+  // Only allow TRAILER_DROP from sources where the extractor can actually surface
+  // the video (YouTube channel RSS, or article HTML with raw embeds — see
+  // isTrailerTrustedSource). For everyone else, "trailer" in the headline is a
+  // news article *about* a trailer, not the trailer itself; let it fall through
+  // to the next-best claim (season / visual / date).
+  if (/trailer|pv|promotional video|teaser/.test(combined) && isTrailerTrustedSource(sourceName)) return 'TRAILER_DROP';
   if (/season\s*\d+|new season|sequel|2nd season|3rd season/.test(combined)) return 'NEW_SEASON_CONFIRMED';
   if (/key visual|main visual|visual revealed/.test(combined)) return 'NEW_KEY_VISUAL';
   if (/release date|premiere date|air date/.test(combined)) return 'DATE_ANNOUNCED';
@@ -235,8 +246,27 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       timestamp: now,
     };
 
-    const imageUrl = candidate.media_urls?.[0] || null;
-    const hasImage = !!imageUrl && imageUrl !== '/images/placeholder-news.svg';
+    let imageUrl = candidate.media_urls?.[0] || null;
+    let hasImage = !!imageUrl && imageUrl !== '/images/placeholder-news.svg';
+
+    // ── Image fallback chain ─────────────────────────────────
+    // Non-video posts MUST ship with a real anime picture (Jose's rule). When
+    // RSS gave us nothing, hit the visual-intelligence engine (AniList +
+    // official-site OG + Reddit search) before giving up. selectBestImage
+    // returns the branded /hero-bg-final.png when it can't find anything; we
+    // treat that as "no image" so the artifact gate routes the post away.
+    if (!hasImage && enrichedData.animeName) {
+      try {
+        const found = await selectBestImage(enrichedData.animeName, post.claim_type);
+        if (found?.url && found.url !== KUMOLAB_BRAND_FALLBACK) {
+          imageUrl = found.url;
+          hasImage = true;
+        }
+      } catch (err: any) {
+        console.warn(`[ProcessingWorker] selectBestImage failed for "${enrichedData.animeName}": ${err.message}`);
+      }
+    }
+
     post.image = imageUrl || '/images/placeholder-news.svg';
 
     const isT1YouTube = candidate.source_tier === 1 && !!candidate.source_name?.toLowerCase().includes('youtube');
@@ -460,7 +490,7 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
         }
 
         const animeName = extractAnimeName(candidate.title, candidate.content);
-        const enrichedData = { animeName, claimType: determineClaimType(candidate.title, candidate.content), studio: candidate.source_name?.includes('YouTube') ? candidate.metadata?.channel_name : undefined };
+        const enrichedData = { animeName, claimType: determineClaimType(candidate.title, candidate.content, candidate.source_name), studio: candidate.source_name?.includes('YouTube') ? candidate.metadata?.channel_name : undefined };
 
         // 4-layer dedup from duplicate-prevention.ts
         const dupResult = await detectDuplicate({

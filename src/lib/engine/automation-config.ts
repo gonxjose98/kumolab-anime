@@ -103,3 +103,23 @@ export const DIVERSITY = {
     // Minimum minutes between consecutive posts on the same platform (STANDARD lane).
     MIN_GAP_MINUTES: 25,
 };
+
+// ── Trailer source allowlist ───────────────────────────────────
+// A TRAILER_DROP post must embed an actual video, and our static-fetch
+// extractor can only see embeds in two cases:
+//   1. The candidate's source URL IS the YouTube URL (YouTube channel RSS).
+//   2. The article HTML embeds raw <iframe> / oEmbed-style YouTube tags
+//      (ANN does this; Crunchyroll News renders embeds via JavaScript so
+//      a static fetch never sees them).
+// Anywhere else, treating "Trailer" in the headline as TRAILER_DROP just
+// produces broken posts that fall through to manual review. We classify
+// those as the next-best claim instead (season / key visual / etc.).
+export const TRAILER_TRUSTED_SOURCES = new Set<string>([
+    'AnimeNewsNetwork',
+]);
+
+export function isTrailerTrustedSource(sourceName: string | undefined | null): boolean {
+    if (!sourceName) return false;
+    if (sourceName.startsWith('YouTube_')) return true;
+    return TRAILER_TRUSTED_SOURCES.has(sourceName);
+}

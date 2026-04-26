@@ -141,33 +141,39 @@ export const RSS_SOURCES = {
  * Monitor for trailer drops, PVs, announcements
  * Format: https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID
  *
- * Revised 2026-03-12:
- * T1: Crunchyroll, Netflix Anime, Aniplex USA, TOHO Animation (auto-publish worthy)
- * T2: Kadokawa, Pony Canyon (EN-only filter), Viz Media (keyword-filtered)
- * T3: MAPPA, Ufotable, A-1 Pictures, CloverWorks (manual review — JP-heavy)
- * Removed: Funimation (dead brand), Sentai Filmworks (inactive), Muse Asia (inactive)
+ * Revised 2026-04-26: replaced the entire previous list — most prior IDs were
+ * unverified and never resolved (all 11 channels had consecutive_failures=16,
+ * last_success=NULL). Resolved every ID below by fetching the channel's
+ * @handle page and reading the canonical channelMetadataRenderer.
+ *
+ * All official-studio + distributor channels are promoted to T1 because:
+ *   1. The `isT1YouTube` shortcut in auto-approval.ts auto-publishes any
+ *      T1 YouTube candidate with score ≥ 7 — and the visual-artifact gate
+ *      already guarantees the video actually exists. A studio uploading a
+ *      trailer to its own channel is evidence by existence; corroboration
+ *      adds nothing.
+ *   2. Anything below T1 routes to manual review per CLAIM_RISK_BY_TIER,
+ *      which contradicts Jose's directive that videos auto-publish without
+ *      manual touch.
+ * Add new channels via the same path: fetch the @handle, copy the channelId
+ * from the page metadata.
  */
 export const YOUTUBE_STUDIO_CHANNELS = {
-    // Tier 1: Major platforms/distributors — consistent EN content, auto-publish worthy
+    // Tier 1: All verified official channels — auto-publish path
     TIER_1: [
-        { name: 'Crunchyroll', channelId: 'UC6pGDc4luvCq5w1C9lt0v0g', tier: 1 },
-        { name: 'Netflix Anime', channelId: 'UC0Q6wx_3LTWqWBp3Z6k5V0Q', tier: 1 },
-        { name: 'Aniplex USA', channelId: 'UC8ZxQ3yL9sT7y8m6h3Z7K2A', tier: 1 },
-        { name: 'TOHO Animation', channelId: 'UCp8LObSyk0vZ02NF4_7PcWg', tier: 1 },
+        { name: 'Crunchyroll', channelId: 'UC6pGDc4bFGD1_36IKv3FnYg', tier: 1 },
+        { name: 'Netflix Anime', channelId: 'UCBSs9x2KzSLhyyA9IKyt4YA', tier: 1 },
+        { name: 'Aniplex USA', channelId: 'UCDb0peSmF5rLX7BvuTcJfCw', tier: 1 },
+        { name: 'TOHO Animation', channelId: 'UC14Yc2Qv92DMuyNRlHvpo2Q', tier: 1 },
+        { name: 'MAPPA', channelId: 'UCgQwnbMmPDQOcj0jMR-ZeWg', tier: 1 },
+        { name: 'Kadokawa', channelId: 'UCY5fcqgSrQItPAX_Z5Frmwg', tier: 1 },
+        { name: 'A-1 Pictures', channelId: 'UCUN7jFL7lnSia_NbzTrx4ow', tier: 1 },
+        { name: 'Viz Media', channelId: 'UCV1da9peoqEwqr45bpTJsbQ', tier: 1 },
+        { name: 'CloverWorks', channelId: 'UCCT6fRG8poit5j_GOE4Hrhw', tier: 1 },
+        { name: 'Pony Canyon', channelId: 'UCk0IUODXaAFr5gEFlZDbzmw', tier: 1 },
     ],
-    // Tier 2: Publishers — good content, needs review or keyword filtering
-    TIER_2: [
-        { name: 'Kadokawa', channelId: 'UCqmNf2x0c3y9fL8F5xM1A9w', tier: 2 },
-        { name: 'Pony Canyon', channelId: 'UCZzMwpW4T56_6fL4U1q8f6w', tier: 2, enOnly: true },
-        { name: 'Viz Media', channelId: 'UCoh3TqQGIRLSFHE8JiSgHCg', tier: 2, keywordFiltered: true },
-    ],
-    // Tier 3: Studio channels — manual review only (JP-heavy, inconsistent uploads)
-    TIER_3: [
-        { name: 'MAPPA', channelId: 'UCZxsdzmU3OoC9Q8Z3swoS6g', tier: 3 },
-        { name: 'Ufotable', channelId: 'UCgHfufyA9n6qMvo3K0XBp2w', tier: 3 },
-        { name: 'A-1 Pictures', channelId: 'UC2xDictxIa66VdNG1PaIyQ', tier: 3 },
-        { name: 'CloverWorks', channelId: 'UC3ryC1YkgR0eJ1O4C9jP-Q', tier: 3 },
-    ],
+    TIER_2: [] as { name: string; channelId: string; tier: number }[],
+    TIER_3: [] as { name: string; channelId: string; tier: number }[],
     // Tier 4: Franchise channels — add verified IDs via admin Connections panel
     TIER_4: [] as { name: string; channelId: string; tier: number }[]
 };

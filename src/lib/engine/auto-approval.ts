@@ -45,8 +45,12 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
 
     // ── Visual artifact gate ─────────────────────────────────────
     // TRAILER_DROP MUST have a video — a trailer post with no embed is broken.
-    // Everything else (visuals, news, dates, staff) MUST have an image.
-    // We never publish a post that can't actually display its claimed content.
+    // Everything else (visuals, news, dates, staff) MUST have an image. Image
+    // acquisition runs upstream in processing-worker (RSS → selectBestImage
+    // fallback). If we still don't have one by the time we reach this gate,
+    // the picture pipeline genuinely failed — drop the post rather than
+    // pile up image-less rows in the manual review queue (Jose's rule:
+    // "non-video posts should come with a picture", no exceptions).
     if (claim === 'TRAILER_DROP') {
         if (!input.hasVideo) {
             return { verdict: 'QUEUE_FOR_REVIEW', reason: 'trailer claim missing video — extraction failed', signals };
@@ -54,7 +58,7 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
         signals.artifact = 'video';
     } else {
         if (!input.hasImage) {
-            return { verdict: 'QUEUE_FOR_REVIEW', reason: 'no image — requires manual image selection', signals };
+            return { verdict: 'REJECT', reason: 'no image — every fallback (RSS + AniList + OG + Reddit) failed', signals };
         }
         signals.artifact = 'image';
     }
