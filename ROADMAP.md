@@ -58,7 +58,10 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - Circuit breaker (`circuit-breaker.ts`) — 3+ declines in 24h pauses auto-publish for 6h
 - Translate-once — Japanese source fields no longer persisted
 - Fork 2 retention via `expires_at` (env-driven, default 60 days, unset = evergreen)
-- **TRAILER_DROP + NEW_KEY_VISUAL bypass the no-image gate** (PR #11, 2026-04-25) — the trailer/visual itself is the post's content; no separate card image needed. T1/T2 video/visual claims now actually auto-publish to the website per the risk matrix.
+- **Visual-artifact gate** (PR #13, 2026-04-25) — never publish a post that can't display what it claims to be:
+    • `TRAILER_DROP` requires `youtube_video_id` (extracted from source URL or article HTML by `video-extractor.ts`). Without it → manual review.
+    • Everything else requires an image. Without it → manual review.
+  Replaces an earlier broken bypass (PR #11) that let trailer posts publish with no embed and no image. Known limitation: Crunchyroll News articles render their YouTube embeds via JavaScript so a static HTTP fetch doesn't see them. Those posts correctly stay in pending review until either source list is filtered or extractor is upgraded to headless render.
 
 ### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 
