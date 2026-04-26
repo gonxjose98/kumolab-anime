@@ -62,6 +62,9 @@ async function checkAdmin(req: NextRequest): Promise<NextResponse | null> {
     return res;
 }
 
+// Methods that mutate state must always go through admin auth, regardless of path.
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;
 
@@ -73,9 +76,17 @@ export async function middleware(req: NextRequest) {
         return (await checkAdmin(req)) ?? NextResponse.next();
     }
 
+    // /api/posts: GET is public (the route handler enforces published-only for
+    // unauthenticated callers); any state-changing method requires admin auth.
+    if (pathname === '/api/posts' || pathname.startsWith('/api/posts/')) {
+        if (MUTATING_METHODS.has(req.method)) {
+            return (await checkAdmin(req)) ?? NextResponse.next();
+        }
+    }
+
     return NextResponse.next();
 }
 
 export const config = {
-    matcher: ['/api/cron/:path*', '/api/admin/:path*'],
+    matcher: ['/api/cron/:path*', '/api/admin/:path*', '/api/posts/:path*', '/api/posts'],
 };

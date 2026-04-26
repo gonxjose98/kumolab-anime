@@ -1,64 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { createFingerprint } from '@/lib/engine/utils';
 
 export const dynamic = 'force-dynamic';
 
+// Public reads here are intentionally narrowed to status='published'. Admin
+// callers (with a valid Supabase session) can pass arbitrary status / hidden
+// filters; everyone else gets only the live blog.
+async function isAuthenticatedAdmin(): Promise<boolean> {
+    try {
+        const cookieStore = await cookies();
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
+        );
+        const { data, error } = await supabase.auth.getUser();
+        return !error && !!data?.user;
+    } catch {
+        return false;
+    }
+}
+
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const status = searchParams.get('status');
+        const requestedStatus = searchParams.get('status');
         const type = searchParams.get('type');
         const limit = parseInt(searchParams.get('limit') || '50');
         const slug = searchParams.get('slug');
         const id = searchParams.get('id');
+
+        const isAdmin = await isAuthenticatedAdmin();
 
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // If slug or id is provided, fetch single post
+        // Single post by slug/id — public callers only see published posts.
         if (slug || id) {
-            console.log('[API /posts] Fetching single post:', { slug, id });
-            
-            let query = supabase
-                .from('posts')
-                .select('*');
-            
+            let query = supabase.from('posts').select('*');
             if (slug) query = query.eq('slug', slug);
             if (id) query = query.eq('id', id);
+            if (!isAdmin) query = query.eq('is_published', true).eq('status', 'published');
 
-            const { data, error } = await query.single();
-            
-            if (error) {
-                console.error('[API /posts] Error fetching post:', error);
+            const { data, error } = await query.maybeSingle();
+
+            if (error || !data) {
                 return NextResponse.json({ error: 'Post not found' }, { status: 404 });
             }
-            
-            if (!data) {
-                console.log('[API /posts] Post not found');
-                return NextResponse.json({ error: 'Post not found' }, { status: 404 });
-            }
-            
-            console.log('[API /posts] Post found:', {
-                id: data.id,
-                slug: data.slug,
-                is_published: data.is_published,
-                status: data.status
-            });
-            
+
             return NextResponse.json(data);
         }
 
-        // Otherwise, fetch list of posts
+        // List endpoint — public callers always get status='published'; admin
+        // callers can request a different status via the query param.
         let query = supabase
             .from('posts')
             .select('*')
             .order('timestamp', { ascending: false })
             .limit(limit);
 
-        if (status) query = query.eq('status', status);
+        if (isAdmin && requestedStatus) {
+            query = query.eq('status', requestedStatus);
+        } else {
+            query = query.eq('status', 'published').eq('is_published', true);
+        }
         if (type) query = query.eq('type', type);
 
         const { data, error } = await query;
