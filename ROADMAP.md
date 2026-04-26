@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-25 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish flow live for video/visual claims (T1/T2 trailers + key visuals → website). Social broadcasting deliberately off (Jose: website-only focus until everything else is fixed).
+**Last updated:** 2026-04-26 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish flow live for video/visual claims (T1/T2 trailers + key visuals → website). Social broadcasting deliberately off (Jose: website-only focus until everything else is fixed).
 
 ---
 
@@ -61,7 +61,11 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - **Visual-artifact gate** (PR #13, 2026-04-25) — never publish a post that can't display what it claims to be:
     • `TRAILER_DROP` requires `youtube_video_id` (extracted from source URL or article HTML by `video-extractor.ts`). Without it → manual review.
     • Everything else requires an image. Without it → manual review.
-  Replaces an earlier broken bypass (PR #11) that let trailer posts publish with no embed and no image. Known limitation: Crunchyroll News articles render their YouTube embeds via JavaScript so a static HTTP fetch doesn't see them. Those posts correctly stay in pending review until either source list is filtered or extractor is upgraded to headless render.
+  Replaces an earlier broken bypass (PR #11) that let trailer posts publish with no embed and no image.
+- **Trailer source allowlist** (2026-04-26) — `TRAILER_DROP` is now produced only by sources whose extractor can actually surface a video: any `YouTube_*` source (URL is the trailer) plus AnimeNewsNetwork (raw `<iframe>` embeds in article HTML). All other sources with "trailer" in the headline fall through to the next-best claim (season / visual / date) instead of producing a broken trailer post that gets stuck in manual review. Single source of truth: `automation-config.ts::TRAILER_TRUSTED_SOURCES` + `isTrailerTrustedSource()`. Crunchyroll News (JS-rendered embeds) is correctly excluded.
+- **YouTube channel ID rewrite** (2026-04-26) — every prior channel ID in `sources-config.ts` was unverified and never resolved (all 11 channels had `consecutive_failures=16`, `last_success=NULL` — never once succeeded). Replaced the entire list with 10 channels resolved by fetching each `@handle` page and reading the canonical `channelMetadataRenderer.title` + channel URL. All 10 promoted to T1 because the `isT1YouTube` shortcut in `auto-approval.ts` is what auto-publishes trailers without manual review — anything below T1 routes to review and contradicts the directive. Source set: Crunchyroll, Netflix Anime, Aniplex USA, TOHO Animation, MAPPA, Kadokawa, A-1 Pictures, Viz Media, CloverWorks, Pony Canyon. Ufotable dropped (no resolvable @handle).
+- **Image fallback wired** (2026-04-26) — `processing-worker.ts` now calls `image-selector.ts::selectBestImage(animeName, claimType)` whenever RSS yields no image. Strategy is AniList cover/banner → official-site OG image → Reddit search → reject. Closes the long-standing "every post lands image-less → manual review" gap.
+- **Artifact gate hardened** (2026-04-26) — non-video posts that still have no image after the fallback chain now `REJECT` instead of `QUEUE_FOR_REVIEW`. Per Jose: every non-video post must ship with a real anime picture; better to lose the post than pile image-less rows in the review queue.
 
 ### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 
