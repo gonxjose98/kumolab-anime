@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
+import { createFingerprint } from '@/lib/engine/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,34 +15,38 @@ export async function POST(req: NextRequest) {
 
         console.log(`[API] Bulk deleting ${ids.length} posts`);
 
-        // Fetch posts BEFORE deleting — we need title, slug, source, source_url for tracking
+        // Fetch posts BEFORE deleting — we need title + source_url to build the
+        // fingerprint that goes into seen_fingerprints (the v2 dedup memory).
         const { data: posts } = await supabaseAdmin
             .from('posts')
-            .select('id, title, slug, source, source_url')
+            .select('id, title, slug, source, source_url, claim_type, anime_id')
             .in('id', ids);
 
-        // Record in declined_posts so the scraper doesn't re-detect them
+        // Record in seen_fingerprints (origin='declined') so the detection worker
+        // never re-detects these. Replaces the old declined_posts table from v1.
         if (posts && posts.length > 0) {
             const now = new Date().toISOString();
-            const declinedRecords = posts.map((post: any) => ({
-                original_post_id: post.id,
-                title: post.title || '',
-                slug: post.slug || '',
-                source: post.source || 'Unknown',
-                source_url: post.source_url || '',
-                declined_at: now,
-                declined_by: 'admin',
-                reason: 'bulk_deleted'
-            }));
+            const fingerprintRecords = posts
+                .filter((p: any) => p.title && p.source_url)
+                .map((post: any) => ({
+                    fingerprint: createFingerprint(post.title, post.source_url),
+                    anime_id: post.anime_id ?? null,
+                    claim_type: post.claim_type ?? null,
+                    origin: 'declined' as const,
+                    source_url: post.source_url,
+                    seen_at: now,
+                }));
 
-            const { error: trackError } = await supabaseAdmin
-                .from('declined_posts')
-                .insert(declinedRecords);
+            if (fingerprintRecords.length > 0) {
+                const { error: trackError } = await supabaseAdmin
+                    .from('seen_fingerprints')
+                    .upsert(fingerprintRecords, { onConflict: 'fingerprint' });
 
-            if (trackError) {
-                console.warn(`[API] Could not track ${declinedRecords.length} deleted posts in declined_posts:`, trackError.message);
-            } else {
-                console.log(`[API] Tracked ${declinedRecords.length} posts in declined_posts`);
+                if (trackError) {
+                    console.warn(`[API] Could not record ${fingerprintRecords.length} fingerprints:`, trackError.message);
+                } else {
+                    console.log(`[API] Recorded ${fingerprintRecords.length} fingerprints (origin=declined)`);
+                }
             }
         }
 

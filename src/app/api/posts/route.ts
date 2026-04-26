@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createFingerprint } from '@/lib/engine/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,30 +125,31 @@ export async function DELETE(req: NextRequest) {
         // Use supabaseAdmin to ensure service_role key (bypasses RLS)
         const { supabaseAdmin } = await import('@/lib/supabase/admin');
 
-        // Fetch post BEFORE deleting to track it
+        // Fetch post BEFORE deleting — need title + source_url to build the
+        // fingerprint that goes into seen_fingerprints (the v2 dedup memory).
         const { data: post } = await supabaseAdmin
             .from('posts')
-            .select('id, title, slug, source, source_url')
+            .select('id, title, slug, source, source_url, claim_type, anime_id')
             .eq('id', id)
             .single();
 
-        // Record in declined_posts so the scraper doesn't re-detect it
-        if (post) {
-            await supabaseAdmin
-                .from('declined_posts')
-                .insert([{
-                    original_post_id: post.id,
-                    title: post.title || '',
-                    slug: post.slug || '',
-                    source: post.source || 'Unknown',
-                    source_url: post.source_url || '',
-                    declined_at: new Date().toISOString(),
-                    declined_by: 'admin',
-                    reason: 'deleted'
-                }])
-                .then(({ error }) => {
-                    if (error) console.warn('[API] Could not track deleted post:', error.message);
-                });
+        // Record in seen_fingerprints (origin='declined') so the detection worker
+        // never re-detects this. Replaces the old declined_posts table from v1.
+        if (post && post.title && post.source_url) {
+            const { error: trackError } = await supabaseAdmin
+                .from('seen_fingerprints')
+                .upsert({
+                    fingerprint: createFingerprint(post.title, post.source_url),
+                    anime_id: post.anime_id ?? null,
+                    claim_type: post.claim_type ?? null,
+                    origin: 'declined' as const,
+                    source_url: post.source_url,
+                    seen_at: new Date().toISOString(),
+                }, { onConflict: 'fingerprint' });
+
+            if (trackError) {
+                console.warn('[API] Could not record fingerprint for deleted post:', trackError.message);
+            }
         }
 
         const { data: deleted, error } = await supabaseAdmin

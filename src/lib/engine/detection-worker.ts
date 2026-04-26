@@ -21,6 +21,7 @@ import {
 import { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } from './sources-config';
 import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logError, logAgentAction } from '../logging/structured-logger';
+import { createFingerprint } from './utils';
 
 // RSS positive keyword filter — only accept RSS items matching these terms
 const RSS_REQUIRED_KEYWORDS = [
@@ -204,20 +205,6 @@ function parseRSSItems(xmlText: string, sourceName: string): DetectionCandidate[
     console.error(`[DetectionWorker] Error parsing RSS from ${sourceName}:`, error);
   }
   return candidates;
-}
-
-// ─── Fingerprint ────────────────────────────────────────────
-
-function createFingerprint(title: string, url: string): string {
-  const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
-  const domain = url.replace(/^https?:\/\//, '').split('/')[0] || '';
-  let hash = 0;
-  const input = normalized + '|' + domain;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return `${normalized.replace(/\s/g, '_').substring(0, 40)}_${Math.abs(hash).toString(36)}`;
 }
 
 // ─── HTML Utils ─────────────────────────────────────────────
