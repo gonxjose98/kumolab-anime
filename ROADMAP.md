@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-26 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish flow live for video/visual claims (T1/T2 trailers + key visuals → website). Social broadcasting deliberately off (Jose: website-only focus until everything else is fixed).
+**Last updated:** 2026-04-26 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish live for video/visual claims. Security hardened (cron + admin API gated by middleware, public-facing endpoints locked, silent failure paths closed). Social broadcasting deliberately off (Jose: website-only focus).
 
 ---
 
@@ -66,6 +66,15 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - **YouTube channel ID rewrite** (2026-04-26) — every prior channel ID in `sources-config.ts` was unverified and never resolved (all 11 channels had `consecutive_failures=16`, `last_success=NULL` — never once succeeded). Replaced the entire list with 10 channels resolved by fetching each `@handle` page and reading the canonical `channelMetadataRenderer.title` + channel URL. All 10 promoted to T1 because the `isT1YouTube` shortcut in `auto-approval.ts` is what auto-publishes trailers without manual review — anything below T1 routes to review and contradicts the directive. Source set: Crunchyroll, Netflix Anime, Aniplex USA, TOHO Animation, MAPPA, Kadokawa, A-1 Pictures, Viz Media, CloverWorks, Pony Canyon. Ufotable dropped (no resolvable @handle).
 - **Image fallback wired** (2026-04-26) — `processing-worker.ts` now calls `image-selector.ts::selectBestImage(animeName, claimType)` whenever RSS yields no image. Strategy is AniList cover/banner → official-site OG image → Reddit search → reject. Closes the long-standing "every post lands image-less → manual review" gap.
 - **Artifact gate hardened** (2026-04-26) — non-video posts that still have no image after the fallback chain now `REJECT` instead of `QUEUE_FOR_REVIEW`. Per Jose: every non-video post must ship with a real anime picture; better to lose the post than pile image-less rows in the review queue.
+- **Security hardening pass** (2026-04-26) — closed the audit-flagged holes:
+    • `src/middleware.ts` is the single chokepoint for API auth. `/api/cron/*` requires Vercel cron header or `CRON_SECRET` bearer; `/api/admin/*` requires a valid Supabase session validated via `getUser()` (round-trips to Supabase, not just cookie presence); state-changing methods on `/api/posts` go through the same admin gate.
+    • `/api/posts` GET narrows to `status='published'` for unauthenticated callers — public can no longer enumerate pending/draft posts via `?status=pending`.
+    • Deleted unauthenticated debug endpoints: `/api/test-insert`, `/api/debug-insert`, `/api/test-x-public`, `/api/admin/test-env`, `/api/admin/test-x-token`. All five let anyone POST garbage rows or leak env state.
+    • Silent-failure paths in `engine.ts` closed: `recordPublishedFingerprint`, `social_ids` updates, and scheduled-fetch errors now flow through `logError()` into `error_logs` instead of `console.error` (which Vercel drops after ~24h).
+    • External API timeouts: AniList 10s, Meta Graph 15s via shared `src/lib/http.ts::fetchWithTimeout`. Without these a hung upstream blocked the whole cron worker.
+    • Schema-drift writes stripped from `custom-post`, `custom-url`, `generate` admin routes (`background_image`, `verification_*`, `twitter_tweet_id`, `studio_name`, `premiere_date` were silently dropped by PostgREST).
+    • Required new env var: `CRON_SECRET` (Vercel Production). Documented in `CLAUDE.md`.
+    • Repo root cleaned: ~140 v1-era debug artifacts deleted, `_archive_pre_rebuild/` migrations removed, `PostManager.tsx.new` orphan removed.
 
 ### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 
