@@ -3,6 +3,8 @@
  * Data fetching layer for KumoLab Blog Automation
  */
 
+import { fetchWithTimeout } from '../http';
+
 const ANILIST_URL = 'https://graphql.anilist.co';
 
 export interface VerificationProvenance {
@@ -86,7 +88,7 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
     };
 
     try {
-        const response = await fetch(ANILIST_URL, {
+        const response = await fetchWithTimeout(ANILIST_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -96,7 +98,7 @@ export async function fetchAniListAiring(startTimestamp: number, endTimestamp: n
                 query,
                 variables
             })
-        });
+        }, 10_000);
 
         if (!response.ok) {
             throw new Error(`AniList API error: ${response.statusText}`);
