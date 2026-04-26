@@ -8,6 +8,10 @@ import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
 /**
  * Unified Cron Handler
  *
+ * Auth: middleware.ts gates this route by Vercel cron header OR
+ * `Authorization: Bearer ${CRON_SECRET}`. The check below is defense in depth
+ * in case the matcher is ever misconfigured.
+ *
  * Workers:
  * - detection:  RSS + YouTube scan
  * - processing: scoring, dedup, post creation + scheduled publishing
@@ -16,7 +20,17 @@ import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
  * - cleanup: 03:00 UTC retention sweep (expired posts, bucket orphans, log TTL)
  */
 
+function isAuthorizedCron(req: NextRequest): boolean {
+    if (req.headers.get('x-vercel-cron') === '1') return true;
+    const secret = process.env.CRON_SECRET;
+    return !!secret && req.headers.get('authorization') === `Bearer ${secret}`;
+}
+
 export async function GET(req: NextRequest) {
+    if (!isAuthorizedCron(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const worker = searchParams.get('worker');
 

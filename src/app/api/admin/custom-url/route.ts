@@ -160,10 +160,9 @@ ${hashtags}
         youtube_embed_url: `https://www.youtube.com/embed/${videoId}`,
         source: channelName,
         source_tier: 1,
-        studio_name: channelName,
-        verification_badge: `${channelName} Official`,
-        verification_score: 90,
         timestamp: new Date().toISOString(),
+        // studio_name, verification_badge, verification_score were dropped from
+        // the v2 posts schema. PostgREST silently ignored them; we now omit them.
     };
 }
 
@@ -175,11 +174,13 @@ async function processXUrl(url: string): Promise<any | null> {
         throw new Error('Could not extract tweet ID from X URL');
     }
 
-    // Check if already exists
+    // Check if already exists. twitter_tweet_id was dropped from v2 schema —
+    // dedup now matches against content (which carries the URL containing the
+    // tweet id) and source_url.
     const { data: existing } = await supabaseAdmin
         .from('posts')
         .select('id')
-        .or(`twitter_tweet_id.eq.${tweetId},content.ilike.%${tweetId}%`)
+        .or(`source_url.eq.${url},content.ilike.%${tweetId}%`)
         .limit(1);
 
     if (existing && existing.length > 0) {
@@ -274,10 +275,12 @@ async function processXUrl(url: string): Promise<any | null> {
         status: 'pending',
         is_published: false,
         image: mediaUrl,
-        twitter_tweet_id: tweetId,
-        twitter_url: url,
+        source_url: url,
         source: `@${username}`,
         source_tier: 2,
         timestamp: new Date().toISOString(),
+        // twitter_tweet_id and twitter_url were dropped from v2 schema. The
+        // source_url field carries the canonical link; that's the authoritative
+        // pointer back to the tweet.
     };
 }

@@ -2,6 +2,7 @@ import { BlogPost } from '@/types';
 import { fetchYouTubeToBucket } from './trailer-fetcher';
 import { publishToTikTok } from './tiktok-publisher';
 import { publishToYouTubeShorts } from './youtube-publisher';
+import { fetchWithTimeout } from '../http';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
@@ -100,7 +101,7 @@ async function publishToInstagram(post: BlogPost): Promise<SocialPublishResult> 
             access_token: META_ACCESS_TOKEN || '',
         });
 
-        const containerRes = await fetch(`${containerUrl}?${containerParams}`, { method: 'POST' });
+        const containerRes = await fetchWithTimeout(`${containerUrl}?${containerParams}`, { method: 'POST' }, 15_000);
         const containerData = await containerRes.json();
 
         if (!containerData.id) {
@@ -117,7 +118,7 @@ async function publishToInstagram(post: BlogPost): Promise<SocialPublishResult> 
         // IG needs ~4s to process the media container before publish.
         await new Promise(r => setTimeout(r, 4000));
 
-        const publishRes = await fetch(`${publishUrl}?${publishParams}`, { method: 'POST' });
+        const publishRes = await fetchWithTimeout(`${publishUrl}?${publishParams}`, { method: 'POST' }, 15_000);
         const publishData = await publishRes.json();
 
         if (publishData.id) {

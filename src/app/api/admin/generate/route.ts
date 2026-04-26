@@ -162,8 +162,8 @@ export async function POST(req: NextRequest) {
                 timestamp: post.timestamp,
                 is_published: post.isPublished, // LIVE if ALERT, else HIDDEN
                 claim_type: post.claimType,
-                premiere_date: post.premiereDate,
-                verification_reason: 'Admin Generated'
+                // premiere_date and verification_reason were dropped from v2.
+                // PostgREST silently ignored them; we now omit.
             }])
             .select()
             .single();

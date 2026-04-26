@@ -14,12 +14,14 @@
 
 import { fetchAniListAiring } from './fetchers';
 import { logSchedulerRun } from '../logging/scheduler';
+import { logError } from '../logging/structured-logger';
 import { generateDailyDropsPost } from './generator';
 import { getPosts } from '../blog';
 import { BlogPost } from '@/types';
 import { supabaseAdmin } from '../supabase/admin';
 import { publishToSocials, SocialPublishResult } from '../social/publisher';
 import { isAutoPublishPaused } from './circuit-breaker';
+import { createFingerprint } from './utils';
 
 // Retention window for Fork 2. Unset / null / NaN → evergreen (Fork 1) behavior.
 function getRetentionExpiry(now: Date): string | null {
@@ -35,22 +37,10 @@ function buildSocialIds(result: SocialPublishResult): Record<string, string> {
     return Object.fromEntries(entries);
 }
 
-function computeFingerprint(title: string, url?: string): string {
-    const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
-    const domain = (url || '').replace(/^https?:\/\//, '').split('/')[0] || '';
-    let hash = 0;
-    const input = normalized + '|' + domain;
-    for (let i = 0; i < input.length; i++) {
-        hash = ((hash << 5) - hash) + input.charCodeAt(i);
-        hash = hash & hash;
-    }
-    return `${normalized.replace(/\s/g, '_').substring(0, 40)}_${Math.abs(hash).toString(36)}`;
-}
-
-async function recordPublishedFingerprint(post: { title: string; source_url?: string | null; anime_id?: string | null; claim_type?: string | null; }) {
+async function recordPublishedFingerprint(post: { id?: string; title: string; source_url?: string | null; anime_id?: string | null; claim_type?: string | null; }) {
     if (!post.title) return;
-    const fp = computeFingerprint(post.title, post.source_url || undefined);
-    await supabaseAdmin.from('seen_fingerprints').upsert({
+    const fp = createFingerprint(post.title, post.source_url || '');
+    const { error } = await supabaseAdmin.from('seen_fingerprints').upsert({
         fingerprint: fp,
         anime_id: post.anime_id ?? null,
         claim_type: post.claim_type ?? null,
@@ -58,6 +48,37 @@ async function recordPublishedFingerprint(post: { title: string; source_url?: st
         source_url: post.source_url ?? null,
         seen_at: new Date().toISOString(),
     }, { onConflict: 'fingerprint' });
+
+    if (error) {
+        await logError({
+            source: 'engine.publish',
+            errorMessage: `seen_fingerprints upsert failed: ${error.message}`,
+            context: { post_id: post.id, title: post.title, code: error.code },
+        });
+    }
+}
+
+// Persist the social IDs onto the post row. Surfaces failures so we don't end up
+// with published posts that have no record of their downstream platform IDs.
+async function persistSocialIds(
+    target: { column: 'id' | 'slug'; value: string; title: string },
+    social: SocialPublishResult,
+): Promise<void> {
+    const ids = buildSocialIds(social);
+    if (Object.keys(ids).length === 0) return;
+
+    const { error } = await supabaseAdmin
+        .from('posts')
+        .update({ social_ids: ids })
+        .eq(target.column, target.value);
+
+    if (error) {
+        await logError({
+            source: 'engine.publish',
+            errorMessage: `social_ids update failed: ${error.message}`,
+            context: { [target.column]: target.value, title: target.title, ids, code: error.code },
+        });
+    }
 }
 
 /**
@@ -161,16 +182,16 @@ async function publishPost(post: BlogPost) {
     let social: SocialPublishResult = {};
     try {
         social = await publishToSocials(post);
-    } catch (e) {
-        console.warn('[Engine] Social broadcast failed:', e);
+    } catch (e: any) {
+        await logError({
+            source: 'engine.publishPost',
+            errorMessage: `Social broadcast threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { slug: post.slug, title: post.title },
+        });
     }
 
-    if (Object.keys(social).length > 0) {
-        await supabaseAdmin
-            .from('posts')
-            .update({ social_ids: buildSocialIds(social) })
-            .eq('slug', post.slug);
-    }
+    await persistSocialIds({ column: 'slug', value: post.slug, title: post.title }, social);
 
     await recordPublishedFingerprint({
         title: post.title,
@@ -214,7 +235,11 @@ export async function publishScheduledPosts() {
         .lte('scheduled_post_time', now.toISOString());
 
     if (error) {
-        console.error('[Publisher] Error fetching scheduled posts:', error);
+        await logError({
+            source: 'engine.publishScheduledPosts',
+            errorMessage: `Failed to fetch scheduled posts: ${error.message}`,
+            context: { code: error.code },
+        });
         return;
     }
 
@@ -243,7 +268,11 @@ export async function publishScheduledPosts() {
                 .eq('id', post.id);
 
             if (updateError) {
-                console.error(`[Publisher] Failed to update post ${post.id}:`, updateError);
+                await logError({
+                    source: 'engine.publishScheduledPosts',
+                    errorMessage: `Status flip failed for post ${post.id}: ${updateError.message}`,
+                    context: { post_id: post.id, title: post.title, code: updateError.code },
+                });
                 continue;
             }
 
@@ -251,18 +280,19 @@ export async function publishScheduledPosts() {
             let social: SocialPublishResult = {};
             try {
                 social = await publishToSocials(post as BlogPost);
-            } catch (e) {
-                console.warn(`[Publisher] Social broadcast failed for ${post.title}:`, e);
+            } catch (e: any) {
+                await logError({
+                    source: 'engine.publishScheduledPosts',
+                    errorMessage: `Social broadcast threw for ${post.title}: ${e?.message || e}`,
+                    stackTrace: e?.stack,
+                    context: { post_id: post.id, title: post.title },
+                });
             }
 
-            if (Object.keys(social).length > 0) {
-                await supabaseAdmin
-                    .from('posts')
-                    .update({ social_ids: buildSocialIds(social) })
-                    .eq('id', post.id);
-            }
+            await persistSocialIds({ column: 'id', value: post.id, title: post.title }, social);
 
             await recordPublishedFingerprint({
+                id: post.id,
                 title: post.title,
                 source_url: post.source_url ?? null,
                 anime_id: post.anime_id ?? null,
@@ -279,8 +309,13 @@ export async function publishScheduledPosts() {
             }
 
             console.log(`[Publisher] Successfully published: ${post.title}`);
-        } catch (e) {
-            console.error(`[Publisher] Error publishing post ${post.title}:`, e);
+        } catch (e: any) {
+            await logError({
+                source: 'engine.publishScheduledPosts',
+                errorMessage: `Unhandled exception publishing ${post.title}: ${e?.message || e}`,
+                stackTrace: e?.stack,
+                context: { post_id: post.id, title: post.title },
+            });
         }
     }
 }

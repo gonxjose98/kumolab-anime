@@ -147,17 +147,10 @@ export async function POST(req: NextRequest) {
             postData.image = finalImageUrl;
         }
 
-        if (imageSettings) {
-            try {
-                postData.image_settings = JSON.parse(imageSettings);
-            } catch (e) {
-                console.error('Failed to parse imageSettings:', e);
-            }
-        }
-
-        if (backgroundImageUrl) {
-            postData.background_image = backgroundImageUrl;
-        }
+        // image_settings + background_image were dropped from posts in the v2
+        // schema. They live only in pre-render image-processor inputs now,
+        // not as persisted columns. PostgREST silently ignored them; we now
+        // simply don't write them.
 
         // Deployment Logic: Use user's choice for website publication
         // For NEW posts, use the toggle value (default false unless Confirmation Alert)
