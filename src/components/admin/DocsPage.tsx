@@ -81,25 +81,28 @@ Social signals. Always require review.
         content: `## Post Approval Lifecycle
 
 \`\`\`
-Scraped → Detection Candidate → Processing → Pending Post
-                                                   ↓
-                                    ┌── Approved → Scheduled → Published
-                                    └── Declined → declined_posts table
+Detected → Detection Candidate → Processing → Decision Engine
+                                                     ↓
+                          ┌── AUTO_APPROVE → Scheduled → Published
+                          ├── QUEUE_FOR_REVIEW → Pending (admin approves)
+                          └── REJECT → seen_fingerprints (origin=declined)
 \`\`\`
 
 ### Status Flow
 1. **Pending** — Awaiting admin review in the Post Manager
-2. **Approved** — Admin clicked approve; auto-scheduled to next available time slot
-3. **Published** — Cron job published at scheduled time; live on site
-4. **Declined** — Rejected; tracked in \`declined_posts\` for deduplication
+2. **Approved** — Auto-approved by decision engine OR admin clicked approve; auto-scheduled
+3. **Published** — Publisher cron picked it up at scheduled_post_time; live on site
+4. **Rejected / declined** — Fingerprint written to \`seen_fingerprints\` so the detection worker never re-detects it
 
-### Auto-Approval Rules
-- T1 YouTube trailers with score >= 7 can be auto-approved
-- Daily Drops (AniList airing episodes) are auto-published at 6 AM EST
+### Auto-Approval Rules (decision engine)
+- TRAILER_DROP must have an embedded video; everything else must have an image
+- T1 YouTube + score ≥ 7 → auto-approve shortcut (self-verifying)
+- T1/T2 visual + image → auto-approve when claim risk allows
+- Medium-risk claims need ≥2 distinct sources within 12h
+- Tone/safety AI pass guards brand voice on the way out
 
-### Time Slots (EST)
-Posts are scheduled to 4 daily slots: **10:00 AM, 2:00 PM, 6:00 PM, 9:00 PM**
-If all slots are filled, the post rolls to the next day at 10:00 AM.`,
+### Scheduler
+Lanes: BREAKING / STANDARD / FILL. 25-min minimum gap between consecutive posts on the same platform. Per-platform peak windows in \`automation-config.ts\`.`,
     },
     {
         id: 'agents',
