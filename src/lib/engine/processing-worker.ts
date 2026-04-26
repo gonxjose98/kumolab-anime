@@ -21,6 +21,7 @@ import { AntigravityAI } from './ai';
 import { decideAutoApproval } from './auto-approval';
 import { assignScheduledSlot } from './scheduler';
 import { evaluateCircuitBreaker } from './circuit-breaker';
+import { extractYouTubeVideo } from './video-extractor';
 
 // ─── Japanese Detection ────────────────────────────────────────
 
@@ -240,6 +241,30 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
 
     const isT1YouTube = candidate.source_tier === 1 && !!candidate.source_name?.toLowerCase().includes('youtube');
 
+    // ── Video extraction for trailer claims ──────────────────
+    // A TRAILER_DROP post must actually embed the trailer — we never publish a
+    // "trailer" post that has no video. If we can't extract a YouTube ID from
+    // the source URL or article HTML, the auto-approval gate routes to review.
+    let hasVideo = false;
+    if (post.claim_type === 'TRAILER_DROP') {
+      const video = await extractYouTubeVideo({
+        source_url: candidate.source_url,
+        canonical_url: candidate.canonical_url,
+        content: candidate.content,
+        title: candidate.title,
+      });
+      if (video) {
+        post.youtube_video_id = video.youtube_video_id;
+        post.youtube_url = video.youtube_url;
+        post.youtube_embed_url = video.youtube_embed_url;
+        // Use the YouTube thumbnail as the post image when we have nothing else.
+        if (!hasImage) {
+          post.image = `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
+        }
+        hasVideo = true;
+      }
+    }
+
     // ── v2 decision pipeline ────────────────────────────────
     const decision = await decideAutoApproval({
       title: post.title,
@@ -250,6 +275,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       source_name: candidate.source_name,
       score: score.total,
       hasImage,
+      hasVideo,
       isT1YouTube,
     });
 
