@@ -232,6 +232,10 @@ Required in Vercel for production (after Phase 1 cutover):
 - `KIMI_API_KEY` (primary) — or `OPENAI_API_KEY` as fallback
 - Optional: `KIMI_MODEL` (default `kimi-k2.5`), `OPENAI_MODEL`
 
+**Auth / security:**
+- `CRON_SECRET` — required. Random 32+ char string. Used by `middleware.ts` and `/api/cron/route.ts` for `Authorization: Bearer ${CRON_SECRET}` fallback when not running under Vercel cron. Set in Vercel Production env.
+  - Vercel cron itself sets `x-vercel-cron: 1` automatically; the bearer token is for manual / GitHub-Actions invocations.
+
 **Other (existing):** `PRINTFUL_ACCESS_TOKEN`, `STRIPE_SECRET_KEY`, `YOUTUBE_API_KEY`, `X_BEARER_TOKEN` (X publish is deferred; these stay for other uses)
 
 Local dev: keys live in `.env.local` (gitignored). Human-readable reference at `.credentials/supabase.md` (also gitignored).
@@ -252,6 +256,7 @@ Local dev: keys live in `.env.local` (gitignored). Human-readable reference at `
 - **No attribution-in-copy** — posts assert claims in KumoLab's voice. Accuracy enforced upstream (multi-source + AniList + tone check), not by "per @source" wording.
 - **Circuit breaker is the sole brake** — no dead-man switch. 3 declines in 24h → 6h pause. Manual reset via `manualResetCircuitBreaker()`.
 - **Cron routing** — All crons route through `src/app/api/cron/route.ts`. No parallel entry points.
+- **Auth surface** — `src/middleware.ts` is the single chokepoint for API auth. `/api/cron/*` requires Vercel cron header or `CRON_SECRET` bearer. `/api/admin/*` requires a valid Supabase session (validated server-side via `getUser()`, not just cookie presence). Page routes under `/admin/*` are gated independently in their layout.tsx server components. Don't reintroduce unauthenticated `test-env` / `test-x-token` style debug endpoints.
 
 ---
 
