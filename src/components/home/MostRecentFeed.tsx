@@ -217,14 +217,15 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
 
                     const cardInner = (
                         <>
-                            {/* YouTube iframe when playing */}
+                            {/* YouTube iframe when playing — full controls + fullscreen + native scrubbing */}
                             {isYouTube && isPlaying && (
                                 <iframe
-                                    src={`https://www.youtube.com/embed/${(videoInfo as any).videoId}?autoplay=1&rel=0&modestbranding=1`}
+                                    src={`https://www.youtube.com/embed/${(videoInfo as any).videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
                                     title={post.title}
                                     frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
                                     allowFullScreen
+                                    referrerPolicy="strict-origin-when-cross-origin"
                                     className={styles.videoIframe}
                                 />
                             )}

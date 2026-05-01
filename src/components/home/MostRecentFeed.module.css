@@ -83,6 +83,7 @@
 .cardGradient {
     position: absolute;
     inset: 0;
+    pointer-events: none; /* purely decorative — must not steal clicks from card content */
     background: linear-gradient(
         180deg,
         rgba(6, 6, 14, 0.3) 0%,
