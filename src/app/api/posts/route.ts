@@ -94,7 +94,11 @@ export async function PUT(req: NextRequest) {
         );
 
         // Only allow safe fields to be updated
-        const allowedFields = ['status', 'is_published', 'scheduled_post_time', 'title', 'content', 'image', 'type', 'timestamp'];
+        const allowedFields = [
+            'status', 'is_published', 'scheduled_post_time',
+            'title', 'content', 'excerpt', 'image', 'type',
+            'source_url', 'timestamp', 'claim_type',
+        ];
         const safeUpdates: Record<string, any> = {};
         for (const key of allowedFields) {
             if (key in updates) {
