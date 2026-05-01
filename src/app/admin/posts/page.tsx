@@ -1,20 +1,12 @@
-import PostManager from '@/components/admin/PostManager';
-import { fromDbPosts } from '@/lib/posts/normalize';
+import PostsList from '@/components/admin/posts/PostsList';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Posts manager — full list + status filter + edit + image manipulation +
- * AI Assist. Single screen for everything you'd ever do to a post.
- *
- * RLS is enabled on every table with no anon policies, so reads go through
- * supabaseAdmin (service role) the same way the dashboard does.
- */
 export default async function PostsPage() {
     const { data, error } = await supabaseAdmin
         .from('posts')
-        .select('*')
+        .select('id, title, slug, status, claim_type, source, image, youtube_video_id, timestamp, published_at, scheduled_post_time')
         .order('timestamp', { ascending: false })
         .limit(500);
 
@@ -28,6 +20,5 @@ export default async function PostsPage() {
         );
     }
 
-    const posts = fromDbPosts(data || []);
-    return <PostManager initialPosts={posts} />;
+    return <PostsList initialPosts={data || []} />;
 }
