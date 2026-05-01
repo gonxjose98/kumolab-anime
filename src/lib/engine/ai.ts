@@ -280,6 +280,71 @@ Do not wrap in quotes or code blocks.`
     }
 
     /**
+     * Generates a 1–2 sentence KumoLab-voice caption for a post. Replaces the
+     * truncated raw RSS description we used to dump into `excerpt`. Different
+     * claim types get different hooks (trailer = "why you should care", season
+     * confirmation = the news in plain terms, etc.).
+     *
+     * Returns the caption string. Always under 200 chars. Falls back to a
+     * sanitized version of the source content on any failure so the post still
+     * has *something* readable.
+     */
+    public async generateCaption(params: {
+        title: string;
+        content: string;
+        claim_type?: string | null;
+    }): Promise<string> {
+        const { title, content, claim_type } = params;
+        const claim = (claim_type || 'OTHER').toUpperCase();
+
+        const claimGuide: Record<string, string> = {
+            TRAILER_DROP:         'Trailer hook — say what landed and why fans should watch (atmosphere, key moment, studio).',
+            NEW_KEY_VISUAL:       'Visual reveal — describe the mood / aesthetic in one beat. No hedging on the studio name.',
+            NEW_SEASON_CONFIRMED: 'Season confirmation — state the season # and source plainly. Add one beat of context (lead-up, gap since last season).',
+            DATE_ANNOUNCED:       'Release date — lead with the date. Add platform / streamer if known.',
+            DELAY:                'Delay — state the new window plainly, no editorializing.',
+            CAST_ADDITION:        'Cast — name the actor + role.',
+            STAFF_UPDATE:         'Staff — name the role + person.',
+        };
+        const guide = claimGuide[claim] || 'Lead with the news in one beat. KumoLab voice.';
+
+        const messages = [
+            {
+                role: 'system',
+                content: `You write captions for KumoLab, an anime news brand. Sharp, culturally fluent, never corporate, never cringe. Posts assert claims in KumoLab's own voice — no "per @source" attribution, no hedging.
+
+Write a 1–2 sentence caption (max 180 chars total) for the post below. ${guide}
+
+Rules:
+- No emojis.
+- No hashtags.
+- No "Crunchyroll reportedly" or "according to" phrasing.
+- Don't repeat the title verbatim — the caption is a hook, not a summary.
+- If the content is thin, say something true and tight rather than padding.
+
+Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
+            },
+            {
+                role: 'user',
+                content: `Title: ${title}\n\nContext: ${content.substring(0, 1500)}`,
+            },
+        ];
+
+        try {
+            const result = await this.sendCompletionRequest(messages, false);
+            const raw = result.choices?.[0]?.message?.content?.trim();
+            if (!raw) throw new Error('empty caption');
+            // Strip wrapping quotes if the model added them anyway.
+            const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+            return cleaned.length > 200 ? cleaned.substring(0, 197).trim() + '…' : cleaned;
+        } catch (e: any) {
+            console.warn('[AntigravityAI] generateCaption failed, falling back to truncated content:', e?.message || e);
+            const fallback = content.replace(/\s+/g, ' ').trim().substring(0, 180);
+            return fallback ? `${fallback}…` : title;
+        }
+    }
+
+    /**
      * Tone + safety gate for auto-publish. Runs AFTER the post copy is drafted,
      * BEFORE it enters the scheduled queue. Returns structured booleans so the
      * auto-approval engine can decide to publish or defer to human review.
