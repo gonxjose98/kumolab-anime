@@ -4,6 +4,7 @@ import { publishToTikTok } from './tiktok-publisher';
 import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
 import { buildSocialHashtags } from './hashtags';
+import { logError } from '../logging/structured-logger';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
@@ -35,7 +36,11 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
     const result: SocialPublishResult = {};
 
     if (process.env.AUTO_PUBLISH_SOCIALS !== 'true') {
-        console.warn(`⚠️ [Social] Auto-publish disabled. Skipping broadcast for: ${post.title}`);
+        await logError({
+            source: 'publisher.ig',
+            errorMessage: 'AUTO_PUBLISH_SOCIALS is not "true" — skipping broadcast',
+            context: { post_id: (post as any).id, slug: post.slug },
+        });
         return result;
     }
 
@@ -44,11 +49,29 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         try {
             const igResult = await publishToInstagram(post);
             Object.assign(result, igResult);
+            // If the publisher returned without an instagram_id it failed
+            // silently — record that, otherwise it stays invisible.
+            if (!igResult.instagram_id) {
+                await logError({
+                    source: 'publisher.ig',
+                    errorMessage: 'IG broadcast returned no instagram_id (see prior logError for Meta error detail)',
+                    context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                });
+            }
         } catch (e: any) {
-            console.error('[Social] IG publish threw:', e.message);
+            await logError({
+                source: 'publisher.ig',
+                errorMessage: `IG publish threw: ${e?.message || e}`,
+                stackTrace: e?.stack,
+                context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+            });
         }
     } else {
-        console.warn('[Social] Meta credentials missing — skipping IG');
+        await logError({
+            source: 'publisher.ig',
+            errorMessage: 'Meta credentials missing — META_ACCESS_TOKEN or META_IG_ID not set',
+            context: { has_token: !!META_ACCESS_TOKEN, has_ig_id: !!IG_USER_ID },
+        });
     }
 
     // ── 2. Video platforms for TRAILER_DROP only ───────────────
@@ -116,7 +139,15 @@ async function publishToInstagram(post: BlogPost): Promise<SocialPublishResult> 
         const containerData = await containerRes.json();
 
         if (!containerData.id) {
-            console.error('❌ [Instagram] Failed Container Phase:', containerData);
+            const meta = containerData?.error || {};
+            const reason = meta.code === 190
+                ? `IG token expired/invalid (Meta code 190): ${meta.message || 'session expired'}`
+                : `IG container creation failed: ${meta.message || JSON.stringify(containerData).substring(0, 300)}`;
+            await logError({
+                source: 'publisher.ig.container',
+                errorMessage: reason,
+                context: { post_slug: post.slug, post_title: post.title, meta_code: meta.code, meta_subcode: meta.error_subcode },
+            });
             return result;
         }
 
@@ -137,10 +168,23 @@ async function publishToInstagram(post: BlogPost): Promise<SocialPublishResult> 
             result.instagram_url = `https://instagram.com/p/${publishData.id}`;
             console.log(`✅ [Instagram] Published: ${publishData.id} (Meta Suite will cross-post to FB + Threads)`);
         } else {
-            console.error('❌ [Instagram] Failed Publish Phase:', publishData);
+            const meta = publishData?.error || {};
+            const reason = meta.code === 190
+                ? `IG token expired/invalid (Meta code 190): ${meta.message || 'session expired'}`
+                : `IG publish phase failed: ${meta.message || JSON.stringify(publishData).substring(0, 300)}`;
+            await logError({
+                source: 'publisher.ig.publish',
+                errorMessage: reason,
+                context: { post_slug: post.slug, post_title: post.title, meta_code: meta.code, meta_subcode: meta.error_subcode },
+            });
         }
     } catch (e: any) {
-        console.error('❌ [Instagram] Error:', e.message);
+        await logError({
+            source: 'publisher.ig.publish',
+            errorMessage: `IG fetch/publish threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { post_slug: post.slug, post_title: post.title },
+        });
     }
 
     return result;
