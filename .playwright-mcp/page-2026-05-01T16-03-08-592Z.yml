@@ -1,0 +1,39 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link "KumoLab Home" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img "KumoLab" [ref=e5]
+      - generic [ref=e6]:
+        - button "Switch to dark mode" [ref=e7] [cursor=pointer]:
+          - img [ref=e8]
+        - generic [ref=e10]:
+          - button "Open menu" [ref=e11] [cursor=pointer]
+          - generic:
+            - generic:
+              - link "Home ホーム":
+                - /url: /
+                - generic: Home
+                - generic: ホーム
+              - link "Blog ブログ":
+                - /url: /blog
+                - generic: Blog
+                - generic: ブログ
+              - link "Merch グッズ":
+                - /url: /merch
+                - generic: Merch
+                - generic: グッズ
+              - link "About 概要":
+                - /url: /about
+                - generic: About
+                - generic: 概要
+  - main [ref=e15]
+  - contentinfo [ref=e19]:
+    - link "K KUMOLAB クモラボ" [ref=e20] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e22]: K
+      - generic [ref=e23]: KUMOLAB
+      - generic [ref=e24]: クモラボ
+    - paragraph [ref=e25]: Your Anime Intelligence Hub — Verified · Real-Time · Always On
+    - generic [ref=e26]: © 2026 KumoLab. All rights reserved.
+  - alert [ref=e27]

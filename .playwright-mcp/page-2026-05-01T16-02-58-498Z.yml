@@ -1,0 +1,199 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link "KumoLab Home" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img "KumoLab" [ref=e5]
+      - generic [ref=e6]:
+        - button "Switch to dark mode" [ref=e7] [cursor=pointer]:
+          - img [ref=e8]
+        - generic [ref=e10]:
+          - button "Open menu" [ref=e11] [cursor=pointer]
+          - generic:
+            - generic:
+              - link "Home ホーム":
+                - /url: /
+                - generic: Home
+                - generic: ホーム
+              - link "Blog ブログ":
+                - /url: /blog
+                - generic: Blog
+                - generic: ブログ
+              - link "Merch グッズ":
+                - /url: /merch
+                - generic: Merch
+                - generic: グッズ
+              - link "About 概要":
+                - /url: /about
+                - generic: About
+                - generic: 概要
+  - main [ref=e15]:
+    - generic [ref=e17]:
+      - generic [ref=e20]: ライブ — Live Intelligence Feed
+      - heading "Your Anime Intelligence Hub" [level=1] [ref=e21]:
+        - text: Your Anime
+        - text: Intelligence Hub
+      - generic [ref=e22]: アニメ・インテリジェンス・ハブ
+      - paragraph [ref=e23]: Real-time tracking of every anime announcement, trailer drop, and industry move. Verified intel. Zero noise.
+      - generic [ref=e24]:
+        - link "View Today's Drops" [ref=e25] [cursor=pointer]:
+          - /url: /latest-daily-drop
+          - generic [ref=e26]: View Today's Drops
+        - link "Explore Feed →" [ref=e27] [cursor=pointer]:
+          - /url: /blog
+          - generic [ref=e30]: Explore Feed →
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e39]: 本日
+        - generic [ref=e40]:
+          - generic [ref=e41]: ⬡
+          - generic [ref=e42]: —
+          - generic [ref=e43]: Today's Drops
+      - generic [ref=e44]:
+        - generic [ref=e47]: トレンド
+        - generic [ref=e48]:
+          - generic [ref=e49]: ◈
+          - generic [ref=e50]: —
+          - generic [ref=e51]: Trending
+      - generic [ref=e52]:
+        - generic [ref=e55]: 確認済み
+        - generic [ref=e56]:
+          - generic [ref=e57]: △
+          - generic [ref=e58]: —
+          - generic [ref=e59]: Verified This Week
+    - generic [ref=e60]:
+      - generic [ref=e61]:
+        - generic [ref=e62]: ◉ 最新 — Most Recent
+        - generic [ref=e63]:
+          - heading "Most Recent" [level=2] [ref=e64]
+          - generic [ref=e65]: Swipe to discover
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - button "Play video" [ref=e68] [cursor=pointer]:
+            - img [ref=e70]
+          - generic [ref=e74]: INTEL
+          - generic [ref=e75]:
+            - img [ref=e76]
+            - text: VIDEO
+          - generic [ref=e78]: 01/08
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: YouTube_Crunchyroll
+              - generic [ref=e82]: 2m ago
+            - heading "That Wasn't a Compliment | Classroom of the Elite Season 4" [level=3] [ref=e83]
+            - link "View full post →" [ref=e84] [cursor=pointer]:
+              - /url: /blog/that-wasnt-a-compliment-classroom-of-the-elite-season-4-mon248bn
+        - generic [ref=e85]:
+          - button "Play video" [ref=e86] [cursor=pointer]:
+            - img [ref=e88]
+          - generic [ref=e92]: INTEL
+          - generic [ref=e93]:
+            - img [ref=e94]
+            - text: VIDEO
+          - generic [ref=e96]: 02/08
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]: YouTube_Aniplex USA
+              - generic [ref=e100]: 1h ago
+            - heading "The Irregular at Magic High School | \"Magic High in 3 Minutes\" — Season 3 Double Seven Arc" [level=3] [ref=e101]
+            - link "View full post →" [ref=e102] [cursor=pointer]:
+              - /url: /blog/the-irregular-at-magic-high-school-quotmagic-high-in-3-minutesquot--season-3-dou-mon02pjt
+        - generic [ref=e103]:
+          - button "Play video" [ref=e104] [cursor=pointer]:
+            - img [ref=e106]
+          - generic [ref=e110]: INTEL
+          - generic [ref=e111]:
+            - img [ref=e112]
+            - text: VIDEO
+          - generic [ref=e114]: 03/08
+          - generic [ref=e115]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: YouTube_Crunchyroll
+              - generic [ref=e118]: 2h ago
+            - heading "Subaru is Whipped | Re:ZERO -Starting Life in Another World- Season 4" [level=3] [ref=e119]
+            - link "View full post →" [ref=e120] [cursor=pointer]:
+              - /url: /blog/subaru-is-whipped-rezero--starting-life-in-another-world--season-4-momy05lb
+        - generic [ref=e121]:
+          - button "Play video" [ref=e122] [cursor=pointer]:
+            - img [ref=e124]
+          - generic [ref=e128]: INTEL
+          - generic [ref=e129]:
+            - img [ref=e130]
+            - text: VIDEO
+          - generic [ref=e132]: 04/08
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]: YouTube_Crunchyroll
+              - generic [ref=e136]: 12h ago
+            - 'heading "Argent Light | Wistoria: Wand and Sword Season 2" [level=3] [ref=e137]'
+            - link "View full post →" [ref=e138] [cursor=pointer]:
+              - /url: /blog/argent-light-wistoria-wand-and-sword-season-2-mog70f32
+        - generic [ref=e139]:
+          - button "Play video" [ref=e140] [cursor=pointer]:
+            - img [ref=e142]
+          - generic [ref=e146]: INTEL
+          - generic [ref=e147]:
+            - img [ref=e148]
+            - text: VIDEO
+          - generic [ref=e150]: 05/08
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]: YouTube_Crunchyroll
+              - generic [ref=e154]: 5d ago
+            - heading "Smoking Behind the Supermarket with You | Official Trailer" [level=3] [ref=e155]
+            - link "View full post →" [ref=e156] [cursor=pointer]:
+              - /url: /blog/smoking-behind-the-supermarket-with-you-official-trailer-crunchyroll-mofnq062
+        - generic [ref=e157]:
+          - button "Play video" [ref=e158] [cursor=pointer]:
+            - img [ref=e160]
+          - generic [ref=e164]: INTEL
+          - generic [ref=e165]:
+            - img [ref=e166]
+            - text: VIDEO
+          - generic [ref=e168]: 06/08
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: YouTube_Crunchyroll
+              - generic [ref=e172]: 5d ago
+            - 'heading "Reborn as a Space Mercenary: I Woke Up Piloting the Strongest Starship! | Official Trailer" [level=3] [ref=e173]'
+            - link "View full post →" [ref=e174] [cursor=pointer]:
+              - /url: /blog/reborn-as-a-space-mercenary-i-woke-up-piloting-the-strongest-starship-official-t-mofnpzsm
+        - generic [ref=e175]:
+          - button "Play video" [ref=e176] [cursor=pointer]:
+            - img [ref=e178]
+          - generic [ref=e182]: INTEL
+          - generic [ref=e183]:
+            - img [ref=e184]
+            - text: VIDEO
+          - generic [ref=e186]: 07/08
+          - generic [ref=e187]:
+            - generic [ref=e188]:
+              - generic [ref=e189]: YouTube_Crunchyroll
+              - generic [ref=e190]: 5d ago
+            - heading "The World's Finest Assassin Gets Reincarnated in Another World Season 2 | Official Trailer" [level=3] [ref=e191]
+            - link "View full post →" [ref=e192] [cursor=pointer]:
+              - /url: /blog/the-worlds-finest-assassin-gets-reincarnated-in-another-world-season-2-official--mofnq0tp
+        - generic [ref=e193]:
+          - button "Play video" [ref=e194] [cursor=pointer]:
+            - img [ref=e196]
+          - generic [ref=e200]: INTEL
+          - generic [ref=e201]:
+            - img [ref=e202]
+            - text: VIDEO
+          - generic [ref=e204]: 08/08
+          - generic [ref=e205]:
+            - generic [ref=e206]:
+              - generic [ref=e207]: YouTube_Crunchyroll
+              - generic [ref=e208]: 5d ago
+            - heading "Hanaori-san Still Wants to Fight in the Next Life | Official Trailer" [level=3] [ref=e209]
+            - link "View full post →" [ref=e210] [cursor=pointer]:
+              - /url: /blog/hanaori-san-still-wants-to-fight-in-the-next-life-official-trailer-crunchyroll-mofnq0eg
+  - contentinfo [ref=e211]:
+    - link "K KUMOLAB クモラボ" [ref=e212] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e214]: K
+      - generic [ref=e215]: KUMOLAB
+      - generic [ref=e216]: クモラボ
+    - paragraph [ref=e217]: Your Anime Intelligence Hub — Verified · Real-Time · Always On
+    - generic [ref=e218]: © 2026 KumoLab. All rights reserved.
+  - alert [ref=e219]
