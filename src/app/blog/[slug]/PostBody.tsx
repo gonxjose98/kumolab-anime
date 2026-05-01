@@ -159,8 +159,12 @@ export default function PostBody({ slug }: { slug: string }) {
         <article className={styles.container}>
             <ArticleJsonLd post={post} />
 
-            {/* Hero image (skip for Twitter posts — the embed IS the hero) */}
-            {post.image && !isTwitterPost && (
+            {/* Hero image — skip for Twitter posts (embed IS the hero) and
+                YouTube posts (the video iframe below IS the hero, no point
+                showing a thumbnail-with-overlay-text above it). For YouTube
+                posts we let the video section be the centerpiece and the
+                clean h1 below tells the user what they're about to watch. */}
+            {post.image && !isTwitterPost && !post.youtube_video_id && (
                 <div className={styles.heroImage}>
                     <img
                         src={post.image}
