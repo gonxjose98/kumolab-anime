@@ -187,16 +187,17 @@ export default function PostBody({ slug }: { slug: string }) {
                 </h1>
             </div>
 
-            {/* YouTube Video Embed */}
+            {/* YouTube Video Embed — full native controls (rewind, fullscreen, captions) */}
             {post.youtube_video_id && (
                 <div className={styles.videoSection}>
                     <div className={styles.videoWrapper}>
                         <iframe
-                            src={`https://www.youtube.com/embed/${post.youtube_video_id}?rel=0`}
+                            src={`https://www.youtube.com/embed/${post.youtube_video_id}?rel=0&modestbranding=1&playsinline=1`}
                             title={post.title}
                             frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
                             allowFullScreen
+                            referrerPolicy="strict-origin-when-cross-origin"
                             className={styles.videoIframe}
                         />
                     </div>

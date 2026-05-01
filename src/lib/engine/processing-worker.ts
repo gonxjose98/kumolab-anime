@@ -140,6 +140,45 @@ function extractAnimeName(title: string, content: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Deterministic title scrub before the AI formatter sees it. Strips channel
+ * suffixes, leading garbage, and de-shouts ALL-CAPS chunks so the formatter
+ * has clean material instead of "Magic High in 3 Minutes" -SEASON 3 DOUBLE
+ * SEVEN ARC" style noise.
+ */
+function preCleanTitle(raw: string): string {
+  if (!raw) return raw;
+  let t = raw;
+
+  // Strip trailing channel/source suffixes that show up on YouTube uploads
+  // ("X | Crunchyroll", "X | Aniplex USA", "X | TOHO animation", etc.)
+  t = t.replace(/\s*\|\s*(crunchyroll(?:\s+dubs)?|aniplex(?:\s+usa)?|toho(?:\s+animation)?|netflix(?:\s+anime)?|kadokawa(?:anime)?|mappa(?:\s+(?:official|channel))?|cloverworks|a-?1\s+pictures(?:\s+channel)?|viz\s*media|pony\s*canyon|funimation|hidive)\s*$/i, '');
+
+  // Drop common bracketed/parenthesized noise: [SUB], [DUB], [ANIME], (Sub), (Official), etc.
+  t = t.replace(/\s*[\[\(]\s*(sub|dub|subtitled|dubbed|english|en|jp|japanese|official|anime|spoiler|spoilers?free)\s*[\]\)]\s*/gi, ' ');
+
+  // Strip leading "RE-", "PV-", "FULL-", "WATCH-" style prefixes joined by hyphens
+  t = t.replace(/^\s*(re|pv|cm|full|watch|new|exclusive)[\s-]+(?=[A-Z0-9])/i, '');
+
+  // Hyphen glued to ALL-CAPS chunk: "X -SEASON 3" → "X — Season 3"
+  t = t.replace(/\s+-([A-Z][A-Z0-9 ]{2,})/g, ' — $1');
+
+  // Strip wrapping straight/smart quotes around the whole thing
+  t = t.replace(/^["'""'']\s*|\s*["'""'']$/g, '').trim();
+
+  // De-shout: only multi-word ALL-CAPS runs ("DOUBLE SEVEN ARC", "FINAL
+  // ARC TRAILER") → Title Case. Single-word ALL-CAPS is preserved so
+  // legitimate acronyms (TYBW, OVA, OP, ED, S2, MAPPA) survive.
+  t = t.replace(/\b[A-Z][A-Z0-9]{1,}(?:\s+[A-Z][A-Z0-9]{1,})+\b/g, (chunk) => {
+    return chunk.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  });
+
+  // Collapse repeated whitespace + trailing punctuation noise
+  t = t.replace(/\s{2,}/g, ' ').replace(/[\s—–-]+$/g, '').trim();
+
+  return t || raw;
+}
+
 function determineClaimType(title: string, content: string, sourceName?: string): string {
   const combined = (title + ' ' + content).toLowerCase();
   // Only allow TRAILER_DROP from sources where the extractor can actually surface
@@ -498,7 +537,11 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
           }
         }
 
-        // ─── Format title to KumoLab standard ──────────────
+        // ─── Pre-clean + format title to KumoLab standard ──────────────
+        // Pre-clean strips channel suffixes / quotes / bracketed noise / shouty
+        // ALL-CAPS BEFORE the AI sees it, so the formatter doesn't have to
+        // wrestle with "Title" -SEASON 3 DOUBLE SEVEN ARC" style cruft.
+        candidate.title = preCleanTitle(candidate.title);
         try {
           const ai = AntigravityAI.getInstance();
           const formattedTitle = await ai.formatKumoLabTitle(candidate.title, candidate.content);
