@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import AdminHeader from '@/components/admin/AdminHeader';
 import GalaxyBackground from '@/components/shared/GalaxyBackground';
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminPostsLayout({ children }: { children: React.ReactNode }) {
     const cookieStore = await cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
