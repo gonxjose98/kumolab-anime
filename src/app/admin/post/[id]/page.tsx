@@ -1,384 +1,498 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import PostAnalytics from '@/components/admin/PostAnalytics';
+interface Settings {
+    applyText: boolean;
+    applyGradient: boolean;
+    applyWatermark: boolean;
+    gradientPosition: 'top' | 'bottom';
+}
+
+const DEFAULT_SETTINGS: Settings = {
+    applyText: true,
+    applyGradient: true,
+    applyWatermark: true,
+    gradientPosition: 'bottom',
+};
 
 export default function PostEditor() {
     const params = useParams();
     const id = params?.id as string;
+    const router = useRouter();
+
     const [post, setPost] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [busy, setBusy] = useState<null | 'save' | 'render' | 'approve' | 'decline' | 'delete'>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [imageError, setImageError] = useState<string | null>(null);
+
+    // Editable fields
     const [title, setTitle] = useState('');
-    const [type, setType] = useState('');
+    const [excerpt, setExcerpt] = useState('');
     const [content, setContent] = useState('');
-    const [excerpt, setExcerpt] = useState(''); // headline/tag used on image overlays
-    const [backgroundImage, setBackgroundImage] = useState('');
-    const [imageSettings, setImageSettings] = useState<any>({});
-    const [rendering, setRendering] = useState(false);
-    const [renderedPreview, setRenderedPreview] = useState<string>('');
-    const [isPublished, setIsPublished] = useState(false);
+    const [sourceUrl, setSourceUrl] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
 
-    // Analytics for this post
-    const [views, setViews] = useState(0);
+    // Image overlay toggles — session-local, sent on each render call.
+    const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
-    const router = useRouter();
-    // Create client-side supabase client
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
-    // const id = params.id; // Removed duplicate id declaration
 
     useEffect(() => {
-        async function fetchPost() {
-            // 1. Fetch Post Data
-            const { data, error } = await supabase
-                .from('posts')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error) {
-                alert('Error loading post');
-                router.push('/admin/dashboard');
+        async function load() {
+            const { data, error } = await supabase.from('posts').select('*').eq('id', id).single();
+            if (error || !data) {
+                setError(error?.message || 'Post not found');
+                setLoading(false);
                 return;
             }
-
             setPost(data);
             setTitle(data.title || '');
-            setType(data.type || '');
-            setContent(data.content || '');
             setExcerpt(data.excerpt || '');
-            setBackgroundImage(data.background_image || '');
-            setImageSettings(data.image_settings || {});
-            setRenderedPreview(data.image || '');
-            setIsPublished(data.is_published);
-
-            // 2. Fetch Analytics for this Post
-            // Match path pattern: /daily-drops-202X or /frieren-s2... (slug)
-            // But wait, page_views stores PATH, not SLUG. We need to construct the likely path.
-            // Assuming blog paths are unique to slug? No, KumoLab uses modal or direct?
-            // Wait, looking at codebase, posts don't have dedicated /blog/[slug] pages yet?
-            // If they are just modals on home, they might not have unique URL hits.
-            // IF individual pages exist, they track. If not, this metric will be 0.
-            // Let's query by possible path signatures.
-
-            // NOTE: Assuming future structure /post/[slug]
-            const pathSignature = `/${data.slug}`;
-            const { count } = await supabase
-                .from('page_views')
-                .select('*', { count: 'exact', head: true })
-                .ilike('path', `%${data.slug}%`);
-
-            setViews(count || 0);
+            setContent(data.content || '');
+            setSourceUrl(data.source_url || '');
+            setImageUrl(data.image || '');
             setLoading(false);
         }
+        load();
+    }, [id, supabase]);
 
-        fetchPost();
-    }, [id, router, supabase]);
+    async function callJson(url: string, body: any): Promise<any> {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false) {
+            throw new Error(json.error || `Request failed (${res.status})`);
+        }
+        return json;
+    }
 
-    const handleSave = async () => {
-        setSaving(true);
-        const { error } = await supabase
-            .from('posts')
-            .update({
-                title,
-                type,
-                content,
-                excerpt,
-                background_image: backgroundImage || null,
-                image_settings: imageSettings,
-                is_published: isPublished,
-                claim_type: post.claim_type,
-                premiere_date: post.premiere_date
-            })
-            .eq('id', id);
+    async function handleSave(opts: { thenApprove?: boolean } = {}) {
+        const action = opts.thenApprove ? 'approve' : 'save';
+        setBusy(action);
+        setError(null);
+        try {
+            const { error } = await supabase
+                .from('posts')
+                .update({ title, excerpt, content, image: imageUrl })
+                .eq('id', id);
+            if (error) throw new Error(error.message);
 
-        if (error) {
-            alert('Failed to save: ' + error.message);
-        } else {
+            if (opts.thenApprove) {
+                await callJson('/api/admin/approve', { postIds: [id] });
+            }
+
             router.push('/admin/dashboard');
             router.refresh();
+        } catch (e: any) {
+            setError(e?.message || 'Save failed');
+            setBusy(null);
         }
-        setSaving(false);
-    };
+    }
 
-    if (loading) return <div className="p-8 text-neutral-500">Loading editor...</div>;
+    async function handleRegenerate() {
+        setBusy('render');
+        setError(null);
+        setImageError(null);
+        try {
+            const json = await callJson('/api/admin/render-post-image', {
+                postId: id,
+                sourceUrl: sourceUrl || undefined,
+                settings,
+            });
+            // Cache-bust so the <img> reloads even if URL is the same.
+            const fresh = `${json.image}${json.image.includes('?') ? '&' : '?'}t=${Date.now()}`;
+            setImageUrl(fresh);
+        } catch (e: any) {
+            setError(e?.message || 'Render failed');
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function handleDecline() {
+        if (!confirm('Decline this post? It will be removed and added to the dedup memory.')) return;
+        setBusy('decline');
+        try {
+            await callJson('/api/admin/decline', { postIds: [id] });
+            router.push('/admin/dashboard');
+            router.refresh();
+        } catch (e: any) {
+            setError(e?.message || 'Decline failed');
+            setBusy(null);
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirm('Permanently delete this post? Cannot be undone.')) return;
+        setBusy('delete');
+        try {
+            const { error } = await supabase.from('posts').delete().eq('id', id);
+            if (error) throw new Error(error.message);
+            router.push('/admin/dashboard');
+            router.refresh();
+        } catch (e: any) {
+            setError(e?.message || 'Delete failed');
+            setBusy(null);
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="max-w-3xl mx-auto py-12 text-center">
+                <div className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    Loading editor…
+                </div>
+            </div>
+        );
+    }
+
+    if (!post) {
+        return (
+            <div className="max-w-3xl mx-auto py-12 text-center">
+                <div className="text-sm" style={{ color: '#ff7777' }}>{error || 'Post not found'}</div>
+            </div>
+        );
+    }
+
+    const isPending = post.status === 'pending';
+    const claimLabel = (post.claim_type || 'OTHER').replace(/_/g, ' ');
 
     return (
-        <div className="max-w-2xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-                <button
-                    onClick={() => router.back()}
-                    className="text-neutral-500 hover:text-white transition-colors text-sm"
-                >
-                    ← Back to Dashboard
-                </button>
+        <div className="max-w-5xl mx-auto space-y-5">
+            {/* Header strip */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                        Edit Post
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <StatusPill status={post.status} />
+                        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                            {claimLabel} · {post.source}
+                        </span>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    {isPending && (
+                        <button
+                            onClick={() => handleSave({ thenApprove: true })}
+                            disabled={!!busy}
+                            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(0,255,136,0.20), rgba(0,212,170,0.12))',
+                                border: '1px solid rgba(0,255,136,0.35)',
+                                color: '#7af0a8',
+                                fontFamily: 'var(--font-display)',
+                            }}
+                        >
+                            {busy === 'approve' ? 'Approving…' : 'Save + Approve'}
+                        </button>
+                    )}
+                    <button
+                        onClick={() => handleSave()}
+                        disabled={!!busy}
+                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
+                            border: '1px solid rgba(123,97,255,0.30)',
+                            color: '#fff',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        {busy === 'save' ? 'Saving…' : 'Save'}
+                    </button>
+                </div>
             </div>
 
-            {/* ANALYTICS PANEL */}
-            <PostAnalytics
-                postId={id}
-                websiteViews={views}
-                initialSocialMetrics={post.social_metrics}
-            />
+            {error && (
+                <div
+                    className="p-3 rounded-lg text-xs"
+                    style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.25)', color: '#ff9999' }}
+                >
+                    {error}
+                </div>
+            )}
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 space-y-6">
+            <div className="grid md:grid-cols-[1fr_360px] gap-5">
+                {/* ── Image preview + render controls ─────────────── */}
+                <Card>
+                    <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
+                        {imageUrl && !imageError ? (
+                            <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    key={imageUrl}
+                                    src={imageUrl}
+                                    alt={title}
+                                    className="w-full h-full object-cover"
+                                    onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
+                                />
+                                {busy === 'render' && (
+                                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
+                                            Rendering…
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+                                <span className="text-xs" style={{ color: '#ff9999' }}>
+                                    {imageError || 'No image set yet.'}
+                                </span>
+                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                    Set a source URL below and click Regenerate.
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </Card>
 
-                {/* 1. Title Editor */}
-                <div>
-                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                        Title
-                    </label>
+                {/* ── Toggles + actions ───────────────────────────── */}
+                <div className="space-y-4">
+                    <Card className="p-4">
+                        <SectionLabel>Overlay toggles</SectionLabel>
+                        <div className="space-y-2 mt-3">
+                            <Toggle
+                                label="Show text"
+                                hint="Title overlay on the image"
+                                value={settings.applyText}
+                                onChange={v => setSettings(s => ({ ...s, applyText: v }))}
+                            />
+                            <Toggle
+                                label="Show gradient"
+                                hint="Dark fade behind the text"
+                                value={settings.applyGradient}
+                                onChange={v => setSettings(s => ({ ...s, applyGradient: v }))}
+                            />
+                            <Toggle
+                                label="Show watermark"
+                                hint="@KumoLabAnime mark"
+                                value={settings.applyWatermark}
+                                onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
+                            />
+
+                            <div className="pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                                <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
+                                    Gradient position
+                                </div>
+                                <div className="flex gap-2">
+                                    {(['bottom', 'top'] as const).map(pos => {
+                                        const active = settings.gradientPosition === pos;
+                                        return (
+                                            <button
+                                                key={pos}
+                                                onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
+                                                className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                                                style={{
+                                                    background: active
+                                                        ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
+                                                        : 'rgba(255,255,255,0.03)',
+                                                    border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
+                                                    color: active ? '#fff' : 'var(--text-tertiary)',
+                                                    fontFamily: 'var(--font-display)',
+                                                }}
+                                            >
+                                                {pos}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleRegenerate}
+                            disabled={!!busy}
+                            className="w-full mt-4 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.18))',
+                                border: '1px solid rgba(255,60,172,0.30)',
+                                color: '#fff',
+                                fontFamily: 'var(--font-display)',
+                            }}
+                        >
+                            {busy === 'render' ? 'Rendering…' : 'Regenerate Image'}
+                        </button>
+                    </Card>
+
+                    {isPending && (
+                        <Card className="p-4">
+                            <SectionLabel>Quick actions</SectionLabel>
+                            <button
+                                onClick={handleDecline}
+                                disabled={!!busy}
+                                className="w-full mt-3 px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                                style={{
+                                    background: 'rgba(255,255,255,0.02)',
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    color: 'var(--text-tertiary)',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                {busy === 'decline' ? 'Declining…' : 'Decline & Remove'}
+                            </button>
+                        </Card>
+                    )}
+
+                    <Card className="p-4">
+                        <button
+                            onClick={handleDelete}
+                            disabled={!!busy}
+                            className="w-full px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:bg-red-500/10 disabled:opacity-40"
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(255,68,68,0.20)',
+                                color: '#ff7777',
+                                fontFamily: 'var(--font-display)',
+                            }}
+                        >
+                            {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
+                        </button>
+                    </Card>
+                </div>
+            </div>
+
+            {/* ── Text fields ─────────────────────────────────────── */}
+            <Card className="p-5 space-y-4">
+                <Field label="Title">
                     <input
                         type="text"
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                        onChange={e => setTitle(e.target.value)}
+                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none transition-colors"
+                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
                     />
-                </div>
+                </Field>
 
-                {/* 2. Headline / Tag Editor */}
-                <div>
-                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                        Headline / Tag (excerpt)
-                    </label>
+                <Field label="Caption (excerpt)" hint="Short hook used on overlays + IG caption lead">
                     <input
                         type="text"
                         value={excerpt}
-                        onChange={(e) => setExcerpt(e.target.value)}
-                        placeholder="FEATURED, JUST CONFIRMED, OFFICIAL, etc"
-                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
+                        onChange={e => setExcerpt(e.target.value)}
+                        placeholder="Sharp, observational, KumoLab voice"
+                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none"
+                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
                     />
-                    <p className="mt-2 text-[11px] text-neutral-500">
-                        This controls the short overlay tag stored in <span className="font-mono">posts.excerpt</span> and used by the image renderer.
-                    </p>
-                </div>
+                </Field>
 
-                {/* 3. Type Editor */}
-                <div>
-                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                        Category (Type)
-                    </label>
-                    <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value)}
-                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
-                    >
-                        <option value="DROP">Daily Drop</option>
-                        <option value="INTEL">Anime Intel</option>
-                        <option value="TRENDING">Trending</option>
-                        <option value="COMMUNITY">Community</option>
-                    </select>
-                </div>
+                <Field label="Source URL" hint="Used as the render source (also drives video extraction for trailers)">
+                    <input
+                        type="text"
+                        value={sourceUrl}
+                        onChange={e => setSourceUrl(e.target.value)}
+                        placeholder="https://… (raw image or article URL)"
+                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
+                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                    />
+                </Field>
 
-                {/* 4. Render + Image Controls */}
-                <div className="bg-black/40 border border-neutral-800 rounded-lg p-4 space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <div className="text-sm font-semibold text-white">Image + Layout</div>
-                            <div className="text-xs text-neutral-500">Edits persist to <span className="font-mono">background_image</span> and <span className="font-mono">image_settings</span>. Rendering writes <span className="font-mono">image</span>.</div>
-                        </div>
-                        <button
-                            onClick={async () => {
-                                setRendering(true);
-                                try {
-                                    const res = await fetch('/api/admin/render-post-image', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ postId: id })
-                                    });
-                                    const data = await res.json();
-                                    if (!data.success) throw new Error(data.error || 'Render failed');
-
-                                    // Update local state with latest DB snapshot
-                                    setPost(data.post);
-                                    setBackgroundImage(data.post.background_image || '');
-                                    setImageSettings(data.post.image_settings || {});
-                                    if (data.post.image) setRenderedPreview(data.post.image);
-                                } catch (e: any) {
-                                    alert('Render failed: ' + e.message);
-                                } finally {
-                                    setRendering(false);
-                                }
-                            }}
-                            disabled={rendering}
-                            className="px-4 py-2 rounded bg-purple-600 text-white text-sm font-bold hover:bg-purple-500 disabled:opacity-50"
-                        >
-                            {rendering ? 'Rendering...' : 'Render Image'}
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                                Background Image URL
-                            </label>
-                            <input
-                                type="text"
-                                value={backgroundImage}
-                                onChange={(e) => setBackgroundImage(e.target.value)}
-                                placeholder="https://... (raw art source)"
-                                className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
-                            />
-                            <p className="mt-2 text-[11px] text-neutral-500">Used as the render source. If empty, renderer falls back to current <span className="font-mono">image</span>.</p>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                                Image Settings (JSON)
-                            </label>
-                            <textarea
-                                value={JSON.stringify(imageSettings || {}, null, 2)}
-                                onChange={(e) => {
-                                    try {
-                                        const parsed = JSON.parse(e.target.value);
-                                        setImageSettings(parsed);
-                                    } catch {
-                                        // ignore parse errors while typing
-                                    }
-                                }}
-                                rows={8}
-                                className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none font-mono text-xs"
-                            />
-                            <p className="mt-2 text-[11px] text-neutral-500">Temporary UI. Next pass: proper controls for positions, scale, gradient, watermark, purple words.</p>
-                        </div>
-                    </div>
-
-                    {/* Preview */}
-                    {(renderedPreview || post.image) && (
-                        <div>
-                            <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                                Current Render
-                            </label>
-                            <div className="aspect-[4/5] max-w-sm bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={renderedPreview || post.image} alt={post.title} className="w-full h-full object-cover" />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* 5. Legacy Image Preview */}
-                {false && post.image && (
-                    <div>
-                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                            Post Image
-                        </label>
-                        <div className="aspect-[4/5] max-w-sm bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
-                        </div>
-                    </div>
-                )}
-
-                {/* 5. Content Editor */}
-                <div>
-                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                        Content / Description
-                    </label>
+                <Field label="Body content">
                     <textarea
-                        value={content || ''}
-                        onChange={(e) => setContent(e.target.value)}
-                        rows={6}
-                        className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none resize-none"
+                        value={content}
+                        onChange={e => setContent(e.target.value)}
+                        rows={5}
+                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none resize-none"
+                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
                     />
-                </div>
-
-                {/* 7. Metadata Editor (for INTEL/DROP posts) */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-800">
-                    <div>
-                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                            Claim Type / Status
-                        </label>
-                        <select
-                            value={post.claim_type || ''}
-                            onChange={(e) => setPost({ ...post, claim_type: e.target.value })}
-                            className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
-                        >
-                            <option value="">None</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="premiered">Premiered</option>
-                            <option value="now_streaming">Now Streaming</option>
-                            <option value="delayed">Delayed</option>
-                            <option value="postponed">Postponed</option>
-                            <option value="rumor">Rumor</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                            Premiere Date
-                        </label>
-                        <input
-                            type="date"
-                            value={post.premiere_date ? new Date(post.premiere_date).toISOString().split('T')[0] : ''}
-                            onChange={(e) => setPost({ ...post, premiere_date: e.target.value })}
-                            className="w-full bg-black border border-neutral-700 text-white px-4 py-3 rounded focus:border-purple-500 focus:outline-none"
-                        />
-                    </div>
-                </div>
-
-                {/* 6. Published Toggle */}
-                <div className="flex items-center justify-between bg-black p-4 rounded border border-neutral-800">
-                    <div>
-                        <div className="text-sm font-medium text-white">Public Visibility</div>
-                        <div className="text-xs text-neutral-500">
-                            {isPublished ? 'Visible to everyone.' : 'Hidden from public site.'}
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => setIsPublished(!isPublished)}
-                        className={`px-4 py-2 rounded text-sm font-bold transition-all ${isPublished
-                            ? 'bg-green-900 text-green-400 border border-green-700 hover:bg-green-800'
-                            : 'bg-red-900 text-red-400 border border-red-700 hover:bg-red-800'
-                            }`}
-                    >
-                        {isPublished ? 'PUBLISHED' : 'UNPUBLISHED'}
-                    </button>
-                </div>
-
-                <div className="pt-4 border-t border-neutral-800 flex justify-between gap-3">
-                    <button
-                        onClick={async () => {
-                            if (confirm('Are you sure you want to delete this post? This cannot be undone.')) {
-                                setSaving(true);
-                                const { error } = await supabase.from('posts').delete().eq('id', id);
-                                if (error) {
-                                    alert('Failed to delete: ' + error.message);
-                                    setSaving(false);
-                                } else {
-                                    router.push('/admin/dashboard');
-                                    router.refresh();
-                                }
-                            }
-                        }}
-                        className="px-6 py-2 rounded text-sm font-bold text-red-500 hover:bg-red-950/30 border border-transparent hover:border-red-900 transition-all"
-                    >
-                        Delete Post
-                    </button>
-
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => router.back()}
-                            className="px-6 py-2 rounded text-sm font-medium text-neutral-400 hover:text-white"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="px-8 py-2 bg-white text-black text-sm font-bold rounded hover:bg-neutral-200 disabled:opacity-50"
-                        >
-                            {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </div>
-
-            </div>
+                </Field>
+            </Card>
         </div>
+    );
+}
+
+// ─── UI primitives ────────────────────────────────────────────
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+    return (
+        <div
+            className={`rounded-xl overflow-hidden ${className}`}
+            style={{
+                background: 'rgba(12, 12, 24, 0.55)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                backdropFilter: 'blur(20px)',
+            }}
+        >
+            {children}
+        </div>
+    );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="text-[10px] font-bold uppercase tracking-[0.25em]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+            {children}
+        </div>
+    );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                {label}
+            </label>
+            {children}
+            {hint && <p className="mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
+        </div>
+    );
+}
+
+function Toggle({ label, hint, value, onChange }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <button
+            onClick={() => onChange(!value)}
+            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all hover:bg-white/[0.03]"
+            style={{ background: 'transparent' }}
+        >
+            <div className="flex flex-col items-start">
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                {hint && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
+            </div>
+            <span
+                className="relative w-9 h-5 rounded-full transition-colors shrink-0"
+                style={{
+                    background: value ? 'linear-gradient(135deg, #00d4ff, #7b61ff)' : 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                }}
+            >
+                <span
+                    className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all"
+                    style={{
+                        left: value ? '17px' : '2px',
+                        background: '#fff',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    }}
+                />
+            </span>
+        </button>
+    );
+}
+
+function StatusPill({ status }: { status: string | null }) {
+    const cfg: Record<string, { color: string; label: string }> = {
+        pending: { color: '#ffaa00', label: 'Pending' },
+        approved: { color: '#00d4ff', label: 'Approved' },
+        published: { color: '#00ff88', label: 'Published' },
+        declined: { color: '#9ca3af', label: 'Declined' },
+    };
+    const c = cfg[status || ''] || { color: '#9ca3af', label: status || 'Unknown' };
+    return (
+        <span
+            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+            style={{ background: `${c.color}18`, border: `1px solid ${c.color}35`, color: c.color }}
+        >
+            {c.label}
+        </span>
     );
 }
