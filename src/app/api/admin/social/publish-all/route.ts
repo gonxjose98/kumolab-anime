@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TwitterApi } from 'twitter-api-v2';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { buildSocialHashtags } from '@/lib/social/hashtags';
 
 // Helper for X (Accuracy Brand Format)
 async function publishToX(post: any, client: TwitterApi, mediaId?: string) {
@@ -93,7 +94,13 @@ async function publishToFacebook(post: any, imageUrl: string) {
 
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
-    const message = `${post.title}\n\nRead more at KumoLabAnime.com\n${postUrl}\n\n#Anime #KumoLab`;
+    const lead = post.excerpt || (post.content ? String(post.content).substring(0, 300) : '');
+    const hashtags = buildSocialHashtags({
+        title: post.title,
+        claim_type: post.claim_type || post.claimType,
+        anime_id: post.anime_id,
+    }).join(' ');
+    const message = `${post.title}\n\n${lead}\n\n${postUrl}\n\n${hashtags}`;
 
     try {
         const res = await fetch(`https://graph.facebook.com/v21.0/${pageId}/photos`, {
@@ -124,7 +131,13 @@ async function publishToInstagram(post: any, imageUrl: string) {
 
     const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     const postUrl = `${domain}/blog/${post.slug}`;
-    const caption = `${post.title}\n\nRead more at KumoLabAnime.com\nLink in bio: ${postUrl}\n\n#Anime #KumoLab`;
+    const lead = post.excerpt || (post.content ? String(post.content).substring(0, 300) : '');
+    const hashtags = buildSocialHashtags({
+        title: post.title,
+        claim_type: post.claim_type || post.claimType,
+        anime_id: post.anime_id,
+    }).join(' ');
+    const caption = `${post.title}\n\n${lead}\n\nLink in bio: ${postUrl}\n\n${hashtags}`.substring(0, 2200);
 
     try {
         // 1. Create Media Container

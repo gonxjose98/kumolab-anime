@@ -3,6 +3,7 @@ import { fetchYouTubeToBucket } from './trailer-fetcher';
 import { publishToTikTok } from './tiktok-publisher';
 import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
+import { buildSocialHashtags } from './hashtags';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
@@ -94,10 +95,20 @@ async function publishToInstagram(post: BlogPost): Promise<SocialPublishResult> 
     if (!IG_USER_ID || !META_ACCESS_TOKEN) return result;
 
     try {
+        // Caption: title + AI-generated excerpt (KumoLab voice) + smart hashtags.
+        // Falls back to a content slice if excerpt is missing for any reason.
+        const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
+        const hashtags = buildSocialHashtags({
+            title: post.title,
+            claim_type: (post as any).claimType || (post as any).claim_type,
+            anime_id: post.anime_id,
+        }).join(' ');
+        const caption = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 2200);
+
         const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
         const containerParams = new URLSearchParams({
             image_url: post.image || '',
-            caption: `${post.title}\n\n${post.content.substring(0, 2100)}\n\n#anime #kumolab #animenews`,
+            caption,
             access_token: META_ACCESS_TOKEN || '',
         });
 
