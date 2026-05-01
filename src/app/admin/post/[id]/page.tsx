@@ -114,14 +114,36 @@ export default function PostEditor() {
         setError(null);
         setImageError(null);
         try {
+            // Persist current title/excerpt FIRST so the live blog post page +
+            // any future render request sees the same values. Skip if the
+            // editor fields are unchanged (avoid redundant write).
+            const dbTitle = post?.title ?? '';
+            const dbExcerpt = post?.excerpt ?? '';
+            if (title !== dbTitle || excerpt !== dbExcerpt || content !== (post?.content ?? '')) {
+                await fetch('/api/posts', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ id, title, excerpt, content }),
+                }).catch(() => {});
+            }
+
+            // Render with the LIVE editor state. The endpoint uses these
+            // overrides as the anime-title and overlay-text, ignoring the DB
+            // copy. So toggling Show Text + typing in Caption + Regenerate
+            // reflects exactly what the user just typed.
             const json = await callJson('/api/admin/render-post-image', {
                 postId: id,
                 sourceUrl: sourceUrl || undefined,
+                title,
+                excerpt,
                 settings,
             });
             // Cache-bust so the <img> reloads even if URL is the same.
             const fresh = `${json.image}${json.image.includes('?') ? '&' : '?'}t=${Date.now()}`;
             setImageUrl(fresh);
+            // Mirror the freshly-saved fields so subsequent regen calls compare cleanly.
+            setPost((p: any) => p ? { ...p, title, excerpt, content, image: json.image } : p);
         } catch (e: any) {
             setError(e?.message || 'Render failed');
         } finally {
@@ -381,7 +403,7 @@ export default function PostEditor() {
 
             {/* ── Text fields ─────────────────────────────────────── */}
             <Card className="p-5 space-y-4">
-                <Field label="Title">
+                <Field label="Title" hint="Big bold line at the top of the rendered image overlay">
                     <input
                         type="text"
                         value={title}
@@ -391,7 +413,7 @@ export default function PostEditor() {
                     />
                 </Field>
 
-                <Field label="Caption (excerpt)" hint="Short hook used on overlays + IG caption lead">
+                <Field label="Overlay text / Caption" hint="The smaller line under the title on the image overlay. Also used as the IG caption lead.">
                     <input
                         type="text"
                         value={excerpt}
