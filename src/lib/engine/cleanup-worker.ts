@@ -9,12 +9,14 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { logSchedulerRun } from '../logging/scheduler';
+import { createFingerprint } from './utils';
 
 const STORAGE_BUCKET = 'blog-images';
 const STORAGE_ALERT_BYTES = 400 * 1024 * 1024; // 400 MB
 
 export interface CleanupResult {
     expiredPostsDeleted: number;
+    stalePendingDeclined: number;
     bucketFilesDeleted: number;
     bucketOrphansDeleted: number;
     candidateSweep: number;
@@ -31,6 +33,11 @@ export interface CleanupResult {
     errors: string[];
 }
 
+// Pending posts older than this get auto-declined. The news isn't news anymore;
+// holding them in the queue just clutters the admin dashboard. Their fingerprint
+// is written so the same content can't re-enter via detection.
+const STALE_PENDING_HOURS = 72;
+
 function extractStoredFilename(imageUrl: string | null): string | null {
     if (!imageUrl) return null;
     // Supabase public URL: https://<project>.supabase.co/storage/v1/object/public/blog-images/<filename>
@@ -44,6 +51,7 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
     const start = Date.now();
     const result: CleanupResult = {
         expiredPostsDeleted: 0,
+        stalePendingDeclined: 0,
         bucketFilesDeleted: 0,
         bucketOrphansDeleted: 0,
         candidateSweep: 0,
@@ -59,6 +67,47 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         durationMs: 0,
         errors: [],
     };
+
+    // 0. Auto-decline stale pending posts. If admin hasn't acted in 72h the
+    //    news is dead news. Fingerprint each so detection can't re-insert them.
+    try {
+        const cutoff = new Date(Date.now() - STALE_PENDING_HOURS * 60 * 60 * 1000).toISOString();
+        const { data: stale, error: fetchErr } = await supabaseAdmin
+            .from('posts')
+            .select('id, title, source_url, anime_id, claim_type')
+            .eq('status', 'pending')
+            .lt('timestamp', cutoff);
+
+        if (fetchErr) throw fetchErr;
+
+        if (stale && stale.length > 0) {
+            const now = new Date().toISOString();
+            const fingerprintRows = stale
+                .filter(p => p.title && p.source_url)
+                .map(p => ({
+                    fingerprint: createFingerprint(p.title, p.source_url),
+                    anime_id: p.anime_id ?? null,
+                    claim_type: p.claim_type ?? null,
+                    origin: 'declined' as const,
+                    source_url: p.source_url,
+                    seen_at: now,
+                }));
+
+            if (fingerprintRows.length > 0) {
+                await supabaseAdmin
+                    .from('seen_fingerprints')
+                    .upsert(fingerprintRows, { onConflict: 'fingerprint' });
+            }
+
+            const ids = stale.map(p => p.id);
+            const { error: delErr } = await supabaseAdmin.from('posts').delete().in('id', ids);
+            if (delErr) throw delErr;
+
+            result.stalePendingDeclined = ids.length;
+        }
+    } catch (e: any) {
+        result.errors.push(`stale_pending_decline: ${e.message}`);
+    }
 
     // 1. Safety-net candidate sweep
     try {
