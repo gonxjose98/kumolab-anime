@@ -166,10 +166,11 @@ function preCleanTitle(raw: string): string {
   // Strip wrapping straight/smart quotes around the whole thing
   t = t.replace(/^["'""'']\s*|\s*["'""'']$/g, '').trim();
 
-  // De-shout: only multi-word ALL-CAPS runs ("DOUBLE SEVEN ARC", "FINAL
-  // ARC TRAILER") → Title Case. Single-word ALL-CAPS is preserved so
-  // legitimate acronyms (TYBW, OVA, OP, ED, S2, MAPPA) survive.
-  t = t.replace(/\b[A-Z][A-Z0-9]{1,}(?:\s+[A-Z][A-Z0-9]{1,})+\b/g, (chunk) => {
+  // De-shout: only multi-word ALL-CAPS runs ("SEASON 3 DOUBLE SEVEN ARC",
+  // "FINAL ARC TRAILER") → Title Case. Single-word ALL-CAPS is preserved
+  // so legitimate acronyms (TYBW, OVA, OP, ED, S2, MAPPA) survive. Allows
+  // digits as second-and-later words ("SEASON 3").
+  t = t.replace(/\b[A-Z][A-Z0-9]+(?:\s+[A-Z0-9][A-Z0-9]*)+\b/g, (chunk) => {
     return chunk.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   });
 

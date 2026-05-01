@@ -4,6 +4,10 @@ import { runProcessingWorker } from '@/lib/engine/processing-worker';
 import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
 import { generateDailyReport } from '@/lib/engine/daily-report';
 import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
+import { generateIntelImage } from '@/lib/engine/image-processor';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+export const maxDuration = 300;
 
 /**
  * Unified Cron Handler
@@ -106,9 +110,77 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        // Server-to-server image regen: cron-bearer-authed (same trust level as
+        // any cron task). Single post or comma-separated batch via ?postIds=.
+        if (worker === 'render') {
+            const idsParam = searchParams.get('postIds') || searchParams.get('postId');
+            if (!idsParam) {
+                return NextResponse.json({ error: 'postIds query param is required' }, { status: 400 });
+            }
+            const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean);
+            const results: any[] = [];
+
+            for (const postId of ids) {
+                try {
+                    const { data: post, error: fetchError } = await supabaseAdmin
+                        .from('posts')
+                        .select('id, slug, title, excerpt, image, source_url')
+                        .eq('id', postId)
+                        .single();
+                    if (fetchError || !post) {
+                        results.push({ id: postId, success: false, error: fetchError?.message || 'Post not found' });
+                        continue;
+                    }
+
+                    const sourceUrl = post.image;
+                    if (!sourceUrl) {
+                        results.push({ id: postId, success: false, error: 'no image to render from' });
+                        continue;
+                    }
+
+                    const rendered = await generateIntelImage({
+                        sourceUrl,
+                        animeTitle: post.title || '',
+                        headline: (post.excerpt || '').toString(),
+                        slug: post.slug || `post-${postId}`,
+                        applyText: true,
+                        applyGradient: true,
+                        applyWatermark: true,
+                        gradientPosition: 'bottom',
+                        classification: 'CLEAN',
+                        bypassSafety: true,
+                    });
+
+                    if (!rendered?.processedImage) {
+                        results.push({ id: postId, success: false, error: 'renderer returned null' });
+                        continue;
+                    }
+
+                    const { error: updateError } = await supabaseAdmin
+                        .from('posts')
+                        .update({ image: rendered.processedImage })
+                        .eq('id', postId);
+                    if (updateError) {
+                        results.push({ id: postId, success: false, error: updateError.message });
+                        continue;
+                    }
+
+                    results.push({ id: postId, success: true, image: rendered.processedImage });
+                } catch (e: any) {
+                    results.push({ id: postId, success: false, error: e?.message || 'render exception' });
+                }
+            }
+
+            return NextResponse.json({
+                success: results.every(r => r.success),
+                worker: 'render',
+                results,
+            });
+        }
+
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup']
+            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render']
         }, { status: 400 });
 
     } catch (error: any) {
