@@ -286,12 +286,17 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
 
     const isT1YouTube = candidate.source_tier === 1 && !!candidate.source_name?.toLowerCase().includes('youtube');
 
-    // ── Video extraction for trailer claims ──────────────────
-    // A TRAILER_DROP post must actually embed the trailer — we never publish a
-    // "trailer" post that has no video. If we can't extract a YouTube ID from
-    // the source URL or article HTML, the auto-approval gate routes to review.
+    // ── Video extraction (always when source has a YouTube URL) ──
+    // We extract for every claim type, not just TRAILER_DROP. A season
+    // announcement / key visual reveal that happens to be a YouTube video
+    // (like an Aniplex "3 Minutes" recap or a studio's season teaser) should
+    // still embed the video on the blog post — otherwise we publish a
+    // thumbnail-only post for content that's literally a video.
+    //
+    // hasVideo still gates the artifact rule: TRAILER_DROP claims require it,
+    // other claims accept video as a bonus alongside an image.
     let hasVideo = false;
-    if (post.claim_type === 'TRAILER_DROP') {
+    {
       const video = await extractYouTubeVideo({
         source_url: candidate.source_url,
         canonical_url: candidate.canonical_url,
@@ -305,6 +310,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
         // Use the YouTube thumbnail as the post image when we have nothing else.
         if (!hasImage) {
           post.image = `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
+          hasImage = true;
         }
         hasVideo = true;
       }
