@@ -16,7 +16,13 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { postId, settings = {}, sourceUrl: sourceOverride } = body || {};
+        const {
+            postId,
+            settings = {},
+            sourceUrl: sourceOverride,
+            title: titleOverride,
+            excerpt: excerptOverride,
+        } = body || {};
 
         if (!postId || typeof postId !== 'string') {
             return NextResponse.json({ success: false, error: 'postId is required' }, { status: 400 });
@@ -37,10 +43,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Post has no image to render from. Set a source URL in the editor first.' }, { status: 400 });
         }
 
+        // Editor passes current title/excerpt as overrides so Regenerate uses
+        // what the user just typed, not stale DB values. Falls back to DB on
+        // omitted keys for cron/server callers that don't send them.
+        const animeTitle = typeof titleOverride === 'string' ? titleOverride : (post.title || '');
+        const headline = typeof excerptOverride === 'string' ? excerptOverride : (post.excerpt || '');
+
         const result = await generateIntelImage({
             sourceUrl,
-            animeTitle: post.title || '',
-            headline: (post.excerpt || '').toString(),
+            animeTitle,
+            headline,
             slug: post.slug || `post-${postId}`,
 
             // All toggles + positions come from the request body. Defaults match
