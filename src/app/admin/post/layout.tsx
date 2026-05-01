@@ -5,7 +5,7 @@ import Link from 'next/link';
 import LogoutButton from '@/components/admin/LogoutButton';
 import GalaxyBackground from '@/components/shared/GalaxyBackground';
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminPostLayout({ children }: { children: React.ReactNode }) {
     const cookieStore = await cookies();
 
     const supabase = createServerClient(
@@ -50,24 +50,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                             className="text-[8px] font-bold uppercase tracking-[0.3em]"
                             style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
                         >
-                            Console
+                            Console · Editor
                         </span>
                     </div>
                 </Link>
 
                 <div className="flex items-center gap-3">
-                    <div
-                        className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                    <Link
+                        href="/admin/dashboard"
+                        className="text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-lg transition-colors hover:bg-white/[0.05]"
+                        style={{
+                            color: 'var(--text-tertiary)',
+                            fontFamily: 'var(--font-display)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                        }}
                     >
-                        <div
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ background: '#00d4ff', animation: 'livePulse 2s ease-in-out infinite' }}
-                        />
-                        <span className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                            {session.user.email}
-                        </span>
-                    </div>
+                        ← Console
+                    </Link>
                     <LogoutButton />
                 </div>
             </header>
