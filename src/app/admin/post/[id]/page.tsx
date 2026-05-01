@@ -1,6 +1,5 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -39,29 +38,35 @@ export default function PostEditor() {
     // Image overlay toggles — session-local, sent on each render call.
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    // The post + post mutation paths go through /api/posts because RLS is
+    // service-role-only — a direct anon-key client read returns zero rows
+    // (PostgREST throws "Cannot coerce the result to a single JSON object"
+    // on .single()). The middleware admin-auths /api/posts mutations and
+    // checks the Supabase session for /api/posts GET.
 
     useEffect(() => {
         async function load() {
-            const { data, error } = await supabase.from('posts').select('*').eq('id', id).single();
-            if (error || !data) {
-                setError(error?.message || 'Post not found');
+            try {
+                const res = await fetch(`/api/posts?id=${encodeURIComponent(id)}`, { cache: 'no-store', credentials: 'same-origin' });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j.error || `Failed to load post (HTTP ${res.status})`);
+                }
+                const data = await res.json();
+                setPost(data);
+                setTitle(data.title || '');
+                setExcerpt(data.excerpt || '');
+                setContent(data.content || '');
+                setSourceUrl(data.source_url || '');
+                setImageUrl(data.image || '');
+            } catch (e: any) {
+                setError(e?.message || 'Post not found');
+            } finally {
                 setLoading(false);
-                return;
             }
-            setPost(data);
-            setTitle(data.title || '');
-            setExcerpt(data.excerpt || '');
-            setContent(data.content || '');
-            setSourceUrl(data.source_url || '');
-            setImageUrl(data.image || '');
-            setLoading(false);
         }
         load();
-    }, [id, supabase]);
+    }, [id]);
 
     async function callJson(url: string, body: any): Promise<any> {
         const res = await fetch(url, {
@@ -81,11 +86,16 @@ export default function PostEditor() {
         setBusy(action);
         setError(null);
         try {
-            const { error } = await supabase
-                .from('posts')
-                .update({ title, excerpt, content, image: imageUrl })
-                .eq('id', id);
-            if (error) throw new Error(error.message);
+            const res = await fetch('/api/posts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id, title, excerpt, content, image: imageUrl }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                throw new Error(json.error || `Save failed (HTTP ${res.status})`);
+            }
 
             if (opts.thenApprove) {
                 await callJson('/api/admin/approve', { postIds: [id] });
@@ -136,8 +146,14 @@ export default function PostEditor() {
         if (!confirm('Permanently delete this post? Cannot be undone.')) return;
         setBusy('delete');
         try {
-            const { error } = await supabase.from('posts').delete().eq('id', id);
-            if (error) throw new Error(error.message);
+            const res = await fetch(`/api/posts?id=${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                throw new Error(json.error || `Delete failed (HTTP ${res.status})`);
+            }
             router.push('/admin/dashboard');
             router.refresh();
         } catch (e: any) {
