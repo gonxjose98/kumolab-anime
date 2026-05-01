@@ -39,11 +39,16 @@ export const AUTOMATION = {
 // REJECT     — never published
 export type ClaimRisk = 'AUTO' | 'CORROBORATE' | 'REVIEW' | 'REJECT';
 
+// Content-mix priorities (Jose, 2026-05-01): KumoLab is more than a trailer
+// reposter. Season confirmations, key visuals, and release dates with strong
+// images are the brand's lead content. Trailers stay AUTO but no longer
+// dominate by default — these other claim types now AUTO at T1 (and T2 for
+// dates) so they actually flow through instead of waiting on corroboration.
 export const CLAIM_RISK_BY_TIER: Record<string, { t1: ClaimRisk; t2: ClaimRisk; t3: ClaimRisk }> = {
     TRAILER_DROP:          { t1: 'AUTO',        t2: 'AUTO',        t3: 'REVIEW' },
     NEW_KEY_VISUAL:        { t1: 'AUTO',        t2: 'AUTO',        t3: 'REVIEW' },
-    DATE_ANNOUNCED:        { t1: 'AUTO',        t2: 'CORROBORATE', t3: 'REVIEW' },
-    NEW_SEASON_CONFIRMED:  { t1: 'CORROBORATE', t2: 'CORROBORATE', t3: 'REVIEW' },
+    DATE_ANNOUNCED:        { t1: 'AUTO',        t2: 'AUTO',        t3: 'REVIEW' },
+    NEW_SEASON_CONFIRMED:  { t1: 'AUTO',        t2: 'CORROBORATE', t3: 'REVIEW' },
     DELAY:                 { t1: 'CORROBORATE', t2: 'CORROBORATE', t3: 'REVIEW' },
     STAFF_UPDATE:          { t1: 'CORROBORATE', t2: 'REVIEW',      t3: 'REVIEW' },
     CAST_ADDITION:         { t1: 'CORROBORATE', t2: 'REVIEW',      t3: 'REVIEW' },

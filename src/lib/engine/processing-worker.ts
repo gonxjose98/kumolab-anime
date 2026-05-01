@@ -232,6 +232,21 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     const now = new Date().toISOString();
     const slug = generateSlug(candidate.title);
 
+    // KumoLab-voice caption (replaces the old truncated-RSS-dump excerpt). If
+    // the AI is down we fall back to a sanitized truncation, so the post still
+    // has *something* readable — but the brand voice is the default.
+    let caption: string;
+    try {
+      caption = await AntigravityAI.getInstance().generateCaption({
+        title: candidate.title,
+        content: candidate.content,
+        claim_type: enrichedData.claimType || 'OTHER',
+      });
+    } catch (err: any) {
+      console.warn(`[ProcessingWorker] caption gen failed: ${err.message}`);
+      caption = sanitizeString(candidate.content, 197) + '…';
+    }
+
     const post: Record<string, any> = {
       title: sanitizeString(candidate.title, 200),
       slug: `${slug}-${Date.now().toString(36)}`,
@@ -239,7 +254,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       claim_type: enrichedData.claimType || 'OTHER',
       anime_id: candidate.metadata?.anime_id ?? null,
       content: sanitizeString(candidate.content, 5000),
-      excerpt: sanitizeString(candidate.content, 197) + '...',
+      excerpt: sanitizeString(caption, 200),
       source_url: candidate.canonical_url || candidate.source_url || '',
       source: candidate.source_name || 'Unknown',
       source_tier: candidate.source_tier || 2,
