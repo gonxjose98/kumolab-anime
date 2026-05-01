@@ -539,7 +539,12 @@ async function scanSingleYouTubeChannel(channel: { name: string; channelId: stri
         source_tier: channel.tier as 1 | 2 | 3,
         source_url: `https://youtube.com/watch?v=${videoId}`,
         title: title.substring(0, 200),
-        content: `${grade.label} from ${channel.name}`,
+        // Seed the body with channel + grade label + the video title itself so
+        // the AI caption generator has something specific to anchor on. The
+        // old "<label> from <channel>" was too thin and produced lazy
+        // "Season Announcement from Aniplex USA" excerpts when the AI fell
+        // back to truncated content.
+        content: `${grade.label} from ${channel.name} — ${title.trim()}`.substring(0, 800),
         detected_at: new Date().toISOString(),
         original_timestamp: publishedAt || undefined,
         media_urls: [`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`],
