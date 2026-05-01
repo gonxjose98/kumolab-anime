@@ -263,8 +263,11 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 <div className={styles.cardFallback} />
                             )}
 
-                            {!isTweetExpanded && <div className={styles.cardGradient} />}
-                            {!isTweetExpanded && <div className={styles.cardScanlines} />}
+                            {/* Decorative overlays — hide while video is playing
+                                so the iframe gets clean pointer access for native
+                                YouTube controls (CC, settings, fullscreen, scrub bar). */}
+                            {!isTweetExpanded && !isPlaying && <div className={styles.cardGradient} />}
+                            {!isTweetExpanded && !isPlaying && <div className={styles.cardScanlines} />}
 
                             {/* Play button for YouTube */}
                             {isYouTube && !isPlaying && (
@@ -304,63 +307,91 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 </button>
                             )}
 
-                            {/* Tag */}
-                            <div
-                                className={styles.cardTag}
-                                style={{
-                                    '--tag-color': tagColor,
-                                    '--tag-color-10': `rgba(${tc.r},${tc.g},${tc.b},0.1)`,
-                                    '--tag-color-20': `rgba(${tc.r},${tc.g},${tc.b},0.2)`,
-                                } as React.CSSProperties}
-                            >
-                                <span className={styles.tagDot} />
-                                <span className={styles.tagText}>{post.type}</span>
-                            </div>
+                            {/* Tag, badges, counter, bottom-content, corner
+                                accents — all hidden while the video is playing
+                                so the YouTube iframe owns the entire card and
+                                its native controls (CC, settings, fullscreen,
+                                scrub bar, share) actually receive taps.
+                                When paused or before play, we render normally. */}
+                            {!isPlaying && (
+                                <>
+                                    <div
+                                        className={styles.cardTag}
+                                        style={{
+                                            '--tag-color': tagColor,
+                                            '--tag-color-10': `rgba(${tc.r},${tc.g},${tc.b},0.1)`,
+                                            '--tag-color-20': `rgba(${tc.r},${tc.g},${tc.b},0.2)`,
+                                        } as React.CSSProperties}
+                                    >
+                                        <span className={styles.tagDot} />
+                                        <span className={styles.tagText}>{post.type}</span>
+                                    </div>
 
-                            {/* Video badge */}
-                            {hasVideo && (
-                                <div className={styles.videoBadge}>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                        {isTwitter ? (
-                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                        ) : (
-                                            <path d="M8 5v14l11-7z"/>
+                                    {hasVideo && (
+                                        <div className={styles.videoBadge}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                                {isTwitter ? (
+                                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                                ) : (
+                                                    <path d="M8 5v14l11-7z"/>
+                                                )}
+                                            </svg>
+                                            {isTwitter ? 'X POST' : 'VIDEO'}
+                                        </div>
+                                    )}
+
+                                    <div className={styles.cardCounter}>
+                                        {String(i + 1).padStart(2, '0')}/{String(feedPosts.length).padStart(2, '0')}
+                                    </div>
+
+                                    <div className={styles.cardBottom} style={isTweetExpanded ? { background: 'rgba(6,6,14,0.95)' } : undefined}>
+                                        <div className={styles.cardMeta}>
+                                            {post.source && (
+                                                <span className={styles.cardSource}>{post.source}</span>
+                                            )}
+                                            <span className={styles.cardTime}>{getRelativeTime(post.timestamp)}</span>
+                                        </div>
+                                        <h3 className={styles.cardTitle}>{cleanTitle}</h3>
+                                        {hasVideo && (
+                                            <Link
+                                                href={`/blog/${post.slug}`}
+                                                className={styles.cardReadMore}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                View full post &rarr;
+                                            </Link>
                                         )}
-                                    </svg>
-                                    {isTwitter ? 'X POST' : 'VIDEO'}
-                                </div>
+                                    </div>
+
+                                    <span className={styles.cornerTL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                                    <span className={styles.cornerTR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                                    <span className={styles.cornerBL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                                    <span className={styles.cornerBR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                                </>
                             )}
 
-                            {/* Counter */}
-                            <div className={styles.cardCounter}>
-                                {String(i + 1).padStart(2, '0')}/{String(feedPosts.length).padStart(2, '0')}
-                            </div>
-
-                            {/* Bottom content */}
-                            <div className={styles.cardBottom} style={isTweetExpanded ? { background: 'rgba(6,6,14,0.95)' } : undefined}>
-                                <div className={styles.cardMeta}>
-                                    {post.source && (
-                                        <span className={styles.cardSource}>{post.source}</span>
-                                    )}
-                                    <span className={styles.cardTime}>{getRelativeTime(post.timestamp)}</span>
-                                </div>
-                                <h3 className={styles.cardTitle}>{cleanTitle}</h3>
-                                {hasVideo && (
-                                    <Link
-                                        href={`/blog/${post.slug}`}
-                                        className={styles.cardReadMore}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        View full post &rarr;
-                                    </Link>
-                                )}
-                            </div>
-
-                            {/* Corner accents */}
-                            <span className={styles.cornerTL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
-                            <span className={styles.cornerTR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
-                            <span className={styles.cornerBL} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
-                            <span className={styles.cornerBR} style={{ borderColor: `rgba(${tc.r},${tc.g},${tc.b},0.25)` }} />
+                            {/* Close button to exit playback (replaces all the
+                                overlays so the user has a way out without
+                                blocking iframe interaction) */}
+                            {isPlaying && (
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPlayingVideos(prev => {
+                                            const next = new Set(prev);
+                                            next.delete(postKey);
+                                            return next;
+                                        });
+                                    }}
+                                    aria-label="Close video"
+                                    className={styles.closeVideoButton}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M18 6L6 18M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </>
                     );
 
