@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Settings {
     applyText: boolean;
@@ -38,6 +38,12 @@ export default function PostEditor() {
     // Image overlay toggles — session-local, sent on each render call.
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
+    // Live-render plumbing: when a toggle changes (or title/caption is
+    // edited and committed), debounce-fire a render so the preview reflects
+    // the change without making the user hunt for the Regenerate button.
+    const liveRenderTimer = useRef<NodeJS.Timeout | null>(null);
+    const initialLoadDone = useRef(false);
+
     // The post + post mutation paths go through /api/posts because RLS is
     // service-role-only — a direct anon-key client read returns zero rows
     // (PostgREST throws "Cannot coerce the result to a single JSON object"
@@ -59,6 +65,10 @@ export default function PostEditor() {
                 setContent(data.content || '');
                 setSourceUrl(data.source_url || '');
                 setImageUrl(data.image || '');
+                // Mark initial load complete on the next tick so the
+                // settings-change effect doesn't fire a render while we're
+                // populating defaults from the just-loaded post.
+                setTimeout(() => { initialLoadDone.current = true; }, 50);
             } catch (e: any) {
                 setError(e?.message || 'Post not found');
             } finally {
@@ -67,6 +77,21 @@ export default function PostEditor() {
         }
         load();
     }, [id]);
+
+    // Live-render: re-run the renderer ~1.2s after the user changes any
+    // toggle or gradient position. Cancels prior timer on each change so
+    // rapid clicks coalesce into a single render at the end.
+    useEffect(() => {
+        if (!initialLoadDone.current) return;
+        if (liveRenderTimer.current) clearTimeout(liveRenderTimer.current);
+        liveRenderTimer.current = setTimeout(() => {
+            handleRegenerate({ silent: true });
+        }, 1200);
+        return () => {
+            if (liveRenderTimer.current) clearTimeout(liveRenderTimer.current);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settings.applyText, settings.applyGradient, settings.applyWatermark, settings.gradientPosition]);
 
     async function callJson(url: string, body: any): Promise<any> {
         const res = await fetch(url, {
@@ -109,9 +134,9 @@ export default function PostEditor() {
         }
     }
 
-    async function handleRegenerate() {
+    async function handleRegenerate(opts: { silent?: boolean } = {}) {
         setBusy('render');
-        setError(null);
+        if (!opts.silent) setError(null);
         setImageError(null);
         try {
             // Persist current title/excerpt FIRST so the live blog post page +
@@ -296,8 +321,42 @@ export default function PostEditor() {
                     </div>
                 </Card>
 
-                {/* ── Toggles + actions ───────────────────────────── */}
+                {/* ── Live overlay editor (text fields + toggles) ──── */}
                 <div className="space-y-4">
+                    <Card className="p-4 space-y-3">
+                        <SectionLabel>Overlay text</SectionLabel>
+                        <div>
+                            <label className="block text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                Title (big bold line)
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={e => setTitle(e.target.value)}
+                                onBlur={() => handleRegenerate({ silent: true })}
+                                className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                                style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                Caption (smaller line under title)
+                            </label>
+                            <input
+                                type="text"
+                                value={excerpt}
+                                onChange={e => setExcerpt(e.target.value)}
+                                onBlur={() => handleRegenerate({ silent: true })}
+                                placeholder="Sharp, observational, KumoLab voice"
+                                className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                                style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
+                            />
+                        </div>
+                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            Edits apply on blur · toggles below apply instantly
+                        </p>
+                    </Card>
+
                     <Card className="p-4">
                         <SectionLabel>Overlay toggles</SectionLabel>
                         <div className="space-y-2 mt-3">
@@ -350,7 +409,7 @@ export default function PostEditor() {
                         </div>
 
                         <button
-                            onClick={handleRegenerate}
+                            onClick={() => handleRegenerate()}
                             disabled={!!busy}
                             className="w-full mt-4 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
                             style={{
@@ -360,7 +419,7 @@ export default function PostEditor() {
                                 fontFamily: 'var(--font-display)',
                             }}
                         >
-                            {busy === 'render' ? 'Rendering…' : 'Regenerate Image'}
+                            {busy === 'render' ? 'Rendering…' : 'Force Regenerate'}
                         </button>
                     </Card>
 
@@ -401,29 +460,8 @@ export default function PostEditor() {
                 </div>
             </div>
 
-            {/* ── Text fields ─────────────────────────────────────── */}
+            {/* ── Body + source URL (less visual; below the fold is fine) ── */}
             <Card className="p-5 space-y-4">
-                <Field label="Title" hint="Big bold line at the top of the rendered image overlay">
-                    <input
-                        type="text"
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none transition-colors"
-                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                    />
-                </Field>
-
-                <Field label="Overlay text / Caption" hint="The smaller line under the title on the image overlay. Also used as the IG caption lead.">
-                    <input
-                        type="text"
-                        value={excerpt}
-                        onChange={e => setExcerpt(e.target.value)}
-                        placeholder="Sharp, observational, KumoLab voice"
-                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none"
-                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                    />
-                </Field>
-
                 <Field label="Source URL" hint="Used as the render source (also drives video extraction for trailers)">
                     <input
                         type="text"
