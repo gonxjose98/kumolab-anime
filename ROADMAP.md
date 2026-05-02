@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-04-26 | **Status:** 🟢 Active — Phase 1 cutover complete. Auto-publish live for video/visual claims. Security hardened (cron + admin API gated by middleware, public-facing endpoints locked, silent failure paths closed). Social broadcasting deliberately off (Jose: website-only focus).
+**Last updated:** 2026-05-02 | **Status:** 🟢 Active — Auto-publish flow producing fresh posts daily (latest: *Needy Girl Overdose | English Dub Trailer* from YouTube_Aniplex USA, auto-published 2026-05-02). Admin redesigned to a 3-route Console / Posts / Calendar surface. Editor overlay system rewired so toggles are independent, default OFF, auto-render on change. IG broadcast deliberately off (Meta page token expired 2026-05-01; awaiting fresh creds). AI provider intermittently 530'ing — caption falls back to deterministic templates.
 
 ---
 
@@ -75,6 +75,28 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
     • Schema-drift writes stripped from `custom-post`, `custom-url`, `generate` admin routes (`background_image`, `verification_*`, `twitter_tweet_id`, `studio_name`, `premiere_date` were silently dropped by PostgREST).
     • Required new env var: `CRON_SECRET` (Vercel Production). Documented in `CLAUDE.md`.
     • Repo root cleaned: ~140 v1-era debug artifacts deleted, `_archive_pre_rebuild/` migrations removed, `PostManager.tsx.new` orphan removed.
+- **Admin console redesign** (2026-04-30 → 2026-05-02, PRs #21–#39) — collapsed 9 admin routes + 16 components down to **3 routes (Console / Posts / Calendar)** + post editor at `/admin/post/[id]`. Net ~3,800 lines deleted. New consolidated `src/app/admin/dashboard/page.tsx` is the at-a-glance landing (status pulse, stat grid, pending review with inline approve/decline, next 24h, recently published, source health, recent activity). New posts list at `src/components/admin/posts/PostsList.tsx` replaces the 3,441-line PostManager modal. Shared header in `src/components/admin/AdminHeader.tsx`. Hamburger menu killed.
+- **Editor rewrite** (2026-05-02, PRs #33–#39) — `/admin/post/[id]` rewired multiple times after Jose hit successive bugs in production. Final state:
+    • Reads/writes go through `/api/posts` (RLS service-role bypass via middleware-gated admin auth) — direct Supabase anon-key calls were throwing "Cannot coerce" because RLS returned 0 rows.
+    • Toggle defaults are all **OFF** (`DEFAULT_SETTINGS` = `{ applyText: false, applyGradient: false, applyWatermark: false }`). User opts in.
+    • Toggles are **independent** — gradient and watermark no longer cascade off when text is off. Image-processor's USER OVERRIDE block now wires all three (`if (typeof applyX === 'boolean') finalApplyX = applyX`); previously only `applyText` was honored and the other two booleans were silently discarded — that was the real reason gradient/watermark toggles "did nothing" no matter what was tried.
+    • Auto-render fires on toggle change with 1.2s debounce. Title/Caption fields fire on blur. Live state passed to render endpoint as overrides (no more "edit text → click regenerate → DB reads stale title" bug).
+    • Render endpoint source-URL priority: explicit override (if image-shaped) → YouTube CDN thumbnail (when `youtube_video_id` is set) → `post.image`. The cleanup worker had been sweeping previously-rendered Supabase Storage PNGs, leaving stale `post.image` URLs that returned HTTP 400 on every render attempt; the YouTube thumbnail is always reliable. 6 broken posts reset via SQL.
+    • New `/api/cron?worker=render&postIds=A,B,C&text=0/1&gradient=0/1&watermark=0/1&gradPos=top/bottom` endpoint for server-to-server batch regen + end-to-end testing without admin auth.
+- **Editor layout + image upload + word color** (2026-05-02) — second pass after Jose tested live:
+    • Gradient `top`/`bottom` now actually moves. Renderer's entropy auto-detect was overriding the user's choice whenever text was on; it now only runs when caller passes no `gradientPosition`.
+    • Watermark visibility hardened — bumped to 30px Outfit with stroke outline + heavier shadow. Toggle was firing all along; the white-on-white was just invisible on bright trailer thumbnails.
+    • Title and caption are now drawn as **independent blocks** with separate `titleScale` / `captionScale` (defaults 100% / 55%) and per-element pixel `titleOffset` / `captionOffset` nudges. Auto-shrink scales both proportionally when combined block won't fit the safe zone.
+    • Editor adds a **Layout** card with scale slider + ↑↓←→ + Recenter for Title, Caption, and Watermark.
+    • Editor adds an **Upload image** button (new `/api/admin/upload-image` endpoint stages the file under `blog-images/editor-uploads/`) so Jose can swap the render source to his own picture without leaving the editor.
+    • Editor adds a **purple-word picker** chip row in the Overlay text card — click any word to flip it to KumoLab purple in the rendered overlay, click again to clear, plus Clear-all. Indices line up with the renderer's existing `purpleWordIndices` field.
+- **Caption + content polish** (2026-05-02, PRs #34) — AI endpoint (`ollama.kumolabanime.com/v1`) returns Cloudflare 530 intermittently. New `src/lib/engine/caption-fallback.ts` produces deterministic claim-type-aware KumoLab-voice captions when AI is down (e.g. "X just dropped a new trailer. Real footage, not a teaser tease."). Detection-worker's seeded content for YouTube candidates enriched from `<label> from <channel>` to include the video title, so AI/fallback both have richer context. Failures now log to `error_logs` (was silent `console.warn`).
+- **Build pipeline** — fixed the "fail-then-pass on every push" pattern by mirroring all 10 production env vars to Preview environment (preview builds were 5xx'ing because module-level Supabase guards threw on missing env). Verified two consecutive clean preview builds before declaring done.
+- **Homepage feed UX** (2026-05-02, PRs #28, #30, #32) — clean post titles (channel suffixes stripped, multi-word ALL-CAPS de-shouted, single-word acronyms preserved), full YouTube native controls (`allowFullScreen`, `picture-in-picture`, `web-share`, `playsinline`), `View full post` link click bug fixed (`.cardGradient` had no `pointer-events: none` and was eating clicks), all card overlays hide while video is playing so iframe owns the tap surface (CC, settings, fullscreen, scrub bar, share work natively), small ✕ close button replaces overlays during playback so users have a way out. Hero overlay PNG removed from blog post page for video posts — embed IS the hero.
+
+**Open blockers (not in flight, awaiting Jose):**
+- **IG broadcasting**: Meta page token expired 2026-05-01 PDT. Need App ID + App Secret + fresh user token to mint never-expiring page token. Posts publish to website fine; IG/FB/Threads cross-posts are paused.
+- **AI endpoint reliability**: ollama.kumolabanime.com upstream is 530'ing intermittently. Captions fall back cleanly; tone/safety pass fails closed (Japanese-translation posts get rejected when AI is down). Two paths: stabilize the ollama instance, or set `KIMI_API_KEY`/`OPENAI_API_KEY` in Vercel env so the AI provider chain in `ai.ts` failovers automatically.
 
 ### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
 

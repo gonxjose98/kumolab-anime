@@ -3,22 +3,44 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+interface XY { x: number; y: number }
+
 interface Settings {
     applyText: boolean;
     applyGradient: boolean;
     applyWatermark: boolean;
     gradientPosition: 'top' | 'bottom';
+    titleScale: number;
+    captionScale: number;
+    titleOffset: XY;
+    captionOffset: XY;
+    watermarkPosition: XY | null;       // null = renderer's auto bottom-center
+    purpleWordIndices: number[];        // indices into the merged title+caption word stream
 }
 
 // All overlays default OFF when opening the editor. The user opts in to
 // each treatment by toggling ON. This is per Jose's directive: nothing
 // should appear unless explicitly enabled.
+//
+// Default scales: title 100%, caption 55% — caption smaller than title by
+// default but still readable, not obnoxious.
 const DEFAULT_SETTINGS: Settings = {
     applyText: false,
     applyGradient: false,
     applyWatermark: false,
     gradientPosition: 'bottom',
+    titleScale: 1,
+    captionScale: 0.55,
+    titleOffset: { x: 0, y: 0 },
+    captionOffset: { x: 0, y: 0 },
+    watermarkPosition: null,
+    purpleWordIndices: [],
 };
+
+const NUDGE_PX = 30;
+const KUMOLAB_PURPLE = '#9D7BFF';
+const CANVAS_W = 1080;
+const CANVAS_H = 1350;
 
 export default function PostEditor() {
     const params = useParams();
@@ -87,8 +109,8 @@ export default function PostEditor() {
     }, [id]);
 
     // Live-render: re-run the renderer ~1.2s after the user changes any
-    // toggle or gradient position. Cancels prior timer on each change so
-    // rapid clicks coalesce into a single render at the end.
+    // toggle, scale, position, or purple selection. Cancels prior timer on
+    // each change so rapid clicks coalesce into a single render at the end.
     useEffect(() => {
         if (!initialLoadDone.current) return;
         if (liveRenderTimer.current) clearTimeout(liveRenderTimer.current);
@@ -99,7 +121,15 @@ export default function PostEditor() {
             if (liveRenderTimer.current) clearTimeout(liveRenderTimer.current);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [settings.applyText, settings.applyGradient, settings.applyWatermark, settings.gradientPosition]);
+    }, [
+        settings.applyText, settings.applyGradient, settings.applyWatermark,
+        settings.gradientPosition, settings.titleScale, settings.captionScale,
+        settings.titleOffset.x, settings.titleOffset.y,
+        settings.captionOffset.x, settings.captionOffset.y,
+        settings.watermarkPosition?.x, settings.watermarkPosition?.y,
+        // Reference the JSON so any change to the array triggers re-render.
+        JSON.stringify(settings.purpleWordIndices),
+    ]);
 
     async function callJson(url: string, body: any): Promise<any> {
         const res = await fetch(url, {
@@ -179,6 +209,34 @@ export default function PostEditor() {
             setPost((p: any) => p ? { ...p, title, excerpt, content, image: json.image } : p);
         } catch (e: any) {
             setError(e?.message || 'Render failed');
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function handleUpload(file: File) {
+        setBusy('render');
+        setError(null);
+        setImageError(null);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/admin/upload-image', {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: fd,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                throw new Error(json.error || `Upload failed (HTTP ${res.status})`);
+            }
+            // Use the uploaded URL as the render source for the next render.
+            setSourceUrl(json.url);
+            // Kick a render immediately so the user sees the uploaded
+            // image swap into the preview without manual regenerate.
+            await handleRegenerate({ silent: true });
+        } catch (e: any) {
+            setError(e?.message || 'Upload failed');
         } finally {
             setBusy(null);
         }
@@ -361,8 +419,21 @@ export default function PostEditor() {
                             />
                         </div>
                         <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            Edits apply on blur · toggles below apply instantly
+                            Edits apply on blur · toggles + nudges apply instantly
                         </p>
+
+                        {/* Purple-word picker — click any word to flip it to
+                            KumoLab purple in the rendered overlay; click again
+                            to clear. Picker only enables when Show text is on.
+                            Words are indexed across the merged title+caption
+                            stream (matches the renderer). */}
+                        <PurpleWordPicker
+                            disabled={!settings.applyText}
+                            title={title}
+                            caption={excerpt}
+                            selected={settings.purpleWordIndices}
+                            onChange={next => setSettings(s => ({ ...s, purpleWordIndices: next }))}
+                        />
                     </Card>
 
                     <Card className="p-4">
@@ -431,6 +502,61 @@ export default function PostEditor() {
                         </button>
                     </Card>
 
+                    {/* ── Layout: scale + position per element ─────────── */}
+                    <Card className="p-4 space-y-4">
+                        <SectionLabel>Layout</SectionLabel>
+
+                        <ElementControls
+                            label="Title"
+                            disabled={!settings.applyText}
+                            scale={settings.titleScale}
+                            scaleMin={0.4}
+                            scaleMax={1.6}
+                            onScaleChange={v => setSettings(s => ({ ...s, titleScale: v }))}
+                            offset={settings.titleOffset}
+                            onNudge={(dx, dy) => setSettings(s => ({
+                                ...s,
+                                titleOffset: { x: s.titleOffset.x + dx, y: s.titleOffset.y + dy },
+                            }))}
+                            onRecenter={() => setSettings(s => ({ ...s, titleOffset: { x: 0, y: 0 } }))}
+                        />
+
+                        <ElementControls
+                            label="Caption"
+                            disabled={!settings.applyText}
+                            scale={settings.captionScale}
+                            scaleMin={0.25}
+                            scaleMax={1.2}
+                            onScaleChange={v => setSettings(s => ({ ...s, captionScale: v }))}
+                            offset={settings.captionOffset}
+                            onNudge={(dx, dy) => setSettings(s => ({
+                                ...s,
+                                captionOffset: { x: s.captionOffset.x + dx, y: s.captionOffset.y + dy },
+                            }))}
+                            onRecenter={() => setSettings(s => ({ ...s, captionOffset: { x: 0, y: 0 } }))}
+                        />
+
+                        {/* Watermark uses an absolute (x,y) — convert nudges
+                            to absolute by snapping the first nudge off the
+                            renderer default (centered, bottom). Recenter
+                            clears back to null so renderer auto-positions. */}
+                        <ElementControls
+                            label="Watermark"
+                            disabled={!settings.applyWatermark}
+                            offset={settings.watermarkPosition
+                                ? {
+                                    x: settings.watermarkPosition.x - CANVAS_W / 2,
+                                    y: settings.watermarkPosition.y - (CANVAS_H - 50),
+                                }
+                                : { x: 0, y: 0 }}
+                            onNudge={(dx, dy) => setSettings(s => {
+                                const base = s.watermarkPosition ?? { x: CANVAS_W / 2, y: CANVAS_H - 50 };
+                                return { ...s, watermarkPosition: { x: base.x + dx, y: base.y + dy } };
+                            })}
+                            onRecenter={() => setSettings(s => ({ ...s, watermarkPosition: null }))}
+                        />
+                    </Card>
+
                     {isPending && (
                         <Card className="p-4">
                             <SectionLabel>Quick actions</SectionLabel>
@@ -470,15 +596,40 @@ export default function PostEditor() {
 
             {/* ── Body + source URL (less visual; below the fold is fine) ── */}
             <Card className="p-5 space-y-4">
-                <Field label="Background image URL (optional)" hint="Override the render background. Leave blank to use the post's existing image. Must be a direct image URL — not a YouTube watch page.">
-                    <input
-                        type="text"
-                        value={sourceUrl}
-                        onChange={e => setSourceUrl(e.target.value)}
-                        placeholder="https://… (direct .jpg / .png / .webp)"
-                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
-                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                    />
+                <Field label="Background image" hint="Upload your own picture or paste a direct image URL. Leave blank to use the post's existing image. URL must be a direct image, not a YouTube watch page.">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                        <input
+                            type="text"
+                            value={sourceUrl}
+                            onChange={e => setSourceUrl(e.target.value)}
+                            placeholder="https://… (direct .jpg / .png / .webp)"
+                            className="flex-1 bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
+                            style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                        />
+                        <label
+                            className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer text-center transition-all hover:-translate-y-0.5"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
+                                border: '1px solid rgba(123,97,255,0.30)',
+                                color: '#fff',
+                                fontFamily: 'var(--font-display)',
+                                opacity: busy ? 0.4 : 1,
+                            }}
+                        >
+                            {busy === 'render' ? 'Uploading…' : 'Upload image'}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                disabled={!!busy}
+                                onChange={e => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleUpload(f);
+                                    e.target.value = ''; // allow re-uploading the same file
+                                }}
+                                className="hidden"
+                            />
+                        </label>
+                    </div>
                 </Field>
 
                 <Field label="Body content">
@@ -560,6 +711,183 @@ function Toggle({ label, hint, value, onChange }: { label: string; hint?: string
                 />
             </span>
         </button>
+    );
+}
+
+// Per-element scale slider + nudge pad. Used for Title, Caption, Watermark.
+// scale fields are optional — Watermark doesn't have a scale knob today.
+function ElementControls({
+    label,
+    disabled,
+    scale,
+    scaleMin,
+    scaleMax,
+    onScaleChange,
+    offset,
+    onNudge,
+    onRecenter,
+}: {
+    label: string;
+    disabled?: boolean;
+    scale?: number;
+    scaleMin?: number;
+    scaleMax?: number;
+    onScaleChange?: (v: number) => void;
+    offset: XY;
+    onNudge: (dx: number, dy: number) => void;
+    onRecenter: () => void;
+}) {
+    const dim = disabled ? 0.4 : 1;
+    return (
+        <div className="space-y-2" style={{ opacity: dim }}>
+            <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
+                    {label}
+                </span>
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {offset.x === 0 && offset.y === 0
+                        ? 'centered'
+                        : `Δ ${offset.x >= 0 ? '+' : ''}${offset.x}, ${offset.y >= 0 ? '+' : ''}${offset.y}`}
+                </span>
+            </div>
+
+            {scale !== undefined && onScaleChange && (
+                <div className="flex items-center gap-2">
+                    <input
+                        type="range"
+                        min={scaleMin ?? 0.4}
+                        max={scaleMax ?? 1.6}
+                        step={0.05}
+                        value={scale}
+                        disabled={disabled}
+                        onChange={e => onScaleChange(parseFloat(e.target.value))}
+                        className="flex-1 accent-purple-500"
+                    />
+                    <span className="text-[10px] font-mono w-10 text-right" style={{ color: 'var(--text-muted)' }}>
+                        {Math.round(scale * 100)}%
+                    </span>
+                </div>
+            )}
+
+            <div className="flex items-center gap-1.5">
+                <NudgeBtn disabled={disabled} onClick={() => onNudge(-NUDGE_PX, 0)}>←</NudgeBtn>
+                <NudgeBtn disabled={disabled} onClick={() => onNudge(0, -NUDGE_PX)}>↑</NudgeBtn>
+                <NudgeBtn disabled={disabled} onClick={() => onNudge(0, NUDGE_PX)}>↓</NudgeBtn>
+                <NudgeBtn disabled={disabled} onClick={() => onNudge(NUDGE_PX, 0)}>→</NudgeBtn>
+                <button
+                    onClick={onRecenter}
+                    disabled={disabled}
+                    className="ml-auto px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-white/[0.05] disabled:cursor-not-allowed"
+                    style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        color: 'var(--text-tertiary)',
+                        fontFamily: 'var(--font-display)',
+                    }}
+                >
+                    Recenter
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function NudgeBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className="w-7 h-7 rounded text-xs font-bold transition-all hover:bg-white/[0.05] disabled:cursor-not-allowed"
+            style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'var(--text-primary)',
+            }}
+        >
+            {children}
+        </button>
+    );
+}
+
+// Renders title words then caption words as a chip row. Click toggles each
+// word's index in the global purpleWordIndices array (which the renderer
+// indexes the same way: title words first, then caption words).
+function PurpleWordPicker({
+    disabled,
+    title,
+    caption,
+    selected,
+    onChange,
+}: {
+    disabled?: boolean;
+    title: string;
+    caption: string;
+    selected: number[];
+    onChange: (next: number[]) => void;
+}) {
+    // Match the renderer's normalization: ALL CAPS so what the picker shows
+    // matches what the rendered overlay shows.
+    const titleWords = (title || '').toUpperCase().trim().split(/\s+/).filter(Boolean);
+    const captionWords = (caption || '').toUpperCase().trim().split(/\s+/).filter(Boolean);
+    const all = [...titleWords, ...captionWords];
+
+    if (all.length === 0) return null;
+
+    const sel = new Set(selected);
+    const toggle = (i: number) => {
+        const next = new Set(sel);
+        if (next.has(i)) next.delete(i);
+        else next.add(i);
+        onChange([...next].sort((a, b) => a - b));
+    };
+
+    const Chip = ({ word, idx, group }: { word: string; idx: number; group: 'title' | 'caption' }) => {
+        const active = sel.has(idx);
+        return (
+            <button
+                key={`${group}-${idx}`}
+                onClick={() => toggle(idx)}
+                disabled={disabled}
+                className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed"
+                style={{
+                    background: active ? `${KUMOLAB_PURPLE}25` : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${active ? KUMOLAB_PURPLE : 'rgba(255,255,255,0.08)'}`,
+                    color: active ? KUMOLAB_PURPLE : 'var(--text-tertiary)',
+                }}
+            >
+                {word}
+            </button>
+        );
+    };
+
+    return (
+        <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)', opacity: disabled ? 0.4 : 1 }}>
+            <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                    Color words KumoLab purple
+                </span>
+                {selected.length > 0 && (
+                    <button
+                        onClick={() => onChange([])}
+                        disabled={disabled}
+                        className="text-[9px] uppercase tracking-wider hover:underline disabled:cursor-not-allowed"
+                        style={{ color: 'var(--text-tertiary)' }}
+                    >
+                        Clear all
+                    </button>
+                )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                {titleWords.map((w, i) => <Chip key={`t-${i}`} word={w} idx={i} group="title" />)}
+            </div>
+            {captionWords.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                    {captionWords.map((w, i) => (
+                        <Chip key={`c-${i}`} word={w} idx={titleWords.length + i} group="caption" />
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }
 
