@@ -208,11 +208,10 @@ export async function generateIntelImage({
             finalApplyWatermark = false;
         }
 
-        // REVALIDATION: If hasText is false (either derived or forced), all overlays MUST BE ZERO
-        if (!finalApplyText) {
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
-        }
+        // Editor toggles are now INDEPENDENT — gradient and watermark no
+        // longer cascade off when text is off. The user gets exactly what
+        // they toggle on. (Old behavior coupled them; that contradicted the
+        // editor UX where each toggle is its own choice.)
 
         // --- CLEAN TEXT PRE-VALIDATION ---
         let cleanedHeadline = (headline || '').toUpperCase().trim().replace(/[—–‒―]/g, '-');
@@ -224,11 +223,10 @@ export async function generateIntelImage({
 
         const hasActualText = (upperTitle.length > 0 || cleanedHeadline.length > 0);
 
-        // HARD CONTRACT: No text = No visual treatments.
-        if (!finalApplyText || !hasActualText) {
+        // If text is requested but there's nothing to render, only kill text
+        // — leave gradient/watermark to their own toggles.
+        if (!hasActualText) {
             finalApplyText = false;
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
         }
 
         // --- SAFE ZONE DETECTION ---
@@ -274,10 +272,15 @@ export async function generateIntelImage({
             totalBlockHeight = (titleLines.length + headlineLines.length) * (135 * 0.92);
         }
 
-        // --- GRADIENT LOGIC (Strictly dependent on Rendering) ---
-        if (finalApplyGradient && finalApplyText && totalBlockHeight > 0) {
+        // --- GRADIENT LOGIC (independent toggle) ---
+        // Renders even without text. Sizes off text block when text is on,
+        // otherwise uses a fixed 600px fade — typical bottom shade for a
+        // clean visual.
+        if (finalApplyGradient) {
             const minGradH = 800;
-            const gradientHeight = Math.max(totalBlockHeight + 500, minGradH);
+            const gradientHeight = totalBlockHeight > 0
+                ? Math.max(totalBlockHeight + 500, minGradH)
+                : 600;
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
 
@@ -388,8 +391,8 @@ export async function generateIntelImage({
             }
         }
 
-        // --- WATERMARK (Strictly dependent on text) ---
-        if (finalApplyWatermark && finalApplyText) {
+        // --- WATERMARK (independent toggle) ---
+        if (finalApplyWatermark) {
             ctx.font = 'bold 24px Arial, sans-serif';
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.textAlign = 'center';
