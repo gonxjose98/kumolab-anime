@@ -99,10 +99,16 @@ export default function PostEditor() {
                 // renderer falls back to post.image (the actual thumbnail).
                 setSourceUrl('');
                 setImageUrl(data.image || '');
-                // Mark initial load complete on the next tick so the
-                // settings-change effect doesn't fire a render while we're
-                // populating defaults from the just-loaded post.
-                setTimeout(() => { initialLoadDone.current = true; }, 50);
+                // Fire a preview render immediately with the default toggle
+                // state (all OFF). This makes the displayed image actually
+                // match the toggle UI on open — without it, the editor was
+                // showing whatever was last persisted to post.image (which
+                // for posts touched by the pre-fix editor still has overlays
+                // baked in). Render-on-open also makes Force Regenerate's
+                // result feel meaningful — the displayed image is now
+                // demonstrably "what these settings produce right now."
+                kickPreview(data);
+                initialLoadDone.current = true;
             } catch (e: any) {
                 setError(e?.message || 'Post not found');
             } finally {
@@ -135,6 +141,30 @@ export default function PostEditor() {
         // Reference the JSON so any change to the array triggers re-render.
         JSON.stringify(settings.purpleWordIndices),
     ]);
+
+    // Preview-render helper that doesn't depend on the title/excerpt useState
+    // values (avoids the "stale state" race when called from inside the
+    // post-load effect). Pass the just-loaded post in directly.
+    async function kickPreview(loadedPost: any) {
+        try {
+            const res = await fetch('/api/admin/render-post-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    postId: loadedPost.id,
+                    title: loadedPost.title || '',
+                    excerpt: loadedPost.excerpt || '',
+                    settings: DEFAULT_SETTINGS,
+                    persist: false,
+                }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (json?.success && json.image) setImageUrl(json.image);
+        } catch {
+            // Soft fail — leave imageUrl as-is and let the user toggle to retry.
+        }
+    }
 
     async function callJson(url: string, body: any): Promise<any> {
         const res = await fetch(url, {
@@ -218,6 +248,32 @@ export default function PostEditor() {
             setImageUrl(json.image); // base64 data URL — no cache-bust needed
         } catch (e: any) {
             setError(e?.message || 'Render failed');
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function handleReset() {
+        setBusy('render');
+        setError(null);
+        setImageError(null);
+        try {
+            const json = await callJson('/api/admin/reset-image', { postId: id });
+            // Setting sourceUrl tells the render endpoint to use this URL as
+            // the preview source, bypassing post.image (which may be baked).
+            setSourceUrl(json.url);
+            // Fire a preview render off the fresh source.
+            const r = await callJson('/api/admin/render-post-image', {
+                postId: id,
+                sourceUrl: json.url,
+                title,
+                excerpt,
+                settings,
+                persist: false,
+            });
+            setImageUrl(r.image);
+        } catch (e: any) {
+            setError(e?.message || 'Reset failed');
         } finally {
             setBusy(null);
         }
@@ -645,7 +701,7 @@ export default function PostEditor() {
 
             {/* ── Body + source URL (less visual; below the fold is fine) ── */}
             <Card className="p-5 space-y-4">
-                <Field label="Background image" hint="Upload your own picture or paste a direct image URL. Leave blank to use the post's existing image. URL must be a direct image, not a YouTube watch page.">
+                <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                         <input
                             type="text"
@@ -655,6 +711,20 @@ export default function PostEditor() {
                             className="flex-1 bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
                             style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
                         />
+                        <button
+                            onClick={handleReset}
+                            disabled={!!busy}
+                            className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                            style={{
+                                background: 'rgba(255,255,255,0.03)',
+                                border: '1px solid rgba(255,255,255,0.10)',
+                                color: 'var(--text-tertiary)',
+                                fontFamily: 'var(--font-display)',
+                            }}
+                            title="Re-fetch a clean original image and discard any baked overlay"
+                        >
+                            Reset
+                        </button>
                         <label
                             className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer text-center transition-all hover:-translate-y-0.5"
                             style={{
@@ -665,7 +735,7 @@ export default function PostEditor() {
                                 opacity: busy ? 0.4 : 1,
                             }}
                         >
-                            {busy === 'render' ? 'Uploading…' : 'Upload image'}
+                            {busy === 'render' ? 'Working…' : 'Upload image'}
                             <input
                                 type="file"
                                 accept="image/*"
