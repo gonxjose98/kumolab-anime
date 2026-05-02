@@ -281,6 +281,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
         title: candidate.title,
         content: candidate.content,
         claim_type: enrichedData.claimType || 'OTHER',
+        source: candidate.source_name,
       });
     } catch (err: any) {
       console.warn(`[ProcessingWorker] caption gen failed: ${err.message}`);

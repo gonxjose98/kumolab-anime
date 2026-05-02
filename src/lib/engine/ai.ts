@@ -1,4 +1,6 @@
 import { EDITORIAL_SYSTEM_PROMPT } from './prompts';
+import { buildFallbackCaption } from './caption-fallback';
+import { logError } from '../logging/structured-logger';
 
 /**
  * Antigravity AI Engine
@@ -293,8 +295,9 @@ Do not wrap in quotes or code blocks.`
         title: string;
         content: string;
         claim_type?: string | null;
+        source?: string | null;
     }): Promise<string> {
-        const { title, content, claim_type } = params;
+        const { title, content, claim_type, source } = params;
         const claim = (claim_type || 'OTHER').toUpperCase();
 
         const claimGuide: Record<string, string> = {
@@ -345,9 +348,16 @@ Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
             const cleaned = raw.replace(/^["']|["']$/g, '').trim();
             return cleaned.length > 200 ? cleaned.substring(0, 197).trim() + '…' : cleaned;
         } catch (e: any) {
-            console.warn('[AntigravityAI] generateCaption failed, falling back to truncated content:', e?.message || e);
-            const fallback = content.replace(/\s+/g, ' ').trim().substring(0, 180);
-            return fallback ? `${fallback}…` : title;
+            // Caption AI is intermittently down (ollama upstream 530s). Log it
+            // so we know, then use the deterministic template fallback. This
+            // produces a real KumoLab-voice line instead of dumping the raw
+            // content/title — much closer to what the AI would have written.
+            await logError({
+                source: 'engine.ai.caption',
+                errorMessage: `generateCaption failed (${e?.message || e}); using deterministic fallback`,
+                context: { title: title.substring(0, 120), claim_type: claim },
+            }).catch(() => {});
+            return buildFallbackCaption({ title, claim_type: claim, source });
         }
     }
 
