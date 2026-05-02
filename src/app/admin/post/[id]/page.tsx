@@ -10,10 +10,13 @@ interface Settings {
     gradientPosition: 'top' | 'bottom';
 }
 
+// All overlays default OFF when opening the editor. The user opts in to
+// each treatment by toggling ON. This is per Jose's directive: nothing
+// should appear unless explicitly enabled.
 const DEFAULT_SETTINGS: Settings = {
-    applyText: true,
-    applyGradient: true,
-    applyWatermark: true,
+    applyText: false,
+    applyGradient: false,
+    applyWatermark: false,
     gradientPosition: 'bottom',
 };
 
@@ -63,7 +66,12 @@ export default function PostEditor() {
                 setTitle(data.title || '');
                 setExcerpt(data.excerpt || '');
                 setContent(data.content || '');
-                setSourceUrl(data.source_url || '');
+                // DO NOT pre-fill sourceUrl from data.source_url — that field
+                // is the article/YouTube watch URL, NOT a renderable image.
+                // Pre-filling it caused the renderer to fetch youtube.com/
+                // watch?v=… as binary, which fails. Leave blank so the
+                // renderer falls back to post.image (the actual thumbnail).
+                setSourceUrl('');
                 setImageUrl(data.image || '');
                 // Mark initial load complete on the next tick so the
                 // settings-change effect doesn't fire a render while we're
@@ -462,12 +470,12 @@ export default function PostEditor() {
 
             {/* ── Body + source URL (less visual; below the fold is fine) ── */}
             <Card className="p-5 space-y-4">
-                <Field label="Source URL" hint="Used as the render source (also drives video extraction for trailers)">
+                <Field label="Background image URL (optional)" hint="Override the render background. Leave blank to use the post's existing image. Must be a direct image URL — not a YouTube watch page.">
                     <input
                         type="text"
                         value={sourceUrl}
                         onChange={e => setSourceUrl(e.target.value)}
-                        placeholder="https://… (raw image or article URL)"
+                        placeholder="https://… (direct .jpg / .png / .webp)"
                         className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
                         style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
                     />
