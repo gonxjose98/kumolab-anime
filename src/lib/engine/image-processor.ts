@@ -47,6 +47,10 @@ interface IntelImageOptions {
     titleOffset?: { x: number; y: number };
     captionOffset?: { x: number; y: number };
     gradientPosition?: 'top' | 'bottom';
+    // Multiplier on every gradient alpha stop (default 1). <1 softens the
+    // fade, >1 hardens it. Clamped to [0.2, 1.6] inside the renderer; final
+    // alpha is also clamped to ≤1 so a "harden" past 1 just flattens stops.
+    gradientStrength?: number;
     purpleWordIndices?: number[];
     applyWatermark?: boolean;
     watermarkPosition?: { x: number; y: number };
@@ -114,6 +118,7 @@ export async function generateIntelImage({
     titleOffset,
     captionOffset,
     gradientPosition,
+    gradientStrength,
     purpleWordIndices,
     applyWatermark = true,
     watermarkPosition,
@@ -298,16 +303,21 @@ export async function generateIntelImage({
             const gradY = isTop ? 0 : HEIGHT - gradientHeight;
             const gradient = ctx.createLinearGradient(0, gradY, 0, isTop ? gradientHeight : HEIGHT);
 
+            // Strength multiplies each stop's alpha. Soft = fade barely
+            // tints, hard = nearly solid black. Stop alpha capped at 1.
+            const k = Math.max(0.2, Math.min(1.6, gradientStrength ?? 1));
+            const a = (v: number) => `rgba(0,0,0,${Math.max(0, Math.min(1, v * k)).toFixed(3)})`;
+
             if (isTop) {
-                gradient.addColorStop(0, 'rgba(0,0,0,0.95)');
-                gradient.addColorStop(0.4, 'rgba(0,0,0,0.6)');
-                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                gradient.addColorStop(0, a(0.95));
+                gradient.addColorStop(0.4, a(0.6));
+                gradient.addColorStop(1, a(0));
             } else {
-                gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
-                gradient.addColorStop(0.6, 'rgba(0,0,0,0.6)');
-                gradient.addColorStop(0.85, 'rgba(0,0,0,0.95)');
-                gradient.addColorStop(1, 'rgba(0,0,0,1)');
+                gradient.addColorStop(0, a(0));
+                gradient.addColorStop(0.4, a(0.2));
+                gradient.addColorStop(0.6, a(0.6));
+                gradient.addColorStop(0.85, a(0.95));
+                gradient.addColorStop(1, a(1));
             }
 
             ctx.save();

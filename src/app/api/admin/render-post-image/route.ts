@@ -6,12 +6,19 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Renders the overlay image for a post and writes the result to posts.image.
+ * Renders the overlay image for a post.
  *
- * Settings can be passed in the request body (preferred) or fall through to
- * sensible defaults. The v2 schema dropped `background_image` and
- * `image_settings` columns; settings are now session-local (component state)
- * sent in the request, not persisted in the DB.
+ * Two modes:
+ *   - persist=false (default) — preview only. Returns a base64 data URL,
+ *     does NOT touch Storage and does NOT write posts.image. Used by the
+ *     editor's auto-render so the user can experiment freely without
+ *     mutating the post until they hit Save.
+ *   - persist=true — final render. Uploads PNG to the blog-images bucket
+ *     and writes posts.image. Used by the editor's Save flow and by
+ *     server-side callers that own the post lifecycle.
+ *
+ * Settings come from the request body; the v2 schema dropped persistent
+ * image settings columns so they live in component state, not the DB.
  */
 export async function POST(req: NextRequest) {
     try {
@@ -22,6 +29,7 @@ export async function POST(req: NextRequest) {
             sourceUrl: sourceOverride,
             title: titleOverride,
             excerpt: excerptOverride,
+            persist = false,
         } = body || {};
 
         if (!postId || typeof postId !== 'string') {
@@ -81,6 +89,9 @@ export async function POST(req: NextRequest) {
             animeTitle,
             headline,
             slug: post.slug || `post-${postId}`,
+            // Preview mode skips the Storage upload and gets back a base64
+            // data URL. Final renders (persist=true) upload as before.
+            skipUpload: !persist,
 
             // All toggles + positions come from the request body. Defaults match
             // the auto-publish renderer: text + gradient + watermark all on.
@@ -90,6 +101,7 @@ export async function POST(req: NextRequest) {
             applyGradient: settings.applyGradient ?? true,
             applyWatermark: settings.applyWatermark ?? true,
             gradientPosition: settings.gradientPosition ?? 'bottom',
+            gradientStrength: settings.gradientStrength,
             textScale: settings.textScale,
             textPosition: settings.textPosition,
             titleScale: settings.titleScale,
@@ -111,6 +123,16 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        if (!persist) {
+            // Preview — return the base64 data URL, do not mutate the row.
+            return NextResponse.json({
+                success: true,
+                image: result.processedImage,
+                layout: result.layout,
+                persisted: false,
+            });
+        }
+
         const { data: updated, error: updateError } = await supabaseAdmin
             .from('posts')
             .update({ image: result.processedImage })
@@ -126,6 +148,7 @@ export async function POST(req: NextRequest) {
             success: true,
             image: updated.image,
             layout: result.layout,
+            persisted: true,
         });
     } catch (e: any) {
         console.error('[admin/render-post-image] error', e);

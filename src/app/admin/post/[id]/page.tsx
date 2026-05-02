@@ -10,6 +10,7 @@ interface Settings {
     applyGradient: boolean;
     applyWatermark: boolean;
     gradientPosition: 'top' | 'bottom';
+    gradientStrength: number;           // 1 = default; <1 softer, >1 harder
     titleScale: number;
     captionScale: number;
     titleOffset: XY;
@@ -29,6 +30,7 @@ const DEFAULT_SETTINGS: Settings = {
     applyGradient: false,
     applyWatermark: false,
     gradientPosition: 'bottom',
+    gradientStrength: 1,
     titleScale: 1,
     captionScale: 0.55,
     titleOffset: { x: 0, y: 0 },
@@ -37,7 +39,9 @@ const DEFAULT_SETTINGS: Settings = {
     purpleWordIndices: [],
 };
 
-const NUDGE_PX = 30;
+// Smaller per-click nudge — 12px gives finer placement without feeling
+// laggy. Earlier 30px was overshooting.
+const NUDGE_PX = 12;
 const KUMOLAB_PURPLE = '#9D7BFF';
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
@@ -123,7 +127,8 @@ export default function PostEditor() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         settings.applyText, settings.applyGradient, settings.applyWatermark,
-        settings.gradientPosition, settings.titleScale, settings.captionScale,
+        settings.gradientPosition, settings.gradientStrength,
+        settings.titleScale, settings.captionScale,
         settings.titleOffset.x, settings.titleOffset.y,
         settings.captionOffset.x, settings.captionOffset.y,
         settings.watermarkPosition?.x, settings.watermarkPosition?.y,
@@ -145,15 +150,29 @@ export default function PostEditor() {
     }
 
     async function handleSave(opts: { thenApprove?: boolean } = {}) {
+        // Single source of truth for "publish my edits": render with
+        // persist=true (uploads PNG + writes posts.image), then PUT the
+        // text fields. Auto-renders during editing don't touch the DB —
+        // this is the only path that does. Save by itself does NOT
+        // approve. Save + Approve approves only on the second action.
         const action = opts.thenApprove ? 'approve' : 'save';
         setBusy(action);
         setError(null);
         try {
+            const renderJson = await callJson('/api/admin/render-post-image', {
+                postId: id,
+                sourceUrl: sourceUrl || undefined,
+                title,
+                excerpt,
+                settings,
+                persist: true,
+            });
+
             const res = await fetch('/api/posts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ id, title, excerpt, content, image: imageUrl }),
+                body: JSON.stringify({ id, title, excerpt, content, image: renderJson.image }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || json.success === false) {
@@ -172,41 +191,31 @@ export default function PostEditor() {
         }
     }
 
+    function handleCancel() {
+        // Discard everything — no DB writes, no render persistence. The
+        // post remains exactly as it was when the editor opened.
+        router.push('/admin/dashboard');
+    }
+
     async function handleRegenerate(opts: { silent?: boolean } = {}) {
+        // Preview-only render. Returns a base64 data URL we display in the
+        // <img> tag. Nothing is written to Storage or the DB until the
+        // user hits Save. This means the user can experiment freely with
+        // toggles, scales, nudges, and word colors and walk away (or hit
+        // Cancel) without leaving any trace on the post.
         setBusy('render');
         if (!opts.silent) setError(null);
         setImageError(null);
         try {
-            // Persist current title/excerpt FIRST so the live blog post page +
-            // any future render request sees the same values. Skip if the
-            // editor fields are unchanged (avoid redundant write).
-            const dbTitle = post?.title ?? '';
-            const dbExcerpt = post?.excerpt ?? '';
-            if (title !== dbTitle || excerpt !== dbExcerpt || content !== (post?.content ?? '')) {
-                await fetch('/api/posts', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ id, title, excerpt, content }),
-                }).catch(() => {});
-            }
-
-            // Render with the LIVE editor state. The endpoint uses these
-            // overrides as the anime-title and overlay-text, ignoring the DB
-            // copy. So toggling Show Text + typing in Caption + Regenerate
-            // reflects exactly what the user just typed.
             const json = await callJson('/api/admin/render-post-image', {
                 postId: id,
                 sourceUrl: sourceUrl || undefined,
                 title,
                 excerpt,
                 settings,
+                persist: false,
             });
-            // Cache-bust so the <img> reloads even if URL is the same.
-            const fresh = `${json.image}${json.image.includes('?') ? '&' : '?'}t=${Date.now()}`;
-            setImageUrl(fresh);
-            // Mirror the freshly-saved fields so subsequent regen calls compare cleanly.
-            setPost((p: any) => p ? { ...p, title, excerpt, content, image: json.image } : p);
+            setImageUrl(json.image); // base64 data URL — no cache-bust needed
         } catch (e: any) {
             setError(e?.message || 'Render failed');
         } finally {
@@ -312,6 +321,19 @@ export default function PostEditor() {
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleCancel}
+                        disabled={!!busy}
+                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:bg-white/[0.05] disabled:opacity-40"
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: 'var(--text-tertiary)',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        Cancel
+                    </button>
                     {isPending && (
                         <button
                             onClick={() => handleSave({ thenApprove: true })}
@@ -458,31 +480,58 @@ export default function PostEditor() {
                                 onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
                             />
 
-                            <div className="pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                                <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
-                                    Gradient position
+                            <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                                <div>
+                                    <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
+                                        Gradient position
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {(['bottom', 'top'] as const).map(pos => {
+                                            const active = settings.gradientPosition === pos;
+                                            return (
+                                                <button
+                                                    key={pos}
+                                                    onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
+                                                    className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                                                    style={{
+                                                        background: active
+                                                            ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
+                                                            : 'rgba(255,255,255,0.03)',
+                                                        border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
+                                                        color: active ? '#fff' : 'var(--text-tertiary)',
+                                                        fontFamily: 'var(--font-display)',
+                                                    }}
+                                                >
+                                                    {pos}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    {(['bottom', 'top'] as const).map(pos => {
-                                        const active = settings.gradientPosition === pos;
-                                        return (
-                                            <button
-                                                key={pos}
-                                                onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
-                                                className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                                                style={{
-                                                    background: active
-                                                        ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
-                                                        : 'rgba(255,255,255,0.03)',
-                                                    border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
-                                                    color: active ? '#fff' : 'var(--text-tertiary)',
-                                                    fontFamily: 'var(--font-display)',
-                                                }}
-                                            >
-                                                {pos}
-                                            </button>
-                                        );
-                                    })}
+
+                                <div style={{ opacity: settings.applyGradient ? 1 : 0.4 }}>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                                            Gradient strength
+                                        </span>
+                                        <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                            {settings.gradientStrength === 1 ? 'default' : `${Math.round(settings.gradientStrength * 100)}%`}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={0.3}
+                                        max={1.5}
+                                        step={0.05}
+                                        value={settings.gradientStrength}
+                                        disabled={!settings.applyGradient}
+                                        onChange={e => setSettings(s => ({ ...s, gradientStrength: parseFloat(e.target.value) }))}
+                                        className="w-full accent-purple-500"
+                                    />
+                                    <div className="flex justify-between text-[8px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                        <span>Soft</span>
+                                        <span>Hard</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -83,6 +83,11 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
     • Auto-render fires on toggle change with 1.2s debounce. Title/Caption fields fire on blur. Live state passed to render endpoint as overrides (no more "edit text → click regenerate → DB reads stale title" bug).
     • Render endpoint source-URL priority: explicit override (if image-shaped) → YouTube CDN thumbnail (when `youtube_video_id` is set) → `post.image`. The cleanup worker had been sweeping previously-rendered Supabase Storage PNGs, leaving stale `post.image` URLs that returned HTTP 400 on every render attempt; the YouTube thumbnail is always reliable. 6 broken posts reset via SQL.
     • New `/api/cron?worker=render&postIds=A,B,C&text=0/1&gradient=0/1&watermark=0/1&gradPos=top/bottom` endpoint for server-to-server batch regen + end-to-end testing without admin auth.
+- **Editor preview semantics + gradient strength** (2026-05-02) — third pass:
+    • Renders are now **preview-only** by default. Render endpoint accepts `persist: boolean` — when false (auto-render, Force Regenerate, image upload), the renderer skips Storage upload and returns a base64 data URL; nothing touches the DB. Only **Save** sets `persist=true`, which uploads the PNG and writes `posts.image`. Fixes the bug Jose hit where regenerating a "100 girlfriends" pending post silently baked the overlay into the DB; the post now stays customizable until Save.
+    • New **Cancel** button — routes back to `/admin/dashboard` without saving anything.
+    • **Gradient strength** slider (0.3 – 1.5, default 1) multiplies every gradient alpha stop in the renderer; lets Jose soften or harden the fade on a per-post basis.
+    • Nudge step shrunk from 30px → 12px so positioning feels precise instead of overshooting.
 - **Editor layout + image upload + word color** (2026-05-02) — second pass after Jose tested live:
     • Gradient `top`/`bottom` now actually moves. Renderer's entropy auto-detect was overriding the user's choice whenever text was on; it now only runs when caller passes no `gradientPosition`.
     • Watermark visibility hardened — bumped to 30px Outfit with stroke outline + heavier shadow. Toggle was firing all along; the white-on-white was just invisible on bright trailer thumbnails.
