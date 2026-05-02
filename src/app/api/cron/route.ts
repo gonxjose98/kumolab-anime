@@ -138,15 +138,22 @@ export async function GET(req: NextRequest) {
                         continue;
                     }
 
+                    // Allow CLI/curl callers to test toggle combinations.
+                    // Defaults match auto-publisher (all on, gradient bottom).
+                    const qpBool = (k: string, def: boolean) => {
+                        const v = searchParams.get(k);
+                        if (v === null) return def;
+                        return v === '1' || v === 'true';
+                    };
                     const rendered = await generateIntelImage({
                         sourceUrl,
                         animeTitle: post.title || '',
                         headline: (post.excerpt || '').toString(),
                         slug: post.slug || `post-${postId}`,
-                        applyText: true,
-                        applyGradient: true,
-                        applyWatermark: true,
-                        gradientPosition: 'bottom',
+                        applyText: qpBool('text', true),
+                        applyGradient: qpBool('gradient', true),
+                        applyWatermark: qpBool('watermark', true),
+                        gradientPosition: (searchParams.get('gradPos') === 'top' ? 'top' : 'bottom'),
                         classification: 'CLEAN',
                         bypassSafety: true,
                     });
