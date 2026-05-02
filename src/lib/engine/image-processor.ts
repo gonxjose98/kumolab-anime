@@ -188,25 +188,19 @@ export async function generateIntelImage({
         const isPortraitPoster = imgRatio < 0.85;
         const derivedClassification = classification || (isPortraitPoster ? 'TEXT_HEAVY' : 'CLEAN');
 
+        // Default each overlay to whether the source is CLEAN.
         let finalApplyText = derivedClassification === 'CLEAN';
         let finalApplyGradient = derivedClassification === 'CLEAN';
         let finalApplyWatermark = derivedClassification === 'CLEAN';
 
-        // USER MANUAL OVERRIDE
-        if (applyText === false) {
-            finalApplyText = false;
-        } else if (applyText === true && derivedClassification === 'CLEAN') {
-            finalApplyText = true;
-        }
-
-        // Default behavior: TEXT_HEAVY -> RAW IMAGE MODE (NO OVERLAYS)
-        // But the Admin editor must be able to force overlays back ON.
-        // If the caller explicitly requests applyText=true, allow it even for TEXT_HEAVY sources.
-        if (derivedClassification === 'TEXT_HEAVY' && applyText !== true) {
-            finalApplyText = false;
-            finalApplyGradient = false;
-            finalApplyWatermark = false;
-        }
+        // USER MANUAL OVERRIDE — when the caller passes an explicit boolean
+        // for any of these flags, that boolean wins. Each is independent.
+        // (Pre-fix: only applyText was wired; gradient and watermark
+        // overrides from the editor were silently ignored, so toggling
+        // them did nothing.)
+        if (typeof applyText === 'boolean') finalApplyText = applyText;
+        if (typeof applyGradient === 'boolean') finalApplyGradient = applyGradient;
+        if (typeof applyWatermark === 'boolean') finalApplyWatermark = applyWatermark;
 
         // Editor toggles are now INDEPENDENT — gradient and watermark no
         // longer cascade off when text is off. The user gets exactly what
