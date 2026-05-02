@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
         const { data: post, error: fetchError } = await supabaseAdmin
             .from('posts')
-            .select('id, slug, title, excerpt, image, source_url')
+            .select('id, slug, title, excerpt, image, source_url, youtube_video_id')
             .eq('id', postId)
             .single();
 
@@ -38,26 +38,33 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: fetchError?.message || 'Post not found' }, { status: 404 });
         }
 
-        // Source URL resolution: prefer an explicit override IF it looks like
-        // a real image URL (not a YouTube watch page or article HTML). Falls
-        // back to post.image (the actual thumbnail/CDN URL) otherwise.
         const looksLikeImage = (u: string | undefined | null): boolean => {
             if (!u || typeof u !== 'string') return false;
-            // Accept obvious image extensions, Supabase Storage URLs, and
-            // YouTube thumbnail CDN hostnames. Reject youtube.com/watch and
-            // article hostnames where the response would be HTML.
             if (/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(u)) return true;
             if (/img\.youtube\.com\/vi\//.test(u)) return true;
             if (/i\.ytimg\.com\//.test(u)) return true;
             if (/storage\/v1\/object\/public\//.test(u)) return true;
-            // Reject anything that looks like an article/watch page
             if (/youtube\.com\/watch|youtu\.be\/|animenewsnetwork\.com|crunchyroll\.com\/news|myanimelist\.net\/news|\/news\/|\/article\//i.test(u)) return false;
             return false;
         };
 
-        const sourceUrl: string | null = looksLikeImage(sourceOverride)
-            ? sourceOverride
-            : (post.image || null);
+        // Source URL resolution priority:
+        //   1. Caller's override IF it looks like a direct image URL.
+        //   2. YouTube CDN thumbnail when youtube_video_id is set — always
+        //      reliable, never goes stale, no auth, original art.
+        //   3. post.image as last resort (may be a stale Supabase Storage
+        //      URL from a prior render that the cleanup worker has since
+        //      swept; we still try it for non-YouTube posts).
+        // If everything fails the renderer will return null and we surface
+        // a clear error message.
+        let sourceUrl: string | null = null;
+        if (looksLikeImage(sourceOverride)) {
+            sourceUrl = sourceOverride;
+        } else if (post.youtube_video_id) {
+            sourceUrl = `https://img.youtube.com/vi/${post.youtube_video_id}/maxresdefault.jpg`;
+        } else if (post.image) {
+            sourceUrl = post.image;
+        }
 
         if (!sourceUrl) {
             return NextResponse.json({ success: false, error: 'Post has no image to render from. Set a Background image URL in the editor first.' }, { status: 400 });
