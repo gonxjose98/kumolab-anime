@@ -9,6 +9,9 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { logAgentAction } from '../logging/structured-logger';
+import { checkMetaTokenHealth, type MetaTokenHealth } from './token-health';
+
+const META_TOKEN_WARNING_DAYS = 30;
 
 export interface DailyReport {
     report_date: string;
@@ -30,6 +33,7 @@ export interface DailyReport {
     headline: string;
     issues: string[];
     highlights: string[];
+    meta_token_health: MetaTokenHealth;
 }
 
 export async function generateDailyReport(): Promise<DailyReport> {
@@ -152,6 +156,31 @@ export async function generateDailyReport(): Promise<DailyReport> {
         issues.push('Over 60% of candidates are duplicates — sources may be overlapping');
     }
 
+    // ── Meta (IG) token health ──
+    const metaTokenHealth = await checkMetaTokenHealth();
+    if (!metaTokenHealth.ok) {
+        const msg = `Meta IG token unhealthy: ${metaTokenHealth.reason ?? 'unknown'}`;
+        issues.push(msg);
+        await supabaseAdmin.from('error_logs').insert({
+            source: 'daily-report:token-health',
+            error_message: msg,
+            context: { meta_token_health: metaTokenHealth },
+        });
+    } else if (
+        metaTokenHealth.daysUntilDataAccessExpiry !== null &&
+        metaTokenHealth.daysUntilDataAccessExpiry !== undefined &&
+        metaTokenHealth.daysUntilDataAccessExpiry < META_TOKEN_WARNING_DAYS
+    ) {
+        const days = metaTokenHealth.daysUntilDataAccessExpiry;
+        const msg = `Meta IG data-access window expires in ${days} day${days === 1 ? '' : 's'} — reauth required to keep publishing`;
+        issues.push(msg);
+        await supabaseAdmin.from('error_logs').insert({
+            source: 'daily-report:token-health',
+            error_message: msg,
+            context: { meta_token_health: metaTokenHealth },
+        });
+    }
+
     if (published > 0) {
         highlights.push(`${published} post${published > 1 ? 's' : ''} published today`);
     }
@@ -196,6 +225,7 @@ export async function generateDailyReport(): Promise<DailyReport> {
         headline,
         issues,
         highlights,
+        meta_token_health: metaTokenHealth,
     };
 
     // ── Persist to DB ──
