@@ -230,6 +230,7 @@ Required in Vercel for production (after Phase 1 cutover):
 
 **AI (provider chain — first present wins, on failure walks to next):**
 - `GEMINI_API_KEY` — Google AI Studio. Default model `gemini-2.5-flash`. Optional override: `GEMINI_MODEL` (e.g. `gemini-2.5-flash-lite` for cheaper, `gemini-flash-latest` to track newest).
+- `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3` — optional, additional Google accounts. Each gets its own free-tier quota (separate GCP project). Stacking three triples daily volume at zero cost. `GEMINI_MODEL_2` / `GEMINI_MODEL_3` for per-key model overrides if needed; otherwise inherit `GEMINI_MODEL`.
 - `GROQ_API_KEY` — console.groq.com (free tier, ~14,400 req/day on `llama-3.3-70b-versatile`). Optional override: `GROQ_MODEL`.
 - `DEEPSEEK_API_KEY` — platform.deepseek.com (paid; cheap last-resort). Optional override: `DEEPSEEK_MODEL` (default `deepseek-chat`).
 

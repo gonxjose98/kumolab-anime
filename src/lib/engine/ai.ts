@@ -11,10 +11,16 @@ import { logError } from '../logging/structured-logger';
  *     provider before any caller-level fallback runs. So losing one provider
  *     doesn't drop a feature.
  *
- *   - Default chain (free → free → cheap paid):
- *       1. Gemini       (GEMINI_API_KEY)     — Google's OpenAI-compat endpoint
- *       2. Groq         (GROQ_API_KEY)       — fast free tier
- *       3. DeepSeek     (DEEPSEEK_API_KEY)   — paid; cheap last-resort
+ *   - Default chain (free → free → free → free → free → cheap paid):
+ *       1. Gemini       (GEMINI_API_KEY)
+ *       2. Gemini #2    (GEMINI_API_KEY_2) — optional, separate Google account
+ *       3. Gemini #3    (GEMINI_API_KEY_3) — optional, separate Google account
+ *       4. Groq         (GROQ_API_KEY)
+ *       5. DeepSeek     (DEEPSEEK_API_KEY) — paid last-resort
+ *
+ *     Each Gemini key is tied to a separate GCP project, so its free-tier
+ *     quota is independent. Stacking three keys triples the daily free
+ *     volume at zero cost.
  *
  *   - Legacy tail (still supported so existing Vercel envs keep working):
  *       4. Kimi         (KIMI_API_KEY / MOONSHOT_API_KEY)
@@ -47,12 +53,38 @@ type Provider = {
 function buildProviderChain(): Provider[] {
     const chain: Provider[] = [];
 
+    // Multi-key Gemini: each key is tied to a separate Google Cloud
+    // project with its own free-tier quota. Stacking three keys triples
+    // the daily free volume at zero cost. When key 1 returns 429
+    // (RESOURCE_EXHAUSTED), the chain just walks to key 2 — same model,
+    // different account, fresh quota. GEMINI_MODEL applies to all three
+    // unless GEMINI_MODEL_2 / GEMINI_MODEL_3 override individually.
+    const geminiBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
+    const defaultGeminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     if (process.env.GEMINI_API_KEY) {
         chain.push({
             name: 'gemini',
-            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+            baseURL: geminiBase,
             apiKey: process.env.GEMINI_API_KEY,
-            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+            model: defaultGeminiModel,
+            supportsResponseFormat: true,
+        });
+    }
+    if (process.env.GEMINI_API_KEY_2) {
+        chain.push({
+            name: 'gemini-2',
+            baseURL: geminiBase,
+            apiKey: process.env.GEMINI_API_KEY_2,
+            model: process.env.GEMINI_MODEL_2 || defaultGeminiModel,
+            supportsResponseFormat: true,
+        });
+    }
+    if (process.env.GEMINI_API_KEY_3) {
+        chain.push({
+            name: 'gemini-3',
+            baseURL: geminiBase,
+            apiKey: process.env.GEMINI_API_KEY_3,
+            model: process.env.GEMINI_MODEL_3 || defaultGeminiModel,
             supportsResponseFormat: true,
         });
     }
