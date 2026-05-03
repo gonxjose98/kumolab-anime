@@ -83,6 +83,18 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
     • Auto-render fires on toggle change with 1.2s debounce. Title/Caption fields fire on blur. Live state passed to render endpoint as overrides (no more "edit text → click regenerate → DB reads stale title" bug).
     • Render endpoint source-URL priority: explicit override (if image-shaped) → YouTube CDN thumbnail (when `youtube_video_id` is set) → `post.image`. The cleanup worker had been sweeping previously-rendered Supabase Storage PNGs, leaving stale `post.image` URLs that returned HTTP 400 on every render attempt; the YouTube thumbnail is always reliable. 6 broken posts reset via SQL.
     • New `/api/cron?worker=render&postIds=A,B,C&text=0/1&gradient=0/1&watermark=0/1&gradPos=top/bottom` endpoint for server-to-server batch regen + end-to-end testing without admin auth.
+- **AI provider independence** (2026-05-03) — KumoLab's automation no longer depends on a single AI vendor or any infrastructure Jose has to keep running:
+    • `src/lib/engine/ai.ts` rewritten as a **provider chain**: Gemini → Groq → DeepSeek → (legacy: Kimi → OpenAI → Antigravity). First successful response wins; each provider failure walks to the next before any caller-level fallback runs. All three primaries speak the OpenAI chat-completions schema (Gemini via its `/v1beta/openai` endpoint).
+    • **Default chain is free-first**: Gemini and Groq both have free tiers covering KumoLab's daily volume; DeepSeek is the paid last-resort (Jose's key shipped). Total expected cost: ~$0/month.
+    • **Per-touchpoint deterministic fallbacks** — if every provider in the chain fails:
+        - generateCaption → claim-type-aware template (`caption-fallback.ts`)
+        - translateToEnglish → returns original text (candidate stays processable)
+        - formatKumoLabTitle → returns raw title
+        - checkToneAndSafety → heuristic phrase/length scan (CRINGE_PHRASES, HEDGE_PHRASES, UNSAFE_PATTERNS, !-count, all-caps detection). Permissive enough to keep auto-publish moving; flagged candidates queue for review, never reject.
+        - generateFromIntel → returns null (caller skips this candidate)
+    • **Net result**: KumoLab's English-source pipeline runs end-to-end with zero AI calls. Non-English candidates re-queue (don't reject) when AI is unavailable. Provider keys are interchangeable — Jose can swap models without touching code.
+    • Self-hosted `ollama.kumolabanime.com` tunnel is now optional; can be retired entirely (it's just one tier in the chain).
+    • Required Vercel env adds: `GEMINI_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`.
 - **Editor render-on-open + Reset image** (2026-05-02) — fourth pass after Jose flagged "every pending post shows overlay text even with Show Text off":
     • Root cause: editor was displaying `post.image` as-is on open. For posts touched in the pre-fix editor, that PNG already had overlays baked in. Toggles being off in session state didn't change the displayed image until something fired a render — and "Force Regenerate" with the baked PNG as render source produced an identical image (no new overlays added on top of an already-baked source).
     • Fix 1 — **render-on-open**: editor now fires a preview render immediately after the post loads, using DEFAULT_SETTINGS (all toggles off). The displayed image now matches the UI state from the moment the editor mounts. For YouTube posts the render uses the CDN thumbnail (always clean); for non-YouTube posts where `post.image` is clean, the preview is also clean.

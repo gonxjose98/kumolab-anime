@@ -3,64 +3,125 @@ import { buildFallbackCaption } from './caption-fallback';
 import { logError } from '../logging/structured-logger';
 
 /**
- * Antigravity AI Engine
- * Single source of truth for all AI-assisted content generation and refinement.
- * 
- * ARCHITECTURE UPDATE:
- * - Removed OpenAI SDK dependency.
- * - Uses native fetch for protocol-agnostic API calls.
- * - Routes exclusively to ANTIGRAVITY_AI_ENDPOINT.
+ * AI Engine for KumoLab.
+ *
+ * Resilience model:
+ *   - Provider chain. Tried in order on every chat call. First success wins;
+ *     each failure (network / 4xx / 5xx / parse error) walks to the next
+ *     provider before any caller-level fallback runs. So losing one provider
+ *     doesn't drop a feature.
+ *
+ *   - Default chain (free → free → cheap paid):
+ *       1. Gemini       (GEMINI_API_KEY)     — Google's OpenAI-compat endpoint
+ *       2. Groq         (GROQ_API_KEY)       — fast free tier
+ *       3. DeepSeek     (DEEPSEEK_API_KEY)   — paid; cheap last-resort
+ *
+ *   - Legacy tail (still supported so existing Vercel envs keep working):
+ *       4. Kimi         (KIMI_API_KEY / MOONSHOT_API_KEY)
+ *       5. OpenAI       (OPENAI_API_KEY)
+ *       6. Antigravity  (ANTIGRAVITY_AI_ENDPOINT — old self-hosted Ollama tunnel)
+ *
+ *   - Per-touchpoint fallbacks if EVERY provider fails:
+ *       • generateCaption       → deterministic template (caption-fallback.ts)
+ *       • translateToEnglish    → return original (mark untranslated)
+ *       • formatKumoLabTitle    → return raw title
+ *       • checkToneAndSafety    → heuristic phrase/length scan (no LLM)
+ *       • generateFromIntel     → null (caller skips)
+ *       • processEditorialPrompt→ throws (admin-triggered, error visible)
+ *
+ *   That last layer is what lets KumoLab keep publishing English-source
+ *   posts with zero AI access. Non-English candidates re-queue rather than
+ *   reject so they process when AI returns.
  */
+
+type Provider = {
+    name: string;
+    baseURL: string;
+    apiKey: string;
+    model: string;
+    // Some providers reject requests that include response_format. We only
+    // attach it when this is true.
+    supportsResponseFormat: boolean;
+};
+
+function buildProviderChain(): Provider[] {
+    const chain: Provider[] = [];
+
+    if (process.env.GEMINI_API_KEY) {
+        chain.push({
+            name: 'gemini',
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+            apiKey: process.env.GEMINI_API_KEY,
+            model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+            supportsResponseFormat: true,
+        });
+    }
+
+    if (process.env.GROQ_API_KEY) {
+        chain.push({
+            name: 'groq',
+            baseURL: 'https://api.groq.com/openai/v1',
+            apiKey: process.env.GROQ_API_KEY,
+            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            supportsResponseFormat: true,
+        });
+    }
+
+    if (process.env.DEEPSEEK_API_KEY) {
+        chain.push({
+            name: 'deepseek',
+            baseURL: 'https://api.deepseek.com/v1',
+            apiKey: process.env.DEEPSEEK_API_KEY,
+            model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+            supportsResponseFormat: true,
+        });
+    }
+
+    // Legacy tail — keep prior envs working without forcing a config swap.
+    const kimiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
+    if (kimiKey) {
+        chain.push({
+            name: 'kimi',
+            baseURL: 'https://api.moonshot.ai/v1',
+            apiKey: kimiKey,
+            model: process.env.KIMI_MODEL || 'kimi-k2.5',
+            supportsResponseFormat: false,
+        });
+    }
+
+    if (process.env.OPENAI_API_KEY) {
+        chain.push({
+            name: 'openai',
+            baseURL: 'https://api.openai.com/v1',
+            apiKey: process.env.OPENAI_API_KEY,
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            supportsResponseFormat: true,
+        });
+    }
+
+    if (process.env.ANTIGRAVITY_AI_ENDPOINT) {
+        chain.push({
+            name: 'antigravity',
+            baseURL: process.env.ANTIGRAVITY_AI_ENDPOINT,
+            apiKey: process.env.ANTIGRAVITY_AI_KEY || 'internal-bearer',
+            model: process.env.ANTIGRAVITY_AI_MODEL || 'antigravity-1.0',
+            supportsResponseFormat: false,
+        });
+    }
+
+    return chain;
+}
+
 export class AntigravityAI {
     private static instance: AntigravityAI;
-    private baseURL: string;
-    private apiKey: string;
-    private model: string;
-    private provider: 'antigravity' | 'openai';
+    private chain: Provider[];
 
     private constructor() {
-        // Check for Antigravity config first, fallback to OpenAI, then Kimi
-        const antigravityEndpoint = process.env.ANTIGRAVITY_AI_ENDPOINT;
-        const openAIKey = process.env.OPENAI_API_KEY;
-        const kimiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
-        
-        // DEBUG: Log env var availability (don't log the actual keys!)
-        console.log('[AntigravityAI] Env check:', {
-            hasAntigravity: !!antigravityEndpoint,
-            hasOpenAI: !!openAIKey,
-            hasKimi: !!kimiKey,
-            kimiKeyLength: kimiKey ? kimiKey.length : 0
-        });
-        
-        if (antigravityEndpoint) {
-            // Use Antigravity AI
-            this.provider = 'antigravity';
-            this.baseURL = antigravityEndpoint;
-            this.apiKey = process.env.ANTIGRAVITY_AI_KEY || 'internal-bearer';
-            this.model = process.env.ANTIGRAVITY_AI_MODEL || 'antigravity-1.0';
-            console.log("[AntigravityAI] Using Antigravity AI provider");
-        } else if (kimiKey) {
-            // Use Kimi/Moonshot - CORRECT ENDPOINT from OpenClaw config
-            this.provider = 'openai'; // Kimi uses OpenAI-compatible API
-            this.baseURL = 'https://api.moonshot.ai/v1'; // NOT .cn - this is the correct endpoint
-            this.apiKey = kimiKey;
-            this.model = process.env.KIMI_MODEL || 'kimi-k2.5';
-            console.log("[AntigravityAI] Using Kimi/Moonshot provider with model:", this.model);
-            console.log("[AntigravityAI] Key starts with sk-:", kimiKey.startsWith('sk-'));
-        } else if (openAIKey) {
-            // Fallback to OpenAI
-            this.provider = 'openai';
-            this.baseURL = 'https://api.openai.com/v1';
-            this.apiKey = openAIKey;
-            this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-            console.log("[AntigravityAI] Using OpenAI provider with model:", this.model);
+        this.chain = buildProviderChain();
+        if (this.chain.length === 0) {
+            console.warn('[AI] No providers configured. Set GEMINI_API_KEY, GROQ_API_KEY, or DEEPSEEK_API_KEY in env.');
         } else {
-            // No AI provider configured
-            this.provider = 'antigravity';
-            this.baseURL = '';
-            this.apiKey = '';
-            this.model = '';
-            console.warn("[AntigravityAI] Warning: No AI provider configured. Set ANTIGRAVITY_AI_ENDPOINT, KIMI_API_KEY, or OPENAI_API_KEY.");
+            console.log(`[AI] Provider chain: ${this.chain.map(p => p.name).join(' → ')}`);
         }
     }
 
@@ -71,61 +132,75 @@ export class AntigravityAI {
         return AntigravityAI.instance;
     }
 
-    /**
-     * Internal Fetch Wrapper
-     * Sends standard chat completion payload to the configured endpoint.
-     */
-    private async sendCompletionRequest(messages: any[], jsonMode: boolean = true): Promise<any> {
-        if (!this.baseURL || !this.apiKey) {
-            throw new Error("AI Configuration Missing: Set ANTIGRAVITY_AI_ENDPOINT or OPENAI_API_KEY in environment variables.");
-        }
-
-        const url = `${this.baseURL}/chat/completions`;
-
-        try {
-            const requestBody: any = {
-                model: this.model,
-                messages: messages,
-                temperature: 1,
-            };
-            
-            // Only add response_format for OpenAI models that support it
-            if (jsonMode && this.provider === 'openai' && this.model.includes('gpt-4')) {
-                requestBody.response_format = { type: 'json_object' };
-            }
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                // Compact the body. When ollama.kumolabanime.com goes down
-                // Cloudflare returns a multi-KB HTML error page — dumping
-                // that into error_logs makes the dashboard error popover
-                // unreadable. Strip tags, collapse whitespace, cap to 200
-                // chars. The HTTP status carries the actual signal anyway.
-                const raw = await response.text();
-                const compact = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                const trimmed = compact.length > 200 ? compact.slice(0, 200) + '…' : compact;
-                throw new Error(`AI Engine HTTP ${response.status}${trimmed ? `: ${trimmed}` : ''}`);
-            }
-
-            const data = await response.json();
-            return data;
-
-        } catch (error: any) {
-            console.error("[AntigravityAI] Request Fetch Error:", error);
-            throw error;
-        }
+    public hasAnyProvider(): boolean {
+        return this.chain.length > 0;
     }
 
     /**
-     * Editorial Assist: Used for manual drafting and iterative refinement in the admin panel.
+     * Walks the provider chain. First successful response wins; failures
+     * are collected so the final thrown error names every provider that
+     * didn't respond. Caller methods catch this and fall back to their
+     * deterministic strategy.
+     */
+    private async sendCompletionRequest(messages: any[], jsonMode: boolean = true): Promise<any> {
+        if (this.chain.length === 0) {
+            throw new Error('No AI providers configured (set GEMINI_API_KEY, GROQ_API_KEY, or DEEPSEEK_API_KEY)');
+        }
+        const failures: string[] = [];
+        for (const provider of this.chain) {
+            try {
+                return await this.callProvider(provider, messages, jsonMode);
+            } catch (e: any) {
+                const msg = (e?.message || String(e)).slice(0, 220);
+                failures.push(`${provider.name} ${msg}`);
+            }
+        }
+        throw new Error(`All AI providers failed → ${failures.join(' | ').slice(0, 800)}`);
+    }
+
+    private async callProvider(provider: Provider, messages: any[], jsonMode: boolean): Promise<any> {
+        const url = `${provider.baseURL.replace(/\/$/, '')}/chat/completions`;
+        const body: any = {
+            model: provider.model,
+            messages,
+            temperature: 1,
+        };
+        if (jsonMode && provider.supportsResponseFormat) {
+            body.response_format = { type: 'json_object' };
+        }
+
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 25_000);
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify(body),
+                signal: ctrl.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
+
+        if (!response.ok) {
+            // Strip HTML error pages (e.g. Cloudflare 1033) and cap length so
+            // the failure string stays readable in error_logs.
+            const raw = await response.text().catch(() => '');
+            const compact = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const trimmed = compact.length > 160 ? compact.slice(0, 160) + '…' : compact;
+            throw new Error(`HTTP ${response.status}${trimmed ? `: ${trimmed}` : ''}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Editorial Assist: admin panel — drafting / refining posts manually.
+     * On full chain failure this throws so the admin sees the error.
      */
     public async processEditorialPrompt(params: {
         prompt: string;
@@ -140,7 +215,7 @@ export class AntigravityAI {
                 content: `
 ${EDITORIAL_SYSTEM_PROMPT}
 
-You are the Antigravity AI Editorial Assistant for KumoLab. 
+You are the AI Editorial Assistant for KumoLab.
 Your job is to help the user draft and refine posts.
 
 CORE RULES:
@@ -148,7 +223,7 @@ CORE RULES:
 - Length: Content MUST be under 280 characters.
 - Accuracy: Use the provided context accurately.
 
-RESPONSE FORMAT: 
+RESPONSE FORMAT:
 You MUST respond with a JSON object. No other text.
 {
   "title": "Anime Title + Status (e.g. Solo Leveling Season 2 Confirmed)",
@@ -165,7 +240,6 @@ Current Date: ${new Date().toISOString().split('T')[0]}
             }
         ];
 
-        // Add history/context
         messages.push(...history);
         if (currentDraft && history.length === 0) {
             messages.push({
@@ -178,19 +252,20 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         const result = await this.sendCompletionRequest(messages, true);
         const content = result.choices?.[0]?.message?.content;
 
-        if (!content) throw new Error('Empty response from AI Engine');
+        if (!content) throw new Error('Empty response from AI');
 
         try {
             return JSON.parse(content);
         } catch (e) {
-            console.error("JSON Parse Error on AI response:", content);
-            throw new Error("AI returned malformed JSON");
+            console.error('[AI] JSON parse error on editorial response:', content);
+            throw new Error('AI returned malformed JSON');
         }
     }
 
     /**
-     * Translate Japanese (or any non-English) text to English.
-     * Returns { title, content } with translated text, or original if already English.
+     * Translate to English. On full-chain failure returns the original
+     * inputs unchanged so the candidate stays processable downstream
+     * (rather than rejecting outright).
      */
     public async translateToEnglish(title: string, content: string): Promise<{ title: string; content: string }> {
         const messages = [
@@ -216,23 +291,29 @@ Respond with ONLY a JSON object:
             }
         ];
 
-        const result = await this.sendCompletionRequest(messages, true);
-        const response = result.choices?.[0]?.message?.content;
-        if (!response) throw new Error('Empty translation response');
-
         try {
-            const parsed = JSON.parse(response);
-            return { title: parsed.title || title, content: parsed.content || content };
-        } catch {
-            // If JSON parse fails, try to extract from response
-            console.warn('[AntigravityAI] Translation JSON parse failed, returning original');
+            const result = await this.sendCompletionRequest(messages, true);
+            const response = result.choices?.[0]?.message?.content;
+            if (!response) throw new Error('empty translation');
+            try {
+                const parsed = JSON.parse(response);
+                return { title: parsed.title || title, content: parsed.content || content };
+            } catch {
+                console.warn('[AI] Translation JSON parse failed, returning original');
+                return { title, content };
+            }
+        } catch (e: any) {
+            await logError({
+                source: 'engine.ai.translate',
+                errorMessage: `translateToEnglish failed (${(e?.message || e).slice(0, 200)}); returning original text`,
+                context: { title: title.substring(0, 120) },
+            }).catch(() => {});
             return { title, content };
         }
     }
 
     /**
-     * Format a title to KumoLab's two-line standard.
-     * Returns the formatted title string.
+     * Title formatter. On full-chain failure returns the raw title.
      */
     public async formatKumoLabTitle(rawTitle: string, rawContent: string): Promise<string> {
         const messages = [
@@ -282,21 +363,23 @@ Do not wrap in quotes or code blocks.`
             }
         ];
 
-        const result = await this.sendCompletionRequest(messages, false);
-        const response = result.choices?.[0]?.message?.content?.trim();
-        if (!response) return rawTitle;
-        return response;
+        try {
+            const result = await this.sendCompletionRequest(messages, false);
+            const response = result.choices?.[0]?.message?.content?.trim();
+            return response || rawTitle;
+        } catch (e: any) {
+            await logError({
+                source: 'engine.ai.format-title',
+                errorMessage: `formatKumoLabTitle failed (${(e?.message || e).slice(0, 200)}); using raw title`,
+                context: { title: rawTitle.substring(0, 120) },
+            }).catch(() => {});
+            return rawTitle;
+        }
     }
 
     /**
-     * Generates a 1–2 sentence KumoLab-voice caption for a post. Replaces the
-     * truncated raw RSS description we used to dump into `excerpt`. Different
-     * claim types get different hooks (trailer = "why you should care", season
-     * confirmation = the news in plain terms, etc.).
-     *
-     * Returns the caption string. Always under 200 chars. Falls back to a
-     * sanitized version of the source content on any failure so the post still
-     * has *something* readable.
+     * Generates a 1–2 sentence KumoLab-voice caption. On full-chain failure
+     * uses the deterministic claim-type-aware template.
      */
     public async generateCaption(params: {
         title: string;
@@ -351,17 +434,12 @@ Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
             const result = await this.sendCompletionRequest(messages, false);
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) throw new Error('empty caption');
-            // Strip wrapping quotes if the model added them anyway.
             const cleaned = raw.replace(/^["']|["']$/g, '').trim();
             return cleaned.length > 200 ? cleaned.substring(0, 197).trim() + '…' : cleaned;
         } catch (e: any) {
-            // Caption AI is intermittently down (ollama upstream 530s). Log it
-            // so we know, then use the deterministic template fallback. This
-            // produces a real KumoLab-voice line instead of dumping the raw
-            // content/title — much closer to what the AI would have written.
             await logError({
                 source: 'engine.ai.caption',
-                errorMessage: `generateCaption failed (${e?.message || e}); using deterministic fallback`,
+                errorMessage: `generateCaption failed (${(e?.message || e).slice(0, 200)}); using deterministic fallback`,
                 context: { title: title.substring(0, 120), claim_type: claim },
             }).catch(() => {});
             return buildFallbackCaption({ title, claim_type: claim, source });
@@ -369,11 +447,9 @@ Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
     }
 
     /**
-     * Tone + safety gate for auto-publish. Runs AFTER the post copy is drafted,
-     * BEFORE it enters the scheduled queue. Returns structured booleans so the
-     * auto-approval engine can decide to publish or defer to human review.
-     *
-     * Cheap enough to run on every auto-candidate — uses the same Kimi/OpenAI backend.
+     * Tone + safety gate. On full-chain failure runs a deterministic
+     * heuristic instead of failing closed — KumoLab's English-source
+     * pipeline keeps publishing without any LLM access.
      */
     public async checkToneAndSafety(title: string, content: string): Promise<{
         on_brand: boolean;
@@ -417,19 +493,23 @@ RESPOND WITH STRICT JSON:
                 reason: String(parsed.reason || ''),
             };
         } catch (e: any) {
-            // Fail closed — if the safety pass can't run, treat as not safe for auto.
-            return {
-                on_brand: false,
-                safe: false,
-                factually_hedged: false,
-                confidence: 0,
-                reason: `safety check error: ${e.message || 'unknown'}`,
-            };
+            // No AI? Run a deterministic phrase/length scan and return its
+            // verdict. Most KumoLab candidates come from official sources
+            // already — the heuristic is permissive enough to keep the
+            // pipeline moving and only flags candidates that contain known
+            // bad phrasing.
+            await logError({
+                source: 'engine.ai.tone',
+                errorMessage: `checkToneAndSafety AI unavailable (${(e?.message || e).slice(0, 160)}); using heuristic fallback`,
+                context: { title: title.substring(0, 120) },
+            }).catch(() => {});
+            return heuristicToneSafety(title, content);
         }
     }
 
     /**
-     * Auto Engine: Used by the background automation to generate high-quality posts from raw intel.
+     * Daily Drops / batch generation. On full-chain failure returns null
+     * so the caller can skip this candidate and try again next cycle.
      */
     public async generateFromIntel(sourceData: string, type: 'INTEL' | 'TRENDING') {
         const messages: any[] = [
@@ -440,9 +520,97 @@ RESPOND WITH STRICT JSON:
             { role: 'user', content: sourceData }
         ];
 
-        const result = await this.sendCompletionRequest(messages, true);
-        const content = result.choices?.[0]?.message?.content;
-
-        return content ? JSON.parse(content) : null;
+        try {
+            const result = await this.sendCompletionRequest(messages, true);
+            const content = result.choices?.[0]?.message?.content;
+            return content ? JSON.parse(content) : null;
+        } catch (e: any) {
+            await logError({
+                source: 'engine.ai.intel',
+                errorMessage: `generateFromIntel failed (${(e?.message || e).slice(0, 200)}); skipping candidate`,
+                context: { type, source_preview: sourceData.substring(0, 120) },
+            }).catch(() => {});
+            return null;
+        }
     }
+}
+
+// ── Heuristic tone/safety fallback ────────────────────────────────
+//
+// Runs when the entire AI provider chain is down. Returns a verdict
+// permissive enough to keep auto-publish moving for clean source titles
+// while still flagging the obvious cringe / hype patterns. This is a
+// last-line defence, not a substitute for the LLM check — the verdict
+// engine treats !on_brand / !safe / !factually_hedged as
+// QUEUE_FOR_REVIEW (not REJECT), so a heuristic miss just routes a post
+// to the admin instead of dropping it.
+
+const CRINGE_PHRASES = [
+    'exciting news for fans',
+    "you won't believe",
+    'must-watch',
+    'must watch',
+    'fans are loving',
+    'fans are going',
+    'trending now',
+    'epic news',
+    'mind-blowing',
+    'going viral',
+    'breaking the internet',
+    'amazing news',
+    'jaw-dropping',
+];
+
+const HEDGE_PHRASES = [
+    'reportedly',
+    'according to rumors',
+    'allegedly',
+    'sources say',
+    'per a leak',
+    'per leaks',
+];
+
+const UNSAFE_PATTERNS = [
+    /\b(?:nsfw|porn|hentai)\b/i,
+    /\b(?:fuck|shit|bitch)\b/i,
+];
+
+function heuristicToneSafety(title: string, content: string): {
+    on_brand: boolean;
+    safe: boolean;
+    factually_hedged: boolean;
+    confidence: number;
+    reason: string;
+} {
+    const text = `${title}\n${content}`;
+    const lower = text.toLowerCase();
+
+    const foundCringe = CRINGE_PHRASES.find(p => lower.includes(p));
+    const foundHedge = HEDGE_PHRASES.find(p => lower.includes(p));
+    const foundUnsafe = UNSAFE_PATTERNS.find(p => p.test(text));
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const allCapsWords = (text.match(/\b[A-Z]{4,}\b/g) || []).filter(w => !['NEWS', 'ANIME', 'MANGA', 'OVA', 'OAD'].includes(w));
+
+    const onBrand = !foundCringe && exclamationCount < 3 && allCapsWords.length < 4;
+    const safe = !foundUnsafe;
+    const factuallyHedged = !foundHedge;
+
+    const reasons: string[] = [];
+    if (foundCringe) reasons.push(`cringe phrase "${foundCringe}"`);
+    if (foundHedge) reasons.push(`hedge phrase "${foundHedge}"`);
+    if (foundUnsafe) reasons.push('unsafe content pattern');
+    if (exclamationCount >= 3) reasons.push('excessive !');
+    if (allCapsWords.length >= 4) reasons.push('all-caps shouting');
+
+    const allPass = onBrand && safe && factuallyHedged;
+    return {
+        on_brand: onBrand,
+        safe,
+        factually_hedged: factuallyHedged,
+        // Confidence is bounded under what an LLM would return — keeps
+        // the verdict engine biased toward QUEUE_FOR_REVIEW for anything
+        // borderline, which is the right behaviour when AI is down.
+        confidence: allPass ? 55 : 25,
+        reason: reasons.length ? `heuristic flags: ${reasons.join(', ')}` : 'heuristic pass (AI providers unavailable)',
+    };
 }

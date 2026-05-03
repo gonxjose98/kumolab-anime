@@ -58,7 +58,7 @@ KumoLab is an anime intelligence platform that automates detection, curation, an
 | **Database** | Supabase (PostgreSQL + Auth + RLS) — project `xzoqsldtcoeaegxcdsia`, region us-east-1 |
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 | **Image processing** | `@napi-rs/canvas`  • `sharp` |
-| **AI (scoring + translate + tone/safety)** | Kimi (Moonshot) primary, OpenAI fallback — via `src/lib/engine/ai.ts` |
+| **AI (scoring + translate + tone/safety)** | Provider chain in `src/lib/engine/ai.ts` — Gemini → Groq → DeepSeek → Kimi → OpenAI → Antigravity. First success wins. Heuristic + deterministic fallbacks per touchpoint so KumoLab keeps publishing English-source posts even with zero AI access. |
 | **Social publishing** | Instagram Graph API via `src/lib/social/publisher.ts` — Meta Suite cross-posts IG → FB + Threads automatically. X / TikTok / YT Shorts publishers pending (Milestone 1.3). |
 | **Data sourcing** | AniList GraphQL API, RSS feeds, YouTube channels |
 
@@ -228,9 +228,17 @@ Required in Vercel for production (after Phase 1 cutover):
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — from Google Cloud project
 - `YOUTUBE_REFRESH_TOKEN` — long-lived, generated via one-time OAuth consent flow
 
-**AI:**
-- `KIMI_API_KEY` (primary) — or `OPENAI_API_KEY` as fallback
-- Optional: `KIMI_MODEL` (default `kimi-k2.5`), `OPENAI_MODEL`
+**AI (provider chain — first present wins, on failure walks to next):**
+- `GEMINI_API_KEY` — Google AI Studio (free tier, ~1500 req/day on `gemini-2.0-flash`). Optional override: `GEMINI_MODEL`.
+- `GROQ_API_KEY` — console.groq.com (free tier, ~14,400 req/day on `llama-3.3-70b-versatile`). Optional override: `GROQ_MODEL`.
+- `DEEPSEEK_API_KEY` — platform.deepseek.com (paid; cheap last-resort). Optional override: `DEEPSEEK_MODEL` (default `deepseek-chat`).
+
+Legacy tail (still honored if set, but not required):
+- `KIMI_API_KEY` (or `MOONSHOT_API_KEY`) — optional override: `KIMI_MODEL`
+- `OPENAI_API_KEY` — optional override: `OPENAI_MODEL`
+- `ANTIGRAVITY_AI_ENDPOINT` (+ optional `ANTIGRAVITY_AI_KEY`, `ANTIGRAVITY_AI_MODEL`) — old self-hosted Ollama tunnel; safe to delete.
+
+If every provider fails the chain falls through to per-touchpoint deterministic fallbacks (caption template, heuristic tone/safety, return-original translation, return-raw title). KumoLab keeps publishing English-source posts with no AI calls at all.
 
 **Auth / security:**
 - `CRON_SECRET` — required. Random 32+ char string. Used by `middleware.ts` and `/api/cron/route.ts` for `Authorization: Bearer ${CRON_SECRET}` fallback when not running under Vercel cron. Set in Vercel Production env.
