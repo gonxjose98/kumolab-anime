@@ -63,6 +63,7 @@ async function fetchDashboardData() {
         { count: pendingCount },
         { count: scheduledCount },
         { count: errors24h },
+        { data: recentErrors },
         { data: pendingPosts },
         { data: scheduledPosts },
         { data: recentlyPublished },
@@ -75,6 +76,7 @@ async function fetchDashboardData() {
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()),
         supabaseAdmin.from('error_logs').select('*', { count: 'exact', head: true }).gte('created_at', last24h.toISOString()),
+        supabaseAdmin.from('error_logs').select('id, source, error_message, context, created_at').gte('created_at', last24h.toISOString()).order('created_at', { ascending: false }).limit(20),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, youtube_video_id, timestamp').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
         supabaseAdmin.from('posts').select('id, title, image, source, claim_type, scheduled_post_time, youtube_video_id').eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()).order('scheduled_post_time', { ascending: true }).limit(10),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
@@ -91,6 +93,7 @@ async function fetchDashboardData() {
             scheduled24h: scheduledCount ?? 0,
             errors24h: errors24h ?? 0,
         },
+        recentErrors: recentErrors || [],
         pendingPosts: pendingPosts || [],
         scheduledPosts: scheduledPosts || [],
         recentlyPublished: recentlyPublished || [],
@@ -102,15 +105,17 @@ async function fetchDashboardData() {
 
 // ─── UI primitives ────────────────────────────────────────────
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
     return (
         <div
+            id={id}
             className={`rounded-2xl ${className}`}
             style={{
                 background: 'rgba(12, 12, 24, 0.55)',
                 border: '1px solid rgba(255,255,255,0.06)',
                 backdropFilter: 'blur(20px)',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+                scrollMarginTop: '80px',
             }}
         >
             {children}
@@ -203,16 +208,33 @@ export default async function DashboardPage() {
                         the cloud sees everything first
                     </p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                     style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
-                    />
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                        {statusLabel}
-                    </span>
-                </div>
+                {stats.errors24h > 0 ? (
+                    <a
+                        href="#recent-errors"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-white/[0.06]"
+                        style={{ background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.25)' }}
+                        title="Jump to the error list below"
+                    >
+                        <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: '#ff4444', boxShadow: '0 0 8px #ff4444' }}
+                        />
+                        <span className="text-[10px] font-mono" style={{ color: '#ff9999' }}>
+                            {statusLabel} — view ↓
+                        </span>
+                    </a>
+                ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                         style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
+                        />
+                        <span className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
+                            {statusLabel}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* ── Stat grid ────────────────────────────────────────── */}
@@ -220,8 +242,61 @@ export default async function DashboardPage() {
                 <StatCard label="Published 24h" value={stats.published24h} accent="#00ff88" />
                 <StatCard label="Pending Review" value={stats.pending} accent="#ffaa00" highlight={stats.pending > 0} />
                 <StatCard label="Scheduled 24h" value={stats.scheduled24h} accent="#00d4ff" />
-                <StatCard label="Errors 24h" value={stats.errors24h} accent={stats.errors24h > 0 ? '#ff4444' : '#9ca3af'} highlight={stats.errors24h > 0} />
+                {stats.errors24h > 0 ? (
+                    <a href="#recent-errors" className="block focus:outline-none" title="Show error details">
+                        <StatCard label="Errors 24h · view ↓" value={stats.errors24h} accent="#ff4444" highlight />
+                    </a>
+                ) : (
+                    <StatCard label="Errors 24h" value={stats.errors24h} accent="#9ca3af" />
+                )}
             </div>
+
+            {/* ── Recent errors (only when there are any) ──────────── */}
+            {data.recentErrors.length > 0 && (
+                <Card className="p-5" id="recent-errors">
+                    <SectionHeader label="Recent Errors (24h)" count={data.recentErrors.length} accent="#ff4444" />
+                    <ul className="space-y-2">
+                        {data.recentErrors.map(err => (
+                            <li
+                                key={err.id}
+                                className="rounded-lg p-3"
+                                style={{ background: 'rgba(255,68,68,0.04)', border: '1px solid rgba(255,68,68,0.18)' }}
+                            >
+                                <div className="flex items-baseline gap-3 flex-wrap">
+                                    <span
+                                        className="text-[10px] font-mono px-2 py-0.5 rounded"
+                                        style={{ background: 'rgba(255,68,68,0.15)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff9999' }}
+                                    >
+                                        {err.source || 'unknown'}
+                                    </span>
+                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                        {timeAgo(err.created_at)} · {new Date(err.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} ET
+                                    </span>
+                                </div>
+                                <p className="text-sm mt-1.5 break-words" style={{ color: 'var(--text-primary)' }}>
+                                    {err.error_message || '(no message)'}
+                                </p>
+                                {err.context && Object.keys(err.context).length > 0 && (
+                                    <details className="mt-1.5">
+                                        <summary
+                                            className="text-[10px] cursor-pointer hover:underline"
+                                            style={{ color: 'var(--text-tertiary)' }}
+                                        >
+                                            context
+                                        </summary>
+                                        <pre
+                                            className="text-[10px] font-mono mt-1 p-2 rounded overflow-x-auto"
+                                            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-tertiary)' }}
+                                        >
+                                            {JSON.stringify(err.context, null, 2)}
+                                        </pre>
+                                    </details>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </Card>
+            )}
 
             {/* ── Platform tokens ──────────────────────────────────── */}
             <PlatformTokenCard health={data.metaTokenHealth} />
