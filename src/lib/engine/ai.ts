@@ -104,8 +104,15 @@ export class AntigravityAI {
             });
 
             if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`AI Engine HTTP ${response.status}: ${errText}`);
+                // Compact the body. When ollama.kumolabanime.com goes down
+                // Cloudflare returns a multi-KB HTML error page — dumping
+                // that into error_logs makes the dashboard error popover
+                // unreadable. Strip tags, collapse whitespace, cap to 200
+                // chars. The HTTP status carries the actual signal anyway.
+                const raw = await response.text();
+                const compact = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                const trimmed = compact.length > 200 ? compact.slice(0, 200) + '…' : compact;
+                throw new Error(`AI Engine HTTP ${response.status}${trimmed ? `: ${trimmed}` : ''}`);
             }
 
             const data = await response.json();

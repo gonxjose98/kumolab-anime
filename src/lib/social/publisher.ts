@@ -49,15 +49,11 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         try {
             const igResult = await publishToInstagram(post);
             Object.assign(result, igResult);
-            // If the publisher returned without an instagram_id it failed
-            // silently — record that, otherwise it stays invisible.
-            if (!igResult.instagram_id) {
-                await logError({
-                    source: 'publisher.ig',
-                    errorMessage: 'IG broadcast returned no instagram_id (see prior logError for Meta error detail)',
-                    context: { post_id: (post as any).id, slug: post.slug, title: post.title },
-                });
-            }
+            // No umbrella log on missing instagram_id — every meaningful
+            // failure mode (container, publish, fetch) already calls
+            // logError with the precise Meta error before we get here.
+            // Logging again at this layer just produced duplicate rows on
+            // the dashboard with no extra information.
         } catch (e: any) {
             await logError({
                 source: 'publisher.ig',
