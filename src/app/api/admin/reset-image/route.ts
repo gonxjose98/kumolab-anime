@@ -13,10 +13,15 @@ export const maxDuration = 30;
 // + an image/* content-type, so we never hand the editor a URL that the
 // renderer can't actually fetch):
 //   1. youtube_video_id → CDN thumbnail
-//   2. og:image scraped from source_url (the article page itself —
-//      Crunchyroll News / ANN / etc. publish clean key visuals here)
-//   3. AniList cover/banner directly
+//   2. AniList banner/cover directly (almost always actual show art)
+//   3. og:image scraped from source_url, but only after filtering out
+//      obvious brand logos (Crunchyroll, ANN, MAL etc. all return their
+//      own logo as og:image when they don't have a per-article hero set)
 //   4. selectBestImage as a last resort
+//
+// AniList is ahead of og:image because Crunchyroll News articles
+// frequently expose their site logo as og:image rather than the article
+// hero — Jose hit this on the "100 girlfriends" post.
 //
 // We deliberately skip selectBestImage's branded fallback ('/hero-bg-final.png')
 // because it's a relative path the editor render endpoint can't fetch
@@ -48,6 +53,20 @@ async function isFetchableImage(url: string | null | undefined): Promise<boolean
     } catch {
         return false;
     }
+}
+
+// Heuristic — many news sites (Crunchyroll, ANN, MAL) fall back to their
+// site logo as og:image when an article doesn't set a custom one. These
+// would render as just the brand mark, not the show art Jose actually
+// wants. If the og:image URL's path looks like a logo/brand asset we
+// skip it and let the chain move on to the next strategy.
+function looksLikeBrandLogo(url: string): boolean {
+    const u = url.toLowerCase();
+    if (/(logo|brand|favicon|icon|sprite|placeholder|default)\b/.test(u)) return true;
+    if (/\/(static|assets|img)\/[^/]*\/(logo|brand)/.test(u)) return true;
+    if (/crunchyroll\.com\/.*\/(logo|brand|cr_logo|crunchyroll[-_]logo)/.test(u)) return true;
+    if (/animenewsnetwork\.com\/.*\/(logo|ann_logo)/.test(u)) return true;
+    return false;
 }
 
 async function scrapeOgImage(url: string): Promise<string | null> {
@@ -125,15 +144,8 @@ export async function POST(req: NextRequest) {
             if (ok) return NextResponse.json({ success: true, url, source: 'youtube_cdn' });
         }
 
-        // Strategy 2: og:image from the article URL itself
-        if (post.source_url && /^https?:\/\//i.test(post.source_url)) {
-            const og = await scrapeOgImage(post.source_url);
-            const ok = og ? await isFetchableImage(og) : false;
-            tried.push({ source: 'og_image', url: og, ok });
-            if (ok && og) return NextResponse.json({ success: true, url: og, source: 'og_image' });
-        }
-
-        // Strategy 3: AniList direct
+        // Strategy 2: AniList direct (banner first — wider crop, usually
+        // cleaner art; then cover as a portrait fallback).
         const anilist = await fetchAniListCovers(post.title || '');
         if (anilist?.banner) {
             const ok = await isFetchableImage(anilist.banner);
@@ -144,6 +156,17 @@ export async function POST(req: NextRequest) {
             const ok = await isFetchableImage(anilist.cover);
             tried.push({ source: 'anilist_cover', url: anilist.cover, ok });
             if (ok) return NextResponse.json({ success: true, url: anilist.cover, source: 'anilist_cover' });
+        }
+
+        // Strategy 3: og:image from the article URL itself, filtered to
+        // skip brand-logo fallbacks (Crunchyroll News will happily return
+        // its own logo as og:image when an article has no custom hero).
+        if (post.source_url && /^https?:\/\//i.test(post.source_url)) {
+            const og = await scrapeOgImage(post.source_url);
+            const isLogo = og ? looksLikeBrandLogo(og) : false;
+            const ok = og && !isLogo ? await isFetchableImage(og) : false;
+            tried.push({ source: isLogo ? 'og_image_skipped_logo' : 'og_image', url: og, ok });
+            if (ok && og) return NextResponse.json({ success: true, url: og, source: 'og_image' });
         }
 
         // Strategy 4: selectBestImage (last resort — slow + Reddit-heavy)
