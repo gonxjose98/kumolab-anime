@@ -117,9 +117,18 @@ export async function POST(req: NextRequest) {
         });
 
         if (!result?.processedImage) {
+            // Pull the specific reason the renderer set on its last failure.
+            const why = (generateIntelImage as any).lastError as string | undefined;
+            const sourceTail = sourceUrl.length > 80 ? `…${sourceUrl.slice(-80)}` : sourceUrl;
             return NextResponse.json(
-                { success: false, error: 'Image renderer returned null (source fetch likely failed — check the source URL is reachable)' },
-                { status: 500 },
+                {
+                    success: false,
+                    error: why
+                        ? `Render failed: ${why} (source: ${sourceTail})`
+                        : `Render failed — source fetch likely blocked or non-image (source: ${sourceTail})`,
+                    sourceUrl,
+                },
+                { status: 502 },
             );
         }
 

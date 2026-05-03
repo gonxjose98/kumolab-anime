@@ -498,6 +498,10 @@ export async function generateIntelImage({
 
     } catch (e: any) {
         console.error("Image Engine Fatal:", e);
+        // Stash the message so the calling route can surface a specific
+        // reason ("source returned 404", "buffer too small", etc.) instead
+        // of the generic "renderer returned null" pop-up.
+        (generateIntelImage as any).lastError = e?.message || String(e);
         return null;
     }
 }
