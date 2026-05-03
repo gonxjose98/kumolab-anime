@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    serverExternalPackages: ["@napi-rs/canvas"],
+    serverExternalPackages: ["@napi-rs/canvas", "ffmpeg-static", "fluent-ffmpeg", "@distube/ytdl-core"],
+    // Make sure the ffmpeg binary that ffmpeg-static downloads at install
+    // time is actually bundled into the serverless function output. Without
+    // this, Next.js's tracing skips the platform-specific binary and the
+    // spawn() call ENOENTs at runtime.
+    outputFileTracingIncludes: {
+        '/api/cron/**': ['./node_modules/ffmpeg-static/**', './public/fonts/**'],
+    },
 
     typescript: {
         ignoreBuildErrors: true,

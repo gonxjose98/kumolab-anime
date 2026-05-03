@@ -14,6 +14,7 @@
 
 import ytdl from '@distube/ytdl-core';
 import { supabaseAdmin } from '../supabase/admin';
+import { processForSocial } from './video-processor';
 
 const BUCKET = 'blog-videos';
 const MAX_BYTES = 80 * 1024 * 1024; // 80 MB hard cap — anything larger skips re-upload
@@ -99,10 +100,27 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
 
         if (!buffer) return null;
 
+        // Run the FFmpeg pass: 9:16 letterbox + KumoLab watermark + 60s
+        // hard-trim. If the pass fails for any reason we fall back to the
+        // original buffer rather than blocking the publish — the trailer
+        // still ships, just without the rebrand.
+        let finalBuffer = buffer;
+        try {
+            const processed = await processForSocial(buffer, { aspect: '9:16', maxSeconds: 60 });
+            if (processed && processed.length > 0) {
+                console.log(`[TrailerFetcher] FFmpeg pass: ${buffer.length} → ${processed.length} bytes`);
+                finalBuffer = processed;
+            } else {
+                console.warn('[TrailerFetcher] FFmpeg pass returned null; uploading raw download');
+            }
+        } catch (e: any) {
+            console.warn('[TrailerFetcher] FFmpeg pass threw, uploading raw download:', e?.message || e);
+        }
+
         const bucketPath = `${slug}-${videoId}.mp4`;
         const { error: uploadError } = await supabaseAdmin.storage
             .from(BUCKET)
-            .upload(bucketPath, buffer, { contentType: 'video/mp4', upsert: true });
+            .upload(bucketPath, finalBuffer, { contentType: 'video/mp4', upsert: true });
 
         if (uploadError) {
             console.error('[TrailerFetcher] Bucket upload failed:', uploadError.message);
@@ -115,8 +133,8 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
             bucket_url: pub.publicUrl,
             bucket_path: bucketPath,
             video_id: videoId,
-            duration_seconds: duration,
-            bytes: buffer.length,
+            duration_seconds: Math.min(duration, 60),
+            bytes: finalBuffer.length,
             title: info.videoDetails.title,
         };
     } catch (e: any) {
