@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
+import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { checkMetaTokenHealth, type MetaTokenHealth } from '@/lib/engine/token-health';
 
 export const dynamic = 'force-dynamic';
@@ -162,97 +163,6 @@ function ClaimPill({ claim }: { claim: string | null }) {
     );
 }
 
-// Collapsed-by-default error row. Summary shows source + time + a short
-// preview of the message. Click to expand the full message and a tidy
-// list of context key/value pairs. We deliberately don't render the raw
-// JSON dump — keys become labels, values are stringified to a single
-// line, long values are truncated with a hover-title for the full text.
-function ErrorRow({ err }: { err: { id: string; source: string | null; error_message: string | null; context: any; created_at: string } }) {
-    const message = err.error_message || '(no message)';
-    const preview = message.length > 100 ? message.slice(0, 100) + '…' : message;
-    const contextEntries: [string, string][] = err.context && typeof err.context === 'object'
-        ? Object.entries(err.context).map(([k, v]) => {
-            const s = typeof v === 'string'
-                ? v
-                : (() => { try { return JSON.stringify(v); } catch { return String(v); } })();
-            return [k, s];
-        })
-        : [];
-    const absTime = new Date(err.created_at).toLocaleString('en-US', {
-        timeZone: 'America/New_York',
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
-
-    return (
-        <details className="group">
-            <summary
-                className="flex items-center gap-3 py-2.5 px-1 cursor-pointer hover:bg-white/[0.02] rounded-md list-none"
-                style={{ outline: 'none' }}
-            >
-                <span
-                    className="text-[10px] transition-transform group-open:rotate-90 shrink-0"
-                    style={{ color: 'var(--text-muted)' }}
-                    aria-hidden
-                >
-                    ▶
-                </span>
-                <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded shrink-0"
-                    style={{ background: 'rgba(255,68,68,0.12)', border: '1px solid rgba(255,68,68,0.28)', color: '#ff9999' }}
-                >
-                    {err.source || 'unknown'}
-                </span>
-                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
-                    {timeAgo(err.created_at)}
-                </span>
-                <span className="text-xs truncate flex-1 min-w-0" style={{ color: 'var(--text-primary)' }}>
-                    {preview}
-                </span>
-            </summary>
-
-            <div className="pl-7 pr-2 pb-3 pt-1 space-y-2">
-                <div>
-                    <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--text-muted)' }}>
-                        Message
-                    </div>
-                    <p className="text-sm break-words" style={{ color: 'var(--text-primary)' }}>
-                        {message}
-                    </p>
-                </div>
-                <div className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                    {absTime} ET
-                </div>
-                {contextEntries.length > 0 && (
-                    <div>
-                        <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                            Context
-                        </div>
-                        <dl className="space-y-1">
-                            {contextEntries.map(([k, v]) => (
-                                <div key={k} className="flex gap-3 text-[11px]">
-                                    <dt
-                                        className="font-mono shrink-0"
-                                        style={{ color: 'var(--text-tertiary)', minWidth: '110px' }}
-                                    >
-                                        {k}
-                                    </dt>
-                                    <dd
-                                        className="font-mono break-all"
-                                        style={{ color: 'var(--text-primary)' }}
-                                        title={v.length > 200 ? v : undefined}
-                                    >
-                                        {v.length > 200 ? v.slice(0, 200) + '…' : v}
-                                    </dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </div>
-                )}
-            </div>
-        </details>
-    );
-}
-
 function PlatformBadge({ icon, on }: { icon: string; on: boolean }) {
     return (
         <span
@@ -275,10 +185,6 @@ export default async function DashboardPage() {
     const data = await fetchDashboardData();
     const { stats } = data;
 
-    const status = stats.errors24h > 0 ? 'caution' : 'green';
-    const statusColor = status === 'green' ? '#00ff88' : '#ffaa00';
-    const statusLabel = status === 'green' ? 'All systems operational' : `${stats.errors24h} error${stats.errors24h === 1 ? '' : 's'} in last 24h`;
-
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             {/* ── Title block ──────────────────────────────────────── */}
@@ -299,33 +205,7 @@ export default async function DashboardPage() {
                         the cloud sees everything first
                     </p>
                 </div>
-                {stats.errors24h > 0 ? (
-                    <a
-                        href="#recent-errors"
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-white/[0.06]"
-                        style={{ background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.25)' }}
-                        title="Jump to the error list below"
-                    >
-                        <span
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ background: '#ff4444', boxShadow: '0 0 8px #ff4444' }}
-                        />
-                        <span className="text-[10px] font-mono" style={{ color: '#ff9999' }}>
-                            {statusLabel} — view ↓
-                        </span>
-                    </a>
-                ) : (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                         style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <span
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
-                        />
-                        <span className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                            {statusLabel}
-                        </span>
-                    </div>
-                )}
+                <ErrorsPopover count={stats.errors24h} errors={data.recentErrors} />
             </div>
 
             {/* ── Stat grid ────────────────────────────────────────── */}
@@ -333,31 +213,13 @@ export default async function DashboardPage() {
                 <StatCard label="Published 24h" value={stats.published24h} accent="#00ff88" />
                 <StatCard label="Pending Review" value={stats.pending} accent="#ffaa00" highlight={stats.pending > 0} />
                 <StatCard label="Scheduled 24h" value={stats.scheduled24h} accent="#00d4ff" />
-                {stats.errors24h > 0 ? (
-                    <a href="#recent-errors" className="block focus:outline-none" title="Show error details">
-                        <StatCard label="Errors 24h · view ↓" value={stats.errors24h} accent="#ff4444" highlight />
-                    </a>
-                ) : (
-                    <StatCard label="Errors 24h" value={stats.errors24h} accent="#9ca3af" />
-                )}
+                <StatCard
+                    label="Errors 24h"
+                    value={stats.errors24h}
+                    accent={stats.errors24h > 0 ? '#ff4444' : '#9ca3af'}
+                    highlight={stats.errors24h > 0}
+                />
             </div>
-
-            {/* ── Recent errors (only when there are any) ──────────── */}
-            {data.recentErrors.length > 0 && (
-                <Card className="p-5" id="recent-errors">
-                    <SectionHeader label="Recent Errors (24h)" count={data.recentErrors.length} accent="#ff4444" />
-                    <p className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>
-                        Click any row to expand and see the full message + context.
-                    </p>
-                    <ul className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                        {data.recentErrors.map(err => (
-                            <li key={err.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                <ErrorRow err={err} />
-                            </li>
-                        ))}
-                    </ul>
-                </Card>
-            )}
 
             {/* ── Platform tokens ──────────────────────────────────── */}
             <PlatformTokenCard health={data.metaTokenHealth} />
