@@ -229,7 +229,7 @@ Required in Vercel for production (after Phase 1 cutover):
 - `YOUTUBE_REFRESH_TOKEN` — long-lived, generated via one-time OAuth consent flow
 
 **AI (provider chain — first present wins, on failure walks to next):**
-- `GEMINI_API_KEY` — Google AI Studio (free tier, ~1500 req/day on `gemini-2.0-flash`). Optional override: `GEMINI_MODEL`.
+- `GEMINI_API_KEY` — Google AI Studio. Default model `gemini-2.5-flash`. Optional override: `GEMINI_MODEL` (e.g. `gemini-2.5-flash-lite` for cheaper, `gemini-flash-latest` to track newest).
 - `GROQ_API_KEY` — console.groq.com (free tier, ~14,400 req/day on `llama-3.3-70b-versatile`). Optional override: `GROQ_MODEL`.
 - `DEEPSEEK_API_KEY` — platform.deepseek.com (paid; cheap last-resort). Optional override: `DEEPSEEK_MODEL` (default `deepseek-chat`).
 
