@@ -44,23 +44,25 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         return result;
     }
 
-    // ── 1. Stage trailer FIRST (TRAILER_DROP only) ─────────────
-    // We need the staged MP4 ready before the IG call so Instagram can
-    // publish a Reels post (video) instead of falling through to the
-    // image-only path. Same staged URL feeds TikTok + YT Shorts below,
-    // so this is one Storage upload feeding three platforms.
+    // ── 1. Stage YouTube video FIRST (any YouTube source) ─────
+    // Per Jose's directive: if the post's source is a YouTube video,
+    // the video itself is what should ship to social — not a screenshot
+    // of the thumbnail. We expanded this from TRAILER_DROP-only to ALL
+    // YouTube-sourced claims so season confirms / date announces / etc.
+    // also publish as Reels when there's a real video underlying them.
+    // Same staged URL feeds TikTok + YT Shorts below.
     const claim = (post as any).claimType || (post as any).claim_type;
     const sourceUrl = (post as any).source_url || '';
     const isYouTubeSource = /youtube\.com|youtu\.be/.test(sourceUrl);
 
     let stagedVideoUrl: string | null = null;
-    if (claim === 'TRAILER_DROP' && isYouTubeSource) {
+    if (isYouTubeSource) {
         const staged = await fetchYouTubeToBucket(sourceUrl, post.slug);
         if (staged) {
             stagedVideoUrl = staged.bucket_url;
             result.staged_video_url = staged.bucket_url;
         } else {
-            console.warn(`[Social] TRAILER_DROP but trailer fetch failed for ${post.slug} — falling back to image post`);
+            console.warn(`[Social] YouTube source but video fetch failed for ${post.slug} — falling back to image post`);
         }
     }
 

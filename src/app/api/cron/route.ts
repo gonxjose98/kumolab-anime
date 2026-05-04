@@ -6,6 +6,7 @@ import { generateDailyReport } from '@/lib/engine/daily-report';
 import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
 import { generateIntelImage } from '@/lib/engine/image-processor';
 import { refreshMetaToken } from '@/lib/engine/token-health';
+import { publishToSocials } from '@/lib/social/publisher';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const maxDuration = 300;
@@ -99,6 +100,43 @@ export async function GET(req: NextRequest) {
                 published: report.posts_published,
                 issues: report.issues.length,
             });
+        }
+
+        // Re-broadcast a previously-published post to social. Used for
+        // recovery / one-off backfills (e.g. when an IG post went out as
+        // image-only because the publisher hadn't been wired for video
+        // yet, or when a token expiry blocked the original broadcast).
+        // Each invocation creates fresh social posts; the operator deletes
+        // the old ones manually.
+        if (worker === 'republish-social') {
+            const idsParam = searchParams.get('postIds') || searchParams.get('postId');
+            if (!idsParam) {
+                return NextResponse.json({ error: 'postIds query param is required' }, { status: 400 });
+            }
+            const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean);
+            const results: any[] = [];
+            for (const postId of ids) {
+                try {
+                    const { data: post, error } = await supabaseAdmin
+                        .from('posts')
+                        .select('*')
+                        .eq('id', postId)
+                        .single();
+                    if (error || !post) {
+                        results.push({ id: postId, success: false, error: error?.message || 'Post not found' });
+                        continue;
+                    }
+                    const social = await publishToSocials(post as any);
+                    // Merge any new social IDs back into the post row so the
+                    // dashboard reflects the new Reels link too.
+                    const merged = { ...((post as any).social_ids || {}), ...social };
+                    await supabaseAdmin.from('posts').update({ social_ids: merged }).eq('id', postId);
+                    results.push({ id: postId, success: true, social });
+                } catch (e: any) {
+                    results.push({ id: postId, success: false, error: e?.message || 'republish exception' });
+                }
+            }
+            return NextResponse.json({ success: results.every(r => r.success), worker: 'republish-social', results });
         }
 
         if (worker === 'refresh-meta-token') {
@@ -215,7 +253,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token']
+            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social']
         }, { status: 400 });
 
     } catch (error: any) {
