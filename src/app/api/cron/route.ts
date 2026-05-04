@@ -154,45 +154,6 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        if (worker === 'diag-binaries') {
-            const fs = await import('fs');
-            const { spawn } = await import('child_process');
-            const out: any = { platform: process.platform };
-            const TMP = '/tmp/yt-dlp';
-            try {
-                if (!fs.existsSync(TMP)) {
-                    const t0 = Date.now();
-                    const res = await fetch('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux', { redirect: 'follow' });
-                    out.dl_status = res.status;
-                    if (res.ok) {
-                        const buf = Buffer.from(await res.arrayBuffer());
-                        fs.writeFileSync(TMP, buf);
-                        fs.chmodSync(TMP, 0o755);
-                        out.dl_bytes = buf.length;
-                        out.dl_ms = Date.now() - t0;
-                    } else {
-                        out.dl_err = await res.text().catch(() => '');
-                    }
-                } else {
-                    out.tmp_already_present = true;
-                }
-                const stat = fs.statSync(TMP);
-                out.tmp_size = stat.size;
-                out.tmp_mode = (stat.mode & 0o777).toString(8);
-                out.version_check = await new Promise(resolve => {
-                    const p = spawn(TMP, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
-                    let stdout = '';
-                    let stderr = '';
-                    p.stdout.on('data', c => stdout += c);
-                    p.stderr.on('data', c => stderr += c);
-                    p.on('error', e => resolve(`ERR: ${e.message}`));
-                    p.on('close', code => resolve(`exit=${code} stdout=${stdout.trim()} stderr=${stderr.trim().slice(0, 200)}`));
-                    setTimeout(() => { try { p.kill('SIGKILL'); } catch {} resolve('TIMEOUT'); }, 8000);
-                });
-            } catch (e: any) { out.err = e?.message; }
-            return NextResponse.json({ success: true, worker: 'diag-binaries', ...out });
-        }
-
         if (worker === 'refresh-meta-token') {
             console.log('[Cron] Refreshing Meta token...');
             const result = await refreshMetaToken();
