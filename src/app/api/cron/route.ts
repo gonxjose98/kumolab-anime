@@ -139,6 +139,30 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: results.every(r => r.success), worker: 'republish-social', results });
         }
 
+        // Diagnostic: report whether the yt-dlp + ffmpeg binaries are
+        // actually present + executable in the deployed function.
+        if (worker === 'diag-binaries') {
+            const fs = await import('fs');
+            const path = await import('path');
+            const cwd = process.cwd();
+            const ytdlpDir = path.join(cwd, 'node_modules', 'youtube-dl-exec', 'bin');
+            const ffmpegPath = path.join(cwd, 'node_modules', 'ffmpeg-static', 'ffmpeg');
+            const out: any = { cwd, platform: process.platform };
+            try {
+                out.ytdlp_dir_exists = fs.existsSync(ytdlpDir);
+                out.ytdlp_dir_contents = out.ytdlp_dir_exists ? fs.readdirSync(ytdlpDir) : null;
+            } catch (e: any) { out.ytdlp_err = e?.message; }
+            try {
+                out.ffmpeg_exists = fs.existsSync(ffmpegPath);
+                if (out.ffmpeg_exists) {
+                    const stat = fs.statSync(ffmpegPath);
+                    out.ffmpeg_size = stat.size;
+                    out.ffmpeg_mode = (stat.mode & 0o777).toString(8);
+                }
+            } catch (e: any) { out.ffmpeg_err = e?.message; }
+            return NextResponse.json({ success: true, worker: 'diag-binaries', ...out });
+        }
+
         if (worker === 'refresh-meta-token') {
             console.log('[Cron] Refreshing Meta token...');
             const result = await refreshMetaToken();
