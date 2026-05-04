@@ -97,7 +97,34 @@ export default function PostEditor() {
                 // Pre-filling it caused the renderer to fetch youtube.com/
                 // watch?v=… as binary, which fails. Leave blank so the
                 // renderer falls back to post.image (the actual thumbnail).
-                setSourceUrl('');
+                // If this post has a previously-approved settings snapshot,
+                // hydrate the editor state from it. That way reopening a
+                // published post shows the EXACT toggles + scales + nudges
+                // + word-color choices you approved with — no guessing.
+                if (data.image_settings && typeof data.image_settings === 'object') {
+                    const s = data.image_settings as any;
+                    setSettings(prev => ({
+                        ...prev,
+                        applyText: s.applyText ?? prev.applyText,
+                        applyGradient: s.applyGradient ?? prev.applyGradient,
+                        applyWatermark: s.applyWatermark ?? prev.applyWatermark,
+                        gradientPosition: s.gradientPosition ?? prev.gradientPosition,
+                        gradientStrength: s.gradientStrength ?? prev.gradientStrength,
+                        titleScale: s.titleScale ?? prev.titleScale,
+                        captionScale: s.captionScale ?? prev.captionScale,
+                        titleOffset: s.titleOffset ?? prev.titleOffset,
+                        captionOffset: s.captionOffset ?? prev.captionOffset,
+                        watermarkPosition: s.watermarkPosition ?? prev.watermarkPosition,
+                        purpleWordIndices: s.purpleWordIndices ?? prev.purpleWordIndices,
+                    }));
+                    if (s.sourceUrl && typeof s.sourceUrl === 'string') {
+                        setSourceUrl(s.sourceUrl);
+                    } else {
+                        setSourceUrl('');
+                    }
+                } else {
+                    setSourceUrl('');
+                }
                 setImageUrl(data.image || '');
                 // Fire a preview render immediately with the default toggle
                 // state (all OFF). This makes the displayed image actually

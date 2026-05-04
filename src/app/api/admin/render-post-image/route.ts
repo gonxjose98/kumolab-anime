@@ -142,9 +142,29 @@ export async function POST(req: NextRequest) {
             });
         }
 
+        // Snapshot the exact settings used so we can reproduce this render
+        // later (cleanup recovery, batch rebake, audit). Includes the source
+        // URL so we know which background was used.
+        const settingsSnapshot = {
+            sourceUrl,
+            applyText: settings.applyText ?? true,
+            applyGradient: settings.applyGradient ?? true,
+            applyWatermark: settings.applyWatermark ?? true,
+            gradientPosition: settings.gradientPosition ?? 'bottom',
+            gradientStrength: settings.gradientStrength ?? 1,
+            textScale: settings.textScale,
+            textPosition: settings.textPosition,
+            titleScale: settings.titleScale,
+            captionScale: settings.captionScale,
+            titleOffset: settings.titleOffset,
+            captionOffset: settings.captionOffset,
+            purpleWordIndices: settings.purpleWordIndices ?? [],
+            watermarkPosition: settings.watermarkPosition ?? null,
+        };
+
         const { data: updated, error: updateError } = await supabaseAdmin
             .from('posts')
-            .update({ image: result.processedImage })
+            .update({ image: result.processedImage, image_settings: settingsSnapshot })
             .eq('id', postId)
             .select('id, image')
             .single();

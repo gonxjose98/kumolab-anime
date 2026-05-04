@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
                 try {
                     const { data: post, error: fetchError } = await supabaseAdmin
                         .from('posts')
-                        .select('id, slug, title, excerpt, image, source_url')
+                        .select('id, slug, title, excerpt, image, source_url, image_settings')
                         .eq('id', postId)
                         .single();
                     if (fetchError || !post) {
@@ -145,28 +145,43 @@ export async function GET(req: NextRequest) {
                         continue;
                     }
 
-                    const sourceUrl = post.image;
+                    // Source priority for re-render:
+                    //   1. ?sourceUrl= query (manual override)
+                    //   2. post.image_settings.sourceUrl (the source last
+                    //      approved by the user — this is what we want)
+                    //   3. post.image (current value; may be the rendered
+                    //      bake itself, so this is a last resort)
+                    const saved: any = post.image_settings || {};
+                    const sourceUrl = (searchParams.get('sourceUrl')) || saved.sourceUrl || post.image;
                     if (!sourceUrl) {
-                        results.push({ id: postId, success: false, error: 'no image to render from' });
+                        results.push({ id: postId, success: false, error: 'no source to render from' });
                         continue;
                     }
 
-                    // Allow CLI/curl callers to test toggle combinations.
-                    // Defaults match auto-publisher (all on, gradient bottom).
-                    const qpBool = (k: string, def: boolean) => {
-                        const v = searchParams.get(k);
-                        if (v === null) return def;
-                        return v === '1' || v === 'true';
+                    // Settings priority: ?text/gradient/watermark/gradPos
+                    // query params override the saved settings on a per-call
+                    // basis (useful for ad-hoc testing). Otherwise we render
+                    // EXACTLY what the user approved last time.
+                    const qpOr = <T>(qp: string | null, fallback: T): boolean | T => {
+                        if (qp === null) return fallback;
+                        return qp === '1' || qp === 'true';
                     };
                     const rendered = await generateIntelImage({
                         sourceUrl,
                         animeTitle: post.title || '',
                         headline: (post.excerpt || '').toString(),
                         slug: post.slug || `post-${postId}`,
-                        applyText: qpBool('text', true),
-                        applyGradient: qpBool('gradient', true),
-                        applyWatermark: qpBool('watermark', true),
-                        gradientPosition: (searchParams.get('gradPos') === 'top' ? 'top' : 'bottom'),
+                        applyText: qpOr(searchParams.get('text'), saved.applyText ?? true) as boolean,
+                        applyGradient: qpOr(searchParams.get('gradient'), saved.applyGradient ?? true) as boolean,
+                        applyWatermark: qpOr(searchParams.get('watermark'), saved.applyWatermark ?? true) as boolean,
+                        gradientPosition: (searchParams.get('gradPos') as 'top' | 'bottom') || saved.gradientPosition || 'bottom',
+                        gradientStrength: saved.gradientStrength,
+                        titleScale: saved.titleScale,
+                        captionScale: saved.captionScale,
+                        titleOffset: saved.titleOffset,
+                        captionOffset: saved.captionOffset,
+                        purpleWordIndices: saved.purpleWordIndices ?? [],
+                        watermarkPosition: saved.watermarkPosition ?? undefined,
                         classification: 'CLEAN',
                         bypassSafety: true,
                     });
