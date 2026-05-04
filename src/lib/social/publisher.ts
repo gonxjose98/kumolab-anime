@@ -9,12 +9,16 @@ import { logError } from '../logging/structured-logger';
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
 const FB_PAGE_ID = '833836379820504';
+const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
+const THREADS_USER_ID = process.env.THREADS_USER_ID;
 
 export interface SocialPublishResult {
     instagram_id?: string;
     instagram_url?: string;
     facebook_id?: string;
     facebook_url?: string;
+    threads_id?: string;
+    threads_url?: string;
     tiktok_publish_id?: string;
     tiktok_url?: string;
     youtube_video_id?: string;
@@ -30,7 +34,9 @@ export interface SocialPublishResult {
  *   - Facebook Page: every published post — direct Graph API call to the
  *     KumoLab Page (replaces the old Meta Suite cross-post path, which was
  *     unreliable). The IG cross-post toggle is left OFF so we don't double-post.
- *     Threads cross-post is still handled by IG (Meta Suite fans IG → Threads).
+ *   - Threads: every published post — direct Threads API call. Replaces
+ *     the IG → Threads cross-post toggle. Long-lived 60-day token is
+ *     refreshed weekly by the refresh-threads-token cron worker.
  *   - TikTok + YouTube Shorts: only for TRAILER_DROP claims whose source_url is a
  *     YouTube video. We download the trailer to the blog-videos bucket, then hand
  *     TikTok + YT the public bucket URL.
@@ -110,7 +116,22 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         }
     }
 
-    // ── 4. Video platforms for TRAILER_DROP only ───────────────
+    // ── 4. Threads (direct Threads API) ────────────────────────
+    if (THREADS_ACCESS_TOKEN && THREADS_USER_ID) {
+        try {
+            const threadsResult = await publishToThreads(post, stagedVideoUrl);
+            Object.assign(result, threadsResult);
+        } catch (e: any) {
+            await logError({
+                source: 'publisher.threads',
+                errorMessage: `Threads publish threw: ${e?.message || e}`,
+                stackTrace: e?.stack,
+                context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+            });
+        }
+    }
+
+    // ── 5. Video platforms for TRAILER_DROP only ───────────────
     if (stagedVideoUrl) {
         // TikTok
         const tiktok = await publishToTikTok({
@@ -450,6 +471,132 @@ async function publishFacebookReel(
         await logError({
             source: 'publisher.fb.reels',
             errorMessage: `FB Reels threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { post_slug: post.slug, post_title: post.title },
+        });
+    }
+
+    return result;
+}
+
+// ── Threads publisher ──────────────────────────────────────────
+//
+// Threads has 3 media types: TEXT, IMAGE, VIDEO. We post:
+//   - VIDEO when stagedVideoUrl is set (the YouTube → Supabase MP4 we
+//     already fetched for IG/FB Reels). Same poll-status pattern as IG.
+//   - IMAGE when there's no video but post.image is set.
+//   - TEXT_POST otherwise.
+//
+// Threads doesn't take long captions like FB, but it's also not as
+// hashtag-light as some assume. We send a punchy version: title + lead
+// + link, no hashtag spam.
+async function publishToThreads(post: BlogPost, stagedVideoUrl: string | null = null): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID) return result;
+
+    const lead = (post as any).excerpt || post.content?.substring(0, 200) || '';
+    const link = `https://kumolabanime.com/${post.slug}`;
+    // Threads max ~500 chars. Title + short lead + link.
+    const text = `${post.title}\n\n${lead}\n\n${link}`.substring(0, 500);
+
+    const isVideo = !!stagedVideoUrl;
+    const hasImage = !!post.image;
+
+    try {
+        // Phase 1: create container
+        const containerUrl = `https://graph.threads.net/v1.0/${THREADS_USER_ID}/threads`;
+        const containerParams = new URLSearchParams({
+            access_token: THREADS_ACCESS_TOKEN,
+            text,
+            media_type: isVideo ? 'VIDEO' : hasImage ? 'IMAGE' : 'TEXT',
+            ...(isVideo ? { video_url: stagedVideoUrl! } : {}),
+            ...(!isVideo && hasImage ? { image_url: post.image! } : {}),
+        });
+
+        const containerRes = await fetchWithTimeout(`${containerUrl}?${containerParams}`, { method: 'POST' }, 20_000);
+        const containerData = await containerRes.json();
+
+        if (!containerData.id) {
+            const meta = containerData?.error || {};
+            await logError({
+                source: 'publisher.threads.container',
+                errorMessage: `Threads container creation failed: ${meta.message || JSON.stringify(containerData).substring(0, 300)}`,
+                context: {
+                    post_slug: post.slug,
+                    post_title: post.title,
+                    meta_code: meta.code,
+                    media_type: isVideo ? 'VIDEO' : hasImage ? 'IMAGE' : 'TEXT',
+                },
+            });
+            return result;
+        }
+
+        // Phase 2: poll status (video and image containers need ingest)
+        // Per docs: TEXT containers are ready instantly, IMAGE/VIDEO need polling.
+        if (isVideo || hasImage) {
+            const maxWaitMs = isVideo ? 60_000 : 8_000;
+            const pollIntervalMs = isVideo ? 4_000 : 2_000;
+            const start = Date.now();
+            let finalStatus: string | null = null;
+            while (Date.now() - start < maxWaitMs) {
+                await new Promise(r => setTimeout(r, pollIntervalMs));
+                const statusRes = await fetchWithTimeout(
+                    `https://graph.threads.net/v1.0/${containerData.id}?fields=status&access_token=${encodeURIComponent(THREADS_ACCESS_TOKEN)}`,
+                    { method: 'GET' },
+                    10_000,
+                );
+                const statusData = await statusRes.json().catch(() => ({}));
+                finalStatus = statusData.status || null;
+                if (finalStatus === 'FINISHED') break;
+                if (finalStatus === 'ERROR' || finalStatus === 'EXPIRED') {
+                    await logError({
+                        source: 'publisher.threads.container',
+                        errorMessage: `Threads container ingest ${finalStatus}: ${JSON.stringify(statusData).substring(0, 300)}`,
+                        context: { post_slug: post.slug, container_id: containerData.id },
+                    });
+                    return result;
+                }
+            }
+            if (finalStatus !== 'FINISHED' && isVideo) {
+                await logError({
+                    source: 'publisher.threads.container',
+                    errorMessage: `Threads VIDEO container did not reach FINISHED in ${maxWaitMs / 1000}s (last: ${finalStatus || 'unknown'})`,
+                    context: { post_slug: post.slug, container_id: containerData.id },
+                });
+                return result;
+            }
+        }
+
+        // Phase 3: publish container
+        const publishUrl = `https://graph.threads.net/v1.0/${THREADS_USER_ID}/threads_publish`;
+        const publishParams = new URLSearchParams({
+            access_token: THREADS_ACCESS_TOKEN,
+            creation_id: containerData.id,
+        });
+        const publishRes = await fetchWithTimeout(`${publishUrl}?${publishParams}`, { method: 'POST' }, 15_000);
+        const publishData = await publishRes.json();
+
+        if (publishData.id) {
+            result.threads_id = publishData.id;
+            result.threads_url = `https://www.threads.net/@kumolabanime/post/${publishData.id}`;
+            console.log(`✅ [Threads] Published ${isVideo ? 'video' : hasImage ? 'image' : 'text'}: ${publishData.id}`);
+        } else {
+            const meta = publishData?.error || {};
+            await logError({
+                source: 'publisher.threads.publish',
+                errorMessage: `Threads publish phase failed: ${meta.message || JSON.stringify(publishData).substring(0, 300)}`,
+                context: {
+                    post_slug: post.slug,
+                    post_title: post.title,
+                    meta_code: meta.code,
+                    media_type: isVideo ? 'VIDEO' : hasImage ? 'IMAGE' : 'TEXT',
+                },
+            });
+        }
+    } catch (e: any) {
+        await logError({
+            source: 'publisher.threads',
+            errorMessage: `Threads fetch/publish threw: ${e?.message || e}`,
             stackTrace: e?.stack,
             context: { post_slug: post.slug, post_title: post.title },
         });

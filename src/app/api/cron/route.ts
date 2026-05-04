@@ -166,6 +166,19 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (worker === 'refresh-threads-token') {
+            console.log('[Cron] Refreshing Threads token...');
+            const { refreshThreadsToken } = await import('@/lib/engine/threads-token');
+            const result = await refreshThreadsToken();
+            return NextResponse.json({
+                success: result.ok,
+                worker: 'refresh-threads-token',
+                rotated: result.rotated,
+                daysUntilExpiry: result.daysUntilExpiry ?? null,
+                reason: result.reason,
+            });
+        }
+
         if (worker === 'cleanup') {
             console.log('[Cron] Running Cleanup Worker...');
             const result = await runCleanupWorker();
