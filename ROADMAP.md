@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-05-02 | **Status:** 🟢 Active — Auto-publish flow producing fresh posts daily (latest: *Needy Girl Overdose | English Dub Trailer* from YouTube_Aniplex USA, auto-published 2026-05-02). Admin redesigned to a 3-route Console / Posts / Calendar surface. Editor overlay system rewired so toggles are independent, default OFF, auto-render on change. IG broadcast deliberately off (Meta page token expired 2026-05-01; awaiting fresh creds). AI provider intermittently 530'ing — caption falls back to deterministic templates.
+**Last updated:** 2026-05-04 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Today's drops (8 posts) all confirmed live across all 3 platforms. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts.
 
 ---
 
@@ -18,15 +18,15 @@ Build KumoLab into a fully automated, multi-platform anime news and media brand 
 
 | Phase | Name | Status | Description |
 | --- | --- | --- | --- |
-| **Phase 1** | Pipeline Rebuild | 🔴 Active | Storage redesign + automation layer + platform wiring before going live |
-| **Phase 2** | Multi-Platform Launch | ⬜ Upcoming | Go live across all platforms simultaneously |
+| **Phase 1** | Pipeline Rebuild | ✅ Complete | Storage redesign + automation layer + platform wiring before going live |
+| **Phase 2** | Multi-Platform Launch | 🟢 Active | Go live across all platforms simultaneously |
 | **Phase 3** | Audience Growth | ⬜ Upcoming | Drive to 10k combined followers |
 | **Phase 4** | Monetization | ⬜ Upcoming | Activate ads + pursue first sponsorships |
 | **Phase 5** | Scale | ⬜ Upcoming | Optimize, expand, grow revenue |
 
 ---
 
-## Phase 1 — Pipeline Rebuild 🔴 Active
+## Phase 1 — Pipeline Rebuild ✅ Complete
 
 **Trigger:** Jose activated KumoLab on 2026-04-20 after the previous Supabase ran out of storage.
 
@@ -121,21 +121,25 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - **Build pipeline** — fixed the "fail-then-pass on every push" pattern by mirroring all 10 production env vars to Preview environment (preview builds were 5xx'ing because module-level Supabase guards threw on missing env). Verified two consecutive clean preview builds before declaring done.
 - **Homepage feed UX** (2026-05-02, PRs #28, #30, #32) — clean post titles (channel suffixes stripped, multi-word ALL-CAPS de-shouted, single-word acronyms preserved), full YouTube native controls (`allowFullScreen`, `picture-in-picture`, `web-share`, `playsinline`), `View full post` link click bug fixed (`.cardGradient` had no `pointer-events: none` and was eating clicks), all card overlays hide while video is playing so iframe owns the tap surface (CC, settings, fullscreen, scrub bar, share work natively), small ✕ close button replaces overlays during playback so users have a way out. Hero overlay PNG removed from blog post page for video posts — embed IS the hero.
 
-**Open blockers (not in flight, awaiting Jose):**
-- **IG broadcasting**: Meta page token expired 2026-05-01 PDT. Need App ID + App Secret + fresh user token to mint never-expiring page token. Posts publish to website fine; IG/FB/Threads cross-posts are paused.
-- **AI endpoint reliability**: ollama.kumolabanime.com upstream is 530'ing intermittently. Captions fall back cleanly; tone/safety pass fails closed (Japanese-translation posts get rejected when AI is down). Two paths: stabilize the ollama instance, or set `KIMI_API_KEY`/`OPENAI_API_KEY` in Vercel env so the AI provider chain in `ai.ts` failovers automatically.
+- **Tri-platform direct publishing** (2026-05-04) — replaced the brittle Meta Suite IG→FB→Threads cross-post toggle with **direct Graph API calls** to all three platforms inside `publishToSocials()`. The cross-post UI page on Meta's web is currently broken for the kumolabanime account (consistent 500s across desktop/mobile/IG-side/FB-side surfaces — confirmed Meta server-side bug); now it doesn't matter. Each platform publishes via its own contract:
+    • **Instagram** — Reels API for video posts, image post otherwise. Container + status_code poll + publish (existing).
+    • **Facebook Page** — `/{PAGE_ID}/video_reels` 3-phase (start → hosted-URL upload → finish) for video, `/{PAGE_ID}/photos` for image. Uses the freshly minted page token with `pages_manage_posts` scope (re-OAuthed via Graph Explorer to add `instagram_manage_insights` + `instagram_manage_comments` + `pages_manage_posts`; never-expiring page token, `data_access_expires_at: 2026-08-02`).
+    • **Threads** — separate **KumoLab Threads** Meta app (App ID `1254048673427302`, Threads App ID `1927422184574661`) created from scratch with the "Access the Threads API" use case. kumolabanime added as Threads tester, invite accepted via threads.net → Account Settings → Website permissions. OAuth flow at `threads.net/oauth/authorize` with `threads_basic + threads_content_publish + threads_manage_insights` scopes; auth code exchanged via `/api/oauth/threads/callback` (one-shot endpoint we built) to a 60-day long-lived token. `publishToThreads(post, stagedVideoUrl)` uses the same Supabase MP4 we already feed IG/FB Reels — VIDEO/IMAGE/TEXT branching with status-poll on video. Container creation → `FINISHED` poll → `/threads_publish`. Captures `threads_id` + `threads_url` into `posts.social_ids`.
+    • **No more cross-post toggle dependency anywhere** — IG cross-post in the user's IG mobile-app settings should be left OFF for FB and ON for Threads (or both off; doesn't matter since we're posting directly). Today's 8 published posts confirmed live on all 3 platforms via backfill.
+    • **Auto-refresh wired** — `refresh-meta-token` cron Mondays 05:00 UTC + new `refresh-threads-token` cron Tuesdays 05:00 UTC (`src/lib/engine/threads-token.ts`). Both call their respective refresh endpoints and hot-swap the rotated token into Vercel env via the Vercel REST API, so no redeploy needed for token rotation. New env vars in Vercel prod + preview: `THREADS_APP_ID`, `THREADS_APP_SECRET`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`. New endpoints (Meta-required): `/api/oauth/threads/{callback,deauthorize,data-deletion,data-deletion/status}`.
+- **Insights APIs unlocked** (2026-05-04) — fresh Meta page token includes `instagram_manage_insights` + `instagram_manage_comments`. Live-tested: per-post IG insights call returns real `reach/likes/comments/shares/saved` data. Threads token has `threads_manage_insights`. Foundation for the planned analytics dashboard worker (next milestone candidate).
+- **AI endpoint reliability resolved** (2026-05-03) — old `ollama.kumolabanime.com` 530s replaced with the multi-provider chain (Gemini × 2 → Groq → DeepSeek). Free-first, paid last-resort. KumoLab no longer depends on any single AI vendor or Jose-maintained infra.
 
-### Milestone 1.3 — Platform Publishers ✅ Code Complete (pending credentials)
+### Milestone 1.3 — Platform Publishers ✅ Live
 
-All code scaffolds built and wired into `publishToSocials()` on commit `136de23`. Each publisher no-ops gracefully when its credentials are missing so cutover doesn't wait on platform approvals.
-
-- ✅ Instagram — live in code (Meta Suite cross-posts → Facebook + Threads)
-- ✅ TikTok — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. Awaits TikTok Developer App approval (Jose, ~2-4 weeks).
-- ✅ YouTube Shorts — scaffold complete (`src/lib/social/youtube-publisher.ts`). OAuth 2.0 refresh-token auth, `videos.insert` multipart upload. Awaits Jose's one-time OAuth consent + refresh token.
-- ✅ Trailer re-upload pipeline — `trailer-fetcher.ts` downloads YouTube video via `@distube/ytdl-core`, stages in `blog-videos` bucket. Scoped to `TRAILER_DROP` claims only.
-- ⬜ X (Twitter) — **deferred** until revenue starts (Jose's call, 2026-04-21).
-- ⬜ Video generation infrastructure — **deferred** entirely (Jose's call, 2026-04-21). Re-upload path covers trailers; non-trailer news skips video platforms until this is built.
-- ⬜ Visible KumoLab branding on re-uploaded videos — **deferred**; accepting occasional DMCA takedowns.
+- ✅ **Instagram** — live, direct Graph API. Reels for video posts (status_code poll up to 60s), image otherwise.
+- ✅ **Facebook Page** — live, direct Graph API. `/video_reels` 3-phase for video, `/photos` for image. Replaces the unreliable Meta Suite cross-post path. **No env-flag gating** — direct FB post is the canonical path.
+- ✅ **Threads** — live, direct Threads API via separate **KumoLab Threads** app. VIDEO/IMAGE/TEXT branching, status-poll on video, 60-day token refreshed weekly via cron.
+- ✅ **TikTok** — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. **Awaits TikTok Developer App approval** (~2-4 weeks; auto-checked every 2 days via the scheduled remote agent).
+- ✅ **YouTube Shorts** — scaffold complete (`src/lib/social/youtube-publisher.ts`). OAuth 2.0 refresh-token auth, `videos.insert` multipart upload. Awaits Jose's one-time OAuth consent + refresh token.
+- ✅ **Trailer re-upload pipeline** — `trailer-fetcher.ts` calls `kumolab-yt-dlp-worker` (Render-hosted Express service, Webshare residential proxy) which streams MP4 back. FFmpeg watermark/letterbox/60s-trim via `video-processor.ts`. Used by IG Reels, FB Reels, Threads VIDEO, TikTok, YT Shorts — one bucket URL feeds all platforms.
+- ⬜ **X (Twitter)** — **deferred** until revenue starts.
+- ⬜ **Video generation infrastructure** — **deferred** entirely. Re-upload path covers trailers; non-trailer news skips video platforms until this is built.
 
 ### Milestone 1.4 — Admin Readiness ⬜ Deferred
 
@@ -174,19 +178,28 @@ Folded into Jose's upcoming admin dashboard redesign (separate project). No read
 
 ---
 
-## Phase 2 — Multi-Platform Launch ⬜ Upcoming
+## Phase 2 — Multi-Platform Launch 🟢 Active
 
-**Trigger:** Phase 1 complete (Milestones 1.3, 1.4, 1.5 all done)
+**Triggered:** 2026-05-04 — tri-platform direct publishing went live.
 
-**Exit condition:** All platforms publishing consistently for 2 weeks.
+**Exit condition:** All platforms publishing consistently for 2 weeks (target: 2026-05-18).
 
-- Connect all platform API credentials in Vercel
-- Run 48-hour silent test — queue posts but don't publish
-- Review first batch manually, then enable `AUTO_PUBLISH_SOCIALS=true`
-- Set up analytics tracking
-- Announce relaunch (Jose-directed — timing and copy his call)
+**Live now:**
+- ✅ Website/blog — every approved post
+- ✅ Instagram — Reels (video) / image, direct API
+- ✅ Facebook Page — Reels (video) / photo, direct API
+- ✅ Threads — VIDEO / IMAGE / TEXT, direct API
+- 🟡 TikTok — code ready, awaiting developer app approval (auto-monitored every 2 days)
+- 🟡 YouTube Shorts — code ready, awaiting one-time OAuth consent
+- ⬜ X — deferred until revenue
 
-**Cadence at launch:** Website/blog: uncapped | Instagram (cross-posted to FB + Threads via Meta Suite): spaced 25+ min | TikTok + YouTube Shorts: firing only for `TRAILER_DROP` claims via trailer re-upload | X: deferred until revenue. Per-platform daily caps removed by design — spacing does the pacing, not count limits.
+**Cadence:** Website uncapped; the 3 social platforms publish in lockstep via `publishToSocials()` (one cron tick = one fan-out to all 3). Min 25 min between posts via scheduler. Per-platform daily caps removed by design — spacing does the pacing.
+
+**This phase's open work:**
+- 2-week stability watch — observe error_logs daily, intervene only if a publisher starts failing
+- IG insights collection cron worker (the `instagram_manage_insights` + `threads_manage_insights` scopes are unlocked but not yet harvested)
+- Analytics card on admin dashboard (per-post reach/likes/comments/shares/saved across all 3 platforms)
+- Announce KumoLab relaunch publicly — Jose-directed timing
 
 ---
 
@@ -257,7 +270,7 @@ Grow content volume, expand sponsorship pipeline (2–3 active deals), explore a
 - **Source URLs belong in `sources-config.ts`** — never hardcode.
 - **Retention:** posts auto-expire at `published_at + KUMOLAB_DEFAULT_RETENTION_DAYS` (default 60). Unset = evergreen.
 - **Dedup:** primary via `seen_fingerprints` table. Old "anime_id + claim_type + season_label" composite is gone.
-- **Meta publishing:** IG only. Do NOT add direct FB or Threads API calls — Meta Suite cross-posts automatically.
+- **Meta publishing:** **direct API to all 3 platforms** — IG, FB Page, Threads. No Meta Suite cross-post dependency anywhere; the IG cross-post toggles must stay OFF (or it doesn't matter — they're orthogonal). Threads has its own separate Meta app (`KumoLab Threads`, App ID `1254048673427302`) with its own OAuth and 60-day token refreshed weekly via cron.
 - **Circuit breaker:** 3 declines in 24h → auto-publish pauses for 6h. Manual reset via `manualResetCircuitBreaker()`.
 - Redeploy Vercel after any `vercel.json` cron changes.
 - Test all cron endpoints with curl before reporting complete.
