@@ -13,7 +13,6 @@
     "engine:hourly": "tsx scripts/run-engine.ts hourly"
   },
   "dependencies": {
-    "@distube/ytdl-core": "^4.16.12",
     "@napi-rs/canvas": "^0.1.88",
     "@supabase/auth-helpers-react": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
@@ -36,6 +35,8 @@
     "sharp": "^0.34.5",
     "stripe": "^20.2.0",
     "twitter-api-v2": "^1.29.0",
+    "youtube-dl-exec": "^3.1.5",
+    "youtubei.js": "^17.0.1",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

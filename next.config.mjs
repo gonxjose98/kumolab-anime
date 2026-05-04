@@ -1,12 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    serverExternalPackages: ["@napi-rs/canvas", "ffmpeg-static", "fluent-ffmpeg", "@distube/ytdl-core"],
-    // Make sure the ffmpeg binary that ffmpeg-static downloads at install
-    // time is actually bundled into the serverless function output. Without
-    // this, Next.js's tracing skips the platform-specific binary and the
-    // spawn() call ENOENTs at runtime.
+    serverExternalPackages: ["@napi-rs/canvas", "ffmpeg-static", "fluent-ffmpeg", "youtube-dl-exec"],
+    // Make sure the ffmpeg + yt-dlp binaries that ship with their npm
+    // packages get bundled into the serverless function output. Without
+    // these tracing includes Next.js skips the platform-specific binaries
+    // and the spawn() calls ENOENT at runtime.
     outputFileTracingIncludes: {
-        '/api/cron/**': ['./node_modules/ffmpeg-static/**', './public/fonts/**'],
+        '/api/cron/**': [
+            './node_modules/ffmpeg-static/**',
+            './node_modules/youtube-dl-exec/bin/**',
+            './public/fonts/**',
+        ],
     },
 
     typescript: {
