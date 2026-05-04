@@ -6,19 +6,24 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Renders the overlay image for a post.
+ * Renders or persists the overlay image for a post.
  *
- * Two modes:
- *   - persist=false (default) — preview only. Returns a base64 data URL,
- *     does NOT touch Storage and does NOT write posts.image. Used by the
- *     editor's auto-render so the user can experiment freely without
- *     mutating the post until they hit Save.
- *   - persist=true — final render. Uploads PNG to the blog-images bucket
- *     and writes posts.image. Used by the editor's Save flow and by
- *     server-side callers that own the post lifecycle.
+ * Three modes:
+ *   - persist=false (default) — preview only. Runs the renderer, returns
+ *     a base64 data URL, does NOT touch Storage and does NOT write
+ *     posts.image. Used by the editor's auto-render so the user can
+ *     experiment freely without mutating the post until they hit Save.
+ *   - persist=true + previewImage in body — promote-existing-bytes.
+ *     The editor cached the last preview's base64; on Save it sends
+ *     those exact bytes back. We decode + upload them as-is + write the
+ *     settings snapshot. NO second render call. The bytes shown in the
+ *     preview ARE the bytes that publish.
+ *   - persist=true with no previewImage — fallback re-render path. Used
+ *     when the editor hasn't had a chance to render yet (rare). Runs the
+ *     renderer on the server side once.
  *
- * Settings come from the request body; the v2 schema dropped persistent
- * image settings columns so they live in component state, not the DB.
+ * Settings + source URL get snapshotted into posts.image_settings so any
+ * later re-render reproduces the user's approved choices.
  */
 export async function POST(req: NextRequest) {
     try {
@@ -30,6 +35,7 @@ export async function POST(req: NextRequest) {
             title: titleOverride,
             excerpt: excerptOverride,
             persist = false,
+            previewImage,
         } = body || {};
 
         if (!postId || typeof postId !== 'string') {
@@ -44,6 +50,58 @@ export async function POST(req: NextRequest) {
 
         if (fetchError || !post) {
             return NextResponse.json({ success: false, error: fetchError?.message || 'Post not found' }, { status: 404 });
+        }
+
+        // Promote-bytes path. When the editor cached the most recent
+        // preview's base64 and sent it back on Save, we upload those
+        // exact bytes — no second render. The image the user saw in the
+        // preview is byte-for-byte the image that publishes.
+        if (persist && typeof previewImage === 'string' && previewImage.startsWith('data:image/')) {
+            const m = previewImage.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
+            if (!m) {
+                return NextResponse.json({ success: false, error: 'previewImage is not a valid base64 data URL' }, { status: 400 });
+            }
+            const contentType = m[1];
+            const buffer = Buffer.from(m[2], 'base64');
+            const ext = contentType === 'image/png' ? 'png' : contentType === 'image/jpeg' ? 'jpg' : 'png';
+            const slug = post.slug || `post-${postId}`;
+            const filename = `${slug}-social.${ext}`;
+
+            const { error: uploadError } = await supabaseAdmin
+                .storage
+                .from('blog-images')
+                .upload(filename, buffer, { contentType, upsert: true });
+            if (uploadError) {
+                return NextResponse.json({ success: false, error: `upload failed: ${uploadError.message}` }, { status: 500 });
+            }
+            const { data: { publicUrl } } = supabaseAdmin.storage.from('blog-images').getPublicUrl(filename);
+
+            // Snapshot the settings the user approved with so any future
+            // re-render reproduces the same picture if the bytes ever go
+            // missing (cleanup recovery, batch rebake).
+            const settingsSnapshot = {
+                sourceUrl: sourceOverride || null,
+                applyText: settings.applyText ?? false,
+                applyGradient: settings.applyGradient ?? false,
+                applyWatermark: settings.applyWatermark ?? false,
+                gradientPosition: settings.gradientPosition ?? 'bottom',
+                gradientStrength: settings.gradientStrength ?? 1,
+                titleScale: settings.titleScale,
+                captionScale: settings.captionScale,
+                titleOffset: settings.titleOffset,
+                captionOffset: settings.captionOffset,
+                purpleWordIndices: settings.purpleWordIndices ?? [],
+                watermarkPosition: settings.watermarkPosition ?? null,
+            };
+
+            const { error: updateError } = await supabaseAdmin
+                .from('posts')
+                .update({ image: `${publicUrl}?v=${Date.now()}`, image_settings: settingsSnapshot })
+                .eq('id', postId);
+            if (updateError) {
+                return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
+            }
+            return NextResponse.json({ success: true, image: publicUrl, persisted: true, mode: 'promoted' });
         }
 
         const looksLikeImage = (u: string | undefined | null): boolean => {

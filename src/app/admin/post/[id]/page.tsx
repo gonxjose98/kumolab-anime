@@ -72,6 +72,10 @@ export default function PostEditor() {
     // the change without making the user hunt for the Regenerate button.
     const liveRenderTimer = useRef<NodeJS.Timeout | null>(null);
     const initialLoadDone = useRef(false);
+    // The last preview render's base64 bytes. On Save we send these back to
+    // the server so what publishes is byte-for-byte what the user just saw,
+    // not a fresh render that might drift.
+    const lastPreviewBytes = useRef<string | null>(null);
 
     // The post + post mutation paths go through /api/posts because RLS is
     // service-role-only — a direct anon-key client read returns zero rows
@@ -207,11 +211,16 @@ export default function PostEditor() {
     }
 
     async function handleSave(opts: { thenApprove?: boolean } = {}) {
-        // Single source of truth for "publish my edits": render with
-        // persist=true (uploads PNG + writes posts.image), then PUT the
-        // text fields. Auto-renders during editing don't touch the DB —
-        // this is the only path that does. Save by itself does NOT
-        // approve. Save + Approve approves only on the second action.
+        // What you see is what publishes. We send the exact base64 bytes
+        // the preview just rendered — the server uploads them as-is, no
+        // second render. The settings snapshot still gets persisted so a
+        // future emergency re-render (cleanup recovery, etc.) can
+        // reproduce the same picture if the bytes ever go missing.
+        //
+        // If lastPreviewBytes is empty (user hit Save before any preview
+        // ran) we fall back to a server-side render with persist=true
+        // using current settings. That path produces the same output as
+        // the auto-render would have.
         const action = opts.thenApprove ? 'approve' : 'save';
         setBusy(action);
         setError(null);
@@ -223,6 +232,7 @@ export default function PostEditor() {
                 excerpt,
                 settings,
                 persist: true,
+                previewImage: lastPreviewBytes.current || undefined,
             });
 
             const res = await fetch('/api/posts', {
@@ -273,6 +283,12 @@ export default function PostEditor() {
                 persist: false,
             });
             setImageUrl(json.image); // base64 data URL — no cache-bust needed
+            // Cache the bytes so Save can promote THIS exact render —
+            // what the user is looking at right now becomes the published
+            // image with no second render.
+            if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
+                lastPreviewBytes.current = json.image;
+            }
         } catch (e: any) {
             setError(e?.message || 'Render failed');
         } finally {
