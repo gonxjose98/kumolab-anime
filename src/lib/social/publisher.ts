@@ -8,10 +8,13 @@ import { logError } from '../logging/structured-logger';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
+const FB_PAGE_ID = '833836379820504';
 
 export interface SocialPublishResult {
     instagram_id?: string;
     instagram_url?: string;
+    facebook_id?: string;
+    facebook_url?: string;
     tiktok_publish_id?: string;
     tiktok_url?: string;
     youtube_video_id?: string;
@@ -23,8 +26,11 @@ export interface SocialPublishResult {
  * Publishes a post to all applicable social platforms.
  *
  * Platform rules:
- *   - Instagram: every published post. Meta Suite cross-posts IG → FB + Threads on
- *     Jose's side, so do NOT call the FB or Threads APIs directly here.
+ *   - Instagram: every published post.
+ *   - Facebook Page: every published post — direct Graph API call to the
+ *     KumoLab Page (replaces the old Meta Suite cross-post path, which was
+ *     unreliable). The IG cross-post toggle is left OFF so we don't double-post.
+ *     Threads cross-post is still handled by IG (Meta Suite fans IG → Threads).
  *   - TikTok + YouTube Shorts: only for TRAILER_DROP claims whose source_url is a
  *     YouTube video. We download the trailer to the blog-videos bucket, then hand
  *     TikTok + YT the public bucket URL.
@@ -89,7 +95,22 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         });
     }
 
-    // ── 3. Video platforms for TRAILER_DROP only ───────────────
+    // ── 3. Facebook Page (direct, no Meta Suite cross-post) ────
+    if (META_ACCESS_TOKEN) {
+        try {
+            const fbResult = await publishToFacebookPage(post);
+            Object.assign(result, fbResult);
+        } catch (e: any) {
+            await logError({
+                source: 'publisher.fb',
+                errorMessage: `FB publish threw: ${e?.message || e}`,
+                stackTrace: e?.stack,
+                context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+            });
+        }
+    }
+
+    // ── 4. Video platforms for TRAILER_DROP only ───────────────
     if (stagedVideoUrl) {
         // TikTok
         const tiktok = await publishToTikTok({
@@ -236,7 +257,7 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
         if (publishData.id) {
             result.instagram_id = publishData.id;
             result.instagram_url = `https://instagram.com/p/${publishData.id}`;
-            console.log(`✅ [Instagram] Published ${isReels ? 'Reels' : 'image'}: ${publishData.id} (Meta Suite cross-posts → FB + Threads)`);
+            console.log(`✅ [Instagram] Published ${isReels ? 'Reels' : 'image'}: ${publishData.id} (FB handled by direct post; Threads via Meta Suite IG cross-post)`);
         } else {
             const meta = publishData?.error || {};
             const reason = meta.code === 190
@@ -260,6 +281,83 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
             errorMessage: `IG fetch/publish threw: ${e?.message || e}`,
             stackTrace: e?.stack,
             context: { post_slug: post.slug, post_title: post.title, media_type: isReels ? 'REELS' : 'IMAGE' },
+        });
+    }
+
+    return result;
+}
+
+// ── Facebook Page publisher ────────────────────────────────────
+//
+// Posts go directly to the KumoLab Page. We use /{PAGE_ID}/photos for
+// image posts (image + caption in one call, returns a post_id) and fall
+// back to /{PAGE_ID}/feed for text-only. We don't post the IG Reel video
+// to FB via API because (a) Reels on FB has a separate `/video_reels`
+// flow that requires a `published=false` upload then `start` then
+// `finish` — overkill for our volume, and (b) FB users get more reach
+// from a clean image post + caption + link to kumolabanime.com than from
+// a re-uploaded vertical Reel. So FB always gets the image flavor.
+async function publishToFacebookPage(post: BlogPost): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!META_ACCESS_TOKEN) return result;
+
+    const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
+    const hashtags = buildSocialHashtags({
+        title: post.title,
+        claim_type: (post as any).claimType || (post as any).claim_type,
+        anime_id: post.anime_id,
+    }).join(' ');
+    const link = `https://kumolabanime.com/${post.slug}`;
+    // FB doesn't truncate as aggressively as IG. Keep it punchy + include the
+    // link so the post drives traffic back to the blog.
+    const message = `${post.title}\n\n${lead}\n\n${link}\n\n${hashtags}`.substring(0, 8000);
+
+    try {
+        const hasImage = !!post.image;
+        const endpoint = hasImage
+            ? `https://graph.facebook.com/v18.0/${FB_PAGE_ID}/photos`
+            : `https://graph.facebook.com/v18.0/${FB_PAGE_ID}/feed`;
+
+        const params = new URLSearchParams({
+            access_token: META_ACCESS_TOKEN,
+            ...(hasImage
+                ? { url: post.image!, caption: message }
+                : { message }),
+        });
+
+        const res = await fetchWithTimeout(`${endpoint}?${params}`, { method: 'POST' }, 20_000);
+        const data = await res.json();
+
+        // /photos returns { id, post_id } — post_id is the wall post we want to link to.
+        // /feed returns { id } directly.
+        const postId = data.post_id || data.id;
+        if (postId) {
+            result.facebook_id = postId;
+            result.facebook_url = `https://facebook.com/${postId}`;
+            console.log(`✅ [Facebook] Published ${hasImage ? 'photo' : 'text'}: ${postId}`);
+        } else {
+            const meta = data?.error || {};
+            const reason = meta.code === 190
+                ? `FB token expired/invalid (Meta code 190): ${meta.message || 'session expired'}`
+                : `FB ${hasImage ? 'photo' : 'feed'} publish failed: ${meta.message || JSON.stringify(data).substring(0, 300)}`;
+            await logError({
+                source: 'publisher.fb',
+                errorMessage: reason,
+                context: {
+                    post_slug: post.slug,
+                    post_title: post.title,
+                    meta_code: meta.code,
+                    meta_subcode: meta.error_subcode,
+                    media_type: hasImage ? 'PHOTO' : 'FEED',
+                },
+            });
+        }
+    } catch (e: any) {
+        await logError({
+            source: 'publisher.fb',
+            errorMessage: `FB fetch/publish threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { post_slug: post.slug, post_title: post.title },
         });
     }
 
