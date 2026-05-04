@@ -23,15 +23,54 @@
  */
 
 import { spawn } from 'child_process';
+import fs from 'fs';
 import { supabaseAdmin } from '../supabase/admin';
 import { processForSocial } from './video-processor';
 
-const ytDlpPath = (() => {
-    // youtube-dl-exec ships the binary at node_modules/youtube-dl-exec/bin/yt-dlp(.exe).
-    // Resolve it via require so the Next.js tracer follows the dep into the bundle.
-    const constants = require('youtube-dl-exec/src/constants.js');
-    return `${constants.YOUTUBE_DL_DIR}/${constants.YOUTUBE_DL_FILE}`;
-})();
+// yt-dlp comes in two flavors:
+//   1. The Python script `yt-dlp` (what `youtube-dl-exec` ships) — needs
+//      Python3 on the system.
+//   2. The standalone PyInstaller-bundled binary `yt-dlp_linux` — no Python
+//      required, pure native exec.
+//
+// Vercel's serverless Linux env has no Python interpreter, so flavor 1
+// fails immediately at spawn with `env: 'python3': No such file or
+// directory`. We fetch flavor 2 from the official GitHub release on first
+// call, cache it in /tmp (which persists across warm invocations on the
+// same Lambda), and chmod +x. ~17 MB download, ~2-5s on cold function.
+//
+// Local dev (Windows) uses the bundled .exe from youtube-dl-exec.
+const TMP_YTDLP = '/tmp/yt-dlp';
+const STANDALONE_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux';
+
+let ytDlpPathPromise: Promise<string> | null = null;
+
+function resolveYtDlp(): Promise<string> {
+    if (ytDlpPathPromise) return ytDlpPathPromise;
+    ytDlpPathPromise = (async () => {
+        if (process.platform === 'win32') {
+            const constants = require('youtube-dl-exec/src/constants.js');
+            return `${constants.YOUTUBE_DL_DIR}/${constants.YOUTUBE_DL_FILE}`;
+        }
+        // Linux (Vercel) — bootstrap standalone binary to /tmp.
+        if (fs.existsSync(TMP_YTDLP)) {
+            try { fs.chmodSync(TMP_YTDLP, 0o755); } catch { /* noop */ }
+            return TMP_YTDLP;
+        }
+        console.log('[TrailerFetcher] Downloading standalone yt-dlp binary…');
+        const res = await fetch(STANDALONE_URL, { redirect: 'follow' });
+        if (!res.ok) throw new Error(`yt-dlp binary download failed: HTTP ${res.status}`);
+        const buf = Buffer.from(await res.arrayBuffer());
+        fs.writeFileSync(TMP_YTDLP, buf);
+        fs.chmodSync(TMP_YTDLP, 0o755);
+        console.log(`[TrailerFetcher] Cached yt-dlp at ${TMP_YTDLP} (${buf.length} bytes)`);
+        return TMP_YTDLP;
+    })().catch(e => {
+        ytDlpPathPromise = null; // allow retry on next call
+        throw e;
+    });
+    return ytDlpPathPromise;
+}
 
 const BUCKET = 'blog-videos';
 const MAX_BYTES = 80 * 1024 * 1024; // 80 MB hard cap
@@ -65,11 +104,17 @@ function extractVideoId(url: string): string | null {
  *   { kind: 'mp4',  data: <Buffer>   } — when -o - streams the muxed MP4
  *   { kind: 'fail', reason: <string> }
  */
-function runYtDlp(args: string[], expectStdoutBytes: boolean, timeoutMs: number): Promise<{ ok: true; buf: Buffer; stderr: string } | { ok: false; reason: string }> {
+async function runYtDlp(args: string[], expectStdoutBytes: boolean, timeoutMs: number): Promise<{ ok: true; buf: Buffer; stderr: string } | { ok: false; reason: string }> {
+    let binary: string;
+    try {
+        binary = await resolveYtDlp();
+    } catch (e: any) {
+        return { ok: false, reason: `binary bootstrap failed: ${e?.message || e}` };
+    }
     return new Promise(resolve => {
         let proc;
         try {
-            proc = spawn(ytDlpPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+            proc = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
         } catch (e: any) {
             resolve({ ok: false, reason: `spawn failed: ${e?.message || e}` });
             return;
