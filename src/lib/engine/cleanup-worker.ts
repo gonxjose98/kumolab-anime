@@ -144,7 +144,26 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         }
     }
 
-    // 4. Orphan sweep — files in bucket whose slug no longer has a post row
+    // 4. Orphan sweep — files in bucket whose slug no longer has a post row.
+    //
+    // image-processor.ts uploads as `<slug>-social.png`. The previous regex
+    // only matched `<slug>-<digits>.<ext>`, so it never recognised the
+    // -social suffix and treated every published post's image as an
+    // orphan — the file got deleted at the next 03:00 UTC sweep, leaving
+    // every post with a 400'ing image URL by the next morning.
+    //
+    // deriveSlug returns the underlying post slug for assets we *should*
+    // check; returns null for filenames we shouldn't touch (editor uploads
+    // in subfolders, ad-hoc files we don't recognise).
+    const deriveSlug = (filename: string): string | null => {
+        if (filename.includes('/')) return null; // subfolder asset (e.g. editor-uploads/) — leave alone
+        const social = filename.match(/^(.+)-social\.(png|jpe?g|webp)$/i);
+        if (social) return social[1];
+        const tsLegacy = filename.match(/^(.+)-\d{6,}\.(png|jpe?g|webp)$/i);
+        if (tsLegacy) return tsLegacy[1];
+        return null;
+    };
+
     try {
         const { data: bucketList, error: listError } = await supabaseAdmin.storage
             .from(STORAGE_BUCKET)
@@ -152,27 +171,29 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
 
         if (listError) throw listError;
         if (bucketList && bucketList.length > 0) {
-            // File names follow "<slug>-<timestamp>.png" (see image-processor.ts)
-            const filenames = bucketList.map(f => f.name);
-            const slugs = filenames.map(f => f.replace(/-\d+\.(png|jpe?g|webp)$/i, '')).filter(Boolean);
+            const candidates = bucketList
+                .map(f => ({ name: f.name, slug: deriveSlug(f.name) }))
+                .filter(c => c.slug !== null) as Array<{ name: string; slug: string }>;
 
-            const { data: existingPosts } = await supabaseAdmin
-                .from('posts')
-                .select('slug')
-                .in('slug', slugs);
+            if (candidates.length > 0) {
+                const slugs = candidates.map(c => c.slug);
+                const { data: existingPosts } = await supabaseAdmin
+                    .from('posts')
+                    .select('slug')
+                    .in('slug', slugs);
 
-            const existingSlugs = new Set((existingPosts || []).map(p => p.slug));
-            const orphans = filenames.filter(name => {
-                const slug = name.replace(/-\d+\.(png|jpe?g|webp)$/i, '');
-                return slug && !existingSlugs.has(slug);
-            });
+                const existingSlugs = new Set((existingPosts || []).map(p => p.slug));
+                const orphans = candidates
+                    .filter(c => !existingSlugs.has(c.slug))
+                    .map(c => c.name);
 
-            if (orphans.length > 0) {
-                const { data: removed, error: removeErr } = await supabaseAdmin.storage
-                    .from(STORAGE_BUCKET)
-                    .remove(orphans);
-                if (removeErr) result.errors.push(`storage.remove(orphans): ${removeErr.message}`);
-                result.bucketOrphansDeleted = removed?.length || 0;
+                if (orphans.length > 0) {
+                    const { data: removed, error: removeErr } = await supabaseAdmin.storage
+                        .from(STORAGE_BUCKET)
+                        .remove(orphans);
+                    if (removeErr) result.errors.push(`storage.remove(orphans): ${removeErr.message}`);
+                    result.bucketOrphansDeleted = removed?.length || 0;
+                }
             }
         }
     } catch (e: any) {
