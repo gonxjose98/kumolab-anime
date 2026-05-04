@@ -180,10 +180,15 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
             '--no-warnings',
             '--no-playlist',
             '--skip-download',
+            // YouTube blocks AWS data-center IPs with "sign in to confirm
+            // you're not a bot" on the default web player client. Mobile
+            // clients (android, ios) and the legacy tv_embedded client use
+            // different player tokens that often bypass that block.
+            '--extractor-args', 'youtube:player_client=android,ios,tv_embedded,web_safari',
             canonical,
         ],
         true,
-        20_000,
+        25_000,
     );
     if (!infoResult.ok) {
         await logError({
@@ -218,6 +223,7 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
             '--merge-output-format', 'mp4',
             '--no-warnings',
             '--no-playlist',
+            '--extractor-args', 'youtube:player_client=android,ios,tv_embedded,web_safari',
             '-o', '-',
             canonical,
         ],
