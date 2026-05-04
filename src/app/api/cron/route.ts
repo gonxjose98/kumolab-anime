@@ -144,17 +144,34 @@ export async function GET(req: NextRequest) {
         if (worker === 'diag-binaries') {
             const fs = await import('fs');
             const path = await import('path');
+            const { spawn } = await import('child_process');
             const cwd = process.cwd();
-            const ytdlpDir = path.join(cwd, 'node_modules', 'youtube-dl-exec', 'bin');
+            const ytdlpPath = path.join(cwd, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp');
             const ffmpegPath = path.join(cwd, 'node_modules', 'ffmpeg-static', 'ffmpeg');
             const out: any = { cwd, platform: process.platform };
             try {
-                out.ytdlp_dir_exists = fs.existsSync(ytdlpDir);
-                out.ytdlp_dir_contents = out.ytdlp_dir_exists ? fs.readdirSync(ytdlpDir) : null;
+                if (fs.existsSync(ytdlpPath)) {
+                    const stat = fs.statSync(ytdlpPath);
+                    out.ytdlp_size = stat.size;
+                    out.ytdlp_mode = (stat.mode & 0o777).toString(8);
+                    // Try to chmod and exec
+                    try { fs.chmodSync(ytdlpPath, 0o755); } catch (e: any) { out.ytdlp_chmod_err = e?.message; }
+                    out.ytdlp_version = await new Promise(resolve => {
+                        const p = spawn(ytdlpPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+                        let stdout = '';
+                        let stderr = '';
+                        p.stdout.on('data', c => stdout += c);
+                        p.stderr.on('data', c => stderr += c);
+                        p.on('error', e => resolve(`ERR: ${e.message}`));
+                        p.on('close', code => resolve(`exit=${code} stdout=${stdout.trim()} stderr=${stderr.trim().slice(0, 200)}`));
+                        setTimeout(() => { try { p.kill('SIGKILL'); } catch {} resolve('TIMEOUT'); }, 8000);
+                    });
+                } else {
+                    out.ytdlp_missing = true;
+                }
             } catch (e: any) { out.ytdlp_err = e?.message; }
             try {
-                out.ffmpeg_exists = fs.existsSync(ffmpegPath);
-                if (out.ffmpeg_exists) {
+                if (fs.existsSync(ffmpegPath)) {
                     const stat = fs.statSync(ffmpegPath);
                     out.ffmpeg_size = stat.size;
                     out.ffmpeg_mode = (stat.mode & 0o777).toString(8);
