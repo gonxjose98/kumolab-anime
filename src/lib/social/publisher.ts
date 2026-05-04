@@ -98,7 +98,7 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
     // ── 3. Facebook Page (direct, no Meta Suite cross-post) ────
     if (META_ACCESS_TOKEN) {
         try {
-            const fbResult = await publishToFacebookPage(post);
+            const fbResult = await publishToFacebookPage(post, stagedVideoUrl);
             Object.assign(result, fbResult);
         } catch (e: any) {
             await logError({
@@ -289,15 +289,14 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
 
 // ── Facebook Page publisher ────────────────────────────────────
 //
-// Posts go directly to the KumoLab Page. We use /{PAGE_ID}/photos for
-// image posts (image + caption in one call, returns a post_id) and fall
-// back to /{PAGE_ID}/feed for text-only. We don't post the IG Reel video
-// to FB via API because (a) Reels on FB has a separate `/video_reels`
-// flow that requires a `published=false` upload then `start` then
-// `finish` — overkill for our volume, and (b) FB users get more reach
-// from a clean image post + caption + link to kumolabanime.com than from
-// a re-uploaded vertical Reel. So FB always gets the image flavor.
-async function publishToFacebookPage(post: BlogPost): Promise<SocialPublishResult> {
+// Posts go directly to the KumoLab Page:
+//   - If stagedVideoUrl is provided (the post originated from a YouTube
+//     video and we already pulled the MP4 to our bucket for IG Reels),
+//     we use the FB Reels API: /video_reels start → hosted-URL upload →
+//     finish. Same video URL we feed IG; one bucket, two platforms.
+//   - Otherwise we use /{PAGE_ID}/photos (image + caption in one call)
+//     for image posts, falling back to /{PAGE_ID}/feed for text-only.
+async function publishToFacebookPage(post: BlogPost, stagedVideoUrl: string | null = null): Promise<SocialPublishResult> {
     const result: SocialPublishResult = {};
     if (!META_ACCESS_TOKEN) return result;
 
@@ -308,9 +307,11 @@ async function publishToFacebookPage(post: BlogPost): Promise<SocialPublishResul
         anime_id: post.anime_id,
     }).join(' ');
     const link = `https://kumolabanime.com/${post.slug}`;
-    // FB doesn't truncate as aggressively as IG. Keep it punchy + include the
-    // link so the post drives traffic back to the blog.
     const message = `${post.title}\n\n${lead}\n\n${link}\n\n${hashtags}`.substring(0, 8000);
+
+    if (stagedVideoUrl) {
+        return await publishFacebookReel(post, stagedVideoUrl, message);
+    }
 
     try {
         const hasImage = !!post.image;
@@ -328,8 +329,6 @@ async function publishToFacebookPage(post: BlogPost): Promise<SocialPublishResul
         const res = await fetchWithTimeout(`${endpoint}?${params}`, { method: 'POST' }, 20_000);
         const data = await res.json();
 
-        // /photos returns { id, post_id } — post_id is the wall post we want to link to.
-        // /feed returns { id } directly.
         const postId = data.post_id || data.id;
         if (postId) {
             result.facebook_id = postId;
@@ -356,6 +355,101 @@ async function publishToFacebookPage(post: BlogPost): Promise<SocialPublishResul
         await logError({
             source: 'publisher.fb',
             errorMessage: `FB fetch/publish threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { post_slug: post.slug, post_title: post.title },
+        });
+    }
+
+    return result;
+}
+
+// FB Reels: 3-phase flow. Start gets a video_id + upload_url, upload phase
+// hands FB the public bucket URL via the `file_url` header (no byte streaming
+// from us), finish flips it to PUBLISHED with the description.
+async function publishFacebookReel(
+    post: BlogPost,
+    videoUrl: string,
+    description: string,
+): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!META_ACCESS_TOKEN) return result;
+
+    try {
+        // Phase 1: start
+        const startRes = await fetchWithTimeout(
+            `https://graph.facebook.com/v18.0/${FB_PAGE_ID}/video_reels`,
+            {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ upload_phase: 'start', access_token: META_ACCESS_TOKEN }),
+            },
+            20_000,
+        );
+        const startData = await startRes.json();
+        if (!startData.video_id || !startData.upload_url) {
+            const meta = startData?.error || {};
+            await logError({
+                source: 'publisher.fb.reels',
+                errorMessage: `FB Reels start failed: ${meta.message || JSON.stringify(startData).substring(0, 300)}`,
+                context: { post_slug: post.slug, meta_code: meta.code, phase: 'start' },
+            });
+            return result;
+        }
+
+        // Phase 2: hosted upload (FB pulls the MP4 from our bucket)
+        const uploadRes = await fetchWithTimeout(
+            startData.upload_url,
+            {
+                method: 'POST',
+                headers: { authorization: `OAuth ${META_ACCESS_TOKEN}`, file_url: videoUrl },
+            },
+            60_000,
+        );
+        if (uploadRes.status !== 200) {
+            const body = await uploadRes.text();
+            await logError({
+                source: 'publisher.fb.reels',
+                errorMessage: `FB Reels upload failed HTTP ${uploadRes.status}: ${body.substring(0, 300)}`,
+                context: { post_slug: post.slug, video_id: startData.video_id, phase: 'upload' },
+            });
+            return result;
+        }
+
+        // Phase 3: finish (publishes the Reel with description)
+        const finishRes = await fetchWithTimeout(
+            `https://graph.facebook.com/v18.0/${FB_PAGE_ID}/video_reels?` +
+                new URLSearchParams({
+                    access_token: META_ACCESS_TOKEN,
+                    upload_phase: 'finish',
+                    video_id: startData.video_id,
+                    video_state: 'PUBLISHED',
+                    description,
+                }),
+            { method: 'POST' },
+            30_000,
+        );
+        const finishData = await finishRes.json();
+        if (finishData.post_id) {
+            result.facebook_id = finishData.post_id;
+            result.facebook_url = `https://facebook.com/${FB_PAGE_ID}/posts/${finishData.post_id}`;
+            console.log(`✅ [Facebook] Published Reel: ${finishData.post_id}`);
+        } else {
+            const meta = finishData?.error || {};
+            await logError({
+                source: 'publisher.fb.reels',
+                errorMessage: `FB Reels finish failed: ${meta.message || JSON.stringify(finishData).substring(0, 300)}`,
+                context: {
+                    post_slug: post.slug,
+                    video_id: startData.video_id,
+                    meta_code: meta.code,
+                    phase: 'finish',
+                },
+            });
+        }
+    } catch (e: any) {
+        await logError({
+            source: 'publisher.fb.reels',
+            errorMessage: `FB Reels threw: ${e?.message || e}`,
             stackTrace: e?.stack,
             context: { post_slug: post.slug, post_title: post.title },
         });
