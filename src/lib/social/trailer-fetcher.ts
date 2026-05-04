@@ -26,6 +26,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import { supabaseAdmin } from '../supabase/admin';
 import { processForSocial } from './video-processor';
+import { logError } from '../logging/structured-logger';
 
 // yt-dlp comes in two flavors:
 //   1. The Python script `yt-dlp` (what `youtube-dl-exec` ships) — needs
@@ -185,7 +186,11 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
         20_000,
     );
     if (!infoResult.ok) {
-        console.warn('[TrailerFetcher] yt-dlp info failed:', infoResult.reason);
+        await logError({
+            source: 'trailer-fetcher.info',
+            errorMessage: `yt-dlp info failed: ${infoResult.reason}`.slice(0, 500),
+            context: { videoId, sourceUrl, slug },
+        }).catch(() => {});
         return null;
     }
     let info: any;
@@ -220,7 +225,11 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
         90_000,
     );
     if (!dlResult.ok) {
-        console.warn('[TrailerFetcher] yt-dlp download failed:', dlResult.reason);
+        await logError({
+            source: 'trailer-fetcher.download',
+            errorMessage: `yt-dlp download failed: ${dlResult.reason}`.slice(0, 500),
+            context: { videoId, sourceUrl, slug, duration },
+        }).catch(() => {});
         return null;
     }
     const downloaded = dlResult.buf;

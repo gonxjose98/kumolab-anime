@@ -141,6 +141,19 @@ export async function GET(req: NextRequest) {
 
         // Diagnostic: report whether the yt-dlp + ffmpeg binaries are
         // actually present + executable in the deployed function.
+        if (worker === 'diag-trailer') {
+            const url = searchParams.get('url') || 'https://www.youtube.com/watch?v=yClYCc4kEp8';
+            const { fetchYouTubeToBucket } = await import('@/lib/social/trailer-fetcher');
+            const t0 = Date.now();
+            const result = await fetchYouTubeToBucket(url, 'diag-' + Date.now());
+            return NextResponse.json({
+                success: !!result,
+                worker: 'diag-trailer',
+                ms: Date.now() - t0,
+                result,
+            });
+        }
+
         if (worker === 'diag-binaries') {
             const fs = await import('fs');
             const { spawn } = await import('child_process');
