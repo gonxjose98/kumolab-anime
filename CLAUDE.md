@@ -218,7 +218,11 @@ Required in Vercel for production (after Phase 1 cutover):
 - `KUMOLAB_CIRCUIT_BREAKER_THRESHOLD=3`
 
 **Meta (IG + Meta Suite cross-post):**
-- `META_ACCESS_TOKEN`, `META_IG_ID`, `AUTO_PUBLISH_SOCIALS=true`
+- `META_ACCESS_TOKEN` — page access token. **Auto-refreshed weekly** via the `refresh-meta-token` cron (Mondays 05:00 UTC); each successful exchange resets the 90-day data-access window forward.
+- `META_IG_ID`
+- `META_APP_ID` + `META_APP_SECRET` — required for the auto-refresh path to call `oauth/access_token?grant_type=fb_exchange_token`.
+- `AUTO_PUBLISH_SOCIALS=true`
+- `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` + `VERCEL_TEAM_ID` — used by the refresh cron to update the `META_ACCESS_TOKEN` env entry in place via Vercel's REST API.
 
 **TikTok (awaits developer app approval):**
 - `TIKTOK_ACCESS_TOKEN` — user-scoped OAuth token from Content Posting API

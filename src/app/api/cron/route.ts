@@ -5,6 +5,7 @@ import { runBlogEngine, publishScheduledPosts } from '@/lib/engine/engine';
 import { generateDailyReport } from '@/lib/engine/daily-report';
 import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
 import { generateIntelImage } from '@/lib/engine/image-processor';
+import { refreshMetaToken } from '@/lib/engine/token-health';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const maxDuration = 300;
@@ -100,6 +101,18 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (worker === 'refresh-meta-token') {
+            console.log('[Cron] Refreshing Meta token...');
+            const result = await refreshMetaToken();
+            return NextResponse.json({
+                success: result.ok,
+                worker: 'refresh-meta-token',
+                rotated: result.rotated,
+                daysUntilDataAccessExpiry: result.daysUntilDataAccessExpiry ?? null,
+                reason: result.reason,
+            });
+        }
+
         if (worker === 'cleanup') {
             console.log('[Cron] Running Cleanup Worker...');
             const result = await runCleanupWorker();
@@ -187,7 +200,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render']
+            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token']
         }, { status: 400 });
 
     } catch (error: any) {
