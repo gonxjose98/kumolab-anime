@@ -100,6 +100,9 @@ export const CONTENT_RULES = {
         'giveaway', 'sweepstakes', 'contest', 'quiz', 'poll',
         'wallpaper', 'ringtone', 'sticker', 'emoji',
         'cosplay', 'review', 'opinion', 'ranking', 'top 10', 'best anime',
+        // Watch-along / reaction content — KumoLab posts anime, not watch parties
+        'watch party', 'watch along', 'watchalong', 'watch-along', 'react along',
+        'reaction', 'reacts to', 'live reaction', 'commentary',
     ],
     // Content categories to exclude (for RSS filtering)
     EXCLUDE_CATEGORIES: [

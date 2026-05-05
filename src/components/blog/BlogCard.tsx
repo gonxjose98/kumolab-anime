@@ -57,21 +57,48 @@ const BlogCard = ({ post }: BlogCardProps) => {
     // Render video embed (YouTube or X/Twitter)
     const renderVideoEmbed = () => {
         if (post.youtube_video_id) {
-            // Use the YouTube thumbnail with object-fit: cover so the card
-            // looks like every other post card. Full video plays on the
-            // detail page — embedding live iframes per card meant the
-            // user saw black bars whenever the video aspect (9:16 Shorts
-            // vs 16:9 standard) didn't match the card aspect.
-            const thumb = `https://img.youtube.com/vi/${post.youtube_video_id}/maxresdefault.jpg`;
-            const fallback = `https://img.youtube.com/vi/${post.youtube_video_id}/hqdefault.jpg`;
+            // YouTube thumbnail cascade: maxres → sd → hq.
+            //
+            // Not every video has a maxres or sd thumbnail. Worse, when
+            // those are missing YouTube returns a 120x90 GREY PLACEHOLDER
+            // (status 200, not 404) — which load fine but pixelate when
+            // stretched to fill the card. We detect that via naturalWidth
+            // on load and step down to the next tier.
+            const id = post.youtube_video_id;
+            const tiers = [
+                `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, // 1280x720, HD videos
+                `https://i.ytimg.com/vi/${id}/sddefault.jpg`,     // 640x480, most modern uploads
+                `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,     // 480x360, ALWAYS exists
+            ];
             return (
                 <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        src={thumb}
+                        src={tiers[0]}
                         alt={post.title}
                         className={styles.image}
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
+                        data-tier="0"
+                        onLoad={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            // YouTube's grey placeholder for missing thumbs
+                            // is 120x90. Anything that small means the tier
+                            // doesn't exist — step down.
+                            if (img.naturalWidth > 0 && img.naturalWidth <= 120) {
+                                const cur = parseInt(img.dataset.tier || '0', 10);
+                                if (cur < tiers.length - 1) {
+                                    img.dataset.tier = String(cur + 1);
+                                    img.src = tiers[cur + 1];
+                                }
+                            }
+                        }}
+                        onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            const cur = parseInt(img.dataset.tier || '0', 10);
+                            if (cur < tiers.length - 1) {
+                                img.dataset.tier = String(cur + 1);
+                                img.src = tiers[cur + 1];
+                            }
+                        }}
                     />
                     <span className={styles.playBadge} aria-hidden>▶</span>
                 </>

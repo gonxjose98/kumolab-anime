@@ -28,6 +28,40 @@ interface DuplicateInput extends Partial<BlogPost> {
     fingerprint?: string;
 }
 
+/**
+ * Extract the canonical anime name from a KumoLab-shaped title.
+ *
+ * KumoLab titles follow conventions:
+ *   "'Anime Name' Season N • <subhead>"
+ *   "'Episode Name' Now Streaming • From 'Anime Name'"
+ *   "'Anime Name' New Trailer Released"
+ *
+ * The anime is almost always inside quotes. When two quoted segments
+ * appear and one is preceded by "from", the second is the anime
+ * (the first is the episode/song title).
+ *
+ * Returns lowercased canonical name, or '' if extraction fails.
+ */
+export function extractAnimeCanonical(title: string): string {
+    if (!title) return '';
+    // Pattern A: "<headline> from 'Anime'" — the part after "from" is the anime
+    const fromMatch = title.match(/from\s+['"‘’“”‚„′″❛❜]([^'"‘’“”‚„′″❛❜]{2,40}?)['"‘’“”‚„′″❛❜]/i);
+    if (fromMatch) return normalizeCanonical(fromMatch[1]);
+    // Pattern B: First quoted string is the anime name
+    const firstQuoted = title.match(/['"‘’“”‚„′″❛❜]([^'"‘’“”‚„′″❛❜]{2,40}?)['"‘’“”‚„′″❛❜]/);
+    if (firstQuoted) return normalizeCanonical(firstQuoted[1]);
+    // Fallback: first 4 meaningful words
+    return normalizeCanonical(title.split(/\s+/).slice(0, 4).join(' '));
+}
+
+function normalizeCanonical(s: string): string {
+    return s.toLowerCase()
+        .replace(/[^\w\s]/g, '') // strip punctuation
+        .replace(/\b(season|episode|ep|part|vol|cour|arc)\s*\d+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function computeFingerprint(title: string, url?: string): string {
     const normalized = title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().substring(0, 80);
     const domain = (url || '').replace(/^https?:\/\//, '').split('/')[0] || '';
@@ -95,6 +129,41 @@ export async function detectDuplicate(
                 action: 'BLOCK',
                 reason: `Same anime + claim already recorded (origin: ${semMatch.origin})`,
             };
+        }
+    }
+
+    // ── LAYER 2.5: Anime canonical + claim within 24h ──────────────
+    // Catches the "two different YouTube videos for the same news event"
+    // case: titles differ enough to dodge fingerprint hashing AND the
+    // Jaccard threshold, but the canonical anime name + claim type
+    // unambiguously identifies them as the same story.
+    //
+    // This is the layer that fires when AniList didn't resolve anime_id
+    // (Layer 2 needs anime_id to work). Cost: one indexed query.
+    const candCanonical = extractAnimeCanonical(candidate.title || '');
+    if (candCanonical && claim) {
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: recent24h } = await supabaseAdmin
+            .from('posts')
+            .select('id, title, claim_type, scheduled_post_time, status')
+            .eq('claim_type', claim)
+            .gte('timestamp', since24h)
+            .limit(80);
+        if (recent24h) {
+            for (const ex of recent24h) {
+                if (ex.id === (candidate as any).id) continue;
+                if (extractAnimeCanonical(ex.title || '') === candCanonical) {
+                    return {
+                        isDuplicate: true,
+                        duplicateOf: ex.id,
+                        duplicateType: 'CLAIM',
+                        confidence: 95,
+                        existingPost: ex,
+                        action: 'BLOCK',
+                        reason: `Same anime (${candCanonical}) + claim ${claim} within 24h — already covered by post ${ex.id}`,
+                    };
+                }
+            }
         }
     }
 
