@@ -8,6 +8,7 @@ const NAV: Array<{ href: string; label: string }> = [
     { href: '/admin/dashboard', label: 'Console' },
     { href: '/admin/posts', label: 'Posts' },
     { href: '/admin/calendar', label: 'Calendar' },
+    { href: '/admin/analytics', label: 'Analytics' },
 ];
 
 /**
