@@ -80,16 +80,19 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
             // entirely. The post still exists on the website. Operator
             // can manually republish via /api/cron?worker=republish-social
             // once the underlying issue is resolved.
-            await logError({
-                source: 'publisher.video-fetch',
-                errorMessage: `YouTube video fetch failed — skipping social publish to avoid screenshot fallback`,
-                context: {
-                    post_id: (post as any).id,
-                    slug: post.slug,
-                    title: post.title,
-                    source_url: sourceUrl,
-                },
-            }).catch(() => {});
+            //
+            // This is intentional behavior, not a fault — log to
+            // action_logs (operational), not error_logs.
+            const { supabaseAdmin } = await import('../supabase/admin');
+            await supabaseAdmin.from('action_logs').insert({
+                action: 'social_publish_skipped',
+                actor: 'system',
+                entity_type: 'post',
+                entity_id: (post as any).id,
+                entity_title: post.title,
+                reason: 'YouTube video fetch failed — no screenshot fallback',
+                details: { slug: post.slug, source_url: sourceUrl },
+            }).then(() => {}, () => {});
             (result as any).skipped_reason = 'video_fetch_failed';
             return result;
         }

@@ -69,10 +69,13 @@ export async function evaluateCircuitBreaker(): Promise<{ tripped: boolean; corr
         { onConflict: 'lock_key' }
     );
 
-    await supabaseAdmin.from('error_logs').insert({
-        source: 'circuit-breaker',
-        error_message: `Auto-publish paused: ${corrections} declines in ${windowHours}h (threshold ${threshold})`,
-        context: { corrections, threshold, pausedUntil },
+    // Log to action_logs (operational state change), not error_logs.
+    // The breaker tripping is the system working as designed, not a fault.
+    await supabaseAdmin.from('action_logs').insert({
+        action: 'circuit_breaker_tripped',
+        actor: 'system',
+        reason: `${corrections} declines in ${windowHours}h (threshold ${threshold})`,
+        details: { corrections, threshold, pausedUntil },
     });
 
     return { tripped: true, corrections };

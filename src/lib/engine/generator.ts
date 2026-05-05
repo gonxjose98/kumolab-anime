@@ -57,7 +57,10 @@ export function generateDailyDropsPost(episodes: AiringEpisode[], date: Date, fo
         slug: `daily-drops-${dateString}`,
         type: 'DROP',
         content,
-        image: '/daily-drops-permanent.jpg', // Permanent branded image
+        // Absolute URL so Meta Graph APIs accept it as image_url. A
+        // relative path passes Next.js but Instagram/Facebook/Threads
+        // reject it ("Param image_url is not a valid URI").
+        image: 'https://kumolabanime.com/daily-drops-permanent.jpg',
         timestamp: date.toISOString(),
         isPublished: true, // Publish immediately
         status: 'published', // Already live
