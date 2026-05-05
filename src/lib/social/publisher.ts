@@ -74,7 +74,24 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
             stagedVideoUrl = staged.bucket_url;
             result.staged_video_url = staged.bucket_url;
         } else {
-            console.warn(`[Social] YouTube source but video fetch failed for ${post.slug} — falling back to image post`);
+            // Per Jose's directive (2026-05-05): when a post is sourced
+            // from a YouTube video and the video fetch fails, do NOT
+            // fall back to publishing the static thumbnail. Skip socials
+            // entirely. The post still exists on the website. Operator
+            // can manually republish via /api/cron?worker=republish-social
+            // once the underlying issue is resolved.
+            await logError({
+                source: 'publisher.video-fetch',
+                errorMessage: `YouTube video fetch failed — skipping social publish to avoid screenshot fallback`,
+                context: {
+                    post_id: (post as any).id,
+                    slug: post.slug,
+                    title: post.title,
+                    source_url: sourceUrl,
+                },
+            }).catch(() => {});
+            (result as any).skipped_reason = 'video_fetch_failed';
+            return result;
         }
     }
 
