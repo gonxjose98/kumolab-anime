@@ -80,38 +80,54 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
     const canonical = `https://www.youtube.com/watch?v=${videoId}`;
 
     // 1. Probe metadata first so we can bail on long videos before pulling
-    // tens of megabytes. Render free tier cold starts add ~30s here.
-    const infoCtrl = new AbortController();
-    const infoTimer = setTimeout(() => infoCtrl.abort(), 75_000);
+    // tens of megabytes. Render free tier cold-starts can take 30-90s,
+    // and when multiple posts publish in the same hourly tick they queue
+    // up behind each other on the proxy — so we give /info up to 150s
+    // and retry once on AbortError (cold-start almost always recovers).
     let title = '';
     let duration = 0;
-    try {
-        const r = await fetch(`${worker.url}/info`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${worker.secret}`,
-            },
-            body: JSON.stringify({ url: canonical }),
-            signal: infoCtrl.signal,
-        });
-        if (!r.ok) {
-            const detail = (await r.text().catch(() => '')).slice(0, 300);
-            throw new Error(`HTTP ${r.status}: ${detail}`);
+    const callInfo = async (): Promise<{ ok: true; title: string; duration: number } | { ok: false; err: string }> => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 150_000);
+        try {
+            const r = await fetch(`${worker.url}/info`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${worker.secret}`,
+                },
+                body: JSON.stringify({ url: canonical }),
+                signal: ctrl.signal,
+            });
+            if (!r.ok) {
+                const detail = (await r.text().catch(() => '')).slice(0, 300);
+                return { ok: false, err: `HTTP ${r.status}: ${detail}` };
+            }
+            const j = await r.json();
+            return { ok: true, title: j.title || '', duration: parseInt(String(j.duration ?? 0), 10) || 0 };
+        } catch (e: any) {
+            return { ok: false, err: (e?.message || e).toString() };
+        } finally {
+            clearTimeout(timer);
         }
-        const j = await r.json();
-        title = j.title || '';
-        duration = parseInt(String(j.duration ?? 0), 10) || 0;
-    } catch (e: any) {
+    };
+
+    let infoRes = await callInfo();
+    if (!infoRes.ok && /abort/i.test(infoRes.err)) {
+        // Cold-start aborts: warm the worker and try once more.
+        await new Promise((r) => setTimeout(r, 3_000));
+        infoRes = await callInfo();
+    }
+    if (!infoRes.ok) {
         await logError({
             source: 'trailer-fetcher.info',
-            errorMessage: `worker /info failed: ${(e?.message || e).toString().slice(0, 250)}`,
+            errorMessage: `worker /info failed: ${infoRes.err.slice(0, 250)}`,
             context: { videoId, sourceUrl, slug, worker: worker.url },
         }).catch(() => {});
         return null;
-    } finally {
-        clearTimeout(infoTimer);
     }
+    title = infoRes.title;
+    duration = infoRes.duration;
 
     if (duration > 180) {
         console.warn(`[TrailerFetcher] Video too long (${duration}s > 180s), skipping`);
@@ -119,8 +135,10 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
     }
 
     // 2. Stream the muxed MP4 from the worker into a Buffer.
+    // 720p at ~30 MB through a proxy + Render free-tier latency can take
+    // 60-120s on slow proxies. Give it 180s.
     const dlCtrl = new AbortController();
-    const dlTimer = setTimeout(() => dlCtrl.abort(), 120_000);
+    const dlTimer = setTimeout(() => dlCtrl.abort(), 180_000);
     let downloaded: Buffer;
     try {
         const r = await fetch(`${worker.url}/download`, {
