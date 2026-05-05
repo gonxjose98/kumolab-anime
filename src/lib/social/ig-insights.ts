@@ -6,7 +6,11 @@
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_IG_ID = process.env.META_IG_ID;
-const GRAPH = 'https://graph.facebook.com/v18.0';
+// Use v22.0 — the modern unified `views` metric replaced `plays` (Reels)
+// and `impressions` (image/carousel) on v22 and rolled out April 2024.
+// On v18, our previous `plays` calls returned an error and we silently
+// fell back to 0, which is why every post showed 0 views.
+const GRAPH = 'https://graph.facebook.com/v22.0';
 
 export interface IGAccountSnapshot {
     ok: boolean;
@@ -75,25 +79,36 @@ async function fetchAccountSnapshot(): Promise<IGAccountSnapshot> {
         }
 
         // 2) Rolling 28-day account insights.
-        // Meta deprecated `impressions` for IG accounts in 2024; the modern
-        // metric trio is `reach`, `profile_views`, `website_clicks`,
-        // `accounts_engaged`. We fetch the lot in one shot.
+        // On v22, account-level metrics that work without a specific
+        // breakdown: `reach`, `profile_views`, `website_clicks`,
+        // `accounts_engaged`. All require `metric_type=total_value`.
         const since = Math.floor((Date.now() - 28 * 86400 * 1000) / 1000);
         const until = Math.floor(Date.now() / 1000);
-        const insightsUrl = `${GRAPH}/${META_IG_ID}/insights?metric=reach,profile_views,website_clicks,accounts_engaged&period=day&metric_type=total_value&since=${since}&until=${until}&access_token=${META_ACCESS_TOKEN}`;
-        const iRes = await fetch(insightsUrl, { cache: 'no-store' });
-        const iData = await iRes.json();
         const byName: Record<string, number> = {};
-        if (Array.isArray(iData.data)) {
-            for (const row of iData.data) {
-                const total = row?.total_value?.value;
-                if (typeof total === 'number') {
-                    byName[row.name] = total;
-                } else if (Array.isArray(row.values)) {
-                    byName[row.name] = row.values.reduce((acc: number, v: any) => acc + (v?.value || 0), 0);
+        // Each metric must be requested separately on v22 — the API
+        // rejects mixed-cardinality metrics in a single call. Fetch in
+        // parallel and merge.
+        const metricNames = ['reach', 'profile_views', 'website_clicks', 'accounts_engaged'];
+        await Promise.all(
+            metricNames.map(async (name) => {
+                try {
+                    const url = `${GRAPH}/${META_IG_ID}/insights?metric=${name}&period=day&metric_type=total_value&since=${since}&until=${until}&access_token=${META_ACCESS_TOKEN}`;
+                    const r = await fetch(url, { cache: 'no-store' });
+                    const j = await r.json();
+                    if (Array.isArray(j?.data)) {
+                        for (const row of j.data) {
+                            const total = row?.total_value?.value;
+                            if (typeof total === 'number') byName[row.name] = total;
+                            else if (Array.isArray(row.values)) {
+                                byName[row.name] = row.values.reduce((acc: number, v: any) => acc + (v?.value || 0), 0);
+                            }
+                        }
+                    }
+                } catch {
+                    // metric unavailable — leave undefined; UI shows —
                 }
-            }
-        }
+            }),
+        );
 
         return {
             ok: true,
@@ -118,28 +133,41 @@ async function fetchTopRecentMedia(limit: number): Promise<IGMediaInsight[]> {
         const data = await res.json();
         if (!Array.isArray(data?.data)) return [];
 
-        // Per-post insights — Reels use `reach,plays,likes,comments`.
-        // Image posts use `reach,impressions`. We try a permissive set
-        // and fall back to whatever Meta returned.
+        // Per-post insights — Meta unified `plays` + `impressions` into
+        // `views` on v22.0. Try `views,reach` first (works on every modern
+        // media type), then fall back to legacy metric names per type.
         const enriched = await Promise.all(
             data.data.map(async (m: any): Promise<IGMediaInsight> => {
                 const isReel = m.media_product_type === 'REELS' || m.media_type === 'VIDEO';
-                const metricSet = isReel ? 'reach,plays' : 'reach,impressions';
                 let views = 0;
                 let reach = 0;
-                try {
-                    const insRes = await fetch(
-                        `${GRAPH}/${m.id}/insights?metric=${metricSet}&access_token=${META_ACCESS_TOKEN}`,
+
+                const tryMetrics = async (metrics: string): Promise<{ ok: boolean; views: number; reach: number }> => {
+                    const r = await fetch(
+                        `${GRAPH}/${m.id}/insights?metric=${metrics}&access_token=${META_ACCESS_TOKEN}`,
                         { cache: 'no-store' },
                     );
-                    const insJson = await insRes.json();
-                    if (Array.isArray(insJson?.data)) {
-                        for (const row of insJson.data) {
-                            const v = row?.values?.[0]?.value || 0;
-                            if (row.name === 'reach') reach = v;
-                            if (row.name === 'plays' || row.name === 'impressions') views = v;
+                    const j = await r.json();
+                    if (j.error) return { ok: false, views: 0, reach: 0 };
+                    let v = 0;
+                    let rch = 0;
+                    if (Array.isArray(j?.data)) {
+                        for (const row of j.data) {
+                            const val = row?.values?.[0]?.value ?? row?.total_value?.value ?? 0;
+                            if (row.name === 'reach') rch = val;
+                            if (row.name === 'views' || row.name === 'plays' || row.name === 'impressions') v = val;
                         }
                     }
+                    return { ok: true, views: v, reach: rch };
+                };
+
+                try {
+                    let res = await tryMetrics('views,reach');
+                    if (!res.ok) {
+                        res = await tryMetrics(isReel ? 'plays,reach' : 'impressions,reach');
+                    }
+                    views = res.views;
+                    reach = res.reach;
                 } catch {
                     // ignore — leave at 0
                 }
