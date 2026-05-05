@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { checkMetaTokenHealth, type MetaTokenHealth } from '@/lib/engine/token-health';
+import { fetchIGDashboardData, type IGDashboardData, type IGAccountSnapshot, type IGMediaInsight } from '@/lib/social/ig-insights';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ async function fetchDashboardData() {
         { data: sourceHealth },
         { data: recentActivity },
         metaTokenHealth,
+        igData,
     ] = await Promise.all([
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).gte('published_at', last24h.toISOString()),
@@ -84,6 +86,10 @@ async function fetchDashboardData() {
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
         checkMetaTokenHealth().catch((e): MetaTokenHealth => ({ ok: false, reason: e?.message ?? 'check failed' })),
+        fetchIGDashboardData().catch((e): IGDashboardData => ({
+            snapshot: { ok: false, reason: e?.message ?? 'IG fetch failed', followers: null, follows: null, mediaCount: null, reach28d: null, profileViews28d: null, websiteClicks28d: null, accountsEngaged28d: null },
+            topRecent: [],
+        })),
     ]);
 
     return {
@@ -101,6 +107,7 @@ async function fetchDashboardData() {
         sourceHealth: sourceHealth || [],
         recentActivity: recentActivity || [],
         metaTokenHealth,
+        igData,
     };
 }
 
@@ -223,6 +230,9 @@ export default async function DashboardPage() {
 
             {/* ── Platform tokens ──────────────────────────────────── */}
             <PlatformTokenCard health={data.metaTokenHealth} />
+
+            {/* ── Instagram insights ───────────────────────────────── */}
+            <IGInsightsCard data={data.igData} />
 
             {/* ── Pending review ───────────────────────────────────── */}
             <Card className="p-5">
@@ -459,6 +469,156 @@ function PlatformTokenCard({ health }: { health: MetaTokenHealth }) {
                 </div>
             </div>
         </Card>
+    );
+}
+
+function IGInsightsCard({ data }: { data: IGDashboardData }) {
+    const { snapshot, topRecent } = data;
+
+    if (!snapshot.ok) {
+        return (
+            <Card className="p-5">
+                <SectionHeader label="Instagram Insights" accent="#ff3cac" />
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {snapshot.reason || 'Insights unavailable. Re-OAuth Meta token with instagram_manage_insights scope.'}
+                </div>
+            </Card>
+        );
+    }
+
+    const fmt = (n: number | null) => n === null || n === undefined ? '—' : n.toLocaleString('en-US');
+
+    return (
+        <Card className="p-5">
+            <div className="flex items-baseline justify-between mb-3">
+                <SectionHeader label="Instagram Insights" accent="#ff3cac" />
+                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    rolling 28 days
+                </span>
+            </div>
+
+            {/* Account-level metrics */}
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-5">
+                <IGMetric label="Followers" value={fmt(snapshot.followers)} accent="#ff3cac" />
+                <IGMetric label="Posts" value={fmt(snapshot.mediaCount)} accent="#7b61ff" />
+                <IGMetric label="Reach" value={fmt(snapshot.reach28d)} accent="#00d4ff" />
+                <IGMetric label="Profile Views" value={fmt(snapshot.profileViews28d)} accent="#00ff88" />
+                <IGMetric label="Engaged" value={fmt(snapshot.accountsEngaged28d)} accent="#ffaa00" />
+                <IGMetric label="Site Clicks" value={fmt(snapshot.websiteClicks28d)} accent="#ff6b35" />
+            </div>
+
+            {/* Top recent posts */}
+            {topRecent.length > 0 && (
+                <>
+                    <div
+                        className="text-[9px] font-bold uppercase tracking-[0.25em] mb-2"
+                        style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
+                    >
+                        Top Recent Posts · by views
+                    </div>
+                    <ul className="space-y-2">
+                        {topRecent.slice(0, 5).map(m => (
+                            <IGPostRow key={m.id} m={m} />
+                        ))}
+                    </ul>
+                </>
+            )}
+        </Card>
+    );
+}
+
+function IGMetric({ label, value, accent }: { label: string; value: string; accent: string }) {
+    return (
+        <div
+            className="rounded-lg px-3 py-2.5"
+            style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.05)',
+            }}
+        >
+            <div
+                className="text-[8px] font-bold uppercase tracking-[0.2em] mb-1"
+                style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
+            >
+                {label}
+            </div>
+            <div
+                className="text-base md:text-lg font-black tabular-nums"
+                style={{ color: accent, fontFamily: 'var(--font-display)' }}
+            >
+                {value}
+            </div>
+        </div>
+    );
+}
+
+function IGPostRow({ m }: { m: IGMediaInsight }) {
+    const isReel = m.mediaType === 'REEL' || m.mediaType === 'VIDEO';
+    return (
+        <li
+            className="flex items-center gap-3 p-2.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+        >
+            {m.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={m.thumbnail}
+                    alt=""
+                    className="w-10 h-10 rounded object-cover shrink-0"
+                    style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+                />
+            ) : (
+                <div
+                    className="w-10 h-10 rounded shrink-0"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                />
+            )}
+            <div className="flex-1 min-w-0">
+                <a
+                    href={m.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs truncate hover:underline"
+                    style={{ color: 'var(--text-secondary)' }}
+                >
+                    {m.caption || '(no caption)'}
+                </a>
+                <div className="flex items-center gap-2 mt-1">
+                    <span
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                        style={{
+                            background: isReel ? 'rgba(255,60,172,0.10)' : 'rgba(123,97,255,0.10)',
+                            border: `1px solid ${isReel ? 'rgba(255,60,172,0.30)' : 'rgba(123,97,255,0.30)'}`,
+                            color: isReel ? '#ff7ec5' : '#a092ff',
+                        }}
+                    >
+                        {isReel ? 'Reel' : 'Image'}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {timeAgo(m.timestamp)}
+                    </span>
+                </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0 text-[10px] font-mono">
+                <IGStat label="views" value={m.views} accent="#00d4ff" />
+                <IGStat label="reach" value={m.reach} accent="#7b61ff" />
+                <IGStat label="likes" value={m.likes} accent="#ff3cac" />
+                <IGStat label="cmt" value={m.comments} accent="#00ff88" />
+            </div>
+        </li>
+    );
+}
+
+function IGStat({ label, value, accent }: { label: string; value: number; accent: string }) {
+    return (
+        <div className="flex flex-col items-end leading-tight">
+            <span className="font-bold tabular-nums" style={{ color: accent }}>
+                {value.toLocaleString('en-US')}
+            </span>
+            <span className="text-[8px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                {label}
+            </span>
+        </div>
     );
 }
 
