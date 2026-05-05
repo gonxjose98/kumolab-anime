@@ -344,8 +344,11 @@ async function publishToFacebookPage(post: BlogPost, stagedVideoUrl: string | nu
         claim_type: (post as any).claimType || (post as any).claim_type,
         anime_id: post.anime_id,
     }).join(' ');
-    const link = `https://kumolabanime.com/blog/${post.slug}`;
-    const message = `${post.title}\n\n${lead}\n\n${link}\n\n${hashtags}`.substring(0, 8000);
+    // Per Jose's directive (2026-05-05): no URL in FB captions. FB
+    // algorithmically downranks posts with external links, and the
+    // Page's Website field surfaces as a clickable header anyway.
+    // Match IG's link-in-bio convention to maximize reach.
+    const message = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 8000);
 
     if (stagedVideoUrl) {
         return await publishFacebookReel(post, stagedVideoUrl, message);
@@ -512,9 +515,12 @@ async function publishToThreads(post: BlogPost, stagedVideoUrl: string | null = 
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID) return result;
 
     const lead = (post as any).excerpt || post.content?.substring(0, 200) || '';
-    const link = `https://kumolabanime.com/blog/${post.slug}`;
-    // Threads max ~500 chars. Title + short lead + link.
-    const text = `${post.title}\n\n${lead}\n\n${link}`.substring(0, 500);
+    // Per Jose's directive (2026-05-05): no URL in Threads captions.
+    // Threads format rewards short native posts; URLs read as
+    // copy-pasted CMS output and underperform on shares/replies.
+    // Match IG's link-in-bio convention to maximize reach.
+    // Threads max ~500 chars. Title + short lead.
+    const text = `${post.title}\n\n${lead}`.substring(0, 500);
 
     const isVideo = !!stagedVideoUrl;
     const hasImage = !!post.image;
