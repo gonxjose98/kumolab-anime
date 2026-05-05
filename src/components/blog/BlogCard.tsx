@@ -57,17 +57,24 @@ const BlogCard = ({ post }: BlogCardProps) => {
     // Render video embed (YouTube or X/Twitter)
     const renderVideoEmbed = () => {
         if (post.youtube_video_id) {
+            // Use the YouTube thumbnail with object-fit: cover so the card
+            // looks like every other post card. Full video plays on the
+            // detail page — embedding live iframes per card meant the
+            // user saw black bars whenever the video aspect (9:16 Shorts
+            // vs 16:9 standard) didn't match the card aspect.
+            const thumb = `https://img.youtube.com/vi/${post.youtube_video_id}/maxresdefault.jpg`;
+            const fallback = `https://img.youtube.com/vi/${post.youtube_video_id}/hqdefault.jpg`;
             return (
-                <div className={styles.videoContainer}>
-                    <iframe
-                        src={`https://www.youtube.com/embed/${post.youtube_video_id}?autoplay=1&mute=1&loop=1&playlist=${post.youtube_video_id}&rel=0`}
-                        title={post.title}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className={styles.videoIframe}
+                <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={thumb}
+                        alt={post.title}
+                        className={styles.image}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
                     />
-                </div>
+                    <span className={styles.playBadge} aria-hidden>▶</span>
+                </>
             );
         }
 

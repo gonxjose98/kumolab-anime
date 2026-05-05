@@ -38,40 +38,38 @@
     background: linear-gradient(135deg, var(--surface-color), var(--surface-hover));
 }
 
-/* Video embeds (YouTube / X) — fill the card area like an image instead
- * of rendering at the iframe's native 16:9 ratio with letterbox bars. */
+/* Twitter/X embed wrapper — kept absolute so the embed sits inside
+ * the card frame. YouTube no longer uses an iframe on the card; it
+ * uses the standard .image rule with the YouTube thumbnail. */
 .videoContainer {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    pointer-events: none; /* whole card is the link target */
+    pointer-events: none;
 }
 
-.videoIframe {
+.playBadge {
     position: absolute;
     top: 50%;
     left: 50%;
-    /* Make the iframe wider than the card so its 16:9 content
-     * fully covers the 1:1 / 4:5 area, then translate-center
-     * crop. Mirrors object-fit: cover for an iframe. */
-    width: 178%;
-    height: 100%;
-    min-width: 100%;
-    min-height: 56.25vw;
     transform: translate(-50%, -50%);
-    border: 0;
-}
-
-@media (min-width: 640px) {
-    .videoIframe {
-        /* For 4:5 cards, height needs to grow even more to keep the
-         * 16:9 video covering the frame. 16/9 ÷ 4/5 = ~2.22 → 222% width. */
-        width: 222%;
-        height: 100%;
-        min-height: 0;
-    }
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    padding-left: 4px; /* optical centering of ▶ glyph */
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
 }
 
 .badge {
