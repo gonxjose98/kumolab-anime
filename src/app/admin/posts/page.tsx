@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export default async function PostsPage() {
     const { data, error } = await supabaseAdmin
         .from('posts')
-        .select('id, title, slug, status, claim_type, source, image, youtube_video_id, timestamp, published_at, scheduled_post_time')
+        .select('id, title, slug, status, claim_type, source, image, youtube_video_id, social_ids, timestamp, published_at, scheduled_post_time')
         .order('timestamp', { ascending: false })
         .limit(500);
 

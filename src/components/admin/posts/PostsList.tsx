@@ -13,6 +13,7 @@ type Post = {
     source?: string | null;
     image?: string | null;
     youtube_video_id?: string | null;
+    social_ids?: Record<string, any> | null;
     timestamp?: string | null;
     published_at?: string | null;
     scheduled_post_time?: string | null;
@@ -194,6 +195,7 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
     const claimLabel = CLAIM_LABEL[claimKey] || CLAIM_LABEL.OTHER;
     const statusColor = STATUS_COLOR[post.status || ''] || '#9ca3af';
     const thumb = thumbUrl(post);
+    const stagedVideoUrl = post.social_ids?.staged_video_url as string | undefined;
     const ts = post.published_at || post.scheduled_post_time || post.timestamp;
 
     return (
@@ -210,6 +212,28 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
                 {thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumb} alt={post.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                ) : stagedVideoUrl ? (
+                    <>
+                        <video
+                            src={stagedVideoUrl}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-full object-cover"
+                            style={{ background: '#000' }}
+                        />
+                        <span
+                            className="absolute top-2 right-2 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                            style={{
+                                background: 'rgba(0,0,0,0.55)',
+                                backdropFilter: 'blur(4px)',
+                                border: '1px solid rgba(255,255,255,0.18)',
+                                color: '#fff',
+                            }}
+                        >
+                            ▶ Video
+                        </span>
+                    </>
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                         <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
