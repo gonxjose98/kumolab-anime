@@ -56,6 +56,61 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         return result;
     }
 
+    // ── 0. Per-post lock to prevent concurrent publishes ───────
+    // Without this, two simultaneous calls (e.g. operator clicks
+    // republish twice, or auto-retry fires while a manual retry is
+    // in flight, or Cloudflare 524's the curl but Vercel keeps
+    // running and the operator triggers again) all create their
+    // OWN brand-new IG/FB/Threads posts. The DB only remembers the
+    // last set of IDs, but the platforms each show 2-3 duplicates.
+    //
+    // Lock TTL = 10 min covers the worst-case full publish path
+    // (worker cold start + 60s download + ffmpeg + 3-platform upload
+    // with status polling). If a publish actually takes longer, the
+    // lock expires and a follow-up retry can proceed.
+    const postId = (post as any).id;
+    if (postId) {
+        const { supabaseAdmin } = await import('../supabase/admin');
+        const lockKey = `publish:${postId}`;
+        const tenMinFromNow = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        // Sweep stale locks first so a crashed earlier publish doesn't
+        // block forever.
+        await supabaseAdmin.from('worker_locks').delete().eq('lock_key', lockKey).lt('expires_at', new Date().toISOString());
+        const { error: lockErr } = await supabaseAdmin.from('worker_locks').insert({
+            lock_key: lockKey,
+            locked_by: `publishToSocials(${post.slug})`,
+            locked_at: new Date().toISOString(),
+            expires_at: tenMinFromNow,
+        });
+        if (lockErr) {
+            // Conflict on lock_key PK = another publish is in flight
+            await supabaseAdmin.from('action_logs').insert({
+                action: 'social_publish_skipped',
+                actor: 'system',
+                entity_type: 'post',
+                entity_id: postId,
+                entity_title: post.title,
+                reason: 'Concurrent publish already in flight — skipping to avoid duplicate posts',
+                details: { slug: post.slug, lock_key: lockKey },
+            }).then(() => {}, () => {});
+            (result as any).skipped_reason = 'lock_held';
+            return result;
+        }
+    }
+
+    // Wrap rest of body so we always release the lock
+    try {
+        return await publishToSocialsInner(post, result);
+    } finally {
+        if (postId) {
+            const { supabaseAdmin } = await import('../supabase/admin');
+            await supabaseAdmin.from('worker_locks').delete().eq('lock_key', `publish:${postId}`);
+        }
+    }
+}
+
+async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult): Promise<SocialPublishResult> {
+
     // ── 1. Stage YouTube video FIRST (any YouTube source) ─────
     // Per Jose's directive: if the post's source is a YouTube video,
     // the video itself is what should ship to social — not a screenshot
