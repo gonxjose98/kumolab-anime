@@ -154,6 +154,19 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (worker === 'health-monitor') {
+            const { getHealthSnapshot, fireHealthAlertsIfChanged } = await import('@/lib/engine/health-monitor');
+            const snap = await getHealthSnapshot();
+            const alerts = await fireHealthAlertsIfChanged(snap);
+            return NextResponse.json({
+                success: true,
+                worker: 'health-monitor',
+                overall: snap.overall,
+                checks: snap.checks.map(c => ({ key: c.key, level: c.level, detail: c.detail })),
+                alerts,
+            });
+        }
+
         if (worker === 'refresh-meta-token') {
             console.log('[Cron] Refreshing Meta token...');
             const result = await refreshMetaToken();

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { checkMetaTokenHealth, type MetaTokenHealth } from '@/lib/engine/token-health';
+import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ async function fetchDashboardData() {
         { data: sourceHealth },
         { data: recentActivity },
         metaTokenHealth,
+        healthSnapshot,
     ] = await Promise.all([
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).gte('published_at', last24h.toISOString()),
@@ -84,6 +86,11 @@ async function fetchDashboardData() {
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
         checkMetaTokenHealth().catch((e): MetaTokenHealth => ({ ok: false, reason: e?.message ?? 'check failed' })),
+        getHealthSnapshot().catch((e): HealthSnapshot => ({
+            overall: 'crit',
+            checks: [{ key: 'health', label: 'Health Monitor', level: 'crit', detail: `Snapshot failed: ${e?.message ?? 'unknown'}` }],
+            checkedAt: new Date().toISOString(),
+        })),
     ]);
 
     return {
@@ -101,6 +108,7 @@ async function fetchDashboardData() {
         sourceHealth: sourceHealth || [],
         recentActivity: recentActivity || [],
         metaTokenHealth,
+        healthSnapshot,
     };
 }
 
@@ -220,6 +228,9 @@ export default async function DashboardPage() {
                     highlight={stats.errors24h > 0}
                 />
             </div>
+
+            {/* ── System Health ───────────────────────────────────── */}
+            <HealthCard snapshot={data.healthSnapshot} />
 
             {/* ── Platform tokens ──────────────────────────────────── */}
             <PlatformTokenCard health={data.metaTokenHealth} />
@@ -417,6 +428,67 @@ export default async function DashboardPage() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────
+
+function HealthCard({ snapshot }: { snapshot: HealthSnapshot }) {
+    const overallColor = snapshot.overall === 'crit' ? '#ff4444' : snapshot.overall === 'warn' ? '#ffaa00' : '#00ff88';
+    const overallLabel = snapshot.overall === 'crit' ? 'Action needed' : snapshot.overall === 'warn' ? 'Degraded' : 'All systems go';
+
+    return (
+        <Card className="p-5">
+            <div className="flex items-baseline justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ background: overallColor, boxShadow: `0 0 10px ${overallColor}` }}
+                    />
+                    <SectionHeader label="System Health" accent={overallColor} />
+                </div>
+                <span
+                    className="text-[10px] font-bold uppercase tracking-[0.2em]"
+                    style={{ color: overallColor, fontFamily: 'var(--font-display)' }}
+                >
+                    {overallLabel}
+                </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {snapshot.checks.map(c => (
+                    <HealthRow key={c.key} level={c.level} label={c.label} detail={c.detail} actionable={c.actionable} />
+                ))}
+            </div>
+        </Card>
+    );
+}
+
+function HealthRow({ level, label, detail, actionable }: { level: HealthLevel; label: string; detail: string; actionable?: string }) {
+    const color = level === 'crit' ? '#ff4444' : level === 'warn' ? '#ffaa00' : '#00ff88';
+    return (
+        <div
+            className="flex items-start gap-3 p-2.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+        >
+            <span
+                className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+            />
+            <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {label}
+                </div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {detail}
+                </div>
+                {actionable && level !== 'ok' && (
+                    <div
+                        className="text-[9px] mt-1 font-mono"
+                        style={{ color: color, opacity: 0.85 }}
+                    >
+                        → {actionable}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function PlatformTokenCard({ health }: { health: MetaTokenHealth }) {
     let accent: string;

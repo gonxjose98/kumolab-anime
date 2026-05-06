@@ -27,6 +27,10 @@
     {
       "path": "/api/cron?worker=refresh-threads-token",
       "schedule": "0 5 * * 2"
+    },
+    {
+      "path": "/api/cron?worker=health-monitor",
+      "schedule": "*/30 * * * *"
     }
   ],
   "build": {
