@@ -34,10 +34,20 @@ function getRelativeTime(timestamp: string): string {
     return `${diffDay}d ago`;
 }
 
-/** Detect if a post has embedded video (YouTube or X/Twitter) */
-function getVideoInfo(post: BlogPost): { type: 'youtube'; videoId: string } | { type: 'twitter'; tweetId: string; tweetUrl: string } | null {
+/** Detect if a post has embedded video (YouTube, X/Twitter, or KumoLab manual upload) */
+function getVideoInfo(
+    post: BlogPost,
+):
+    | { type: 'youtube'; videoId: string }
+    | { type: 'twitter'; tweetId: string; tweetUrl: string }
+    | { type: 'staged'; url: string }
+    | null {
     if (post.youtube_video_id) {
         return { type: 'youtube', videoId: post.youtube_video_id };
+    }
+    const stagedUrl = (post as any).social_ids?.staged_video_url as string | undefined;
+    if (stagedUrl) {
+        return { type: 'staged', url: stagedUrl };
     }
     // Check for Twitter post (via proper fields or content fallback)
     const tweetId = post.twitter_tweet_id || post.content?.match(/Tweet ID:\s*(\d+)/)?.[1];
@@ -110,10 +120,51 @@ function TwitterEmbed({ tweetId, tweetUrl }: { tweetId: string; tweetUrl: string
     );
 }
 
+/** Staged-video element — autoplays muted when `active` is true, pauses
+ *  otherwise. Uses `useEffect` to imperatively call play/pause so React
+ *  state changes map cleanly to media-element behavior. */
+function StagedVideo({ url, active }: { url: string; active: boolean }) {
+    const ref = useRef<HTMLVideoElement>(null);
+    useEffect(() => {
+        const v = ref.current;
+        if (!v) return;
+        if (active) {
+            // play() can reject if autoplay is blocked; we ignore — muted
+            // playback is permitted by every modern browser.
+            v.play().catch(() => {});
+        } else {
+            v.pause();
+        }
+    }, [active]);
+    return (
+        <video
+            ref={ref}
+            src={url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                background: '#000',
+                zIndex: 1,
+            }}
+        />
+    );
+}
+
 const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [playingVideos, setPlayingVideos] = useState<Set<string>>(new Set());
     const [expandedTweets, setExpandedTweets] = useState<Set<string>>(new Set());
+    // For staged (manual-upload) videos: track which the user has explicitly
+    // paused via center-tap. Default behavior is: autoplay muted when card
+    // is the active (snapped) one; otherwise paused.
+    const [pausedStaged, setPausedStaged] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Filter: keep published, non-DROP posts. Deduplicate by title prefix.
@@ -205,10 +256,16 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                     const videoInfo = getVideoInfo(post);
                     const isYouTube = videoInfo?.type === 'youtube';
                     const isTwitter = videoInfo?.type === 'twitter';
+                    const isStaged = videoInfo?.type === 'staged';
                     const hasVideo = !!videoInfo;
                     const postKey = post.id || String(i);
                     const isPlaying = isYouTube && playingVideos.has(postKey);
                     const isTweetExpanded = isTwitter && expandedTweets.has(postKey);
+                    // Staged videos autoplay muted when this card is the
+                    // currently-snapped (active) one, unless the user
+                    // explicitly paused via center-tap.
+                    const isStagedActive = isStaged && i === activeIndex && !pausedStaged.has(postKey);
+                    const isStagedPaused = isStaged && pausedStaged.has(postKey);
 
                     // Determine image source
                     const imageSrc = isYouTube
@@ -217,6 +274,73 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
 
                     const cardInner = (
                         <>
+                            {/* Manual-upload (staged) video — TikTok-style.
+                                Autoplays muted when this card is snapped; tap
+                                center to pause/resume; tapping anywhere else
+                                falls through to the card link → blog detail
+                                where it autoplays again with controls. */}
+                            {isStaged && (
+                                <>
+                                    <StagedVideo
+                                        url={(videoInfo as any).url}
+                                        active={isStagedActive}
+                                    />
+                                    {/* Center pause/resume overlay — only this
+                                        ~50% center area handles the tap; sides
+                                        propagate to the wrapping card link. */}
+                                    <button
+                                        type="button"
+                                        aria-label={isStagedPaused ? 'Resume' : 'Pause'}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setPausedStaged(prev => {
+                                                const next = new Set(prev);
+                                                if (next.has(postKey)) next.delete(postKey);
+                                                else next.add(postKey);
+                                                return next;
+                                            });
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '25%',
+                                            left: '25%',
+                                            width: '50%',
+                                            height: '50%',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            zIndex: 5,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        {isStagedPaused && (
+                                            <div
+                                                style={{
+                                                    width: 72,
+                                                    height: 72,
+                                                    borderRadius: '50%',
+                                                    background: 'rgba(0,0,0,0.55)',
+                                                    backdropFilter: 'blur(6px)',
+                                                    border: '1px solid rgba(255,255,255,0.18)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    pointerEvents: 'none',
+                                                }}
+                                            >
+                                                <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                                                    <path d="M8 5v14l11-7z" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+
                             {/* YouTube iframe when playing — full controls + fullscreen + native scrubbing */}
                             {isYouTube && isPlaying && (
                                 <iframe
@@ -240,8 +364,8 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                                 </div>
                             )}
 
-                            {/* Background image (hidden when video is playing or tweet expanded) */}
-                            {!isPlaying && !isTweetExpanded && imageSrc && (
+                            {/* Background image (hidden when video is playing or tweet expanded or staged video is active) */}
+                            {!isPlaying && !isTweetExpanded && !isStaged && imageSrc && (
                                 <img
                                     src={imageSrc}
                                     alt=""
@@ -259,7 +383,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
                             )}
 
                             {/* Fallback background for posts without images */}
-                            {!isPlaying && !isTweetExpanded && !imageSrc && (
+                            {!isPlaying && !isTweetExpanded && !isStaged && !imageSrc && (
                                 <div className={styles.cardFallback} />
                             )}
 

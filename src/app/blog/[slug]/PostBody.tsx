@@ -198,13 +198,18 @@ export default function PostBody({ slug }: { slug: string }) {
                 </h1>
             </div>
 
-            {/* Manual upload (Reel-style) HTML5 video — set max-height so
-                portrait 9:16 phone videos don't blow past the viewport */}
+            {/* Manual upload (Reel-style) HTML5 video — autoplays muted on
+                arrival like TikTok; user can tap to unmute / pause via the
+                native controls. max-height: 85vh keeps portrait 9:16 phone
+                videos from blowing past the viewport. */}
             {hasUploadedVideo && (
                 <div className={styles.videoSection}>
                     <video
                         src={stagedVideoUrl}
                         controls
+                        autoPlay
+                        muted
+                        loop
                         playsInline
                         preload="metadata"
                         style={{
