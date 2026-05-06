@@ -73,6 +73,7 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const router = useRouter();
     const [filter, setFilter] = useState<Filter>('all');
     const [aiOpen, setAiOpen] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
 
     const counts = useMemo(() => {
         const c = { all: initialPosts.length, pending: 0, approved: 0, published: 0 };
@@ -109,18 +110,32 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
                         Click any post to edit · {initialPosts.length} total
                     </p>
                 </div>
-                <button
-                    onClick={() => setAiOpen(true)}
-                    className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
-                    style={{
-                        background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.20))',
-                        border: '1px solid rgba(255,60,172,0.35)',
-                        color: '#fff',
-                        fontFamily: 'var(--font-display)',
-                    }}
-                >
-                    ✦ AI Assist
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setUploadOpen(true)}
+                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,255,136,0.20))',
+                            border: '1px solid rgba(0,212,255,0.35)',
+                            color: '#fff',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        ↑ Upload
+                    </button>
+                    <button
+                        onClick={() => setAiOpen(true)}
+                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.20))',
+                            border: '1px solid rgba(255,60,172,0.35)',
+                            color: '#fff',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        ✦ AI Assist
+                    </button>
+                </div>
             </div>
 
             {/* Filter tabs */}
@@ -168,6 +183,7 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
             )}
 
             {aiOpen && <AiAssistModal onClose={() => setAiOpen(false)} />}
+            {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} onSuccess={() => { setUploadOpen(false); router.refresh(); }} />}
         </div>
     );
 }
@@ -389,6 +405,262 @@ function AiAssistModal({ onClose }: { onClose: () => void }) {
                             </button>
                         )}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Upload Modal ─────────────────────────────────────────────
+//
+// Pick a video or image from device, optionally write a title +
+// caption + "via @creator" credit, hit Publish. The file uploads
+// directly from the browser to Supabase Storage (using the
+// authenticated supabase-js client so we bypass Vercel's 4.5 MB
+// body limit), then we POST the resulting public URL to the
+// upload-and-publish endpoint, which creates the post + fans out
+// to IG / FB / Threads via the standard publishToSocials flow.
+function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+    const [file, setFile] = useState<File | null>(null);
+    const [title, setTitle] = useState('');
+    const [caption, setCaption] = useState('');
+    const [credit, setCredit] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [progress, setProgress] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [result, setResult] = useState<{ blogUrl: string; social: any } | null>(null);
+
+    const isVideo = file?.type.startsWith('video/');
+    const isImage = file?.type.startsWith('image/');
+
+    async function publish() {
+        if (!file) { setError('Pick a video or image file first'); return; }
+        if (!isVideo && !isImage) { setError('File must be a video or image'); return; }
+        if (!caption.trim()) { setError('Caption is required'); return; }
+
+        setBusy(true);
+        setError(null);
+        setProgress('Uploading file…');
+
+        try {
+            const { supabase } = await import('@/lib/supabase/client');
+            const bucket = isVideo ? 'blog-videos' : 'blog-images';
+            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 60) || 'upload';
+            const key = `manual-uploads/${Date.now()}-${safeName}`;
+
+            const { error: upErr } = await supabase.storage
+                .from(bucket)
+                .upload(key, file, { contentType: file.type, upsert: false });
+            if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+
+            const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(key);
+
+            setProgress('Publishing to socials…');
+            const res = await fetch('/api/admin/upload-and-publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mediaUrl: publicUrl,
+                    mediaType: isVideo ? 'video' : 'image',
+                    title: title.trim() || undefined,
+                    caption: caption.trim(),
+                    credit: credit.trim() || undefined,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || 'Publish failed');
+
+            setResult({ blogUrl: json.blogUrl, social: json.social || {} });
+            setProgress(null);
+        } catch (e: any) {
+            setError(e?.message || 'Upload/publish failed');
+            setProgress(null);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4"
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
+            onClick={onClose}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-lg rounded-t-2xl md:rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                style={{
+                    background: 'rgba(12, 12, 24, 0.95)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    backdropFilter: 'blur(24px)',
+                    boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(0,212,255,0.10)',
+                }}
+            >
+                <div className="p-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-bold uppercase tracking-[0.2em]" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                            ↑ Upload & Publish
+                        </h2>
+                        <button onClick={onClose} className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                            Close
+                        </button>
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Pushes to website + Instagram + Facebook + Threads in one shot
+                    </p>
+                </div>
+
+                <div className="p-5 space-y-4 overflow-y-auto">
+                    {result ? (
+                        <div className="space-y-3">
+                            <div className="text-sm font-bold" style={{ color: '#7af0a8' }}>
+                                ✓ Published
+                            </div>
+                            <a href={result.blogUrl} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#7adfff' }}>
+                                {result.blogUrl} ↗
+                            </a>
+                            {result.social?.instagram_url && (
+                                <a href={result.social.instagram_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#ff7ec5' }}>
+                                    Instagram ↗
+                                </a>
+                            )}
+                            {result.social?.facebook_url && (
+                                <a href={result.social.facebook_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#7adfff' }}>
+                                    Facebook ↗
+                                </a>
+                            )}
+                            {result.social?.threads_url && (
+                                <a href={result.social.threads_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#a092ff' }}>
+                                    Threads ↗
+                                </a>
+                            )}
+                            {result.social?.skipped_reason && (
+                                <div className="text-[11px]" style={{ color: '#ffaa00' }}>
+                                    Social skipped: {result.social.skipped_reason}
+                                </div>
+                            )}
+                            <button
+                                onClick={onSuccess}
+                                className="w-full px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(0,255,136,0.18), rgba(0,212,170,0.10))',
+                                    border: '1px solid rgba(0,255,136,0.35)',
+                                    color: '#7af0a8',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                Done
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {/* File picker */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                    Video or Image File
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="video/*,image/*"
+                                    onChange={e => { setFile(e.target.files?.[0] || null); setError(null); }}
+                                    disabled={busy}
+                                    className="block w-full text-[11px] file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-wider file:cursor-pointer"
+                                    style={{
+                                        color: 'var(--text-secondary)',
+                                    }}
+                                />
+                                {file && (
+                                    <div className="text-[10px] mt-1 font-mono" style={{ color: 'var(--text-tertiary)' }}>
+                                        {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB · {isVideo ? 'video' : isImage ? 'image' : 'unknown'}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Title (optional) */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                    Title <span style={{ color: 'var(--text-muted)' }}>(optional, for the website)</span>
+                                </label>
+                                <input
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                    disabled={busy}
+                                    placeholder="If blank, first line of caption is used"
+                                    className="w-full px-3 py-2 rounded-lg text-xs"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.04)',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        color: 'var(--text-primary)',
+                                    }}
+                                />
+                            </div>
+
+                            {/* Caption */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                    Caption
+                                </label>
+                                <textarea
+                                    value={caption}
+                                    onChange={e => setCaption(e.target.value)}
+                                    disabled={busy}
+                                    rows={6}
+                                    placeholder="What's the post about? Goes on IG, FB, Threads + the website."
+                                    className="w-full px-3 py-2 rounded-lg text-xs"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.04)',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        color: 'var(--text-primary)',
+                                        resize: 'vertical',
+                                    }}
+                                />
+                            </div>
+
+                            {/* Credit */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                    Credit <span style={{ color: 'var(--text-muted)' }}>(optional, will append "via @handle")</span>
+                                </label>
+                                <input
+                                    value={credit}
+                                    onChange={e => setCredit(e.target.value)}
+                                    disabled={busy}
+                                    placeholder="creatorhandle"
+                                    className="w-full px-3 py-2 rounded-lg text-xs"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.04)',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        color: 'var(--text-primary)',
+                                    }}
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff7777' }}>
+                                    {error}
+                                </div>
+                            )}
+                            {progress && (
+                                <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.20)', color: '#7adfff' }}>
+                                    {progress}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={publish}
+                                disabled={busy || !file || !caption.trim()}
+                                className="w-full px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,255,136,0.20))',
+                                    border: '1px solid rgba(0,212,255,0.35)',
+                                    color: '#fff',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                {busy ? 'Working…' : 'Publish to Website + IG + FB + Threads'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

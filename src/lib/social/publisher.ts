@@ -122,8 +122,14 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     const sourceUrl = (post as any).source_url || '';
     const isYouTubeSource = /youtube\.com|youtu\.be/.test(sourceUrl);
 
-    let stagedVideoUrl: string | null = null;
-    if (isYouTubeSource) {
+    // Manual uploads come pre-staged: the operator already pushed the
+    // MP4 to our blog-videos bucket via the admin upload flow, and
+    // attached the public URL on the post object. Skip the worker
+    // fetch entirely for these.
+    let stagedVideoUrl: string | null = (post as any)._prestagedVideoUrl || null;
+    if (stagedVideoUrl) {
+        result.staged_video_url = stagedVideoUrl;
+    } else if (isYouTubeSource) {
         const staged = await fetchYouTubeToBucket(sourceUrl, post.slug);
         if (staged) {
             stagedVideoUrl = staged.bucket_url;
