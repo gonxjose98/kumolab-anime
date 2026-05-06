@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
         if (!caption || typeof caption !== 'string') {
             return NextResponse.json({ success: false, error: 'caption is required' }, { status: 400 });
         }
+        if (!title || typeof title !== 'string' || !title.trim()) {
+            return NextResponse.json({ success: false, error: 'title is required' }, { status: 400 });
+        }
 
-        const titleClean = (title && typeof title === 'string') ? title.slice(0, 200) : caption.split('\n')[0].slice(0, 100) || 'KumoLab Upload';
+        const titleClean = title.trim().slice(0, 200);
         const captionFinal = credit && typeof credit === 'string' && credit.trim()
             ? `${caption.trim()}\n\nvia @${credit.trim().replace(/^@/, '')}`
             : caption.trim();

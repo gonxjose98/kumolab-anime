@@ -436,6 +436,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     async function publish() {
         if (!file) { setError('Pick a video or image file first'); return; }
         if (!isVideo && !isImage) { setError('File must be a video or image'); return; }
+        if (!title.trim()) { setError('Title is required'); return; }
         if (!caption.trim()) { setError('Caption is required'); return; }
 
         setBusy(true);
@@ -576,16 +577,16 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                 )}
                             </div>
 
-                            {/* Title (optional) */}
+                            {/* Title (required) */}
                             <div>
                                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                    Title <span style={{ color: 'var(--text-muted)' }}>(optional, for the website)</span>
+                                    Title <span style={{ color: '#ff7777' }}>*</span>
                                 </label>
                                 <input
                                     value={title}
                                     onChange={e => setTitle(e.target.value)}
                                     disabled={busy}
-                                    placeholder="If blank, first line of caption is used"
+                                    placeholder="The headline for the website blog post"
                                     className="w-full px-3 py-2 rounded-lg text-xs"
                                     style={{
                                         background: 'rgba(255,255,255,0.04)',
@@ -648,7 +649,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
                             <button
                                 onClick={publish}
-                                disabled={busy || !file || !caption.trim()}
+                                disabled={busy || !file || !title.trim() || !caption.trim()}
                                 className="w-full px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
                                 style={{
                                     background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,255,136,0.20))',
