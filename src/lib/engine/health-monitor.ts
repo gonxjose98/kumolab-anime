@@ -83,7 +83,7 @@ async function checkCronFreshness(): Promise<HealthCheck> {
     if (age > 120) {
         return {
             key: 'cron',
-            label: 'Detection Cron',
+            label: 'Scraper',
             level: 'crit',
             detail: `Last run ${age === Infinity ? 'never' : age + ' min'} ago — cron may be broken`,
             actionable: 'Check Vercel cron logs',
@@ -92,14 +92,14 @@ async function checkCronFreshness(): Promise<HealthCheck> {
     if (age > 60) {
         return {
             key: 'cron',
-            label: 'Detection Cron',
+            label: 'Scraper',
             level: 'warn',
             detail: `Last run ${age} min ago (expected <60)`,
         };
     }
     return {
         key: 'cron',
-        label: 'Detection Cron',
+        label: 'Scraper',
         level: 'ok',
         detail: `Last run ${age} min ago`,
     };
