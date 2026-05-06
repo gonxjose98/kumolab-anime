@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-05-04 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Today's drops (8 posts) all confirmed live across all 3 platforms. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts.
+**Last updated:** 2026-05-06 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Today's hardening pass closed the dedup gaps, idempotency hole, and silent-fail UX issues that surfaced in early Phase 2 traffic — see "Reliability & UX hardening (2026-05-05/06)" below. Manual upload button now lets Jose push reels/photos through the same 4-destination pipeline. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts.
 
 ---
 
@@ -196,10 +196,49 @@ Folded into Jose's upcoming admin dashboard redesign (separate project). No read
 **Cadence:** Website uncapped; the 3 social platforms publish in lockstep via `publishToSocials()` (one cron tick = one fan-out to all 3). Min 25 min between posts via scheduler. Per-platform daily caps removed by design — spacing does the pacing.
 
 **This phase's open work:**
-- 2-week stability watch — observe error_logs daily, intervene only if a publisher starts failing
-- IG insights collection cron worker (the `instagram_manage_insights` + `threads_manage_insights` scopes are unlocked but not yet harvested)
-- Analytics card on admin dashboard (per-post reach/likes/comments/shares/saved across all 3 platforms)
+- 2-week stability watch — System Health card on admin dashboard now surfaces issues at-a-glance; intervene as flagged
+- ✅ Analytics page on admin dashboard — `/admin/analytics`, IG account snapshot + top posts (shipped 2026-05-04, Graph v22 unified `views` metric)
+- IG/Threads/FB insights deep-dive — per-post reach/saves/shares aggregated into the dashboard analytics page (in progress)
 - Announce KumoLab relaunch publicly — Jose-directed timing
+
+### Reliability & UX hardening (2026-05-05/06)
+
+Phase 2 traffic surfaced a cluster of issues that had been latent. Closed in one sprint:
+
+- **Bandwidth control on yt-dlp worker** (2026-05-05) — Webshare moved to 3 GB/mo paid plan ($6.30/mo yearly). Worker pinned to 720p ceiling (`best[height<=720][ext=mp4]…`) for predictable ~25-35 MB per trailer. Mobile player clients (`youtube:player_client=android,ios,web`) added to bypass YouTube's bot-wall on Render IPs. `/info` timeout 75s → 150s + single retry on AbortError handles Render free-tier cold starts.
+- **Dedup, three new layers** (2026-05-05/06) — the system was letting through:
+    • Localized-title dupes (e.g. *Witch Hat Atelier* vs Japanese *Tongari Boushi no Atelier*; *Kuzuki Residence* vs *Kami no Niwa tsuki Kusunoki-tei*) where AniList didn't resolve `anime_id` and Layer 2 was silent.
+    • Two different YouTube clips for the same news event (different titles → different fingerprints).
+    • Watch-party content sneaking past the source-time NEGATIVE_KEYWORDS filter because the AI title formatter introduced "Watch Party" during translation, *after* the filter ran.
+  Fixes: **Layer 2.5** (`extractAnimeCanonical(title)` + claim_type + 24h window) catches different sources reporting the same event. **Layer 2.6** (`extractSubtitleHash` — strip the first quoted segment, hash the rest) catches localized-title pairs that share the news subtitle word-for-word ("Episode 5 Preview Released • Airing Every Saturday"). **Layer 3 same-claim threshold** lowered from 0.55 → 0.40. **Post-translation NEGATIVE_KEYWORDS recheck** runs in `processing-worker.ts` immediately after `formatKumoLabTitle`, so AI-introduced banned phrases get caught before pending review.
+- **Publisher idempotency** (2026-05-06) — `publishToSocials` now acquires a per-post advisory lock on `worker_locks` keyed `publish:{post_id}` (10-min TTL) before doing any work. Concurrent calls (Cloudflare 524 + operator retry, auto-retry firing while a manual retry is in flight, two cron ticks racing) short-circuit with `skipped_reason='lock_held'` instead of each independently creating brand-new IG/FB/Threads posts. Cause of today's Dr.STONE 3× duplicate: Meta APIs have no idempotency keys, so each `publishToSocials` call mints fresh containers; without the lock, parallel calls each landed.
+- **No-screenshot-fallback rule** (2026-05-05) — when a YouTube-source post's video fetch fails, the publisher now skips socials entirely instead of degrading to a static thumbnail. Skipped posts carry `social_ids.skipped_reason='video_fetch_failed'` + `publish_attempts` counter.
+- **Auto-retry for video-fetch failures** (2026-05-06) — `publishScheduledPosts` also picks up posts where `social_ids.skipped_reason='video_fetch_failed'` AND `published_at` within 6h AND `publish_attempts < 5`. Each tick bumps the counter; 5-attempt cap avoids infinite loops on permanently-broken videos. Combined with the 720p ceiling + bot-wall bypass + cold-start retry, video-fetch hiccups now self-heal within an hour with no operator action.
+- **Daily Drops is website-only** (2026-05-06) — `engine.ts::publishPost` short-circuits the social broadcast for `type='DROP'` posts. The daily airing summary is a meta index, not anime news; doesn't belong on Reels.
+- **Daily Drops absolute URL fix** (2026-05-05) — `generator.ts` was emitting `image: '/daily-drops-permanent.jpg'` (relative). Meta APIs reject relative URIs ("image_url is not a valid URI"). Now absolute.
+- **No URLs in IG/FB/Threads captions** (2026-05-05) — replaces the broken-link issue + algorithmically downranks. FB Page Website field + bio links carry click-through; captions optimize for reach.
+- **Circuit-breaker threshold 3 → 10** (2026-05-05) — with semantic dedup catching dupes pre-pending, organic decline rate is near-zero. Threshold of 3 was tripping the breaker on stale historical declines. `KUMOLAB_CIRCUIT_BREAKER_THRESHOLD=10` set on prod + preview Vercel env.
+- **System Health card on admin dashboard** (2026-05-05/06) — at-a-glance red/yellow/green for 7 checks: Worker reachability, Scraper freshness, Circuit Breaker, Stuck Posts, Publish Cadence vs prior 24h baseline, Meta Token expiry, Error Rate. Each red row shows actionable next-step text. Per Jose: dashboard-only, no external alerting (Telegram/Slack/Discord) — keeps moving parts to zero.
+- **Operational logs reclassified** (2026-05-05) — circuit-breaker trip events and `publisher.video-fetch` skips now write to `action_logs` (system state changes) instead of `error_logs`. The dashboard's "Errors 24h" stat now reflects actual faults.
+- **Blog UX polish** — YouTube cards on `/blog` now use static thumbnail (`maxres → sd → hq` cascade with placeholder detection) + play badge instead of letterboxed live iframes that black-barred portrait/landscape mismatches. FB/Threads link bug fixed (was missing `/blog/` prefix and 404'ing on click). FB algorithm downrank avoided by removing in-caption URLs.
+
+### Manual upload feature (2026-05-06)
+
+New **↑ Upload** button on `/admin/posts` next to AI Assist. Lets Jose push a video or image from his phone to the website + IG + FB + Threads in one shot — same `publishToSocials()` pipeline as automated posts, no special-casing.
+
+- **Two-step browser flow** to bypass Vercel's 4.5 MB serverless body limit:
+    1. Browser POSTs to admin-gated `/api/admin/upload-sign` → server uses service-role admin client to mint a one-time signed upload URL (filename slicing preserves `.mov` / `.mp4` / `.jpg` extension).
+    2. Browser PUTs the file directly to Supabase Storage via the signed URL — bypasses storage RLS entirely; works for files up to ~100 MB.
+    3. Browser POSTs the resulting public URL + caption + optional `via @creator` credit to `/api/admin/upload-and-publish`. Server creates a `posts` row, attaches `_prestagedVideoUrl` so the publisher skips its YouTube-fetch step, and routes the same MP4 through IG Reels + FB Reels + Threads VIDEO.
+- **Storage bucket configs updated**: `blog-videos` accepts mp4, webm, quicktime (.mov), m4v, 3gpp, mpeg (size cap 100 MB). `blog-images` accepts png/jpeg/webp/gif/heic/heif (size cap 15 MB).
+- **Storage RLS policies added** for `authenticated` role — INSERT/UPDATE/DELETE on the two media buckets. Server-issued signed URLs don't actually need this, but it's there for future flexibility.
+- **Title is required**, no caption-fallback. `social_ids.staged_video_url` carries the public URL.
+- **Per-platform success card** on completion — clickable links to the website + IG + FB + Threads posts; greyed-out rows for any platform that didn't take. Skipped reasons surfaced.
+- **TikTok-style render across surfaces** for the staged video:
+    • **Homepage (`MostRecentFeed`)**: autoplays muted+loop when the card is the snapped one; pauses when scrolled away. Center-tap toggles pause with a frosted ▶ glyph; side-tap falls through to the card link.
+    • **Blog detail page (`PostBody`)**: HTML5 `<video controls autoPlay muted loop playsInline>` with max-height 85vh so portrait phone videos don't blow past the viewport.
+    • **Blog card list + admin grid**: muted `<video preload="auto">` poster — Safari forced to paint first frame via `currentTime = 0.1` on `loadedmetadata` (preload="metadata" alone leaves `.mov` files black on iOS Safari).
+- **Per-post idempotency lock** (above) prevents accidental dupes if Jose re-clicks publish.
 
 ---
 
@@ -271,7 +310,10 @@ Grow content volume, expand sponsorship pipeline (2–3 active deals), explore a
 - **Retention:** posts auto-expire at `published_at + KUMOLAB_DEFAULT_RETENTION_DAYS` (default 60). Unset = evergreen.
 - **Dedup:** primary via `seen_fingerprints` table. Old "anime_id + claim_type + season_label" composite is gone.
 - **Meta publishing:** **direct API to all 3 platforms** — IG, FB Page, Threads. No Meta Suite cross-post dependency anywhere; the IG cross-post toggles must stay OFF (or it doesn't matter — they're orthogonal). Threads has its own separate Meta app (`KumoLab Threads`, App ID `1254048673427302`) with its own OAuth and 60-day token refreshed weekly via cron.
-- **Circuit breaker:** 3 declines in 24h → auto-publish pauses for 6h. Manual reset via `manualResetCircuitBreaker()`.
+- **Circuit breaker:** **10** declines in 24h → auto-publish pauses for 6h (was 3, raised 2026-05-05). Manual reset via `manualResetCircuitBreaker()` or DELETE on `worker_locks` row `lock_key='auto_publish_paused'`.
+- **Publisher idempotency:** every `publishToSocials` call holds a per-post advisory lock (`publish:{post_id}`, 10-min TTL). Force a republish by deleting the lock first.
+- **Dedup signals (in order):** seen_fingerprints exact match → anime_id+claim → anime canonical+claim+24h → subtitle hash+claim+24h → title Jaccard (0.40 same-claim, 0.55 cross-claim).
+- **No-screenshot-fallback rule:** YouTube-source posts that fail video fetch skip socials entirely. `publishScheduledPosts` retries them automatically up to 5 attempts within 6h.
 - Redeploy Vercel after any `vercel.json` cron changes.
 - Test all cron endpoints with curl before reporting complete.
 
