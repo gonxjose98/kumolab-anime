@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 type Post = {
     id: string;
@@ -420,18 +420,63 @@ function AiAssistModal({ onClose }: { onClose: () => void }) {
 // body limit), then we POST the resulting public URL to the
 // upload-and-publish endpoint, which creates the post + fans out
 // to IG / FB / Threads via the standard publishToSocials flow.
+type UploadPhase = 'idle' | 'uploading' | 'publishing' | 'done';
+
+function PlatformConfirmRow({ icon, label, url, accent, skipped }: { icon: string; label: string; url?: string | null; accent: string; skipped?: boolean }) {
+    if (skipped) {
+        return (
+            <div
+                className="flex items-center gap-3 p-3 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', opacity: 0.5 }}
+            >
+                <span className="text-base">{icon}</span>
+                <span className="text-[11px] font-semibold flex-1" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>not posted</span>
+            </div>
+        );
+    }
+    if (!url) return null;
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-lg transition-all hover:translate-x-0.5"
+            style={{ background: `${accent}10`, border: `1px solid ${accent}40` }}
+        >
+            <span className="text-base">{icon}</span>
+            <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-semibold" style={{ color: '#fff' }}>{label}</div>
+                <div className="text-[9px] truncate font-mono" style={{ color: accent }}>{url.replace(/^https?:\/\//, '')}</div>
+            </div>
+            <span style={{ color: accent }}>↗</span>
+        </a>
+    );
+}
+
 function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
     const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
     const [caption, setCaption] = useState('');
     const [credit, setCredit] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [progress, setProgress] = useState<string | null>(null);
+    const [phase, setPhase] = useState<UploadPhase>('idle');
+    const [phaseStartedAt, setPhaseStartedAt] = useState<number>(0);
+    const [now, setNow] = useState<number>(0);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<{ blogUrl: string; social: any } | null>(null);
 
+    const busy = phase === 'uploading' || phase === 'publishing';
+
+    // Tick a clock so the elapsed-time readout updates while we're working
+    useEffect(() => {
+        if (!busy) return;
+        const id = setInterval(() => setNow(Date.now()), 500);
+        return () => clearInterval(id);
+    }, [busy]);
+
     const isVideo = file?.type.startsWith('video/');
     const isImage = file?.type.startsWith('image/');
+    const elapsedSec = phaseStartedAt ? Math.floor((now - phaseStartedAt) / 1000) : 0;
 
     async function publish() {
         if (!file) { setError('Pick a video or image file first'); return; }
@@ -439,9 +484,9 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         if (!title.trim()) { setError('Title is required'); return; }
         if (!caption.trim()) { setError('Caption is required'); return; }
 
-        setBusy(true);
         setError(null);
-        setProgress('Uploading file…');
+        setPhase('uploading');
+        setPhaseStartedAt(Date.now());
 
         try {
             const { supabase } = await import('@/lib/supabase/client');
@@ -456,14 +501,16 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
             const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(key);
 
-            setProgress('Publishing to socials…');
+            setPhase('publishing');
+            setPhaseStartedAt(Date.now());
+
             const res = await fetch('/api/admin/upload-and-publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     mediaUrl: publicUrl,
                     mediaType: isVideo ? 'video' : 'image',
-                    title: title.trim() || undefined,
+                    title: title.trim(),
                     caption: caption.trim(),
                     credit: credit.trim() || undefined,
                 }),
@@ -472,12 +519,10 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             if (!res.ok || !json.success) throw new Error(json.error || 'Publish failed');
 
             setResult({ blogUrl: json.blogUrl, social: json.social || {} });
-            setProgress(null);
+            setPhase('done');
         } catch (e: any) {
             setError(e?.message || 'Upload/publish failed');
-            setProgress(null);
-        } finally {
-            setBusy(false);
+            setPhase('idle');
         }
     }
 
@@ -513,31 +558,42 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
                 <div className="p-5 space-y-4 overflow-y-auto">
                     {result ? (
-                        <div className="space-y-3">
-                            <div className="text-sm font-bold" style={{ color: '#7af0a8' }}>
-                                ✓ Published
+                        <div className="space-y-4">
+                            <div className="text-center py-3">
+                                <div className="text-3xl mb-2">✅</div>
+                                <div className="text-sm font-bold" style={{ color: '#7af0a8', fontFamily: 'var(--font-display)' }}>
+                                    SUCCESSFULLY POSTED
+                                </div>
+                                <div className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                                    Tap any link below to open the post
+                                </div>
                             </div>
-                            <a href={result.blogUrl} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#7adfff' }}>
-                                {result.blogUrl} ↗
-                            </a>
-                            {result.social?.instagram_url && (
-                                <a href={result.social.instagram_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#ff7ec5' }}>
-                                    Instagram ↗
-                                </a>
-                            )}
-                            {result.social?.facebook_url && (
-                                <a href={result.social.facebook_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#7adfff' }}>
-                                    Facebook ↗
-                                </a>
-                            )}
-                            {result.social?.threads_url && (
-                                <a href={result.social.threads_url} target="_blank" rel="noopener noreferrer" className="block text-xs hover:underline" style={{ color: '#a092ff' }}>
-                                    Threads ↗
-                                </a>
-                            )}
+
+                            <PlatformConfirmRow icon="🌐" label="Website" url={result.blogUrl} accent="#7adfff" />
+                            <PlatformConfirmRow
+                                icon="📷"
+                                label="Instagram"
+                                url={result.social?.instagram_url}
+                                accent="#ff7ec5"
+                                skipped={!result.social?.instagram_url}
+                            />
+                            <PlatformConfirmRow
+                                icon="📘"
+                                label="Facebook"
+                                url={result.social?.facebook_url}
+                                accent="#7adfff"
+                                skipped={!result.social?.facebook_url}
+                            />
+                            <PlatformConfirmRow
+                                icon="🧵"
+                                label="Threads"
+                                url={result.social?.threads_url}
+                                accent="#a092ff"
+                                skipped={!result.social?.threads_url}
+                            />
                             {result.social?.skipped_reason && (
-                                <div className="text-[11px]" style={{ color: '#ffaa00' }}>
-                                    Social skipped: {result.social.skipped_reason}
+                                <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(255,170,0,0.10)', border: '1px solid rgba(255,170,0,0.30)', color: '#ffcc66' }}>
+                                    Note: socials skipped — {result.social.skipped_reason}
                                 </div>
                             )}
                             <button
@@ -641,9 +697,47 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                     {error}
                                 </div>
                             )}
-                            {progress && (
-                                <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.20)', color: '#7adfff' }}>
-                                    {progress}
+
+                            {busy && (
+                                <div
+                                    className="p-3 rounded-lg space-y-2"
+                                    style={{ background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.25)' }}
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="inline-block w-3 h-3 rounded-full" style={{
+                                            background: '#7adfff',
+                                            animation: 'livePulse 1s ease-in-out infinite',
+                                        }} />
+                                        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: '#7adfff', fontFamily: 'var(--font-display)' }}>
+                                            {phase === 'uploading' ? 'Uploading file to KumoLab' : 'Publishing to all platforms'}
+                                        </span>
+                                        <span className="ml-auto text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                            {elapsedSec}s
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                        {phase === 'uploading'
+                                            ? `Sending ${file?.name} (${((file?.size || 0) / 1024 / 1024).toFixed(1)} MB) to storage…`
+                                            : phase === 'publishing'
+                                                ? 'Creating post + pushing to Instagram, Facebook, and Threads. Videos take 1–3 minutes for the platforms to process.'
+                                                : ''}
+                                    </div>
+                                    <div
+                                        className="h-0.5 rounded-full overflow-hidden"
+                                        style={{ background: 'rgba(255,255,255,0.06)' }}
+                                    >
+                                        <div
+                                            className="h-full"
+                                            style={{
+                                                width: '40%',
+                                                background: 'linear-gradient(90deg, transparent, #7adfff, transparent)',
+                                                animation: 'shimmer 1.5s linear infinite',
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                        Don&apos;t close this window — it&apos;s working.
+                                    </div>
                                 </div>
                             )}
 

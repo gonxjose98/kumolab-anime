@@ -237,6 +237,11 @@ img {
   50% { opacity: 0.4; box-shadow: 0 0 2px rgba(0, 212, 255, 0.2); }
 }
 
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
 @keyframes scrollFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(10px); }
