@@ -105,10 +105,31 @@ const BlogCard = ({ post }: BlogCardProps) => {
             );
         }
 
+        // Manual uploads (admin Upload button): MP4 lives in social_ids.staged_video_url.
+        // No YouTube ID, no thumbnail. Render the video directly with first-frame
+        // poster (browser auto-extracts) and a play badge — clicking the card
+        // opens the detail page where it plays with controls.
+        const stagedVideoUrl = (post as any).social_ids?.staged_video_url as string | undefined;
+        if (stagedVideoUrl) {
+            return (
+                <>
+                    <video
+                        src={stagedVideoUrl}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className={styles.image}
+                        style={{ background: '#000', objectFit: 'cover' }}
+                    />
+                    <span className={styles.playBadge} aria-hidden>▶</span>
+                </>
+            );
+        }
+
         // Check for X/Twitter embed in content (tweet ID stored in content)
         const tweetIdMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
         const tweetId = tweetIdMatch ? tweetIdMatch[1] : null;
-        
+
         if (tweetId) {
             // Use Twitter's official embed widget
             return (
@@ -123,9 +144,10 @@ const BlogCard = ({ post }: BlogCardProps) => {
         return null;
     };
 
-    // Check for video embed - YouTube explicit field, X extracted from content
+    // Check for video embed - YouTube, X (tweet), or manual-upload staged video
     const tweetIdMatch = post.content?.match(/Tweet ID:\s*(\d+)/);
-    const hasVideoEmbed = post.youtube_video_id || tweetIdMatch;
+    const stagedVideoUrl = (post as any).social_ids?.staged_video_url;
+    const hasVideoEmbed = post.youtube_video_id || tweetIdMatch || stagedVideoUrl;
 
     return (
         <Link href={`/blog/${post.slug}`} className={styles.card}>

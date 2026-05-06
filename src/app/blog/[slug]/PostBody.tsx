@@ -153,6 +153,13 @@ export default function PostBody({ slug }: { slug: string }) {
     const isTwitterPost = !!tweetId;
     const cleanedContent = cleanContent(post.content);
 
+    // Manual uploads (the admin Upload button) put the MP4 in
+    // social_ids.staged_video_url. There's no YouTube ID to embed
+    // and no Twitter ID to fetch — we render the staged URL directly
+    // in an HTML5 <video> tag.
+    const stagedVideoUrl: string | undefined = (post as any).social_ids?.staged_video_url;
+    const hasUploadedVideo = !!stagedVideoUrl && !post.youtube_video_id && !isTwitterPost;
+
     const postUrl = `https://kumolab-anime.com/blog/${post.slug}`;
 
     return (
@@ -164,7 +171,7 @@ export default function PostBody({ slug }: { slug: string }) {
                 showing a thumbnail-with-overlay-text above it). For YouTube
                 posts we let the video section be the centerpiece and the
                 clean h1 below tells the user what they're about to watch. */}
-            {post.image && !isTwitterPost && !post.youtube_video_id && (
+            {post.image && !isTwitterPost && !post.youtube_video_id && !hasUploadedVideo && (
                 <div className={styles.heroImage}>
                     <img
                         src={post.image}
@@ -190,6 +197,27 @@ export default function PostBody({ slug }: { slug: string }) {
                     {post.title.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}.*$/, '')}
                 </h1>
             </div>
+
+            {/* Manual upload (Reel-style) HTML5 video — set max-height so
+                portrait 9:16 phone videos don't blow past the viewport */}
+            {hasUploadedVideo && (
+                <div className={styles.videoSection}>
+                    <video
+                        src={stagedVideoUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        style={{
+                            width: '100%',
+                            maxHeight: '85vh',
+                            background: '#000',
+                            borderRadius: '12px',
+                            display: 'block',
+                            margin: '0 auto',
+                        }}
+                    />
+                </div>
+            )}
 
             {/* YouTube Video Embed — full native controls (rewind, fullscreen, captions) */}
             {post.youtube_video_id && (
