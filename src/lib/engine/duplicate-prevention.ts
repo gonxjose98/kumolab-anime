@@ -54,6 +54,28 @@ export function extractAnimeCanonical(title: string): string {
     return normalizeCanonical(title.split(/\s+/).slice(0, 4).join(' '));
 }
 
+/**
+ * Strip the first quoted segment (the anime name) and return a
+ * normalized version of the remaining subtitle text. Used to catch
+ * dupes where the same news event is reported under different
+ * localized anime names.
+ */
+export function extractSubtitleHash(title: string): string {
+    if (!title) return '';
+    // Remove the first quoted segment (anime name). Handles both straight
+    // and curly quotes that KumoLab's AI formatter sometimes emits.
+    const stripped = title.replace(/['"‘’“”‚„′″❛❜][^'"‘’“”‚„′″❛❜]{2,40}?['"‘’“”‚„′″❛❜]/, '').trim();
+    // Normalize: lowercase, strip punctuation, collapse whitespace.
+    const normalized = stripped
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    // Require at least 12 chars of meaningful subtitle to avoid matching
+    // empty / minimal subtitles ("Released", "Announced") on every post.
+    return normalized.length >= 12 ? normalized : '';
+}
+
 function normalizeCanonical(s: string): string {
     return s.toLowerCase()
         .replace(/[^\w\s]/g, '') // strip punctuation
@@ -167,6 +189,41 @@ export async function detectDuplicate(
         }
     }
 
+    // ── LAYER 2.6: Subtitle exact match within 24h ────────────────
+    // The first quoted segment of a KumoLab title is the anime name;
+    // everything else describes the news event. Two posts about the
+    // same anime under different localizations (e.g. "Kuzuki Residence"
+    // vs "Kami no Niwa tsuki Kusunoki-tei") differ in the quoted part
+    // but the post-quote subtitle is often word-for-word identical
+    // ("Episode 5 Preview Released • Airing Every Saturday"). Hash the
+    // subtitle, look for matches in the 24h window with the same claim.
+    const subtitleHash = extractSubtitleHash(candidate.title || '');
+    if (subtitleHash && claim) {
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: subMatches } = await supabaseAdmin
+            .from('posts')
+            .select('id, title, claim_type, status')
+            .eq('claim_type', claim)
+            .gte('timestamp', since24h)
+            .limit(80);
+        if (subMatches) {
+            for (const ex of subMatches) {
+                if (ex.id === (candidate as any).id) continue;
+                if (extractSubtitleHash(ex.title || '') === subtitleHash) {
+                    return {
+                        isDuplicate: true,
+                        duplicateOf: ex.id,
+                        duplicateType: 'SIMILAR',
+                        confidence: 90,
+                        existingPost: ex,
+                        action: 'BLOCK',
+                        reason: `Identical subtitle ("${subtitleHash.substring(0, 50)}...") + claim ${claim} within 24h — likely localized duplicate of post ${ex.id}`,
+                    };
+                }
+            }
+        }
+    }
+
     // ── LAYER 3: Title similarity vs. live posts in the window ─────
     if (candidate.title) {
         const since = new Date();
@@ -184,9 +241,14 @@ export async function detectDuplicate(
                 if (!existing.title || existing.id === (candidate as any).id) continue;
                 const similarity = calculateTitleSimilarity(candidate.title, existing.title);
 
-                if (similarity >= 0.55) {
-                    const sameClaim = !!claim && existing.claim_type === claim;
+                // Same-claim dupes share lots of news-template tokens
+                // ("released", "announced", "new", "episode") so the bar
+                // is lower for matching when claim_type also matches.
+                // Cross-claim still needs the higher generic threshold.
+                const sameClaim = !!claim && existing.claim_type === claim;
+                const minSimilarity = sameClaim ? 0.40 : 0.55;
 
+                if (similarity >= minSimilarity) {
                     if (sameClaim || similarity >= similarityThreshold) {
                         return {
                             isDuplicate: true,

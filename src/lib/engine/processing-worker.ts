@@ -558,6 +558,31 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
         const animeName = extractAnimeName(candidate.title, candidate.content);
         const enrichedData = { animeName, claimType: determineClaimType(candidate.title, candidate.content, candidate.source_name), studio: candidate.source_name?.includes('YouTube') ? candidate.metadata?.channel_name : undefined };
 
+        // ─── Post-translation negative-keyword recheck ─────────────────
+        // The AI title formatter often introduces English phrases that
+        // weren't in the source RSS / YouTube title (e.g. translates a
+        // Japanese title and adds "Watch Party"). NEGATIVE_KEYWORDS were
+        // already checked at scrape time, but the AI rewrite can sneak
+        // banned phrases in. Re-check here, after the rewrite, before
+        // we ever create a post row. Reuses the same source-of-truth list.
+        const titleLower = (candidate.title || '').toLowerCase();
+        const postFormatNegative = (await import('./sources-config')).CONTENT_RULES.NEGATIVE_KEYWORDS.find(kw =>
+          titleLower.includes(kw.toLowerCase())
+        );
+        if (postFormatNegative) {
+          await logScraperDecision({
+            candidateTitle: candidate.title,
+            sourceName: candidate.source_name,
+            sourceTier: candidate.source_tier,
+            decision: 'rejected_score',
+            reason: `Post-AI-format negative keyword: ${postFormatNegative}`,
+            score: score.total,
+          });
+          stats.rejected++;
+          await supabaseAdmin.from('detection_candidates').delete().eq('id', candidate.id);
+          continue;
+        }
+
         // 4-layer dedup from duplicate-prevention.ts
         const dupResult = await detectDuplicate({
           title: candidate.title,
