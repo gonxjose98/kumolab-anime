@@ -489,26 +489,42 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         setPhaseStartedAt(Date.now());
 
         try {
-            const { supabase } = await import('@/lib/supabase/client');
-            const bucket = isVideo ? 'blog-videos' : 'blog-images';
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 60) || 'upload';
-            const key = `manual-uploads/${Date.now()}-${safeName}`;
+            // Step 1: Ask the server (admin-gated) for a one-time signed
+            // upload URL. This bypasses storage RLS — the server uses the
+            // service role to mint the URL, and middleware already enforced
+            // admin auth on this route.
+            const signRes = await fetch('/api/admin/upload-sign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mediaType: isVideo ? 'video' : 'image',
+                    filename: file.name,
+                }),
+            });
+            const sign = await signRes.json();
+            if (!signRes.ok || !sign.success) throw new Error(sign.error || 'Could not get upload URL');
 
-            const { error: upErr } = await supabase.storage
-                .from(bucket)
-                .upload(key, file, { contentType: file.type, upsert: false });
-            if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
-
-            const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(key);
+            // Step 2: PUT the file directly to Supabase Storage via the
+            // signed URL. No anon-vs-authenticated drama.
+            const putRes = await fetch(sign.signedUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type, 'x-upsert': 'false' },
+            });
+            if (!putRes.ok) {
+                const detail = await putRes.text().catch(() => '');
+                throw new Error(`Upload failed: HTTP ${putRes.status} ${detail.slice(0, 120)}`);
+            }
 
             setPhase('publishing');
             setPhaseStartedAt(Date.now());
 
+            // Step 3: Tell the server to create the post + fan out to socials.
             const res = await fetch('/api/admin/upload-and-publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    mediaUrl: publicUrl,
+                    mediaUrl: sign.publicUrl,
                     mediaType: isVideo ? 'video' : 'image',
                     title: title.trim(),
                     caption: caption.trim(),
