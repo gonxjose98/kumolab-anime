@@ -218,7 +218,17 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
                             src={stagedVideoUrl}
                             muted
                             playsInline
-                            preload="metadata"
+                            preload="auto"
+                            // Mobile Safari refuses to render a .mov first
+                            // frame from preload="metadata" alone. Forcing a
+                            // tiny seek on loadedmetadata forces a paint of
+                            // the actual frame at 0.1s — works on both
+                            // Safari and Chrome. We don't autoplay because
+                            // this is the admin grid (potentially many at
+                            // once); just need a poster.
+                            onLoadedMetadata={(e) => {
+                                try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
+                            }}
                             className="w-full h-full object-cover"
                             style={{ background: '#000' }}
                         />

@@ -32,8 +32,16 @@ export async function POST(req: NextRequest) {
         }
 
         const bucket = mediaType === 'video' ? 'blog-videos' : 'blog-images';
-        const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 60) || 'upload';
-        const path = `manual-uploads/${Date.now()}-${safeName}`;
+        // Preserve the file extension. iOS reels often have 80+ char names —
+        // we shorten the BASE but keep the ext intact so the public URL ends
+        // in .mov / .mp4 / .jpg etc. Without an ext, the admin <video> tag
+        // can't reliably show a poster frame on Safari.
+        const dot = filename.lastIndexOf('.');
+        const ext = dot >= 0 ? filename.slice(dot).toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 8) : '';
+        const base = (dot >= 0 ? filename.slice(0, dot) : filename)
+            .replace(/[^a-zA-Z0-9-]/g, '_')
+            .slice(0, 50) || 'upload';
+        const path = `manual-uploads/${Date.now()}-${base}${ext}`;
 
         const { data, error } = await supabaseAdmin
             .storage

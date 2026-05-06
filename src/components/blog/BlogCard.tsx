@@ -117,7 +117,12 @@ const BlogCard = ({ post }: BlogCardProps) => {
                         src={stagedVideoUrl}
                         muted
                         playsInline
-                        preload="metadata"
+                        preload="auto"
+                        // Force first-frame paint — Safari won't show one
+                        // for .mov files from preload="metadata" alone.
+                        onLoadedMetadata={(e) => {
+                            try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
+                        }}
                         className={styles.image}
                         style={{ background: '#000', objectFit: 'cover' }}
                     />
