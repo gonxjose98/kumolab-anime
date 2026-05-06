@@ -251,37 +251,66 @@ export async function publishScheduledPosts() {
         return;
     }
 
-    if (!scheduledPosts || scheduledPosts.length === 0) {
-        console.log('[Publisher] No posts scheduled for this hour.');
+    // Also pick up posts that published-to-website-only because the
+    // video fetch failed earlier (worker 502, cold-start, proxy issue,
+    // etc.). Retry them on each tick for up to 6 hours / 5 attempts.
+    // Without this, a transient worker hiccup leaves posts orphaned on
+    // the website with no socials forever.
+    const sixHoursAgo = new Date(now.getTime() - 6 * 3600 * 1000).toISOString();
+    const { data: retryPosts } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .eq('status', 'published')
+        .gte('published_at', sixHoursAgo)
+        .filter('social_ids->>skipped_reason', 'eq', 'video_fetch_failed');
+
+    const allPosts = [...(scheduledPosts || []), ...(retryPosts || []).filter(rp =>
+        // Cap at 5 attempts to avoid infinite loops on permanently-broken videos
+        ((rp.social_ids?.publish_attempts as number) || 0) < 5
+    )];
+
+    if (allPosts.length === 0) {
+        console.log('[Publisher] No posts to publish or retry.');
         return;
     }
 
-    console.log(`[Publisher] Found ${scheduledPosts.length} posts to publish.`);
+    console.log(`[Publisher] ${scheduledPosts?.length || 0} new + ${retryPosts?.length || 0} retry candidates`);
     const expiresAt = getRetentionExpiry(now);
 
-    for (const post of scheduledPosts) {
+    for (const post of allPosts) {
+        const isRetry = post.status === 'published';
         try {
-            console.log(`[Publisher] Publishing scheduled post: ${post.title}`);
+            console.log(`[Publisher] ${isRetry ? 'Retrying' : 'Publishing'} post: ${post.title}`);
 
-            // Flip status up-front so a concurrent run can't double-publish.
-            const { error: updateError } = await supabaseAdmin
-                .from('posts')
-                .update({
-                    status: 'published',
-                    is_published: true,
-                    timestamp: now.toISOString(),
-                    published_at: now.toISOString(),
-                    expires_at: expiresAt,
-                })
-                .eq('id', post.id);
+            if (!isRetry) {
+                // Flip status up-front so a concurrent run can't double-publish.
+                const { error: updateError } = await supabaseAdmin
+                    .from('posts')
+                    .update({
+                        status: 'published',
+                        is_published: true,
+                        timestamp: now.toISOString(),
+                        published_at: now.toISOString(),
+                        expires_at: expiresAt,
+                    })
+                    .eq('id', post.id);
 
-            if (updateError) {
-                await logError({
-                    source: 'engine.publishScheduledPosts',
-                    errorMessage: `Status flip failed for post ${post.id}: ${updateError.message}`,
-                    context: { post_id: post.id, title: post.title, code: updateError.code },
-                });
-                continue;
+                if (updateError) {
+                    await logError({
+                        source: 'engine.publishScheduledPosts',
+                        errorMessage: `Status flip failed for post ${post.id}: ${updateError.message}`,
+                        context: { post_id: post.id, title: post.title, code: updateError.code },
+                    });
+                    continue;
+                }
+            } else {
+                // Bump attempt counter for retries
+                const attempts = ((post.social_ids?.publish_attempts as number) || 0) + 1;
+                await supabaseAdmin
+                    .from('posts')
+                    .update({ social_ids: { ...post.social_ids, publish_attempts: attempts } })
+                    .eq('id', post.id);
+                console.log(`[Publisher] Retry attempt ${attempts}/5 for ${post.title}`);
             }
 
             // Broadcast to socials, capture IDs.
