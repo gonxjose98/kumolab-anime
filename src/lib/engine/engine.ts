@@ -179,16 +179,24 @@ async function publishPost(post: BlogPost) {
     }
 
     // Social broadcast — non-blocking for post existence but we do await for IDs.
+    // Daily Drops (type='DROP') is a website-only post per Jose's directive
+    // (2026-05-06): the daily airing summary doesn't belong on social
+    // because it's not anime news, it's a meta index post. Skip socials
+    // for that post type only; everything else fans out as normal.
     let social: SocialPublishResult = {};
-    try {
-        social = await publishToSocials(post);
-    } catch (e: any) {
-        await logError({
-            source: 'engine.publishPost',
-            errorMessage: `Social broadcast threw: ${e?.message || e}`,
-            stackTrace: e?.stack,
-            context: { slug: post.slug, title: post.title },
-        });
+    if (post.type === 'DROP') {
+        console.log(`[Engine] Skipping social broadcast for Daily Drops post: ${post.slug}`);
+    } else {
+        try {
+            social = await publishToSocials(post);
+        } catch (e: any) {
+            await logError({
+                source: 'engine.publishPost',
+                errorMessage: `Social broadcast threw: ${e?.message || e}`,
+                stackTrace: e?.stack,
+                context: { slug: post.slug, title: post.title },
+            });
+        }
     }
 
     await persistSocialIds({ column: 'slug', value: post.slug, title: post.title }, social);
