@@ -73,6 +73,17 @@ export async function selectBestImage(animeTitle: string, context: string = 'Gen
         }
     }
 
+    // --- STRATEGY 1B: JIKAN (MyAnimeList) — sometimes higher-res ---
+    // AniList's `extra-large` cover variant 404s for many series; even
+    // when present it tops out around 460-1080px. MAL covers via Jikan
+    // (cdn.myanimelist.net) are usually 600-1200px wide and routinely
+    // higher resolution. Free API, no key, ~3 req/sec rate limit.
+    // Tier 2 — preferred over AniList when available, below Official OG.
+    const jikanCover = await fetchJikanCover(cleanSearchTitle);
+    if (jikanCover) {
+        await processCandidate(jikanCover, 'Jikan/MAL Cover', 2, candidates);
+    }
+
     // --- STRATEGY 2: CLEAN VISUAL SEARCH (Tier 1 Priority) ---
     // Specifically look for "clean" or "artwork" to avoid posters.
     // We treat these as Top Tier (1) because they lead to premium clean visuals.
@@ -310,6 +321,56 @@ async function scrapeOgImage(url: string): Promise<string | null> {
         const $ = cheerio.load(html);
         return $('meta[property="og:image"]').attr('content') || null;
     } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Fetch the largest available cover URL for an anime title from
+ * Jikan (the unofficial MyAnimeList API). Free, no API key required,
+ * ~3 req/sec rate limit. MAL CDN images at /images/anime/.../l.jpg
+ * are typically 600-1200px wide vs AniList's 460-1080px.
+ *
+ * Returns null on miss / error.
+ */
+async function fetchJikanCover(title: string): Promise<string | null> {
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10_000);
+        const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1&order_by=popularity&sort=asc`;
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) return null;
+        const json = await res.json();
+        const item = json?.data?.[0];
+        if (!item) return null;
+        // Validate the result actually matches what we searched for —
+        // Jikan will happily return the most popular anime if the search
+        // misses entirely.
+        const titleNorm = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const malNorm = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const malEngNorm = (item.title_english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (
+            !malNorm.includes(titleNorm) &&
+            !malEngNorm.includes(titleNorm) &&
+            !titleNorm.includes(malNorm) &&
+            !titleNorm.includes(malEngNorm)
+        ) {
+            console.log(`[Jikan] Search returned non-matching anime — ignoring (search "${title}", got "${item.title}")`);
+            return null;
+        }
+        // Prefer the highest-resolution variant available
+        const candidates: (string | undefined)[] = [
+            item.images?.webp?.large_image_url,
+            item.images?.jpg?.large_image_url,
+            item.images?.webp?.image_url,
+            item.images?.jpg?.image_url,
+        ];
+        const picked = candidates.find(u => typeof u === 'string' && u.length > 0);
+        if (picked) console.log(`[Jikan] Found cover: ${picked}`);
+        return picked || null;
+    } catch (e: any) {
+        console.warn(`[Jikan] Lookup failed for "${title}":`, e?.message || e);
         return null;
     }
 }

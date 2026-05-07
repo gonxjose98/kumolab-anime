@@ -64,6 +64,28 @@ export default function PostEditor() {
     const [excerpt, setExcerpt] = useState('');
     const [content, setContent] = useState('');
     const [sourceUrl, setSourceUrl] = useState('');
+    const [imageDims, setImageDims] = useState<{ w: number; h: number } | null>(null);
+
+    // Probe the current source image's natural dimensions whenever it
+    // changes. Lets the user see if they're working with a small
+    // (low-quality) source before they decide to publish or convert
+    // to Reel — AniList "large" covers come back ~460x650, which
+    // pixelates badly when blown up to 1080x1920.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (!sourceUrl) { setImageDims(null); return; }
+        let cancelled = false;
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            if (!cancelled) setImageDims({ w: img.naturalWidth, h: img.naturalHeight });
+        };
+        img.onerror = () => {
+            if (!cancelled) setImageDims(null);
+        };
+        img.src = sourceUrl;
+        return () => { cancelled = true; };
+    }, [sourceUrl]);
     const [imageUrl, setImageUrl] = useState('');
 
     // Image overlay toggles — session-local, sent on each render call.
@@ -754,6 +776,40 @@ export default function PostEditor() {
             {/* ── Body + source URL (less visual; below the fold is fine) ── */}
             <Card className="p-5 space-y-4">
                 <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">
+                    {imageDims && (
+                        (() => {
+                            const minDim = Math.min(imageDims.w, imageDims.h);
+                            // Quality tiers: <600px short side = LOW (will pixelate
+                            // when blown up to a 1080×1920 Reel); 600-1000 = OK;
+                            // 1000+ = GOOD (Reel-grade).
+                            const tier = minDim < 600 ? 'low' : minDim < 1000 ? 'ok' : 'good';
+                            const tierColor = tier === 'low' ? '#ff7777' : tier === 'ok' ? '#ffaa00' : '#7af0a8';
+                            const tierLabel = tier === 'low' ? 'LOW' : tier === 'ok' ? 'OK' : 'GOOD';
+                            const tierHint = tier === 'low'
+                                ? 'will pixelate if you Convert to Reel'
+                                : tier === 'ok'
+                                    ? 'acceptable for static post; soft if Reel-converted'
+                                    : 'high enough for crisp Reel conversion';
+                            return (
+                                <div className="flex items-center gap-2 mb-2 -mt-1">
+                                    <span
+                                        className="text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded"
+                                        style={{
+                                            background: `${tierColor}15`,
+                                            border: `1px solid ${tierColor}40`,
+                                            color: tierColor,
+                                            fontFamily: 'var(--font-display)',
+                                        }}
+                                    >
+                                        {imageDims.w} × {imageDims.h} · {tierLabel}
+                                    </span>
+                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                        {tierHint}
+                                    </span>
+                                </div>
+                            );
+                        })()
+                    )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                         <input
                             type="text"
