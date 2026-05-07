@@ -3,24 +3,37 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
+// Midnight in America/New_York for "today" as a UTC ISO string.
+// Resolves DST automatically via Intl. NY is always behind UTC.
+function nyDayStartISO(): string {
+    const nyDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+    const utcMidnight = new Date(`${nyDate}T00:00:00Z`);
+    const nyHour = parseInt(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: '2-digit', hour12: false,
+    }).format(utcMidnight), 10);
+    const hoursAhead = (24 - nyHour) % 24;
+    return new Date(utcMidnight.getTime() + hoursAhead * 3_600_000).toISOString();
+}
+
 export async function GET(req: NextRequest) {
     try {
-        // Get today's date
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayISO = today.toISOString();
+        const todayISO = nyDayStartISO();
 
-        // Get start of week
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
+        // Start of week (Sunday) in NY timezone
+        const weekStart = new Date(todayISO);
+        weekStart.setUTCDate(weekStart.getUTCDate() - new Date(todayISO).getUTCDay());
         const weekStartISO = weekStart.toISOString();
 
-        // Count today's drops
+        // Count every post that went live today (NY midnight → now)
         const { count: todayDrops, error: dropsError } = await supabaseAdmin
             .from('posts')
             .select('*', { count: 'exact', head: true })
-            .eq('type', 'DROP')
-            .gte('timestamp', todayISO);
+            .eq('status', 'published')
+            .gte('published_at', todayISO);
 
         if (dropsError) throw dropsError;
 
