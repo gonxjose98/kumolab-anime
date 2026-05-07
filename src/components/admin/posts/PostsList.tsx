@@ -65,8 +65,16 @@ function timeAgo(iso: string | null | undefined): string {
 }
 
 function thumbUrl(p: Post): string | null {
-    if (p.youtube_video_id) return `https://img.youtube.com/vi/${p.youtube_video_id}/mqdefault.jpg`;
+    // Match what the publisher actually posts. Order:
+    //   1. post.image (the AniList/Crunchyroll/uploaded picture that
+    //      goes to IG/FB photo / Threads IMAGE flow). This is the
+    //      single source of truth for what readers see on socials.
+    //   2. YouTube thumbnail — only as a last-resort fallback when
+    //      post.image is missing/placeholder. Avoids the desync where
+    //      the admin tile showed the YT thumb but IG actually posted
+    //      the AniList cover (different art for the same anime).
     if (p.image && !p.image.includes('placeholder')) return p.image;
+    if (p.youtube_video_id) return `https://img.youtube.com/vi/${p.youtube_video_id}/mqdefault.jpg`;
     return null;
 }
 

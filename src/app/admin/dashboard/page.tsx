@@ -571,7 +571,13 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
 }
 
 function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: string | null }) {
-    const url = youtube_id ? `https://img.youtube.com/vi/${youtube_id}/mqdefault.jpg` : src;
+    // Match the publisher: post.image is the source of truth (it's what
+    // gets posted to IG/FB/Threads). Fall back to YouTube thumbnail only
+    // when post.image is missing — avoids the admin-vs-social desync
+    // where the dashboard showed YT thumb but IG actually posted the
+    // AniList cover.
+    const url = (src && !src.includes('placeholder')) ? src
+        : (youtube_id ? `https://img.youtube.com/vi/${youtube_id}/mqdefault.jpg` : null);
     if (!url || url.includes('placeholder')) {
         return (
             <div
