@@ -154,6 +154,31 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        // Diagnostic: run image-to-Reel against a given URL, return
+        // FFmpeg stderr + exit code + output bytes. No publish.
+        if (worker === 'diag-image-reel') {
+            const url = searchParams.get('url');
+            if (!url) {
+                return NextResponse.json({ error: 'url query param required' }, { status: 400 });
+            }
+            const { imageToReel, fetchImageBuffer } = await import('@/lib/social/image-to-video');
+            const t0 = Date.now();
+            const buf = await fetchImageBuffer(url);
+            if (!buf) {
+                return NextResponse.json({ success: false, stage: 'fetch', error: 'image fetch returned null' });
+            }
+            const reel = await imageToReel(buf, { direction: 'in' });
+            return NextResponse.json({
+                success: !!(reel.buffer && reel.buffer.length > 0),
+                source_bytes: buf.length,
+                output_bytes: reel.buffer?.length ?? 0,
+                exit_code: reel.exitCode,
+                ms: Date.now() - t0,
+                ffmpeg_args: reel.args,
+                stderr_tail: reel.stderr.slice(-2000),
+            });
+        }
+
         if (worker === 'health-monitor') {
             const { getHealthSnapshot, fireHealthAlertsIfChanged } = await import('@/lib/engine/health-monitor');
             const snap = await getHealthSnapshot();
