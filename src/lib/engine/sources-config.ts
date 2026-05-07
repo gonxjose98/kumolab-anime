@@ -103,6 +103,18 @@ export const CONTENT_RULES = {
         // Watch-along / reaction content — KumoLab posts anime, not watch parties
         'watch party', 'watch along', 'watchalong', 'watch-along', 'react along',
         'reaction', 'reacts to', 'live reaction', 'commentary',
+        // Physical media releases — KumoLab covers new anime news, not
+        // home-video / CD / box-set drops. ("Naruto Shippuden Set 10 Launch
+        // Trailer" slipped through 2026-05-07 because Viz uses numbered-set
+        // naming rather than literal "Blu-ray" / "Box Set".)
+        'bluray', 'blu ray', 'boxset', 'box-set', 'home video', 'home release',
+        'physical release', 'limited edition',
+        'cd release', 'on cd', 'soundtrack cd', 'theme song cd',
+        // Viz Media's numbered box-set convention (Set 1 — Set 25). Anime
+        // distributors use these to market home-video drops, not new-anime news.
+        'set 1', 'set 2', 'set 3', 'set 4', 'set 5', 'set 6', 'set 7', 'set 8', 'set 9',
+        'set 10', 'set 11', 'set 12', 'set 13', 'set 14', 'set 15', 'set 16', 'set 17',
+        'set 18', 'set 19', 'set 20', 'set 21', 'set 22', 'set 23', 'set 24', 'set 25',
     ],
     // Content categories to exclude (for RSS filtering)
     EXCLUDE_CATEGORIES: [
