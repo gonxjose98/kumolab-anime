@@ -129,14 +129,18 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     let stagedVideoUrl: string | null = (post as any)._prestagedVideoUrl || null;
     if (stagedVideoUrl) {
         result.staged_video_url = stagedVideoUrl;
-    } else if (post.image && !isYouTubeSource && (post as any).type !== 'DROP') {
-        // Image-only post → convert to Ken-Burns slow-zoom Reel.
-        // IG (and to a lesser degree FB/Threads) HEAVILY de-prioritizes
-        // still-image posts in 2025. Sub-5k accounts often see <500
-        // views on images vs 5-10k on the same content as a Reel. We
-        // turn the post.image into a 12s 1080x1920 video and run the
-        // existing Reels publisher path. Falls through to image flow
-        // if FFmpeg fails.
+    } else if (
+        post.image &&
+        !isYouTubeSource &&
+        (post as any).type !== 'DROP' &&
+        // OPT-IN: only convert when the operator explicitly enabled it
+        // for this specific post (image_settings.convertToReel === true).
+        // Default OFF — Jose's directive 2026-05-06.
+        ((post as any).image_settings?.convertToReel === true)
+    ) {
+        // Image post → 12s Ken-Burns slow-zoom Reel. Operator-enabled
+        // per-post via the editor. Falls through to image flow if FFmpeg
+        // fails.
         try {
             const { imageToReel, fetchImageBuffer } = await import('./image-to-video');
             const { supabaseAdmin } = await import('../supabase/admin');
