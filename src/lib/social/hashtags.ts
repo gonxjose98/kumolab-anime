@@ -7,10 +7,9 @@
  *   - Add a claim-type hashtag (#Trailer, #KeyVisual, #NewSeason, #ReleaseDate)
  *   - Cap at 6 total — more than 6 looks spammy and IG's algo doesn't reward it
  *
- * Title format coming out of formatKumoLabTitle is two-line:
- *     'Anime Title'
- *     Update • Detail
- * We pull the quoted anime name from line 1; if that fails, fall back to
+ * Title format coming out of formatKumoLabTitle is single-line:
+ *     'Anime Title' Update • Detail
+ * We pull the quoted anime name first; if that fails, fall back to
  * anime_id (kebab-case slug from AniList) or a sanitized first-clause grab.
  */
 
@@ -48,8 +47,8 @@ function toPascalCase(input: string): string {
 function extractSeriesName(title: string, anime_id?: string | null): string | null {
     if (!title) return null;
 
-    // 1. Quoted name (works for the formatKumoLabTitle two-line output):
-    //    'Demon Slayer'  →  "Demon Slayer"
+    // 1. Quoted name (works for the formatKumoLabTitle single-line output):
+    //    'Demon Slayer' New Anime Official Trailer Released  →  "Demon Slayer"
     const quoted = title.match(/[''""'""]([^''""'""]{2,60})[''""'""]/);
     if (quoted?.[1]) return quoted[1];
 

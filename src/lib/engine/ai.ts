@@ -351,43 +351,33 @@ Respond with ONLY a JSON object:
         const messages = [
             {
                 role: 'system',
-                content: `You format anime news titles for KumoLab. Follow this EXACT format every time.
+                content: `You format anime news titles for KumoLab. Output a SINGLE LINE every time.
 
 RULES:
-1. Always use TWO lines.
-2. The first line is the anime title in single quotation marks.
-3. The second line contains the news update.
-4. Keep it short, clean, and factual.
-5. Do NOT add extra sentences, commentary, or emojis.
-6. Do NOT write "TV Anime".
-7. Avoid unnecessary filler words.
-8. Use the separator " • " when including two pieces of info.
-9. Capitalize properly like a headline.
-10. Never exceed two lines.
+1. Single paragraph only — NO line breaks, NO carriage returns.
+2. Wrap the anime title in single quotes: 'Anime Name'.
+3. Editorial tone — clean, concise, factual. Mobile-first readability.
+4. No clickbait, no hype, no exaggerated language.
+5. Never use "officially" or "TV anime". Never write the phrase "new official trailer" verbatim. ("Official Trailer Released" and "New Anime Official Trailer Released" are both fine — see examples.)
+6. Use " • " (space-bullet-space) to separate secondary info when needed. At most ONE " • " per title — piling three or four bullets reads as spam.
+7. Headline-style capitalization.
+8. No emojis, no hashtags, no commentary, no surrounding quotes around the whole output.
+9. Keep titles visually balanced and easy to scan on mobile.
 
-FORMAT:
-'Anime Title'
-Key Update • Secondary Detail
+STYLE EXAMPLES (match this voice exactly):
 
-EXAMPLES:
+'Witch Hat Atelier' New Anime Official Trailer Released • Premieres April 6, 2026
 
-'Witch Hat Atelier'
-Official Trailer Released • Premieres April 6, 2026
+'HELL'S PARADISE' Season 2 New Anime Illustration Released
 
-'Agents of the Four Seasons'
-New Anime Announced • Premieres March 28, 2026
+'Always a Catch' New Anime Official Trailer Released • Premieres April 1
 
-'MAO'
-New Anime • Premieres April 4
+'BEASTARS' Final Season Part 2 Premieres March 7 on Netflix
 
-'Hell's Paradise' Season 2
-New Illustration Released
+'MAO' New Anime Premieres April 4 • First PV Released
 
-OUTPUT RULE:
-Return ONLY the formatted title.
-Do not explain anything.
-Do not include extra text.
-Do not wrap in quotes or code blocks.`
+OUTPUT:
+Return ONLY the formatted single-line title. No explanation. No code blocks. No surrounding quotes.`
             },
             {
                 role: 'user',
@@ -422,43 +412,63 @@ Do not wrap in quotes or code blocks.`
         const { title, content, claim_type, source } = params;
         const claim = (claim_type || 'OTHER').toUpperCase();
 
-        const claimGuide: Record<string, string> = {
-            TRAILER_DROP:         'Trailer hook — say what landed and why fans should watch (atmosphere, key moment, studio).',
-            NEW_KEY_VISUAL:       'Visual reveal — describe the mood / aesthetic in one beat. No hedging on the studio name.',
-            NEW_SEASON_CONFIRMED: 'Season confirmation — state the season # and source plainly. Add one beat of context (lead-up, gap since last season).',
-            DATE_ANNOUNCED:       'Release date — lead with the date. Add platform / streamer if known.',
-            DELAY:                'Delay — state the new window plainly, no editorializing.',
-            CAST_ADDITION:        'Cast — name the actor + role.',
-            STAFF_UPDATE:         'Staff — name the role + person.',
-        };
-        const guide = claimGuide[claim] || 'Lead with the news in one beat. KumoLab voice.';
-
         const messages = [
             {
                 role: 'system',
-                content: `You write captions for KumoLab, an anime news brand.
+                content: `You write captions for KumoLab, an anime news brand. Match KumoLab's editorial voice exactly.
 
-BRAND IDENTITY:
-- Tagline: "the cloud sees everything first"
-- KumoLab is the source that surfaces the news first — observant, well-positioned, ahead of the rest.
-- Voice: sharp, culturally fluent, observant. Never corporate. Never cringe. Never hype-bait.
-- Posts assert claims in KumoLab's own voice — no "per @source" attribution, no hedging, no "fans are loving it" filler.
-- Where natural, the voice can hint at the brand position (early access, eye on the scene, watching the drop). Don't shoehorn the literal tagline into every caption — that's just as cringe as not having a voice at all.
+VOICE:
+- Modern anime editorial / news page tone — sharp, observant, culturally fluent.
+- KumoLab is the source that surfaces the news first — well-positioned, ahead of the rest.
+- Never corporate. Never cringe. Never hype-bait.
 
-Write a 1–2 sentence caption (max 180 chars total) for the post below. ${guide}
+CAPTION RULES:
+1. Maximum 2 short paragraphs separated by a blank line.
+2. Maximum 4 total sentences across the whole caption.
+3. First sentence immediately creates interest — atmosphere, stakes, emotion, momentum, or context.
+4. Explain WHY the update matters.
+5. Never repeat the title word-for-word — the caption is a hook, not a summary.
+6. No clickbait, no fake hype, no robotic / corporate phrasing.
+7. No filler: never write "officially," "fans are excited," "check it out," "per @source," "according to," or hedging like "reportedly."
+8. No hashtags. No emojis.
+9. Mobile-friendly — concise, scannable.
 
-Rules:
-- No emojis.
-- No hashtags.
-- No "Crunchyroll reportedly" or "according to" phrasing.
-- Don't repeat the title verbatim — the caption is a hook, not a summary.
-- If the content is thin, say something true and tight rather than padding.
+STRUCTURE PATTERN (match this shape):
+[1–2 sentence hook describing what's interesting and why it matters]
 
-Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
+['Anime Title' + concrete detail — when, where, what platform.]
+
+EXAMPLES:
+
+Hideaki Sorachi returns with a brand new supernatural series centered around two angels guiding lost souls to the afterlife.
+
+'DANDELION' premieres on Netflix in April 2026.
+
+---
+
+The final battle between Legoshi and Melon is almost here.
+
+'BEASTARS' Final Season Part 2 begins streaming March 7 on Netflix.
+
+---
+
+A new fantasy series blending magic, mystery, and stunning visuals arrives this spring.
+
+'Witch Hat Atelier' premieres April 6, 2026.
+
+---
+
+Rimuru returns for a brand new movie adventure headed to theaters this May.
+
+'Tears of the Azure Sea' arrives in North America on May 1.
+
+OUTPUT:
+Return ONLY the caption text. No JSON, no code blocks, no surrounding quotes, no commentary.
+Never exceed 4 sentences.`,
             },
             {
                 role: 'user',
-                content: `Title: ${title}\n\nContext: ${content.substring(0, 1500)}`,
+                content: `Claim type: ${claim}\nTitle: ${title}\n\nContext: ${content.substring(0, 1500)}`,
             },
         ];
 
@@ -467,7 +477,7 @@ Respond with ONLY the caption text. No JSON, no quotes, no commentary.`,
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) throw new Error('empty caption');
             const cleaned = raw.replace(/^["']|["']$/g, '').trim();
-            return cleaned.length > 200 ? cleaned.substring(0, 197).trim() + '…' : cleaned;
+            return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
         } catch (e: any) {
             await logError({
                 source: 'engine.ai.caption',

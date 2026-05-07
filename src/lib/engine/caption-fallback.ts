@@ -1,53 +1,49 @@
 /**
- * Deterministic caption fallback used when the AI provider is unreachable
- * (the antigravity ollama endpoint has been intermittently 5xx'ing). No LLM
- * call — pure string templates per claim type so we always produce a clean,
- * tight, KumoLab-voiced excerpt instead of dumping the raw RSS-derived
- * content into the post body.
+ * Deterministic caption fallback used when the entire AI provider chain is
+ * unreachable. No LLM call — pure string templates per claim type so we
+ * always produce a clean, tight, KumoLab-voiced caption instead of dumping
+ * the raw RSS-derived content into the post body.
  *
- * Tone target: sharp, observational, not corporate, not hype-bait. Same
- * voice we'd ask the AI to use, just deterministic. Output is always
- * <= 180 chars, no emojis, no hashtags, no "per @source" hedging.
+ * Tone target: sharp, observational, editorial. Two-paragraph shape matches
+ * the AI prompt: short hook, then the announcement line wrapping the series
+ * name in single quotes. No "officially," no hashtags, no emojis, no
+ * "fans are excited" / "according to" filler.
  */
 
 const CLAIM_TEMPLATES: Record<string, string[]> = {
     TRAILER_DROP: [
-        '{series} just dropped a new trailer. {source} put it up today.',
-        'Fresh trailer for {series}. The cloud caught it the moment it landed.',
-        '{series} got a new trailer. Real footage, not a teaser tease.',
+        "A fresh trailer just landed.\n\n'{series}' has a new look at what's coming.",
+        "New trailer dropped today.\n\n'{series}' shows another piece of the picture.",
     ],
     NEW_KEY_VISUAL: [
-        '{series} unveiled a new key visual ahead of the next stretch.',
-        'New visual for {series} — KumoLab tracked the drop.',
-        '{series} put out a fresh visual. Mood is set.',
+        "A new visual just surfaced.\n\n'{series}' updates the look ahead of the next chapter.",
+        "Key art just landed.\n\n'{series}' tightens the mood for what's coming.",
     ],
     NEW_SEASON_CONFIRMED: [
-        '{series} is officially back. The new season is confirmed.',
-        '{series} is getting another season. Confirmation just landed.',
-        'New season of {series} confirmed — the wait paid off.',
+        "Another chapter is on the way.\n\n'{series}' is coming back for a new season.",
+        "The next season is locked in.\n\n'{series}' returns with more story to tell.",
     ],
     DATE_ANNOUNCED: [
-        '{series} locked its premiere date. Mark it.',
-        'Premiere date set for {series}. KumoLab caught the announcement.',
-        '{series} has a date now — the schedule just dropped.',
+        "The premiere window is set.\n\n'{series}' has a date.",
+        "Schedule just landed.\n\n'{series}' premieres soon.",
     ],
     DELAY: [
-        '{series} pushed back. New window confirmed.',
-        '{series} is delayed. The studio pulled the lever.',
+        "The release just shifted.\n\n'{series}' moves to a new window.",
+        "A new timeline is in.\n\n'{series}' has been pushed back.",
     ],
     CAST_ADDITION: [
-        'New voice joins {series}. Cast just got an upgrade.',
-        '{series} added another name to the cast.',
+        "The cast list just got bigger.\n\n'{series}' added a new voice.",
+        "A new name joins the booth.\n\n'{series}' brings on more cast.",
     ],
     STAFF_UPDATE: [
-        '{series} staffing update — production is shifting.',
-        '{series} just shuffled the staff board.',
+        "Production is shifting.\n\n'{series}' updated its staff.",
+        "A new name is on the production board.\n\n'{series}' shuffles the staff.",
     ],
 };
 
 const GENERIC_TEMPLATES = [
-    '{series} just made news. KumoLab caught the drop.',
-    'Fresh from {source}: {series} update worth watching.',
+    "An update worth watching.\n\n'{series}' just made news.",
+    "The latest from the scene.\n\n'{series}' has a fresh update.",
 ];
 
 function pickStable(templates: string[], seed: string): string {
