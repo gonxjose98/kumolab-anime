@@ -64,9 +64,11 @@ export async function imageToReel(
     const direction = opts.direction ?? 'in';
     const totalFrames = duration * FPS;
 
-    const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-    const fontExists = fs.existsSync(fontPath);
-    const fontArg = fontExists ? `:fontfile='${fontPath.replace(/\\/g, '/')}'` : '';
+    // Note: drawtext filter isn't available in the bundled ffmpeg-static
+    // build on Vercel for this code path (despite the binary advertising
+    // --enable-libfreetype), so we skip the watermark on image-to-Reel
+    // output. Plain image-source posts don't need a video watermark
+    // anyway — the brand identity comes from the static image content.
 
     // Use a crop+scale animation instead of zoompan. zoompan is finicky
     // with looped image inputs (silently produces 0 bytes for many
@@ -99,7 +101,6 @@ export async function imageToReel(
         `crop=w='iw*${cropScale}':h='ih*${cropScale}':x='(iw-out_w)/2':y='(ih-out_h)/2'`,
         `scale=${TARGET_W}:${TARGET_H}`,
         'setsar=1',
-        `drawtext=text='${WATERMARK_TEXT}'${fontArg}:fontcolor=white@0.85:fontsize=32:x=w-tw-32:y=h-th-44:shadowcolor=black@0.7:shadowx=2:shadowy=2`,
     ].join(',');
 
     // Write input image to /tmp first — stdin pipe for PNG input is
