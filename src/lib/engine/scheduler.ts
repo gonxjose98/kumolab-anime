@@ -102,10 +102,21 @@ async function recentScheduledSlots(nowUtc: Date, lookAheadHours: number = 48): 
         .sort((a, b) => a.getTime() - b.getTime());
 }
 
+// Premium engagement windows in ET — when anime audiences are most
+// active and IG/Threads/FB algorithms reward posts with the strongest
+// initial-hour engagement signals.
+//
+//   12-13 ET (lunch break)             — solid mid-day mini-peak
+//   17-23 ET (after-school + evening)  — the big evening window
+//
+// These are STRONGLY preferred over other peak-window hours.
+const PREMIUM_HOURS_ET = new Set([12, 17, 18, 19, 20, 21, 22]);
+
 // Find the next slot that:
 //   - falls within the website's peak-hour window (broadest — website cadence gates the others)
 //   - is at least DIVERSITY.MIN_GAP_MINUTES after the prior scheduled slot
 //   - is in the future
+//   - is in a PREMIUM_HOURS_ET window if any are reachable within the next 24h
 async function findStandardSlot(nowUtc: Date): Promise<Date> {
     const existing = await recentScheduledSlots(nowUtc);
     const minGapMs = DIVERSITY.MIN_GAP_MINUTES * 60 * 1000;
@@ -117,15 +128,26 @@ async function findStandardSlot(nowUtc: Date): Promise<Date> {
     // Plus a 15-min buffer so we're not racing a cron that fires every hour
     candidate = new Date(candidate.getTime() + 15 * 60 * 1000);
 
-    // Walk forward, respecting peak window + gap
-    for (let i = 0; i < 72 * 12; i++) { // up to 72h in 5-min steps
-        const hour = etHour(candidate);
-        if (inWindow(hour, PLATFORM_PEAK_WINDOWS.x)) {
-            // Respect min gap from any existing slot
-            const collision = existing.find(e => Math.abs(e.getTime() - candidate.getTime()) < minGapMs);
-            if (!collision) return candidate;
+    // Two-pass: first prefer PREMIUM hours within the next 24h. If
+    // nothing fits, fall back to the broader peak window. This concentrates
+    // posts in evening windows where reach compounds without abandoning
+    // the original peak-window scheduling logic on quieter days.
+    const hoursAhead24 = 24 * 12; // 24h in 5-min steps
+    for (let pass = 0; pass < 2; pass++) {
+        const allowHours = pass === 0 ? PREMIUM_HOURS_ET : null;
+        const maxSteps = pass === 0 ? hoursAhead24 : 72 * 12;
+        let walker = new Date(candidate);
+        for (let i = 0; i < maxSteps; i++) {
+            const hour = etHour(walker);
+            const hourOk = allowHours
+                ? allowHours.has(hour)
+                : inWindow(hour, PLATFORM_PEAK_WINDOWS.x);
+            if (hourOk) {
+                const collision = existing.find(e => Math.abs(e.getTime() - walker.getTime()) < minGapMs);
+                if (!collision) return walker;
+            }
+            walker = new Date(walker.getTime() + 5 * 60 * 1000);
         }
-        candidate = new Date(candidate.getTime() + 5 * 60 * 1000);
     }
 
     // Fallback: schedule at nowUtc + 1 hour

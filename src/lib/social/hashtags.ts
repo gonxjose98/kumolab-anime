@@ -83,29 +83,78 @@ function extractSeriesName(title: string, anime_id?: string | null): string | nu
     return null;
 }
 
+// Mid-tier reach hashtags (1-10M posts) — discovery layer that bridges
+// the mega-tag floor (#anime, 100M+) to niche per-series tags. Pulled
+// from current top-performing anime news aggregators on IG.
+const MID_REACH_TAGS = [
+    '#animenews',
+    '#animecommunity',
+    '#animeworld',
+    '#otaku',
+    '#animefan',
+    '#animeedit',
+    '#animeposting',
+    '#manga',
+];
+
+// Niche fandom tags by claim type — smaller pools but higher
+// engagement-rate-per-impression. Mixed in with the series-specific tag.
+const CLAIM_NICHE_TAGS: Record<string, string[]> = {
+    TRAILER_DROP:         ['#animeintel', '#animeleaks', '#newanimetrailer'],
+    NEW_KEY_VISUAL:       ['#animekeyvisual', '#animeart', '#animeintel'],
+    NEW_SEASON_CONFIRMED: ['#newanimeseason', '#animeintel', '#animeannouncement'],
+    DATE_ANNOUNCED:       ['#animereleasedate', '#animecountdown', '#upcominganime'],
+    DELAY:                ['#animenews', '#animedrama'],
+    CAST_ADDITION:        ['#animecast', '#animevoiceacting', '#seiyuu'],
+    STAFF_UPDATE:         ['#animestaff', '#animeproduction'],
+    OTHER:                ['#animeintel', '#animeposting'],
+};
+
 export function buildSocialHashtags(params: {
     title: string;
     claim_type?: string | null;
     anime_id?: string | null;
 }): string[] {
-    const tags: string[] = ['#anime'];
+    // Layered for IG's 2025 algorithm: 1 mega + 2-3 mid + 3-5 niche.
+    // Total target 8-10 tags. Pure-mega gets buried; pure-niche caps reach;
+    // the layered mix is what news/aggregator accounts actually use to
+    // pick up Explore distribution at the sub-10k follower scale.
+    const tags: string[] = [];
 
+    // 1. MEGA — broad anchor
+    tags.push('#anime');
+
+    // 2. MID — pick 3 from the rotation. Hard-include #animenews because
+    // it's KumoLab's positioning anchor; the other 2 rotate to vary the
+    // signal across posts and avoid getting flagged as repetitive.
+    tags.push('#animenews');
+    const midPool = MID_REACH_TAGS.filter(t => t !== '#animenews');
+    // Stable rotation seeded by the title so the same post always gets
+    // the same 2 picks (debuggable, doesn't drift across re-renders).
+    const seed = (params.title || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const m1 = midPool[seed % midPool.length];
+    const m2 = midPool[(seed * 7 + 3) % midPool.length];
+    if (m1) tags.push(m1);
+    if (m2 && m2 !== m1) tags.push(m2);
+
+    // 3. NICHE — series-specific hashtag (always include if extractable).
     const series = extractSeriesName(params.title, params.anime_id);
     if (series) {
         const pascal = toPascalCase(series);
-        // Reasonable length window for a single-series hashtag. >30 chars
-        // looks like a sentence got mashed in; <3 chars is a noise word.
         if (pascal.length >= 3 && pascal.length <= 30 && !BLOCKLIST.has(pascal.toLowerCase())) {
             tags.push(`#${pascal}`);
         }
     }
 
+    // 4. NICHE — claim-type primary hashtag (legacy: #Trailer / #KeyVisual / etc.)
     const claim = (params.claim_type || '').toUpperCase();
     if (CLAIM_HASHTAG[claim]) tags.push(CLAIM_HASHTAG[claim]);
 
-    tags.push('#animenews');
+    // 5. NICHE — claim-type fandom tags (1-3 of these, picked per-claim).
+    const claimNiche = CLAIM_NICHE_TAGS[claim] || CLAIM_NICHE_TAGS.OTHER;
+    for (const t of claimNiche.slice(0, 3)) tags.push(t);
 
-    // Dedupe + cap at 6
+    // Dedupe + cap at 10. IG accepts 30 but >10 reads as spam to the algorithm.
     const seen = new Set<string>();
     const out: string[] = [];
     for (const t of tags) {
@@ -113,7 +162,7 @@ export function buildSocialHashtags(params: {
         if (seen.has(k)) continue;
         seen.add(k);
         out.push(t);
-        if (out.length >= 6) break;
+        if (out.length >= 10) break;
     }
     return out;
 }

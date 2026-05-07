@@ -129,6 +129,36 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     let stagedVideoUrl: string | null = (post as any)._prestagedVideoUrl || null;
     if (stagedVideoUrl) {
         result.staged_video_url = stagedVideoUrl;
+    } else if (post.image && !isYouTubeSource && (post as any).type !== 'DROP') {
+        // Image-only post → convert to Ken-Burns slow-zoom Reel.
+        // IG (and to a lesser degree FB/Threads) HEAVILY de-prioritizes
+        // still-image posts in 2025. Sub-5k accounts often see <500
+        // views on images vs 5-10k on the same content as a Reel. We
+        // turn the post.image into a 12s 1080x1920 video and run the
+        // existing Reels publisher path. Falls through to image flow
+        // if FFmpeg fails.
+        try {
+            const { imageToReel, fetchImageBuffer } = await import('./image-to-video');
+            const { supabaseAdmin } = await import('../supabase/admin');
+            const buf = await fetchImageBuffer(post.image);
+            if (buf) {
+                const reelBuf = await imageToReel(buf, { direction: 'in' });
+                if (reelBuf && reelBuf.length > 0) {
+                    const bucketPath = `${post.slug}-image-reel.mp4`;
+                    const { error: upErr } = await supabaseAdmin.storage
+                        .from('blog-videos')
+                        .upload(bucketPath, reelBuf, { contentType: 'video/mp4', upsert: true });
+                    if (!upErr) {
+                        const { data: { publicUrl } } = supabaseAdmin.storage.from('blog-videos').getPublicUrl(bucketPath);
+                        stagedVideoUrl = publicUrl;
+                        result.staged_video_url = publicUrl;
+                        console.log(`[Publisher] Converted still image to ${(reelBuf.length / 1024 / 1024).toFixed(1)} MB Reel for ${post.slug}`);
+                    }
+                }
+            }
+        } catch (e: any) {
+            console.warn(`[Publisher] Image-to-Reel conversion failed for ${post.slug} — falling back to image post:`, e?.message || e);
+        }
     } else if (isYouTubeSource) {
         const staged = await fetchYouTubeToBucket(sourceUrl, post.slug);
         if (staged) {
