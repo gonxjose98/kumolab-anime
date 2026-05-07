@@ -27,6 +27,8 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import crypto from 'crypto';
 
 const ffmpegPath = require('ffmpeg-static') as string;
 
@@ -77,12 +79,28 @@ export async function imageToReel(
         `drawtext=text='${WATERMARK_TEXT}'${fontArg}:fontcolor=white@0.85:fontsize=32:x=w-tw-32:y=h-th-44:shadowcolor=black@0.7:shadowx=2:shadowy=2`,
     ].join(',');
 
+    // Write input image to /tmp first — stdin pipe for PNG input is
+    // fragile (FFmpeg has trouble auto-detecting format from a piped
+    // stream when combined with -loop 1). File input is rock-solid on
+    // Vercel's /tmp filesystem.
+    const tmpDir = os.tmpdir();
+    const tmpId = crypto.randomBytes(6).toString('hex');
+    const inPath = path.join(tmpDir, `img-${tmpId}.bin`);
+    const outPath = path.join(tmpDir, `out-${tmpId}.mp4`);
+
+    try {
+        await fs.promises.writeFile(inPath, input);
+    } catch (e: any) {
+        console.error('[ImageToReel] tmp write failed:', e?.message || e);
+        return null;
+    }
+
     const args = [
         '-y',
         '-loop', '1',
-        '-i', 'pipe:0',         // image stdin
+        '-i', inPath,
         '-f', 'lavfi',
-        '-i', 'anullsrc=r=44100:cl=stereo',  // silent audio track
+        '-i', 'anullsrc=r=44100:cl=stereo',
         '-t', String(duration),
         '-vf', filter,
         '-c:v', 'libx264',
@@ -95,36 +113,47 @@ export async function imageToReel(
         '-b:a', '128k',
         '-shortest',
         '-movflags', '+faststart',
-        '-f', 'mp4',
-        'pipe:1',
+        outPath,
     ];
 
     return new Promise((resolve) => {
-        const proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
-        const chunks: Buffer[] = [];
+        const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
         let stderrTail = '';
 
-        proc.stdout.on('data', (c: Buffer) => chunks.push(c));
+        proc.stdout.on('data', () => {});
         proc.stderr.on('data', (c: Buffer) => { stderrTail = (stderrTail + c.toString()).slice(-2000); });
         proc.on('error', (e) => {
             console.error('[ImageToReel] spawn error:', e.message);
+            cleanup();
             resolve(null);
         });
-        proc.on('close', (code) => {
+        proc.on('close', async (code) => {
             if (code !== 0) {
-                console.error(`[ImageToReel] ffmpeg exit ${code}, stderr tail:\n${stderrTail.slice(-800)}`);
+                console.error(`[ImageToReel] ffmpeg exit ${code}, stderr tail:\n${stderrTail.slice(-1200)}`);
+                cleanup();
                 resolve(null);
                 return;
             }
-            resolve(Buffer.concat(chunks));
+            try {
+                const out = await fs.promises.readFile(outPath);
+                cleanup();
+                resolve(out);
+            } catch (e: any) {
+                console.error('[ImageToReel] output read failed:', e?.message || e);
+                cleanup();
+                resolve(null);
+            }
         });
 
-        // 60s ceiling — image-to-video is a small, fast operation.
-        const killTimer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 60_000);
+        // 90s ceiling — image-to-video is small + fast, but Vercel cold
+        // starts can add overhead.
+        const killTimer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 90_000);
         proc.on('close', () => clearTimeout(killTimer));
 
-        proc.stdin.write(input);
-        proc.stdin.end();
+        function cleanup() {
+            try { fs.unlinkSync(inPath); } catch {}
+            try { fs.unlinkSync(outPath); } catch {}
+        }
     });
 }
 

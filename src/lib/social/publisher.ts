@@ -140,28 +140,49 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     ) {
         // Image post → 12s Ken-Burns slow-zoom Reel. Operator-enabled
         // per-post via the editor. Falls through to image flow if FFmpeg
-        // fails.
+        // fails — but logs the failure so we can debug.
         try {
             const { imageToReel, fetchImageBuffer } = await import('./image-to-video');
             const { supabaseAdmin } = await import('../supabase/admin');
             const buf = await fetchImageBuffer(post.image);
-            if (buf) {
-                const reelBuf = await imageToReel(buf, { direction: 'in' });
-                if (reelBuf && reelBuf.length > 0) {
-                    const bucketPath = `${post.slug}-image-reel.mp4`;
-                    const { error: upErr } = await supabaseAdmin.storage
-                        .from('blog-videos')
-                        .upload(bucketPath, reelBuf, { contentType: 'video/mp4', upsert: true });
-                    if (!upErr) {
-                        const { data: { publicUrl } } = supabaseAdmin.storage.from('blog-videos').getPublicUrl(bucketPath);
-                        stagedVideoUrl = publicUrl;
-                        result.staged_video_url = publicUrl;
-                        console.log(`[Publisher] Converted still image to ${(reelBuf.length / 1024 / 1024).toFixed(1)} MB Reel for ${post.slug}`);
-                    }
-                }
+            if (!buf) {
+                await logError({
+                    source: 'publisher.image-to-reel',
+                    errorMessage: `Could not fetch source image: ${post.image}`,
+                    context: { post_id: (post as any).id, slug: post.slug, image: post.image },
+                }).catch(() => {});
+                throw new Error('image fetch returned null');
             }
+            console.log(`[Publisher] Image-to-Reel: fetched ${buf.length} bytes from ${post.image}`);
+            const reelBuf = await imageToReel(buf, { direction: 'in' });
+            if (!reelBuf || reelBuf.length === 0) {
+                await logError({
+                    source: 'publisher.image-to-reel',
+                    errorMessage: `FFmpeg conversion returned ${reelBuf?.length ?? 0} bytes`,
+                    context: { post_id: (post as any).id, slug: post.slug, source_bytes: buf.length },
+                }).catch(() => {});
+                throw new Error('ffmpeg produced no output');
+            }
+            const bucketPath = `${post.slug}-image-reel.mp4`;
+            const { error: upErr } = await supabaseAdmin.storage
+                .from('blog-videos')
+                .upload(bucketPath, reelBuf, { contentType: 'video/mp4', upsert: true });
+            if (upErr) {
+                await logError({
+                    source: 'publisher.image-to-reel',
+                    errorMessage: `Bucket upload failed: ${upErr.message}`,
+                    context: { post_id: (post as any).id, slug: post.slug, bytes: reelBuf.length },
+                }).catch(() => {});
+                throw new Error(`upload failed: ${upErr.message}`);
+            }
+            const { data: { publicUrl } } = supabaseAdmin.storage.from('blog-videos').getPublicUrl(bucketPath);
+            stagedVideoUrl = publicUrl;
+            result.staged_video_url = publicUrl;
+            console.log(`[Publisher] Converted still image to ${(reelBuf.length / 1024 / 1024).toFixed(1)} MB Reel for ${post.slug}`);
         } catch (e: any) {
-            console.warn(`[Publisher] Image-to-Reel conversion failed for ${post.slug} — falling back to image post:`, e?.message || e);
+            console.warn(`[Publisher] Image-to-Reel failed for ${post.slug}, falling back to image post:`, e?.message || e);
+            // The detailed error already went to error_logs above; this
+            // catch just unwinds to the image flow.
         }
     } else if (isYouTubeSource) {
         const staged = await fetchYouTubeToBucket(sourceUrl, post.slug);
