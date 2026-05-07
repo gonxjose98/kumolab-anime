@@ -102,56 +102,99 @@ async function recentScheduledSlots(nowUtc: Date, lookAheadHours: number = 48): 
         .sort((a, b) => a.getTime() - b.getTime());
 }
 
-// Premium engagement windows in ET — when anime audiences are most
-// active and IG/Threads/FB algorithms reward posts with the strongest
-// initial-hour engagement signals.
+// ── Posting hour grid (per Jose 2026-05-07) ─────────────────────
+// Slot model: one post per hour, top of hour ET. 7 AM–11 PM ET window
+// (16 hours/day), with strong preference for premium hours when picking.
 //
-//   12-13 ET (lunch break)             — solid mid-day mini-peak
-//   17-23 ET (after-school + evening)  — the big evening window
+//   PREMIUM_HOURS_ET — anime audience peak; IG rewards first-hour
+//                      engagement most heavily during these windows.
+//                      12 ET (lunch) + 17–22 ET (after-school + evening).
+//   WINDOW_START_ET / WINDOW_END_ET — hard cap; nothing schedules outside.
 //
-// These are STRONGLY preferred over other peak-window hours.
+// Decision flow when a post needs a slot:
+//   1. Mark every hour in next 16 hours as open or claimed
+//      (claimed = an existing post is already scheduled in that hour)
+//   2. Filter to hours inside the 7–22 ET window
+//   3. From open hours: prefer premium first, fall back to non-premium
+//   4. Slot = top of hour ET (e.g. 18:00 ET, never 18:23 ET)
 const PREMIUM_HOURS_ET = new Set([12, 17, 18, 19, 20, 21, 22]);
+const WINDOW_START_ET = 7;
+const WINDOW_END_ET = 23; // exclusive — last slot is 22:00 ET (10 PM)
+
+/** Return a Date pinned to the top of the given ET hour, on the given UTC date. */
+function topOfHourEt(refUtc: Date, hourEt: number, dayOffset: number = 0): Date {
+    // Walk forward minute-by-minute from refUtc until we hit the desired
+    // ET hour with minute=0. Easy and DST-safe (avoids manually computing
+    // the ET offset for both standard time and DST).
+    const start = new Date(refUtc);
+    start.setUTCMinutes(0, 0, 0);
+    // Add dayOffset days then walk hours
+    start.setUTCHours(start.getUTCHours() + dayOffset * 24);
+    for (let i = 0; i < 36; i++) {
+        if (etHour(start) === hourEt) return start;
+        start.setUTCHours(start.getUTCHours() + 1);
+    }
+    return start;
+}
+
+/** Bucket a Date to its ET hour-of-day key, e.g. "2026-05-07T18". */
+function etHourKey(d: Date): string {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => parts.find(p => p.type === t)?.value || '';
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}`;
+}
 
 // Find the next slot that:
-//   - falls within the website's peak-hour window (broadest — website cadence gates the others)
-//   - is at least DIVERSITY.MIN_GAP_MINUTES after the prior scheduled slot
-//   - is in the future
-//   - is in a PREMIUM_HOURS_ET window if any are reachable within the next 24h
+//   - is in the 7-22 ET posting window
+//   - is in an UN-CLAIMED hour (no existing scheduled post that hour)
+//   - prefers PREMIUM hours over non-premium when both are available
 async function findStandardSlot(nowUtc: Date): Promise<Date> {
     const existing = await recentScheduledSlots(nowUtc);
-    const minGapMs = DIVERSITY.MIN_GAP_MINUTES * 60 * 1000;
+    const claimedHours = new Set(existing.map(etHourKey));
 
-    let candidate = new Date(nowUtc);
-    candidate.setSeconds(0, 0);
-    // Start at the next 5-min boundary
-    candidate.setMinutes(Math.ceil(candidate.getMinutes() / 5) * 5);
-    // Plus a 15-min buffer so we're not racing a cron that fires every hour
-    candidate = new Date(candidate.getTime() + 15 * 60 * 1000);
+    // Build a candidate list: every hour in the next 16 hours that
+    // (a) sits inside the 7-22 ET window and (b) is in the future
+    // by at least 15 min (so we're not racing the cron that fires
+    // hourly).
+    const minLeadMs = 15 * 60 * 1000;
+    const horizon = 16 * 60 * 60 * 1000; // 16 hours ahead
+    const horizonEnd = new Date(nowUtc.getTime() + horizon);
 
-    // Two-pass: first prefer PREMIUM hours within the next 24h. If
-    // nothing fits, fall back to the broader peak window. This concentrates
-    // posts in evening windows where reach compounds without abandoning
-    // the original peak-window scheduling logic on quieter days.
-    const hoursAhead24 = 24 * 12; // 24h in 5-min steps
-    for (let pass = 0; pass < 2; pass++) {
-        const allowHours = pass === 0 ? PREMIUM_HOURS_ET : null;
-        const maxSteps = pass === 0 ? hoursAhead24 : 72 * 12;
-        let walker = new Date(candidate);
-        for (let i = 0; i < maxSteps; i++) {
-            const hour = etHour(walker);
-            const hourOk = allowHours
-                ? allowHours.has(hour)
-                : inWindow(hour, PLATFORM_PEAK_WINDOWS.x);
-            if (hourOk) {
-                const collision = existing.find(e => Math.abs(e.getTime() - walker.getTime()) < minGapMs);
-                if (!collision) return walker;
-            }
-            walker = new Date(walker.getTime() + 5 * 60 * 1000);
+    const candidates: { slot: Date; hour: number; isPremium: boolean }[] = [];
+
+    // Walk hour-by-hour starting at the current top-of-hour
+    let walker = new Date(nowUtc);
+    walker.setUTCMinutes(0, 0, 0);
+    walker = new Date(walker.getTime() + 60 * 60 * 1000); // start at next top-of-hour
+    while (walker.getTime() < horizonEnd.getTime()) {
+        const hourEt = etHour(walker);
+        const inWindow = hourEt >= WINDOW_START_ET && hourEt < WINDOW_END_ET;
+        const futureEnough = walker.getTime() - nowUtc.getTime() >= minLeadMs;
+        const claimed = claimedHours.has(etHourKey(walker));
+        if (inWindow && futureEnough && !claimed) {
+            candidates.push({
+                slot: walker,
+                hour: hourEt,
+                isPremium: PREMIUM_HOURS_ET.has(hourEt),
+            });
         }
+        walker = new Date(walker.getTime() + 60 * 60 * 1000);
     }
 
-    // Fallback: schedule at nowUtc + 1 hour
-    return new Date(nowUtc.getTime() + 3600 * 1000);
+    // 1. First premium open slot wins
+    const premium = candidates.find(c => c.isPremium);
+    if (premium) return premium.slot;
+
+    // 2. Otherwise the earliest non-premium open slot
+    if (candidates.length > 0) return candidates[0].slot;
+
+    // 3. Last resort — no slots open in the next 16h. Fall through to
+    // tomorrow's first premium hour. Avoids returning a slot inside
+    // the off-hours.
+    return topOfHourEt(nowUtc, 12, 1);
 }
 
 // ── Public entry point ────────────────────────────────────────
