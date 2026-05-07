@@ -70,36 +70,39 @@ export async function imageToReel(
     // output. Plain image-source posts don't need a video watermark
     // anyway — the brand identity comes from the static image content.
 
-    // Use a crop+scale animation instead of zoompan. zoompan is finicky
-    // with looped image inputs (silently produces 0 bytes for many
-    // image/version combos on Vercel's bundled FFmpeg). crop with
-    // time-varying expressions is rock-solid across versions.
+    // Ken Burns zoom via scale (time-varying) + fixed-dimension crop.
     //
-    // Approach:
-    //   1. Cover-scale image to a large oversize working canvas
-    //   2. Center-crop to the canvas (squares the aspect)
-    //   3. Crop a smaller region over time (linear scale 1.0 → 0.87
-    //      for "in"; reverse for "out") = Ken Burns zoom effect
-    //   4. Scale that crop to 1080x1920 = the output frame
-    //   5. Watermark
+    // Why this approach:
+    //   - zoompan filter silently produces 0 bytes on Vercel's FFmpeg
+    //   - crop's w/h expressions are evaluated ONCE at config time, so
+    //     they can't be time-varying — but x/y can. Only animating
+    //     position would give pan, not zoom.
+    //   - scale's w/h DO accept time variable t per-frame. Combine with
+    //     a fixed center-crop and you get true Ken Burns zoom.
+    //
+    // Pipeline:
+    //   1. First scale: cover-fit to 2160-wide working canvas
+    //   2. Center-crop to 2160x3840 to square the aspect
+    //   3. Scale-zoom: grow over time so cropped center looks zoomed
+    //   4. Center-crop fixed 1080x1920 = the output Reel frame
     const SRC_W = TARGET_W * 2;   // 2160 working canvas
     const SRC_H = TARGET_H * 2;   // 3840
-    const ZOOM_DELTA = 0.13;       // 13% zoom — gentle, doesn't crop too much
+    const ZOOM_FACTOR = 1.13;      // final zoom = 13% larger over `duration` seconds
 
-    // Crop scale over time. t is FFmpeg's filter time in seconds.
-    //   in:  s = 1 - δ*t/D       starts at 1 (full frame), shrinks to (1-δ)
-    //   out: s = (1-δ) + δ*t/D   starts at (1-δ), grows back to 1
-    const cropScale = direction === 'in'
-        ? `(1 - ${ZOOM_DELTA}*t/${duration})`
-        : `(${1 - ZOOM_DELTA} + ${ZOOM_DELTA}*t/${duration})`;
+    // Time-varying scale factor.
+    //   in:  s = 1 + (Z-1)*t/D    grows from 1 to ZOOM_FACTOR
+    //   out: s = Z - (Z-1)*t/D    shrinks from ZOOM_FACTOR back to 1
+    const scaleFactor = direction === 'in'
+        ? `(1+${ZOOM_FACTOR - 1}*t/${duration})`
+        : `(${ZOOM_FACTOR}-${ZOOM_FACTOR - 1}*t/${duration})`;
 
     const filter = [
         `scale=${SRC_W}:${SRC_H}:force_original_aspect_ratio=increase`,
         `crop=${SRC_W}:${SRC_H}`,
-        // Time-animated crop. iw/ih are the previous filter's output
-        // dims (= SRC_W, SRC_H). x/y center the smaller crop window.
-        `crop=w='iw*${cropScale}':h='ih*${cropScale}':x='(iw-out_w)/2':y='(ih-out_h)/2'`,
-        `scale=${TARGET_W}:${TARGET_H}`,
+        // Time-varying scale: grow the source image larger than the
+        // working canvas. Cropped center frame appears to zoom.
+        `scale=w='${SRC_W}*${scaleFactor}':h='${SRC_H}*${scaleFactor}':eval=frame`,
+        `crop=${TARGET_W}:${TARGET_H}:(iw-${TARGET_W})/2:(ih-${TARGET_H})/2`,
         'setsar=1',
     ].join(',');
 
