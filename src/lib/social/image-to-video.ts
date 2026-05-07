@@ -96,12 +96,16 @@ export async function imageToReel(
         ? `(1+${ZOOM_FACTOR - 1}*t/${duration})`
         : `(${ZOOM_FACTOR}-${ZOOM_FACTOR - 1}*t/${duration})`;
 
+    // Use lanczos scaler for every scale step — preserves significantly
+    // more detail when upscaling small images (which is the common case
+    // for AniList cover sources at ~460px wide). Default FFmpeg scaler
+    // is bilinear, which softens edges and produces visible pixelation.
     const filter = [
-        `scale=${SRC_W}:${SRC_H}:force_original_aspect_ratio=increase`,
+        `scale=${SRC_W}:${SRC_H}:force_original_aspect_ratio=increase:flags=lanczos`,
         `crop=${SRC_W}:${SRC_H}`,
         // Time-varying scale: grow the source image larger than the
         // working canvas. Cropped center frame appears to zoom.
-        `scale=w='${SRC_W}*${scaleFactor}':h='${SRC_H}*${scaleFactor}':eval=frame`,
+        `scale=w='${SRC_W}*${scaleFactor}':h='${SRC_H}*${scaleFactor}':eval=frame:flags=lanczos`,
         `crop=${TARGET_W}:${TARGET_H}:(iw-${TARGET_W})/2:(ih-${TARGET_H})/2`,
         'setsar=1',
     ].join(',');
@@ -187,17 +191,36 @@ export async function imageToReel(
 /**
  * Helper: fetch a remote image URL into a Buffer. Used by the publisher
  * when post.image is a URL we don't have the bytes for yet.
+ *
+ * Auto-upgrades AniList CDN URLs from /large/ (~460px) to /extra-large/
+ * (~1080px+) before fetching — much higher-resolution source means a
+ * sharper Reel after upscaling. Falls back to the original URL if the
+ * extra-large variant doesn't exist.
  */
 export async function fetchImageBuffer(url: string): Promise<Buffer | null> {
-    try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 30_000);
-        const res = await fetch(url, { signal: ctrl.signal });
-        clearTimeout(t);
-        if (!res.ok) return null;
-        const arr = await res.arrayBuffer();
-        return Buffer.from(arr);
-    } catch {
-        return null;
+    const candidates: string[] = [];
+    // AniList higher-res variant — same path, different size segment
+    if (/\/cover\/large\//.test(url) || /\/cover\/medium\//.test(url) || /\/cover\/small\//.test(url)) {
+        candidates.push(url.replace(/\/cover\/(large|medium|small)\//, '/cover/extra-large/'));
     }
+    candidates.push(url);
+
+    for (const candidate of candidates) {
+        try {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 30_000);
+            const res = await fetch(candidate, { signal: ctrl.signal });
+            clearTimeout(t);
+            if (!res.ok) continue;
+            const arr = await res.arrayBuffer();
+            const buf = Buffer.from(arr);
+            if (buf.length > 0) {
+                if (candidate !== url) console.log(`[ImageToReel] Upgraded source ${url} → ${candidate}`);
+                return buf;
+            }
+        } catch {
+            // try next
+        }
+    }
+    return null;
 }

@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
                 captionOffset: settings.captionOffset,
                 purpleWordIndices: settings.purpleWordIndices ?? [],
                 watermarkPosition: settings.watermarkPosition ?? null,
+                convertToReel: settings.convertToReel ?? false,
             };
 
             const { error: updateError } = await supabaseAdmin
@@ -218,6 +219,7 @@ export async function POST(req: NextRequest) {
             captionOffset: settings.captionOffset,
             purpleWordIndices: settings.purpleWordIndices ?? [],
             watermarkPosition: settings.watermarkPosition ?? null,
+            convertToReel: settings.convertToReel ?? false,
         };
 
         const { data: updated, error: updateError } = await supabaseAdmin

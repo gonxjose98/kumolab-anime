@@ -17,6 +17,7 @@ interface Settings {
     captionOffset: XY;
     watermarkPosition: XY | null;       // null = renderer's auto bottom-center
     purpleWordIndices: number[];        // indices into the merged title+caption word stream
+    convertToReel: boolean;             // if true, image-only post is converted to a 12s Ken-Burns Reel before publishing
 }
 
 // All overlays default OFF when opening the editor. The user opts in to
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: Settings = {
     captionOffset: { x: 0, y: 0 },
     watermarkPosition: null,
     purpleWordIndices: [],
+    convertToReel: false,
 };
 
 // Smaller per-click nudge — 12px gives finer placement without feeling
@@ -120,6 +122,7 @@ export default function PostEditor() {
                         captionOffset: s.captionOffset ?? prev.captionOffset,
                         watermarkPosition: s.watermarkPosition ?? prev.watermarkPosition,
                         purpleWordIndices: s.purpleWordIndices ?? prev.purpleWordIndices,
+                        convertToReel: s.convertToReel ?? prev.convertToReel,
                     }));
                     if (s.sourceUrl && typeof s.sourceUrl === 'string') {
                         setSourceUrl(s.sourceUrl);
@@ -577,6 +580,12 @@ export default function PostEditor() {
                                 hint="@KumoLabAnime mark"
                                 value={settings.applyWatermark}
                                 onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
+                            />
+                            <Toggle
+                                label="Convert image to Reel"
+                                hint="12s slow-zoom; publishes as Reel on IG / FB / Threads"
+                                value={settings.convertToReel}
+                                onChange={v => setSettings(s => ({ ...s, convertToReel: v }))}
                             />
 
                             <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
