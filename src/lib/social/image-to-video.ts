@@ -72,25 +72,22 @@ export async function imageToReel(
 
     // Ken Burns zoom via scale (time-varying) + fixed-dimension crop.
     //
-    // Why this approach:
-    //   - zoompan filter silently produces 0 bytes on Vercel's FFmpeg
-    //   - crop's w/h expressions are evaluated ONCE at config time, so
-    //     they can't be time-varying — but x/y can. Only animating
-    //     position would give pan, not zoom.
-    //   - scale's w/h DO accept time variable t per-frame. Combine with
-    //     a fixed center-crop and you get true Ken Burns zoom.
+    // Behavior at t=0 must show the FULL image (zero zoom). At t=duration
+    // the cropped center should look ~25% zoomed in toward center.
     //
-    // Pipeline:
-    //   1. First scale: cover-fit to 2160-wide working canvas
-    //   2. Center-crop to 2160x3840 to square the aspect
-    //   3. Scale-zoom: grow over time so cropped center looks zoomed
-    //   4. Center-crop fixed 1080x1920 = the output Reel frame
-    const SRC_W = TARGET_W * 2;   // 2160 working canvas
-    const SRC_H = TARGET_H * 2;   // 3840
-    const ZOOM_FACTOR = 1.13;      // final zoom = 13% larger over `duration` seconds
+    // Implementation: start the working canvas at EXACTLY the output
+    // dimensions (1080×1920). At t=0, scale factor 1.0 means the final
+    // center-crop is the entire frame = no zoom. As t grows, scale
+    // factor grows past 1.0 = the image gets bigger than the crop
+    // window, and the crop appears zoomed in toward center.
+    //
+    // (Earlier version used a 2160×3840 oversize working canvas, which
+    // meant the final 1080×1920 center crop was ALREADY 50% zoomed at
+    // t=0 — visible pre-zoom Jose flagged.)
+    const ZOOM_FACTOR = 1.25;      // 25% zoom over `duration` seconds
 
     // Time-varying scale factor.
-    //   in:  s = 1 + (Z-1)*t/D    grows from 1 to ZOOM_FACTOR
+    //   in:  s = 1 + (Z-1)*t/D    grows from 1 (full image) to ZOOM_FACTOR
     //   out: s = Z - (Z-1)*t/D    shrinks from ZOOM_FACTOR back to 1
     const scaleFactor = direction === 'in'
         ? `(1+${ZOOM_FACTOR - 1}*t/${duration})`
@@ -101,11 +98,17 @@ export async function imageToReel(
     // for AniList cover sources at ~460px wide). Default FFmpeg scaler
     // is bilinear, which softens edges and produces visible pixelation.
     const filter = [
-        `scale=${SRC_W}:${SRC_H}:force_original_aspect_ratio=increase:flags=lanczos`,
-        `crop=${SRC_W}:${SRC_H}`,
-        // Time-varying scale: grow the source image larger than the
-        // working canvas. Cropped center frame appears to zoom.
-        `scale=w='${SRC_W}*${scaleFactor}':h='${SRC_H}*${scaleFactor}':eval=frame:flags=lanczos`,
+        // Cover-scale source to fit TARGET_W×TARGET_H, then crop to
+        // exact dimensions. This is the t=0 base frame — full image,
+        // no pre-zoom.
+        `scale=${TARGET_W}:${TARGET_H}:force_original_aspect_ratio=increase:flags=lanczos`,
+        `crop=${TARGET_W}:${TARGET_H}`,
+        // Time-varying scale: at t=0 stays at TARGET_W×TARGET_H, grows
+        // to TARGET_W*ZOOM_FACTOR × TARGET_H*ZOOM_FACTOR by t=duration.
+        `scale=w='${TARGET_W}*${scaleFactor}':h='${TARGET_H}*${scaleFactor}':eval=frame:flags=lanczos`,
+        // Final fixed center crop. At t=0 this just matches the frame
+        // (no-op). As t grows, the frame is larger so we crop the
+        // expanding-toward-edges portion — visual zoom-in toward center.
         `crop=${TARGET_W}:${TARGET_H}:(iw-${TARGET_W})/2:(ih-${TARGET_H})/2`,
         'setsar=1',
     ].join(',');
