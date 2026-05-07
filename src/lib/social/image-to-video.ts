@@ -137,7 +137,13 @@ export async function imageToReel(
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-profile:v', 'high',
-        '-preset', 'veryfast',
+        // ultrafast: image-to-Reel has minimal real motion (just a slow
+        // zoom on a static frame), so the slowdown from veryfast→ultrafast
+        // is invisible quality-wise but cuts encode time ~3x. veryfast
+        // at lanczos was running at 0.09x realtime on Vercel = 130s per
+        // 12s of output, which blew past the 90s kill timer. Need to
+        // come in well under our SLA.
+        '-preset', 'ultrafast',
         '-crf', '23',
         '-r', String(FPS),
         '-c:a', 'aac',
@@ -176,9 +182,10 @@ export async function imageToReel(
             }
         });
 
-        // 90s ceiling — image-to-video is small + fast, but Vercel cold
-        // starts can add overhead.
-        const killTimer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 90_000);
+        // 180s ceiling — Vercel cold starts + lanczos scaler + libx264 can
+        // push 12s of output to 60-90s of real time. Earlier 90s killed
+        // a publish at 83% through. Plenty of margin now.
+        const killTimer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 180_000);
         proc.on('close', () => clearTimeout(killTimer));
 
         function cleanup() {
