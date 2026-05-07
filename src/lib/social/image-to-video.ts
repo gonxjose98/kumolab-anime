@@ -59,22 +59,36 @@ export async function imageToReel(
     const fontExists = fs.existsSync(fontPath);
     const fontArg = fontExists ? `:fontfile='${fontPath.replace(/\\/g, '/')}'` : '';
 
-    // zoompan zoom curve: ease from 1.0 → 1.15 over the duration. The
-    // 'on' iterator in zoompan goes from 0 to (totalFrames - 1).
-    // direction=in goes 1 → 1.15; out goes 1.15 → 1.
-    const zoomExpr = direction === 'in'
-        ? `1 + 0.15*(on/${totalFrames})`
-        : `1.15 - 0.15*(on/${totalFrames})`;
+    // Use a crop+scale animation instead of zoompan. zoompan is finicky
+    // with looped image inputs (silently produces 0 bytes for many
+    // image/version combos on Vercel's bundled FFmpeg). crop with
+    // time-varying expressions is rock-solid across versions.
+    //
+    // Approach:
+    //   1. Cover-scale image to a large oversize working canvas
+    //   2. Center-crop to the canvas (squares the aspect)
+    //   3. Crop a smaller region over time (linear scale 1.0 → 0.87
+    //      for "in"; reverse for "out") = Ken Burns zoom effect
+    //   4. Scale that crop to 1080x1920 = the output frame
+    //   5. Watermark
+    const SRC_W = TARGET_W * 2;   // 2160 working canvas
+    const SRC_H = TARGET_H * 2;   // 3840
+    const ZOOM_DELTA = 0.13;       // 13% zoom — gentle, doesn't crop too much
 
-    // Filter graph:
-    //   1. scale to oversize cover so the zoom never reveals empty pixels
-    //   2. zoompan creates the motion frames at 1080x1920
-    //   3. setsar to square pixels
-    //   4. drawtext for the bottom-right watermark
+    // Crop scale over time. t is FFmpeg's filter time in seconds.
+    //   in:  s = 1 - δ*t/D       starts at 1 (full frame), shrinks to (1-δ)
+    //   out: s = (1-δ) + δ*t/D   starts at (1-δ), grows back to 1
+    const cropScale = direction === 'in'
+        ? `(1 - ${ZOOM_DELTA}*t/${duration})`
+        : `(${1 - ZOOM_DELTA} + ${ZOOM_DELTA}*t/${duration})`;
+
     const filter = [
-        `scale=${TARGET_W * 2}:${TARGET_H * 2}:force_original_aspect_ratio=increase`,
-        `crop=${TARGET_W * 2}:${TARGET_H * 2}`,
-        `zoompan=z='${zoomExpr}':s=${TARGET_W}x${TARGET_H}:d=${totalFrames}:fps=${FPS}`,
+        `scale=${SRC_W}:${SRC_H}:force_original_aspect_ratio=increase`,
+        `crop=${SRC_W}:${SRC_H}`,
+        // Time-animated crop. iw/ih are the previous filter's output
+        // dims (= SRC_W, SRC_H). x/y center the smaller crop window.
+        `crop=w='iw*${cropScale}':h='ih*${cropScale}':x='(iw-out_w)/2':y='(ih-out_h)/2'`,
+        `scale=${TARGET_W}:${TARGET_H}`,
         'setsar=1',
         `drawtext=text='${WATERMARK_TEXT}'${fontArg}:fontcolor=white@0.85:fontsize=32:x=w-tw-32:y=h-th-44:shadowcolor=black@0.7:shadowx=2:shadowy=2`,
     ].join(',');
