@@ -39,8 +39,11 @@ async function checkWorker(): Promise<HealthCheck> {
         };
     }
     try {
+        // 60s timeout absorbs Render free-tier cold starts (dyno sleeps
+        // after 15 min idle, 30-60s to spin back up). Anything past 60s
+        // is a real outage.
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 8_000);
+        const t = setTimeout(() => ctrl.abort(), 60_000);
         const res = await fetch(`${WORKER_URL.replace(/\/$/, '')}/healthz`, { signal: ctrl.signal });
         clearTimeout(t);
         const body = await res.json().catch(() => null);
