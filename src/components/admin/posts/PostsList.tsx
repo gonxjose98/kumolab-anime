@@ -489,6 +489,7 @@ function PlatformConfirmRow({ icon, label, url, accent, skipped }: { icon: strin
 }
 
 function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+    const router = useRouter();
     const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
     const [caption, setCaption] = useState('');
@@ -515,18 +516,20 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     async function publish() {
         if (!file) { setError('Pick a video or image file first'); return; }
         if (!isVideo && !isImage) { setError('File must be a video or image'); return; }
-        if (!title.trim()) { setError('Title is required'); return; }
-        if (!caption.trim()) { setError('Caption is required'); return; }
+        // Title and caption only required for VIDEO uploads (which
+        // immediately publish). Image uploads route to the editor where
+        // those fields get filled in.
+        if (isVideo) {
+            if (!title.trim()) { setError('Title is required'); return; }
+            if (!caption.trim()) { setError('Caption is required'); return; }
+        }
 
         setError(null);
         setPhase('uploading');
         setPhaseStartedAt(Date.now());
 
         try {
-            // Step 1: Ask the server (admin-gated) for a one-time signed
-            // upload URL. This bypasses storage RLS — the server uses the
-            // service role to mint the URL, and middleware already enforced
-            // admin auth on this route.
+            // Step 1: signed upload URL.
             const signRes = await fetch('/api/admin/upload-sign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -538,8 +541,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             const sign = await signRes.json();
             if (!signRes.ok || !sign.success) throw new Error(sign.error || 'Could not get upload URL');
 
-            // Step 2: PUT the file directly to Supabase Storage via the
-            // signed URL. No anon-vs-authenticated drama.
+            // Step 2: PUT to Supabase storage.
             const putRes = await fetch(sign.signedUrl, {
                 method: 'PUT',
                 body: file,
@@ -553,7 +555,12 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             setPhase('publishing');
             setPhaseStartedAt(Date.now());
 
-            // Step 3: Tell the server to create the post + fan out to socials.
+            // Step 3: branch on media type:
+            //   image → create as DRAFT, redirect to /admin/post/[id]
+            //           so the operator gets the full editor
+            //           (overlays, convertToReel, layout, etc.)
+            //   video → publish IMMEDIATELY (current flow). Videos
+            //           don't need the overlay editor.
             const res = await fetch('/api/admin/upload-and-publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -563,11 +570,22 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                     title: title.trim(),
                     caption: caption.trim(),
                     credit: credit.trim() || undefined,
+                    mode: isImage ? 'draft' : 'publish',
                 }),
             });
             const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.error || 'Publish failed');
+            if (!res.ok || !json.success) throw new Error(json.error || 'Upload failed');
 
+            if (isImage && json.editorUrl) {
+                // Send the operator straight to the editor. They'll set
+                // title + caption + overlays + convertToReel toggle and
+                // hit Approve from there.
+                onClose();
+                router.push(json.editorUrl);
+                return;
+            }
+
+            // Video path — landed on socials directly.
             setResult({ blogUrl: json.blogUrl, social: json.social || {} });
             setPhase('done');
         } catch (e: any) {
@@ -602,7 +620,9 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                         </button>
                     </div>
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Pushes to website + Instagram + Facebook + Threads in one shot
+                        {isImage
+                            ? 'Image uploads open in the editor — set overlays, toggle Convert-to-Reel, then Approve'
+                            : 'Video uploads publish straight to website + Instagram + Facebook + Threads'}
                     </p>
                 </div>
 
@@ -683,64 +703,92 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                 )}
                             </div>
 
-                            {/* Title (required) */}
-                            <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                    Title <span style={{ color: '#ff7777' }}>*</span>
-                                </label>
-                                <input
-                                    value={title}
-                                    onChange={e => setTitle(e.target.value)}
-                                    disabled={busy}
-                                    placeholder="The headline for the website blog post"
-                                    className="w-full px-3 py-2 rounded-lg text-xs"
+                            {/* For IMAGE uploads: skip the inline title/caption/credit
+                                fields entirely — those go in the editor. Show a brief
+                                explainer instead so the operator knows what's coming. */}
+                            {isImage && (
+                                <div
+                                    className="p-3 rounded-lg text-[11px]"
                                     style={{
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: '1px solid rgba(255,255,255,0.08)',
-                                        color: 'var(--text-primary)',
+                                        background: 'rgba(0,212,255,0.06)',
+                                        border: '1px solid rgba(0,212,255,0.20)',
+                                        color: '#7adfff',
                                     }}
-                                />
-                            </div>
+                                >
+                                    <div className="font-semibold mb-1">→ Continues to the editor</div>
+                                    <div style={{ color: 'var(--text-muted)' }}>
+                                        After upload you'll get the full editing toolset:
+                                        title · caption · text overlay · gradient · watermark ·
+                                        layout nudge · convert-to-Reel toggle · upload swap.
+                                        Approve from there to publish to all 4 destinations.
+                                    </div>
+                                </div>
+                            )}
 
-                            {/* Caption */}
-                            <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                    Caption
-                                </label>
-                                <textarea
-                                    value={caption}
-                                    onChange={e => setCaption(e.target.value)}
-                                    disabled={busy}
-                                    rows={6}
-                                    placeholder="What's the post about? Goes on IG, FB, Threads + the website."
-                                    className="w-full px-3 py-2 rounded-lg text-xs"
-                                    style={{
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: '1px solid rgba(255,255,255,0.08)',
-                                        color: 'var(--text-primary)',
-                                        resize: 'vertical',
-                                    }}
-                                />
-                            </div>
+                            {/* Title (required for VIDEO only — image uploads use the editor) */}
+                            {!isImage && (
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                        Title <span style={{ color: '#ff7777' }}>*</span>
+                                    </label>
+                                    <input
+                                        value={title}
+                                        onChange={e => setTitle(e.target.value)}
+                                        disabled={busy}
+                                        placeholder="The headline for the website blog post"
+                                        className="w-full px-3 py-2 rounded-lg text-xs"
+                                        style={{
+                                            background: 'rgba(255,255,255,0.04)',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            color: 'var(--text-primary)',
+                                        }}
+                                    />
+                                </div>
+                            )}
 
-                            {/* Credit */}
-                            <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                    Credit <span style={{ color: 'var(--text-muted)' }}>(optional, will append "via @handle")</span>
-                                </label>
-                                <input
-                                    value={credit}
-                                    onChange={e => setCredit(e.target.value)}
-                                    disabled={busy}
-                                    placeholder="creatorhandle"
-                                    className="w-full px-3 py-2 rounded-lg text-xs"
-                                    style={{
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: '1px solid rgba(255,255,255,0.08)',
-                                        color: 'var(--text-primary)',
-                                    }}
-                                />
-                            </div>
+                            {/* Caption (only for VIDEO — images set caption in editor) */}
+                            {!isImage && (
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                        Caption
+                                    </label>
+                                    <textarea
+                                        value={caption}
+                                        onChange={e => setCaption(e.target.value)}
+                                        disabled={busy}
+                                        rows={6}
+                                        placeholder="What's the post about? Goes on IG, FB, Threads + the website."
+                                        className="w-full px-3 py-2 rounded-lg text-xs"
+                                        style={{
+                                            background: 'rgba(255,255,255,0.04)',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            color: 'var(--text-primary)',
+                                            resize: 'vertical',
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Credit (only for VIDEO — images set in editor) */}
+                            {!isImage && (
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                                        Credit <span style={{ color: 'var(--text-muted)' }}>(optional, will append "via @handle")</span>
+                                    </label>
+                                    <input
+                                        value={credit}
+                                        onChange={e => setCredit(e.target.value)}
+                                        disabled={busy}
+                                        placeholder="creatorhandle"
+                                        className="w-full px-3 py-2 rounded-lg text-xs"
+                                        style={{
+                                            background: 'rgba(255,255,255,0.04)',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            color: 'var(--text-primary)',
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             {error && (
                                 <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff7777' }}>
@@ -793,7 +841,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
                             <button
                                 onClick={publish}
-                                disabled={busy || !file || !title.trim() || !caption.trim()}
+                                disabled={busy || !file || (!isImage && (!title.trim() || !caption.trim()))}
                                 className="w-full px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
                                 style={{
                                     background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,255,136,0.20))',
@@ -802,7 +850,11 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                     fontFamily: 'var(--font-display)',
                                 }}
                             >
-                                {busy ? 'Working…' : 'Publish to Website + IG + FB + Threads'}
+                                {busy
+                                    ? 'Working…'
+                                    : isImage
+                                        ? 'Upload & Continue to Editor'
+                                        : 'Publish to Website + IG + FB + Threads'}
                             </button>
                         </>
                     )}

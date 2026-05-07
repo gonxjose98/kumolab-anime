@@ -24,7 +24,20 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
-        const { mediaUrl, mediaType, title, caption, credit } = body || {};
+        const { mediaUrl, mediaType, title, caption, credit, mode } = body || {};
+
+        // Mode:
+        //   'publish' — old behavior. Insert post as published + fan out
+        //               to socials immediately. Used for VIDEO uploads
+        //               where there's no editor work to do — just stage
+        //               the MP4 and post it.
+        //   'draft'   — insert post as PENDING, no social publish. Caller
+        //               (browser) redirects to /admin/post/[id] so the
+        //               operator can use the full editor: title, caption,
+        //               text/gradient/watermark overlays, convertToReel
+        //               toggle, image upload swap, etc. Approve from
+        //               there to publish via the standard flow.
+        const isDraft = mode === 'draft';
 
         if (!mediaUrl || typeof mediaUrl !== 'string') {
             return NextResponse.json({ success: false, error: 'mediaUrl is required' }, { status: 400 });
@@ -32,17 +45,23 @@ export async function POST(req: NextRequest) {
         if (mediaType !== 'video' && mediaType !== 'image') {
             return NextResponse.json({ success: false, error: 'mediaType must be "video" or "image"' }, { status: 400 });
         }
-        if (!caption || typeof caption !== 'string') {
+        // Title and caption are required only in publish mode. In draft
+        // mode they can be empty placeholders — the operator fills them
+        // in via the editor.
+        if (!isDraft && (!caption || typeof caption !== 'string')) {
             return NextResponse.json({ success: false, error: 'caption is required' }, { status: 400 });
         }
-        if (!title || typeof title !== 'string' || !title.trim()) {
+        if (!isDraft && (!title || typeof title !== 'string' || !title.trim())) {
             return NextResponse.json({ success: false, error: 'title is required' }, { status: 400 });
         }
 
-        const titleClean = title.trim().slice(0, 200);
+        const titleClean = (title && typeof title === 'string' && title.trim())
+            ? title.trim().slice(0, 200)
+            : 'Untitled — KumoLab Upload';
+        const captionInput = (caption && typeof caption === 'string') ? caption.trim() : '';
         const captionFinal = credit && typeof credit === 'string' && credit.trim()
-            ? `${caption.trim()}\n\nvia @${credit.trim().replace(/^@/, '')}`
-            : caption.trim();
+            ? `${captionInput}\n\nvia @${credit.trim().replace(/^@/, '')}`
+            : captionInput;
 
         // Slug: lowercased title + short uuid suffix to guarantee uniqueness
         const slugBase = titleClean.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').slice(0, 80);
@@ -69,16 +88,27 @@ export async function POST(req: NextRequest) {
             claim_type: isVideo ? 'TRAILER_DROP' : 'OTHER',
             source: 'KumoLab Manual Upload',
             source_url: null, // Not a YouTube source — bypasses trailer-fetcher
-            status: 'published',
-            is_published: true,
+            status: isDraft ? 'pending' : 'published',
+            is_published: !isDraft,
             timestamp: now.toISOString(),
-            published_at: now.toISOString(),
-            expires_at: expiresAt.toISOString(),
+            published_at: isDraft ? null : now.toISOString(),
+            expires_at: isDraft ? null : expiresAt.toISOString(),
             anime_id: null,
-            social_ids: isVideo ? { staged_video_url: mediaUrl } : {},
+            social_ids: isVideo && !isDraft ? { staged_video_url: mediaUrl } : {},
         });
         if (insertErr) {
             return NextResponse.json({ success: false, error: `DB insert failed: ${insertErr.message}` }, { status: 500 });
+        }
+
+        // Draft mode short-circuits here. Caller redirects to the editor.
+        if (isDraft) {
+            return NextResponse.json({
+                success: true,
+                postId,
+                slug,
+                editorUrl: `/admin/post/${postId}`,
+                mode: 'draft',
+            });
         }
 
         // Build the post object the publisher expects. Important:
