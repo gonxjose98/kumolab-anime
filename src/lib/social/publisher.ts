@@ -154,31 +154,37 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                 throw new Error('image fetch returned null');
             }
             console.log(`[Publisher] Image-to-Reel: fetched ${buf.length} bytes from ${post.image}`);
-            const reelBuf = await imageToReel(buf, { direction: 'in' });
-            if (!reelBuf || reelBuf.length === 0) {
+            const reel = await imageToReel(buf, { direction: 'in' });
+            if (!reel.buffer || reel.buffer.length === 0) {
                 await logError({
                     source: 'publisher.image-to-reel',
-                    errorMessage: `FFmpeg conversion returned ${reelBuf?.length ?? 0} bytes`,
-                    context: { post_id: (post as any).id, slug: post.slug, source_bytes: buf.length },
+                    errorMessage: `FFmpeg conversion failed (exit ${reel.exitCode}): ${reel.stderr.slice(-800) || 'no stderr'}`,
+                    context: {
+                        post_id: (post as any).id,
+                        slug: post.slug,
+                        source_bytes: buf.length,
+                        ffmpeg_args: reel.args,
+                        exit_code: reel.exitCode,
+                    },
                 }).catch(() => {});
                 throw new Error('ffmpeg produced no output');
             }
             const bucketPath = `${post.slug}-image-reel.mp4`;
             const { error: upErr } = await supabaseAdmin.storage
                 .from('blog-videos')
-                .upload(bucketPath, reelBuf, { contentType: 'video/mp4', upsert: true });
+                .upload(bucketPath, reel.buffer, { contentType: 'video/mp4', upsert: true });
             if (upErr) {
                 await logError({
                     source: 'publisher.image-to-reel',
                     errorMessage: `Bucket upload failed: ${upErr.message}`,
-                    context: { post_id: (post as any).id, slug: post.slug, bytes: reelBuf.length },
+                    context: { post_id: (post as any).id, slug: post.slug, bytes: reel.buffer.length },
                 }).catch(() => {});
                 throw new Error(`upload failed: ${upErr.message}`);
             }
             const { data: { publicUrl } } = supabaseAdmin.storage.from('blog-videos').getPublicUrl(bucketPath);
             stagedVideoUrl = publicUrl;
             result.staged_video_url = publicUrl;
-            console.log(`[Publisher] Converted still image to ${(reelBuf.length / 1024 / 1024).toFixed(1)} MB Reel for ${post.slug}`);
+            console.log(`[Publisher] Converted still image to ${(reel.buffer.length / 1024 / 1024).toFixed(1)} MB Reel for ${post.slug}`);
         } catch (e: any) {
             console.warn(`[Publisher] Image-to-Reel failed for ${post.slug}, falling back to image post:`, e?.message || e);
             // The detailed error already went to error_logs above; this

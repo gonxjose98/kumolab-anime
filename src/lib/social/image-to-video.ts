@@ -43,14 +43,23 @@ export interface ImageToVideoOptions {
     direction?: 'in' | 'out'; // zoom in (default — focuses interest) or zoom out
 }
 
+export interface ImageToReelResult {
+    buffer: Buffer | null;
+    stderr: string;
+    exitCode: number | null;
+    args: string[];
+}
+
 /**
- * Convert an image Buffer to a portrait MP4 Reel. Returns null on
- * failure — caller falls back to publishing the image as-is.
+ * Convert an image Buffer to a portrait MP4 Reel. Returns a result with
+ * the buffer (or null on failure) plus diagnostic info — caller logs
+ * stderr to error_logs when buffer is null so we can debug FFmpeg
+ * failures without reading Vercel function logs.
  */
 export async function imageToReel(
     input: Buffer,
     opts: ImageToVideoOptions = {},
-): Promise<Buffer | null> {
+): Promise<ImageToReelResult> {
     const duration = opts.durationSec ?? DURATION_SEC;
     const direction = opts.direction ?? 'in';
     const totalFrames = duration * FPS;
@@ -106,7 +115,7 @@ export async function imageToReel(
         await fs.promises.writeFile(inPath, input);
     } catch (e: any) {
         console.error('[ImageToReel] tmp write failed:', e?.message || e);
-        return null;
+        return { buffer: null, stderr: `tmp write failed: ${e?.message || e}`, exitCode: null, args: [] };
     }
 
     const args = [
@@ -135,27 +144,27 @@ export async function imageToReel(
         let stderrTail = '';
 
         proc.stdout.on('data', () => {});
-        proc.stderr.on('data', (c: Buffer) => { stderrTail = (stderrTail + c.toString()).slice(-2000); });
+        proc.stderr.on('data', (c: Buffer) => { stderrTail = (stderrTail + c.toString()).slice(-3000); });
         proc.on('error', (e) => {
             console.error('[ImageToReel] spawn error:', e.message);
             cleanup();
-            resolve(null);
+            resolve({ buffer: null, stderr: `spawn error: ${e.message}\n${stderrTail}`, exitCode: null, args });
         });
         proc.on('close', async (code) => {
             if (code !== 0) {
                 console.error(`[ImageToReel] ffmpeg exit ${code}, stderr tail:\n${stderrTail.slice(-1200)}`);
                 cleanup();
-                resolve(null);
+                resolve({ buffer: null, stderr: stderrTail, exitCode: code, args });
                 return;
             }
             try {
                 const out = await fs.promises.readFile(outPath);
                 cleanup();
-                resolve(out);
+                resolve({ buffer: out, stderr: stderrTail, exitCode: 0, args });
             } catch (e: any) {
                 console.error('[ImageToReel] output read failed:', e?.message || e);
                 cleanup();
-                resolve(null);
+                resolve({ buffer: null, stderr: `output read failed: ${e?.message || e}\n${stderrTail}`, exitCode: 0, args });
             }
         });
 
