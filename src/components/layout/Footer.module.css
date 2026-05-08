@@ -56,6 +56,31 @@
     margin: 0 0 16px;
 }
 
+.legalLinks {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 14px;
+    font-size: 12px;
+    font-family: var(--font-main);
+}
+
+.legalLink {
+    color: var(--text-tertiary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.legalLink:hover {
+    color: var(--accent-cyan);
+}
+
+.legalSep {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
 .copyright {
     font-size: 11px;
     font-family: var(--font-main);

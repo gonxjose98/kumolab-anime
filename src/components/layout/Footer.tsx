@@ -14,6 +14,11 @@ const Footer = () => {
             <p className={styles.tagline}>
                 Your Anime Intelligence Hub — Verified · Real-Time · Always On
             </p>
+            <nav className={styles.legalLinks} aria-label="Legal">
+                <Link href="/privacy" className={styles.legalLink}>Privacy Policy</Link>
+                <span className={styles.legalSep}>·</span>
+                <Link href="/terms" className={styles.legalLink}>Terms of Service</Link>
+            </nav>
             <div className={styles.copyright}>
                 &copy; {new Date().getFullYear()} KumoLab. All rights reserved.
             </div>
