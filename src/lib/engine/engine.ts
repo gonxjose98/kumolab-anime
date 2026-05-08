@@ -64,6 +64,14 @@ async function persistSocialIds(
     target: { column: 'id' | 'slug'; value: string; title: string },
     social: SocialPublishResult,
 ): Promise<void> {
+    // Lock-held writebacks must NOT overwrite social_ids — the in-flight
+    // call (the one that holds the lock) is responsible for the real
+    // writeback. Without this guard, a second concurrent publishToSocials
+    // returns `{skipped_reason: "lock_held"}` and we replace social_ids
+    // with that, wiping the IG/FB/Threads IDs the lock-holder wrote.
+    // (Caused 2026-05-08 Kusunoki Ep 6 to lose its instagram_id.)
+    if ((social as any).skipped_reason === 'lock_held') return;
+
     const ids = buildSocialIds(social);
     if (Object.keys(ids).length === 0) return;
 

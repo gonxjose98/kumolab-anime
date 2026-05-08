@@ -363,8 +363,13 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
         // the video, which can take 10–60s. We poll status_code (FINISHED |
         // ERROR | EXPIRED | IN_PROGRESS | PUBLISHED) up to ~60s for Reels
         // and 6s for image.
-        const maxWaitMs = isReels ? 60_000 : 6_000;
-        const pollIntervalMs = isReels ? 4_000 : 2_000;
+        // Reels can take 60–150s to transcode on IG's side. The old 60s
+        // ceiling was timing out posts that ultimately would have finished
+        // (2 misses in one day on 2026-05-08). The cron route's
+        // maxDuration is 300s, so 180s here still leaves room for FB +
+        // Threads after IG.
+        const maxWaitMs = isReels ? 180_000 : 6_000;
+        const pollIntervalMs = isReels ? 5_000 : 2_000;
         const start = Date.now();
         let finalStatus: string | null = null;
         while (Date.now() - start < maxWaitMs) {
@@ -682,8 +687,10 @@ async function publishToThreads(post: BlogPost, stagedVideoUrl: string | null = 
         // Phase 2: poll status (video and image containers need ingest)
         // Per docs: TEXT containers are ready instantly, IMAGE/VIDEO need polling.
         if (isVideo || hasImage) {
-            const maxWaitMs = isVideo ? 60_000 : 8_000;
-            const pollIntervalMs = isVideo ? 4_000 : 2_000;
+            // Same reasoning as IG above — Threads VIDEO transcoding
+            // can run 60–150s on Meta's side. Match the IG ceiling.
+            const maxWaitMs = isVideo ? 180_000 : 8_000;
+            const pollIntervalMs = isVideo ? 5_000 : 2_000;
             const start = Date.now();
             let finalStatus: string | null = null;
             while (Date.now() - start < maxWaitMs) {
