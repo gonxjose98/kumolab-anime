@@ -207,7 +207,7 @@ export default async function DashboardPage() {
                             WebkitTextFillColor: 'transparent',
                         }}
                     >
-                        Console
+                        Dashboard
                     </h1>
                     <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
                         the cloud sees everything first
@@ -420,7 +420,7 @@ export default async function DashboardPage() {
             {/* ── Footer ───────────────────────────────────────────── */}
             <div className="text-center pt-2 pb-4">
                 <span className="text-[9px] font-mono uppercase tracking-[0.3em]" style={{ color: 'var(--text-muted)' }}>
-                    KumoLab Console · {stats.publishedTotal} published all-time
+                    KumoLab Dashboard · {stats.publishedTotal} published all-time
                 </span>
             </div>
         </div>
