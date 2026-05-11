@@ -430,8 +430,8 @@ export default function PostEditor() {
     const claimLabel = (post.claim_type || 'OTHER').replace(/_/g, ' ');
 
     return (
-        <div className="max-w-5xl mx-auto space-y-5">
-            {/* Header strip */}
+        <div className="max-w-3xl mx-auto space-y-4 pb-12">
+            {/* Header strip — Cancel / (Save+Approve if pending) / Save */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
@@ -498,378 +498,442 @@ export default function PostEditor() {
                 </div>
             )}
 
-            <div className="grid md:grid-cols-[1fr_360px] gap-5">
-                {/* ── Image preview + render controls ─────────────── */}
-                <Card>
-                    <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
-                        {imageUrl && !imageError ? (
-                            <>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    key={imageUrl}
-                                    src={imageUrl}
-                                    alt={title}
-                                    className="w-full h-full object-cover"
-                                    onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
-                                />
-                                {busy === 'render' && (
-                                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
-                                            Rendering…
-                                        </span>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                                <span className="text-xs" style={{ color: '#ff9999' }}>
-                                    {imageError || 'No image set yet.'}
-                                </span>
-                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                    Set a source URL below and click Regenerate.
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </Card>
+            {/* ── 1. Image preview — front and center ──────────────── */}
+            <Card>
+                <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
+                    {imageUrl && !imageError ? (
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                key={imageUrl}
+                                src={imageUrl}
+                                alt={title}
+                                className="w-full h-full object-cover"
+                                onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
+                            />
+                            {busy === 'render' && (
+                                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
+                                        Rendering…
+                                    </span>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+                            <span className="text-xs" style={{ color: '#ff9999' }}>
+                                {imageError || 'No image set yet.'}
+                            </span>
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                Open "Image source" below to set one.
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </Card>
 
-                {/* ── Live overlay editor (text fields + toggles) ──── */}
-                <div className="space-y-4">
-                    <Card className="p-4 space-y-3">
-                        <SectionLabel>Overlay text</SectionLabel>
-                        <div>
-                            <label className="block text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                Title (big bold line)
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                                onBlur={() => handleRegenerate({ silent: true })}
-                                className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
-                                style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                Caption (smaller line under title)
-                            </label>
-                            <input
-                                type="text"
-                                value={excerpt}
-                                onChange={e => setExcerpt(e.target.value)}
-                                onBlur={() => handleRegenerate({ silent: true })}
-                                placeholder="Sharp, observational, KumoLab voice"
-                                className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
-                                style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
-                            />
-                        </div>
-                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            Edits apply on blur · toggles + nudges apply instantly
+            {/* ── 2. Title — prominent, magazine-style ─────────────── */}
+            <Card className="p-5">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                    Title
+                </label>
+                <input
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    onBlur={() => handleRegenerate({ silent: true })}
+                    className="w-full bg-transparent text-lg md:text-xl font-bold leading-snug focus:outline-none"
+                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+                />
+                <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Headline on the website + first line of social captions.
+                </p>
+            </Card>
+
+            {/* ── 3. Caption — the body that publishes ─────────────── */}
+            <Card className="p-5">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                    Caption
+                </label>
+                <textarea
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    rows={5}
+                    className="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-none"
+                    style={{ color: 'var(--text-primary)' }}
+                />
+                <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Body on the website + caption below the title on Instagram, Facebook, and Threads.
+                </p>
+            </Card>
+
+            {/* ── 4. Overlay & image editing — collapsed by default ── */}
+            <Collapsible
+                title="Overlay & image editing"
+                hint="Customize the text rendered on the image, gradients, watermark, and layout"
+            >
+                {/* Sub-section: overlay sub-caption + purple word picker */}
+                <div className="p-5 space-y-4">
+                    <SectionLabel>Overlay text</SectionLabel>
+                    <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                            Overlay sub-caption
+                        </label>
+                        <input
+                            type="text"
+                            value={excerpt}
+                            onChange={e => setExcerpt(e.target.value)}
+                            onBlur={() => handleRegenerate({ silent: true })}
+                            placeholder="Short line rendered under the title on the image"
+                            className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                            style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
+                        />
+                        <p className="mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            Small text under the title <em>on the image only</em>. Separate from the social-media caption above.
                         </p>
+                    </div>
+                    <PurpleWordPicker
+                        disabled={!settings.applyText}
+                        title={title}
+                        caption={excerpt}
+                        selected={settings.purpleWordIndices}
+                        onChange={next => setSettings(s => ({ ...s, purpleWordIndices: next }))}
+                    />
+                </div>
 
-                        {/* Purple-word picker — click any word to flip it to
-                            KumoLab purple in the rendered overlay; click again
-                            to clear. Picker only enables when Show text is on.
-                            Words are indexed across the merged title+caption
-                            stream (matches the renderer). */}
-                        <PurpleWordPicker
-                            disabled={!settings.applyText}
-                            title={title}
-                            caption={excerpt}
-                            selected={settings.purpleWordIndices}
-                            onChange={next => setSettings(s => ({ ...s, purpleWordIndices: next }))}
+                {/* Sub-section: overlay toggles + gradient */}
+                <div className="p-5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <SectionLabel>Overlay toggles</SectionLabel>
+                    <div className="space-y-2 mt-3">
+                        <Toggle
+                            label="Show text"
+                            hint="Title overlay on the image"
+                            value={settings.applyText}
+                            onChange={v => setSettings(s => ({ ...s, applyText: v }))}
                         />
-                    </Card>
+                        <Toggle
+                            label="Show gradient"
+                            hint="Dark fade behind the text"
+                            value={settings.applyGradient}
+                            onChange={v => setSettings(s => ({ ...s, applyGradient: v }))}
+                        />
+                        <Toggle
+                            label="Show watermark"
+                            hint="@KumoLabAnime mark"
+                            value={settings.applyWatermark}
+                            onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
+                        />
+                        <Toggle
+                            label="Convert image to Reel"
+                            hint="12s slow-zoom; publishes as Reel on IG / FB / Threads"
+                            value={settings.convertToReel}
+                            onChange={v => setSettings(s => ({ ...s, convertToReel: v }))}
+                        />
 
-                    <Card className="p-4">
-                        <SectionLabel>Overlay toggles</SectionLabel>
-                        <div className="space-y-2 mt-3">
-                            <Toggle
-                                label="Show text"
-                                hint="Title overlay on the image"
-                                value={settings.applyText}
-                                onChange={v => setSettings(s => ({ ...s, applyText: v }))}
-                            />
-                            <Toggle
-                                label="Show gradient"
-                                hint="Dark fade behind the text"
-                                value={settings.applyGradient}
-                                onChange={v => setSettings(s => ({ ...s, applyGradient: v }))}
-                            />
-                            <Toggle
-                                label="Show watermark"
-                                hint="@KumoLabAnime mark"
-                                value={settings.applyWatermark}
-                                onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
-                            />
-                            <Toggle
-                                label="Convert image to Reel"
-                                hint="12s slow-zoom; publishes as Reel on IG / FB / Threads"
-                                value={settings.convertToReel}
-                                onChange={v => setSettings(s => ({ ...s, convertToReel: v }))}
-                            />
-
-                            <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                                <div>
-                                    <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
-                                        Gradient position
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {(['bottom', 'top'] as const).map(pos => {
-                                            const active = settings.gradientPosition === pos;
-                                            return (
-                                                <button
-                                                    key={pos}
-                                                    onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
-                                                    className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                                                    style={{
-                                                        background: active
-                                                            ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
-                                                            : 'rgba(255,255,255,0.03)',
-                                                        border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
-                                                        color: active ? '#fff' : 'var(--text-tertiary)',
-                                                        fontFamily: 'var(--font-display)',
-                                                    }}
-                                                >
-                                                    {pos}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                        <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <div>
+                                <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
+                                    Gradient position
                                 </div>
+                                <div className="flex gap-2">
+                                    {(['bottom', 'top'] as const).map(pos => {
+                                        const active = settings.gradientPosition === pos;
+                                        return (
+                                            <button
+                                                key={pos}
+                                                onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
+                                                className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                                                style={{
+                                                    background: active
+                                                        ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
+                                                        : 'rgba(255,255,255,0.03)',
+                                                    border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
+                                                    color: active ? '#fff' : 'var(--text-tertiary)',
+                                                    fontFamily: 'var(--font-display)',
+                                                }}
+                                            >
+                                                {pos}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                                <div style={{ opacity: settings.applyGradient ? 1 : 0.4 }}>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
-                                            Gradient strength
-                                        </span>
-                                        <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                                            {settings.gradientStrength === 1 ? 'default' : `${Math.round(settings.gradientStrength * 100)}%`}
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min={0.3}
-                                        max={1.5}
-                                        step={0.05}
-                                        value={settings.gradientStrength}
-                                        disabled={!settings.applyGradient}
-                                        onChange={e => setSettings(s => ({ ...s, gradientStrength: parseFloat(e.target.value) }))}
-                                        className="w-full accent-purple-500"
-                                    />
-                                    <div className="flex justify-between text-[8px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                        <span>Soft</span>
-                                        <span>Hard</span>
-                                    </div>
+                            <div style={{ opacity: settings.applyGradient ? 1 : 0.4 }}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                                        Gradient strength
+                                    </span>
+                                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                        {settings.gradientStrength === 1 ? 'default' : `${Math.round(settings.gradientStrength * 100)}%`}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={0.3}
+                                    max={1.5}
+                                    step={0.05}
+                                    value={settings.gradientStrength}
+                                    disabled={!settings.applyGradient}
+                                    onChange={e => setSettings(s => ({ ...s, gradientStrength: parseFloat(e.target.value) }))}
+                                    className="w-full accent-purple-500"
+                                />
+                                <div className="flex justify-between text-[8px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                    <span>Soft</span>
+                                    <span>Hard</span>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <button
-                            onClick={() => handleRegenerate()}
-                            disabled={!!busy}
-                            className="w-full mt-4 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                            style={{
-                                background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.18))',
-                                border: '1px solid rgba(255,60,172,0.30)',
-                                color: '#fff',
-                                fontFamily: 'var(--font-display)',
-                            }}
-                        >
-                            {busy === 'render' ? 'Rendering…' : 'Force Regenerate'}
-                        </button>
-                    </Card>
+                    <button
+                        onClick={() => handleRegenerate()}
+                        disabled={!!busy}
+                        className="w-full mt-4 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.18))',
+                            border: '1px solid rgba(255,60,172,0.30)',
+                            color: '#fff',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        {busy === 'render' ? 'Rendering…' : 'Force Regenerate'}
+                    </button>
+                </div>
 
-                    {/* ── Layout: scale + position per element ─────────── */}
-                    <Card className="p-4 space-y-4">
-                        <SectionLabel>Layout</SectionLabel>
+                {/* Sub-section: layout (scale + position per element) */}
+                <div className="p-5 space-y-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <SectionLabel>Layout</SectionLabel>
 
-                        <ElementControls
-                            label="Title"
-                            disabled={!settings.applyText}
-                            scale={settings.titleScale}
-                            scaleMin={0.4}
-                            scaleMax={1.6}
-                            onScaleChange={v => setSettings(s => ({ ...s, titleScale: v }))}
-                            offset={settings.titleOffset}
-                            onNudge={(dx, dy) => setSettings(s => ({
-                                ...s,
-                                titleOffset: { x: s.titleOffset.x + dx, y: s.titleOffset.y + dy },
-                            }))}
-                            onRecenter={() => setSettings(s => ({ ...s, titleOffset: { x: 0, y: 0 } }))}
-                        />
+                    <ElementControls
+                        label="Title"
+                        disabled={!settings.applyText}
+                        scale={settings.titleScale}
+                        scaleMin={0.4}
+                        scaleMax={1.6}
+                        onScaleChange={v => setSettings(s => ({ ...s, titleScale: v }))}
+                        offset={settings.titleOffset}
+                        onNudge={(dx, dy) => setSettings(s => ({
+                            ...s,
+                            titleOffset: { x: s.titleOffset.x + dx, y: s.titleOffset.y + dy },
+                        }))}
+                        onRecenter={() => setSettings(s => ({ ...s, titleOffset: { x: 0, y: 0 } }))}
+                    />
 
-                        <ElementControls
-                            label="Caption"
-                            disabled={!settings.applyText}
-                            scale={settings.captionScale}
-                            scaleMin={0.25}
-                            scaleMax={1.2}
-                            onScaleChange={v => setSettings(s => ({ ...s, captionScale: v }))}
-                            offset={settings.captionOffset}
-                            onNudge={(dx, dy) => setSettings(s => ({
-                                ...s,
-                                captionOffset: { x: s.captionOffset.x + dx, y: s.captionOffset.y + dy },
-                            }))}
-                            onRecenter={() => setSettings(s => ({ ...s, captionOffset: { x: 0, y: 0 } }))}
-                        />
+                    <ElementControls
+                        label="Sub-caption"
+                        disabled={!settings.applyText}
+                        scale={settings.captionScale}
+                        scaleMin={0.25}
+                        scaleMax={1.2}
+                        onScaleChange={v => setSettings(s => ({ ...s, captionScale: v }))}
+                        offset={settings.captionOffset}
+                        onNudge={(dx, dy) => setSettings(s => ({
+                            ...s,
+                            captionOffset: { x: s.captionOffset.x + dx, y: s.captionOffset.y + dy },
+                        }))}
+                        onRecenter={() => setSettings(s => ({ ...s, captionOffset: { x: 0, y: 0 } }))}
+                    />
 
-                        {/* Watermark uses an absolute (x,y) — convert nudges
-                            to absolute by snapping the first nudge off the
-                            renderer default (centered, bottom). Recenter
-                            clears back to null so renderer auto-positions. */}
-                        <ElementControls
-                            label="Watermark"
-                            disabled={!settings.applyWatermark}
-                            offset={settings.watermarkPosition
-                                ? {
-                                    x: settings.watermarkPosition.x - CANVAS_W / 2,
-                                    y: settings.watermarkPosition.y - (CANVAS_H - 50),
-                                }
-                                : { x: 0, y: 0 }}
-                            onNudge={(dx, dy) => setSettings(s => {
-                                const base = s.watermarkPosition ?? { x: CANVAS_W / 2, y: CANVAS_H - 50 };
-                                return { ...s, watermarkPosition: { x: base.x + dx, y: base.y + dy } };
-                            })}
-                            onRecenter={() => setSettings(s => ({ ...s, watermarkPosition: null }))}
-                        />
-                    </Card>
+                    <ElementControls
+                        label="Watermark"
+                        disabled={!settings.applyWatermark}
+                        offset={settings.watermarkPosition
+                            ? {
+                                x: settings.watermarkPosition.x - CANVAS_W / 2,
+                                y: settings.watermarkPosition.y - (CANVAS_H - 50),
+                            }
+                            : { x: 0, y: 0 }}
+                        onNudge={(dx, dy) => setSettings(s => {
+                            const base = s.watermarkPosition ?? { x: CANVAS_W / 2, y: CANVAS_H - 50 };
+                            return { ...s, watermarkPosition: { x: base.x + dx, y: base.y + dy } };
+                        })}
+                        onRecenter={() => setSettings(s => ({ ...s, watermarkPosition: null }))}
+                    />
+                </div>
+            </Collapsible>
 
-                    {isPending && (
-                        <Card className="p-4">
-                            <SectionLabel>Quick actions</SectionLabel>
+            {/* ── 5. Image source — collapsed by default ──────────── */}
+            <Collapsible
+                title="Image source"
+                hint="Replace the background image — upload, paste a URL, or reset to a fresh original"
+            >
+                <div className="p-5">
+                    <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">
+                        {imageDims && (
+                            (() => {
+                                const minDim = Math.min(imageDims.w, imageDims.h);
+                                const tier = minDim < 600 ? 'low' : minDim < 1000 ? 'ok' : 'good';
+                                const tierColor = tier === 'low' ? '#ff7777' : tier === 'ok' ? '#ffaa00' : '#7af0a8';
+                                const tierLabel = tier === 'low' ? 'LOW' : tier === 'ok' ? 'OK' : 'GOOD';
+                                const tierHint = tier === 'low'
+                                    ? 'will pixelate if you Convert to Reel'
+                                    : tier === 'ok'
+                                        ? 'acceptable for static post; soft if Reel-converted'
+                                        : 'high enough for crisp Reel conversion';
+                                return (
+                                    <div className="flex items-center gap-2 mb-2 -mt-1">
+                                        <span
+                                            className="text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded"
+                                            style={{
+                                                background: `${tierColor}15`,
+                                                border: `1px solid ${tierColor}40`,
+                                                color: tierColor,
+                                                fontFamily: 'var(--font-display)',
+                                            }}
+                                        >
+                                            {imageDims.w} × {imageDims.h} · {tierLabel}
+                                        </span>
+                                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                            {tierHint}
+                                        </span>
+                                    </div>
+                                );
+                            })()
+                        )}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                            <input
+                                type="text"
+                                value={sourceUrl}
+                                onChange={e => setSourceUrl(e.target.value)}
+                                placeholder="https://… (direct .jpg / .png / .webp)"
+                                className="flex-1 bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
+                                style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                            />
                             <button
-                                onClick={handleDecline}
+                                onClick={handleReset}
                                 disabled={!!busy}
-                                className="w-full mt-3 px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                                className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
                                 style={{
-                                    background: 'rgba(255,255,255,0.02)',
-                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    background: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.10)',
                                     color: 'var(--text-tertiary)',
                                     fontFamily: 'var(--font-display)',
                                 }}
+                                title="Re-fetch a clean original image and discard any baked overlay"
                             >
-                                {busy === 'decline' ? 'Declining…' : 'Decline & Remove'}
+                                Reset
                             </button>
-                        </Card>
-                    )}
-
-                    <Card className="p-4">
-                        <button
-                            onClick={handleDelete}
-                            disabled={!!busy}
-                            className="w-full px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:bg-red-500/10 disabled:opacity-40"
-                            style={{
-                                background: 'transparent',
-                                border: '1px solid rgba(255,68,68,0.20)',
-                                color: '#ff7777',
-                                fontFamily: 'var(--font-display)',
-                            }}
-                        >
-                            {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
-                        </button>
-                    </Card>
-                </div>
-            </div>
-
-            {/* ── Body + source URL (less visual; below the fold is fine) ── */}
-            <Card className="p-5 space-y-4">
-                <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">
-                    {imageDims && (
-                        (() => {
-                            const minDim = Math.min(imageDims.w, imageDims.h);
-                            // Quality tiers: <600px short side = LOW (will pixelate
-                            // when blown up to a 1080×1920 Reel); 600-1000 = OK;
-                            // 1000+ = GOOD (Reel-grade).
-                            const tier = minDim < 600 ? 'low' : minDim < 1000 ? 'ok' : 'good';
-                            const tierColor = tier === 'low' ? '#ff7777' : tier === 'ok' ? '#ffaa00' : '#7af0a8';
-                            const tierLabel = tier === 'low' ? 'LOW' : tier === 'ok' ? 'OK' : 'GOOD';
-                            const tierHint = tier === 'low'
-                                ? 'will pixelate if you Convert to Reel'
-                                : tier === 'ok'
-                                    ? 'acceptable for static post; soft if Reel-converted'
-                                    : 'high enough for crisp Reel conversion';
-                            return (
-                                <div className="flex items-center gap-2 mb-2 -mt-1">
-                                    <span
-                                        className="text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded"
-                                        style={{
-                                            background: `${tierColor}15`,
-                                            border: `1px solid ${tierColor}40`,
-                                            color: tierColor,
-                                            fontFamily: 'var(--font-display)',
-                                        }}
-                                    >
-                                        {imageDims.w} × {imageDims.h} · {tierLabel}
-                                    </span>
-                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                        {tierHint}
-                                    </span>
-                                </div>
-                            );
-                        })()
-                    )}
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                        <input
-                            type="text"
-                            value={sourceUrl}
-                            onChange={e => setSourceUrl(e.target.value)}
-                            placeholder="https://… (direct .jpg / .png / .webp)"
-                            className="flex-1 bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
-                            style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                        />
-                        <button
-                            onClick={handleReset}
-                            disabled={!!busy}
-                            className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                            style={{
-                                background: 'rgba(255,255,255,0.03)',
-                                border: '1px solid rgba(255,255,255,0.10)',
-                                color: 'var(--text-tertiary)',
-                                fontFamily: 'var(--font-display)',
-                            }}
-                            title="Re-fetch a clean original image and discard any baked overlay"
-                        >
-                            Reset
-                        </button>
-                        <label
-                            className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer text-center transition-all hover:-translate-y-0.5"
-                            style={{
-                                background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
-                                border: '1px solid rgba(123,97,255,0.30)',
-                                color: '#fff',
-                                fontFamily: 'var(--font-display)',
-                                opacity: busy ? 0.4 : 1,
-                            }}
-                        >
-                            {busy === 'render' ? 'Working…' : 'Upload image'}
-                            <input
-                                type="file"
-                                accept="image/*"
-                                disabled={!!busy}
-                                onChange={e => {
-                                    const f = e.target.files?.[0];
-                                    if (f) handleUpload(f);
-                                    e.target.value = ''; // allow re-uploading the same file
+                            <label
+                                className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer text-center transition-all hover:-translate-y-0.5"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
+                                    border: '1px solid rgba(123,97,255,0.30)',
+                                    color: '#fff',
+                                    fontFamily: 'var(--font-display)',
+                                    opacity: busy ? 0.4 : 1,
                                 }}
-                                className="hidden"
-                            />
-                        </label>
-                    </div>
-                </Field>
+                            >
+                                {busy === 'render' ? 'Working…' : 'Upload image'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    disabled={!!busy}
+                                    onChange={e => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleUpload(f);
+                                        e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
+                    </Field>
+                </div>
+            </Collapsible>
 
-                <Field label="Body content">
-                    <textarea
-                        value={content}
-                        onChange={e => setContent(e.target.value)}
-                        rows={5}
-                        className="w-full bg-black/40 px-4 py-3 rounded-lg text-sm focus:outline-none resize-none"
-                        style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                    />
-                </Field>
+            {/* ── 6. Quick actions ─────────────────────────────────── */}
+            {isPending && (
+                <Card className="p-4">
+                    <SectionLabel>Quick actions</SectionLabel>
+                    <button
+                        onClick={handleDecline}
+                        disabled={!!busy}
+                        className="w-full mt-3 px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                        style={{
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            color: 'var(--text-tertiary)',
+                            fontFamily: 'var(--font-display)',
+                        }}
+                    >
+                        {busy === 'decline' ? 'Declining…' : 'Decline & Remove'}
+                    </button>
+                </Card>
+            )}
+
+            <Card className="p-4">
+                <button
+                    onClick={handleDelete}
+                    disabled={!!busy}
+                    className="w-full px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:bg-red-500/10 disabled:opacity-40"
+                    style={{
+                        background: 'transparent',
+                        border: '1px solid rgba(255,68,68,0.20)',
+                        color: '#ff7777',
+                        fontFamily: 'var(--font-display)',
+                    }}
+                >
+                    {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
+                </button>
             </Card>
         </div>
+    );
+}
+
+// Collapsible section using native <details>. Closed by default. The
+// summary row is the click target; the chevron rotates 180° when open
+// (uses Tailwind's [&[open]>summary>span.chev] arbitrary variant, no
+// extra state needed).
+function Collapsible({
+    title,
+    hint,
+    defaultOpen,
+    children,
+}: {
+    title: string;
+    hint?: string;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <details
+            open={defaultOpen}
+            className="rounded-xl overflow-hidden group"
+            style={{
+                background: 'rgba(12, 12, 24, 0.55)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                backdropFilter: 'blur(20px)',
+            }}
+        >
+            <summary
+                className="px-5 py-4 cursor-pointer flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors list-none [&::-webkit-details-marker]:hidden"
+            >
+                <div className="min-w-0">
+                    <div
+                        className="text-[11px] font-bold uppercase tracking-[0.22em]"
+                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
+                    >
+                        {title}
+                    </div>
+                    {hint && (
+                        <div className="mt-1 text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                            {hint}
+                        </div>
+                    )}
+                </div>
+                <span
+                    className="shrink-0 text-[10px] font-mono transition-transform group-open:rotate-180"
+                    style={{ color: 'var(--text-muted)' }}
+                    aria-hidden
+                >
+                    ▾
+                </span>
+            </summary>
+            <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                {children}
+            </div>
+        </details>
     );
 }
 
