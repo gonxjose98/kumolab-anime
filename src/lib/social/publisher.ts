@@ -126,7 +126,22 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     // MP4 to our blog-videos bucket via the admin upload flow, and
     // attached the public URL on the post object. Skip the worker
     // fetch entirely for these.
-    let stagedVideoUrl: string | null = (post as any)._prestagedVideoUrl || null;
+    //
+    // Two pre-staged paths:
+    //   • _prestagedVideoUrl   — in-memory side channel (upload-and-publish
+    //                            'publish' mode, fires immediately so the
+    //                            URL never needs to round-trip the DB)
+    //   • social_ids.staged_video_url — persisted on the row, so the
+    //                            scheduled-publish cron can find it after
+    //                            approve→cron crosses a process boundary.
+    //                            Set by import-from-url and by upload-and-
+    //                            publish 'publish' mode's writeback. Reading
+    //                            it here lets imported videos publish without
+    //                            an in-memory hand-off.
+    let stagedVideoUrl: string | null =
+        (post as any)._prestagedVideoUrl ||
+        (post as any).social_ids?.staged_video_url ||
+        null;
     if (stagedVideoUrl) {
         result.staged_video_url = stagedVideoUrl;
     } else if (

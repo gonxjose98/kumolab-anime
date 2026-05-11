@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
+import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
 import { checkMetaTokenHealth, type MetaTokenHealth } from '@/lib/engine/token-health';
 import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
 
@@ -237,7 +238,27 @@ export default async function DashboardPage() {
 
             {/* ── Pending review ───────────────────────────────────── */}
             <Card className="p-5">
-                <SectionHeader label="Pending Review" count={data.pendingPosts.length} accent="#ffaa00" />
+                <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-baseline gap-3">
+                        <span
+                            className="text-[10px] font-bold uppercase tracking-[0.25em]"
+                            style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
+                        >
+                            Pending Review
+                        </span>
+                        <span
+                            className="text-[10px] font-mono px-2 py-0.5 rounded-full"
+                            style={{
+                                background: '#ffaa0015',
+                                border: '1px solid #ffaa0030',
+                                color: '#ffaa00',
+                            }}
+                        >
+                            {data.pendingPosts.length}
+                        </span>
+                    </div>
+                    <ImportFromUrlButton />
+                </div>
                 {data.pendingPosts.length === 0 ? (
                     <EmptyState text="Nothing waiting on you. Auto-publish handled everything that came through." />
                 ) : (
