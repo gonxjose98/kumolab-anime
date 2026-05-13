@@ -60,6 +60,25 @@ const OFFICIAL_CHANNEL_TITLES = new Set<string>([
     'netflix anime',
 ]);
 
+// Channel names come back from yt-dlp with locale suffixes — "TOHO
+// animation チャンネル" instead of plain "TOHO animation", or
+// "Crunchyroll Anime" instead of "Crunchyroll". Match the allowlist
+// entry against the start of the lowercased channel title with a
+// word-boundary check on the following character so prefixes are
+// honored without false-positive substring matches.
+function isOfficialChannel(lcChannel: string): boolean {
+    for (const name of OFFICIAL_CHANNEL_TITLES) {
+        if (lcChannel === name) return true;
+        if (!lcChannel.startsWith(name)) continue;
+        const next = lcChannel[name.length];
+        // No trailing char (exact) or non-word char (space, punctuation,
+        // non-ASCII like the JP チ) → official; another letter/digit
+        // means we matched a prefix of a longer unrelated name.
+        if (!next || /[^a-z0-9]/i.test(next)) return true;
+    }
+    return false;
+}
+
 const REACTION_PATTERN = /\b(reaction|reacting|reacts?|first time|breakdown|reviewing|explained|theory|theories|analyzing|analysed|analyzed)\b/i;
 const COMPILATION_PATTERN = /\b(compilation|every (?:scene|moment|opening)|recap|summary|all (?:the )?openings?)\b/i;
 const OP_ED_PATTERN = /\b(opening|op\s*\d?|ending|ed\s*\d?|theme song)\b/i;
@@ -205,7 +224,7 @@ export async function searchYouTube(
         const pros: string[] = [];
         const risks: CandidateRisk[] = [];
 
-        const isOfficial = OFFICIAL_CHANNEL_TITLES.has(lcChannel);
+        const isOfficial = isOfficialChannel(lcChannel);
         if (isOfficial) pros.push('Official channel');
 
         const inDurationWindow = v.durationSeconds >= window[0] && v.durationSeconds <= window[1];
