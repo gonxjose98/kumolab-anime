@@ -107,6 +107,13 @@ export async function POST(req: NextRequest) {
             expires_at: null,
             anime_id: null,
             social_ids: {
+                // original_video_url is immutable — set once at import and
+                // never overwritten by video-process. The editor loads from
+                // this URL so every re-trim cuts from the full original, not
+                // from a previously-trimmed file. staged_video_url is what
+                // the publisher uses at publish time; it gets rewritten each
+                // time the operator hits "Apply changes" in VideoEditor.
+                original_video_url: staged.bucket_url,
                 staged_video_url: staged.bucket_url,
                 import_platform: platform,
                 import_bytes: staged.bytes,

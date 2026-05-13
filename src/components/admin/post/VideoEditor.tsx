@@ -8,6 +8,13 @@
  * editing sections when the post is a video import (social_ids.staged_video_url
  * is set and post.image is null).
  *
+ * The video element ALWAYS loads from the immutable original (passed in as
+ * initialVideoUrl, sourced from social_ids.original_video_url upstream). After
+ * Apply, the server cuts a fresh trimmed file from that original and updates
+ * social_ids.staged_video_url, but the editor keeps showing the original so
+ * the operator can re-trim differently without losing material. trimStart /
+ * trimEnd in image_settings.video are now always relative to the original.
+ *
  * Trim UX: iPhone / Instagram style — a horizontal filmstrip of thumbnails
  * extracted from the video, with two draggable edge handles. The "kept"
  * region between the handles is bright; everything outside is dimmed.
@@ -28,6 +35,7 @@ interface VideoSettings {
 
 interface VideoEditorProps {
     postId: string;
+    /** Immutable original video URL — editor always loads from here. */
     initialVideoUrl: string;
     initialSettings?: Partial<VideoSettings>;
     onProcessed?: (newUrl: string, durationSeconds: number) => void;
@@ -46,7 +54,10 @@ export default function VideoEditor({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const timelineRef = useRef<HTMLDivElement | null>(null);
 
-    const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
+    // The video element is locked to the original; we never swap its src on
+    // Apply. The operator's trim handles (state below) describe a cut against
+    // this same original, so re-trims always have the full source available.
+    const videoUrl = initialVideoUrl;
     const [duration, setDuration] = useState<number | null>(null);
     const [trimStart, setTrimStart] = useState(initialSettings?.trimStart ?? 0);
     const [trimEnd, setTrimEnd] = useState(initialSettings?.trimEnd ?? 0);
@@ -57,44 +68,108 @@ export default function VideoEditor({
     const [thumbs, setThumbs] = useState<string[]>([]);
     const [draggingHandle, setDraggingHandle] = useState<'start' | 'end' | null>(null);
 
-    // Once the <video> loads metadata we know the true duration.
-    // - Always set duration state.
-    // - Clamp any persisted trim values to the new duration. Stale settings
-    //   are common: image_settings.video.trimEnd was saved against the
-    //   PRE-trim source duration, so after a previous "Apply changes" the
-    //   stored trimEnd is usually larger than the new clip's runtime.
-    //   Without this clamp the right handle renders off the timeline.
-    // - If the operator hasn't set an end, default to the full clip.
-    const initialEndSetForUrl = useRef<string | null>(null);
+    // Once the <video> loads metadata we know the true duration. Clamp any
+    // persisted trim values into [0, duration] and default the end handle
+    // to the full clip when nothing was saved yet.
+    const initialClampDone = useRef(false);
     function handleLoadedMetadata() {
         const v = videoRef.current;
         if (!v || !isFinite(v.duration)) return;
         const trueDuration = v.duration;
         setDuration(trueDuration);
-        if (initialEndSetForUrl.current !== videoUrl) {
-            initialEndSetForUrl.current = videoUrl;
+        if (!initialClampDone.current) {
+            initialClampDone.current = true;
             const persistedEnd = initialSettings?.trimEnd ?? 0;
             const persistedStart = initialSettings?.trimStart ?? 0;
-            // Clamp end into [0, duration]. Treat 0/missing as "full clip".
             const clampedEnd =
                 !persistedEnd || persistedEnd === 0
                     ? trueDuration
                     : Math.min(persistedEnd, trueDuration);
-            // Clamp start into [0, clampedEnd - 0.5s].
             const clampedStart = Math.max(0, Math.min(persistedStart, clampedEnd - 0.5));
             setTrimStart(clampedStart);
             setTrimEnd(clampedEnd);
+            // Snap the playhead onto the kept region so the first frame the
+            // operator sees is the actual start of their selection.
+            v.currentTime = clampedStart;
         }
     }
 
-    // Force video element to re-fetch when we swap to a freshly processed result.
+    // Latest-state refs so the rAF clamp loop and the imperative listeners
+    // below always see the operator's current trim selection. Reading
+    // trimStart/trimEnd from a render closure is unsafe here: the listener
+    // can be attached once and then outlive many renders, and the rAF tick
+    // fires far more frequently than the native `timeupdate` event so any
+    // closure staleness would compound into seconds of overshoot. iPhone /
+    // Instagram-style trim preview must clamp tightly enough that a 1-second
+    // selection actually loops at 1 second.
+    const trimStartRef = useRef(trimStart);
+    const trimEndRef = useRef(trimEnd);
+    const draggingHandleRef = useRef<'start' | 'end' | null>(draggingHandle);
+    useEffect(() => { trimStartRef.current = trimStart; }, [trimStart]);
+    useEffect(() => { trimEndRef.current = trimEnd; }, [trimEnd]);
+    useEffect(() => { draggingHandleRef.current = draggingHandle; }, [draggingHandle]);
+
+    // rAF clamp loop. Runs at the browser's frame rate (~16ms) while the
+    // video is playing, which is tight enough that even a 1-second trim
+    // loops cleanly. Driven by play/pause events on the <video>.
     useEffect(() => {
         const v = videoRef.current;
         if (!v) return;
-        v.load();
-        // Reset thumbnails — they'll be re-extracted once new metadata loads.
-        setThumbs([]);
-    }, [videoUrl]);
+        let rafId = 0;
+
+        const tick = () => {
+            if (draggingHandleRef.current) {
+                rafId = requestAnimationFrame(tick);
+                return;
+            }
+            const start = trimStartRef.current;
+            const end = trimEndRef.current;
+            if (end > start) {
+                if (v.currentTime >= end - 0.02) {
+                    v.currentTime = start;
+                } else if (v.currentTime < start - 0.02) {
+                    v.currentTime = start;
+                }
+            }
+            rafId = requestAnimationFrame(tick);
+        };
+
+        const onPlay = () => {
+            const start = trimStartRef.current;
+            const end = trimEndRef.current;
+            if (v.currentTime < start || v.currentTime >= end - 0.05) {
+                v.currentTime = start;
+            }
+            cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(tick);
+        };
+        const onPause = () => {
+            cancelAnimationFrame(rafId);
+            rafId = 0;
+        };
+        // Clamp native scrub-bar drags too: if the operator drags the system
+        // playhead outside the kept region, snap them back inside.
+        const onSeeking = () => {
+            if (draggingHandleRef.current) return;
+            const start = trimStartRef.current;
+            const end = trimEndRef.current;
+            if (v.currentTime < start - 0.02) v.currentTime = start;
+            else if (v.currentTime >= end - 0.02) v.currentTime = start;
+        };
+
+        v.addEventListener('play', onPlay);
+        v.addEventListener('pause', onPause);
+        v.addEventListener('ended', onPause);
+        v.addEventListener('seeking', onSeeking);
+
+        return () => {
+            cancelAnimationFrame(rafId);
+            v.removeEventListener('play', onPlay);
+            v.removeEventListener('pause', onPause);
+            v.removeEventListener('ended', onPause);
+            v.removeEventListener('seeking', onSeeking);
+        };
+    }, []);
 
     // Extract THUMB_COUNT thumbnails from the video using an offscreen
     // <video> + canvas. Runs whenever the video URL or duration changes.
@@ -220,14 +295,12 @@ export default function VideoEditor({
             if (!res.ok || json.success === false) {
                 throw new Error(json.error || `Process failed (HTTP ${res.status})`);
             }
-            const fresh = `${json.staged_video_url}?t=${Date.now()}`;
-            setVideoUrl(fresh);
+            // Keep the original loaded so the operator can re-trim differently
+            // without losing material. The server cut a fresh staged file from
+            // the original; that URL is now what the publisher will use, but
+            // it never replaces the video element's source here.
             const newDuration = trimEnd - trimStart;
-            initialEndSetForUrl.current = fresh;
-            setTrimStart(0);
-            setTrimEnd(newDuration);
-            setDuration(newDuration);
-            setInfo(`Trimmed to ${newDuration.toFixed(1)}s (${(json.bytes / 1024 / 1024).toFixed(1)} MB)${watermark ? ' with watermark' : ''}.`);
+            setInfo(`Saved a ${newDuration.toFixed(1)}s clip${watermark ? ' with watermark' : ''} (${(json.bytes / 1024 / 1024).toFixed(1)} MB). Adjust the handles and Apply again to re-cut from the original.`);
             onProcessed?.(json.staged_video_url, newDuration);
         } catch (e: any) {
             setError(e?.message || 'Process failed');

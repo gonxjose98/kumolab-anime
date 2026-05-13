@@ -526,7 +526,13 @@ export default function PostEditor() {
             {isVideoPost ? (
                 <VideoEditor
                     postId={id}
-                    initialVideoUrl={post.social_ids.staged_video_url}
+                    // Always load the immutable original. staged_video_url is
+                    // the publisher's current trimmed file; the editor needs
+                    // the full source to let the operator re-trim freely.
+                    // Legacy posts (imported before original_video_url existed)
+                    // fall back to staged_video_url, which on a never-trimmed
+                    // post is identical to the original.
+                    initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
                     initialSettings={post.image_settings?.video}
                     onProcessed={(newUrl) => {
                         // Mirror the new URL onto local post state so other
