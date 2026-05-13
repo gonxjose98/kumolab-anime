@@ -15,12 +15,14 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { searchYouTube } from '@/lib/youtube/search';
 
 export const dynamic = 'force-dynamic';
-// Render free tier sleeps the yt-dlp worker after 15min idle. First
-// click after that period triggers a 30-90s cold start before /search
-// even responds. 30s here was too tight and produced a 504 from
-// Vercel's edge. 120s gives the worker time to wake + run yt-dlp
-// without ever bumping against the function timeout.
-export const maxDuration = 120;
+// Render free tier sleeps the yt-dlp worker after 15min idle. A cold
+// click can stack 30-90s cold-start + up to 60s of yt-dlp ytsearch
+// over the Webshare proxy. 30s here was too tight and produced a 504
+// from Vercel's edge. 180s gives headroom for the worst case (cold
+// start + slow proxy + retry) without ever bumping against the limit.
+// The internal abort in search.ts (90s, with a 3s retry on cold-abort)
+// still surfaces a friendly JSON error before Vercel kills the fn.
+export const maxDuration = 180;
 
 export async function POST(req: NextRequest) {
     try {
