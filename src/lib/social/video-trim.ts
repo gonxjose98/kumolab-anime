@@ -23,6 +23,8 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import crypto from 'crypto';
 import { supabaseAdmin } from '../supabase/admin';
 import { logError } from '../logging/structured-logger';
 
@@ -72,24 +74,27 @@ async function fetchBucketVideo(url: string): Promise<Buffer | null> {
 }
 
 /**
- * Build the FFmpeg argv for a trim+optional-watermark pass over stdin → stdout.
- * - -ss must come AFTER -i when input is pipe:0. stdin is not seekable, so
- *   pre-input -ss fails immediately with the input being eaten. Post-input
- *   -ss discards frames until the seek point — slower than fast-seek on a
- *   real file but works on stdin. Operator clips are short (≤ a few minutes)
- *   so the discard cost is negligible.
- * - When watermark is off, we use -c copy → near-instant trim, no re-encode.
- * - When watermark is on, video stream must re-encode; audio copies.
+ * Build the FFmpeg argv for a trim+optional-watermark pass between two
+ * real files on disk. Using /tmp on Vercel (writable, 512 MB) lets us:
+ *   - Fast-seek the input with pre-input -ss (requires seekable source)
+ *   - Use +faststart on output (requires seekable destination, otherwise
+ *     ffmpeg errors with "muxer does not support non seekable output")
+ * Both of these die when piping through stdin/stdout.
  */
-function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] {
+function buildArgs(
+    opts: TrimOptions,
+    fontPathEscaped: string | null,
+    inputPath: string,
+    outputPath: string,
+): string[] {
     const duration = Math.max(0, opts.trimEnd - opts.trimStart);
     const base: string[] = [
         '-hide_banner',
         '-loglevel', 'error',
         '-y',
-        '-i', 'pipe:0',
-        // Post-input seek + duration — works on non-seekable stdin
+        // Pre-input fast seek — works because input is a real file
         '-ss', opts.trimStart.toFixed(3),
+        '-i', inputPath,
         '-t', duration.toFixed(3),
     ];
 
@@ -120,8 +125,7 @@ function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] 
             '-level', '4.1',
             '-c:a', 'copy',
             '-movflags', '+faststart',
-            '-f', 'mp4',
-            'pipe:1',
+            outputPath,
         ];
     }
 
@@ -130,8 +134,7 @@ function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] 
         ...base,
         '-c', 'copy',
         '-movflags', '+faststart',
-        '-f', 'mp4',
-        'pipe:1',
+        outputPath,
     ];
 }
 
@@ -142,11 +145,11 @@ interface FfmpegResult {
     spawnError?: string;
 }
 
-function runFfmpeg(input: Buffer, args: string[]): Promise<FfmpegResult> {
+function runFfmpegFileIO(args: string[]): Promise<FfmpegResult> {
     return new Promise((resolve) => {
         let proc;
         try {
-            proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+            proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
         } catch (e: any) {
             const msg = e?.message || String(e);
             console.error('[VideoTrim] spawn failed:', msg);
@@ -154,9 +157,7 @@ function runFfmpeg(input: Buffer, args: string[]): Promise<FfmpegResult> {
             return;
         }
 
-        const chunks: Buffer[] = [];
         let stderrTail = '';
-        proc.stdout.on('data', (c: Buffer) => chunks.push(c));
         proc.stderr.on('data', (c: Buffer) => {
             stderrTail = (stderrTail + c.toString()).slice(-2000);
         });
@@ -179,13 +180,11 @@ function runFfmpeg(input: Buffer, args: string[]): Promise<FfmpegResult> {
                 resolve({ output: null, exitCode: code, stderrTail });
                 return;
             }
-            resolve({ output: Buffer.concat(chunks), exitCode: code, stderrTail });
+            // Output is on disk; caller reads it. Return an empty buffer
+            // here just to signal success — the real bytes come from
+            // readFileSync(outputPath) in the orchestrator.
+            resolve({ output: Buffer.alloc(0), exitCode: code, stderrTail });
         });
-
-        proc.stdin.on('error', (e: Error) => {
-            console.warn('[VideoTrim] stdin write error:', e.message);
-        });
-        proc.stdin.end(input);
     });
 }
 
@@ -214,12 +213,38 @@ export async function trimImportedVideo(
         }
     }
 
-    const args = buildArgs(opts, fontPathEscaped);
-    const ff = await runFfmpeg(sourceBuf, args);
-    if (!ff.output || ff.output.length === 0) {
+    // Vercel /tmp is writable (512 MB) and the only place we can use
+    // seekable file I/O. Both -movflags +faststart on output and fast-seek
+    // -ss on input require real files — they fail on stdin/stdout pipes.
+    const tmpDir = os.tmpdir();
+    const tmpId = crypto.randomBytes(6).toString('hex');
+    const inputPath = path.join(tmpDir, `trim-in-${tmpId}.mp4`);
+    const outputPath = path.join(tmpDir, `trim-out-${tmpId}.mp4`);
+
+    const cleanup = () => {
+        try { fs.unlinkSync(inputPath); } catch { /* noop */ }
+        try { fs.unlinkSync(outputPath); } catch { /* noop */ }
+    };
+
+    try {
+        fs.writeFileSync(inputPath, sourceBuf);
+    } catch (e: any) {
+        cleanup();
+        await logError({
+            source: 'video-trim.tmpwrite',
+            errorMessage: `Could not write source to /tmp: ${e?.message || e}`,
+            context: { postId, bytes: sourceBuf.length },
+        }).catch(() => {});
+        return { error: 'Failed to stage source video on server' };
+    }
+
+    const args = buildArgs(opts, fontPathEscaped, inputPath, outputPath);
+    const ff = await runFfmpegFileIO(args);
+    if (ff.exitCode !== 0 || !fs.existsSync(outputPath)) {
         const summary = ff.spawnError
             ? `spawn failed: ${ff.spawnError}`
             : `ffmpeg exited ${ff.exitCode}: ${ff.stderrTail.slice(-400) || 'no stderr'}`;
+        cleanup();
         await logError({
             source: 'video-trim.ffmpeg',
             errorMessage: `FFmpeg failed — ${summary}`,
@@ -227,7 +252,23 @@ export async function trimImportedVideo(
         }).catch(() => {});
         return { error: `Video processing failed — ${summary.slice(0, 200)}` };
     }
-    const out = ff.output;
+
+    let out: Buffer;
+    try {
+        out = fs.readFileSync(outputPath);
+    } catch (e: any) {
+        cleanup();
+        await logError({
+            source: 'video-trim.tmpread',
+            errorMessage: `Could not read processed output: ${e?.message || e}`,
+            context: { postId, outputPath },
+        }).catch(() => {});
+        return { error: 'Failed to read processed video from server' };
+    }
+    cleanup();
+    if (out.length === 0) {
+        return { error: 'Processed video is empty' };
+    }
 
     // New bucket path so we never overwrite the original (operator may want
     // to retry with different trim points; the source must remain intact).
