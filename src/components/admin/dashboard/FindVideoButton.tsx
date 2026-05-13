@@ -16,7 +16,8 @@
  *   /api/admin/scrape-attach → download MP4 + UPDATE the pending row
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 
 type Step = 'idle' | 'searching' | 'results' | 'downloading' | 'done';
@@ -86,7 +87,16 @@ export default function FindVideoButton({
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const [query, setQuery] = useState(cleanQueryForSearch(postTitle));
+
+    // The dashboard's pending-review Card uses backdrop-filter: blur(),
+    // which makes it a containing block for position:fixed descendants.
+    // Without a portal the modal would anchor inside the Card instead
+    // of the viewport — its footer overlapped the "Next 24 Hours" and
+    // "Recently Published" sections below. Portal to document.body so
+    // the modal sits at the top of the stacking context.
+    useEffect(() => setMounted(true), []);
     const [step, setStep] = useState<Step>('idle');
     const [error, setError] = useState<string | null>(null);
     const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -185,7 +195,7 @@ export default function FindVideoButton({
                 🔍 Find Video
             </button>
 
-            {open && (
+            {open && mounted && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4"
                     style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
@@ -383,7 +393,8 @@ export default function FindVideoButton({
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </>
     );
