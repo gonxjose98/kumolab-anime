@@ -7,6 +7,12 @@
  * candidates with risk flags the operator can use to override the
  * pre-selected top pick.
  *
+ * Backend: calls the kumolab-yt-dlp-worker's POST /search endpoint
+ * (yt-dlp's `ytsearchN:` driver). Goes through the same Webshare proxy
+ * chain as the /download path, so no YouTube Data API quota or key is
+ * needed. The worker returns full metadata per result (title, channel,
+ * duration, view count, upload_date, thumbnail).
+ *
  * Ranking signals:
  *   + Official-channel match (curated allowlist of anime distributors/studios)
  *   + Duration fits the claim-type window (or the OP/ED override window)
@@ -20,13 +26,10 @@
  * the operator can still pick them when there's nothing better.
  */
 
-const API_KEY = process.env.YOUTUBE_API_KEY || '';
-const API_BASE = 'https://www.googleapis.com/youtube/v3';
-
 // Channels we strongly trust as official anime / distributor sources.
-// Matched against the lowercased channelTitle returned by YouTube. The
-// list is intentionally small + curated — false positives here would
-// auto-elevate fan re-uploads with the same channel name.
+// Matched against the lowercased channelTitle returned by the worker.
+// The list is intentionally small + curated — false positives here
+// would auto-elevate fan re-uploads with the same channel name.
 const OFFICIAL_CHANNEL_TITLES = new Set<string>([
     'aniplex usa',
     'aniplex of america',
@@ -103,11 +106,15 @@ export interface YouTubeCandidate {
     risks: CandidateRisk[];
 }
 
-function parseISO8601Duration(iso: string): number {
-    if (!iso) return 0;
-    const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
-    if (!m) return 0;
-    return (parseInt(m[1] || '0', 10) * 3600) + (parseInt(m[2] || '0', 10) * 60) + parseInt(m[3] || '0', 10);
+interface WorkerSearchItem {
+    videoId: string;
+    title: string;
+    channelTitle: string;
+    channelId: string;
+    durationSeconds: number;
+    viewCount: number;
+    publishedAt: string;
+    thumbnailUrl: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -117,52 +124,70 @@ function formatDuration(seconds: number): string {
     return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
+function workerEnv(): { url: string; secret: string } | null {
+    const url = process.env.YT_WORKER_URL;
+    const secret = process.env.YT_WORKER_SECRET;
+    if (!url || !secret) return null;
+    return { url: url.replace(/\/$/, ''), secret };
+}
+
+async function workerSearch(
+    query: string,
+    maxResults: number,
+): Promise<{ ok: true; items: WorkerSearchItem[] } | { ok: false; error: string }> {
+    const worker = workerEnv();
+    if (!worker) return { ok: false, error: 'YT_WORKER_URL / YT_WORKER_SECRET not configured' };
+
+    // Cold-start tolerance: the worker can sleep up to 60s on Render's
+    // free tier. We retry once on AbortError after a 3s warmup like the
+    // download path does.
+    const callOnce = async (): Promise<{ ok: true; items: WorkerSearchItem[] } | { ok: false; err: string }> => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 90_000);
+        try {
+            const r = await fetch(`${worker.url}/search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${worker.secret}`,
+                },
+                body: JSON.stringify({ query, maxResults }),
+                signal: ctrl.signal,
+            });
+            if (!r.ok) {
+                const detail = (await r.text().catch(() => '')).slice(0, 300);
+                return { ok: false, err: `HTTP ${r.status}: ${detail}` };
+            }
+            const j: any = await r.json();
+            return { ok: true, items: (j?.items ?? []) as WorkerSearchItem[] };
+        } catch (e: any) {
+            return { ok: false, err: (e?.message || e).toString() };
+        } finally {
+            clearTimeout(timer);
+        }
+    };
+
+    let res = await callOnce();
+    if (!res.ok && /abort/i.test(res.err)) {
+        await new Promise((r) => setTimeout(r, 3_000));
+        res = await callOnce();
+    }
+    if (!res.ok) return { ok: false, error: `worker /search failed: ${res.err}` };
+    return { ok: true, items: res.items };
+}
+
 export async function searchYouTube(
     query: string,
     options: { claimType?: string | null; postPublishedAt?: string | null; maxResults?: number } = {},
 ): Promise<{ ok: true; candidates: YouTubeCandidate[] } | { ok: false; error: string }> {
-    if (!API_KEY) return { ok: false, error: 'YOUTUBE_API_KEY not configured' };
     const q = query.trim();
     if (!q) return { ok: false, error: 'Query is empty' };
 
     const maxResults = Math.min(Math.max(options.maxResults ?? 10, 5), 15);
 
-    // 1. search.list — IDs only; videos.list gives us the real metadata.
-    const searchUrl =
-        `${API_BASE}/search?part=snippet&type=video&maxResults=${maxResults}` +
-        `&q=${encodeURIComponent(q)}&order=relevance&safeSearch=none&key=${API_KEY}`;
-
-    let searchRes: Response;
-    try {
-        searchRes = await fetch(searchUrl, { cache: 'no-store' });
-    } catch (e: any) {
-        return { ok: false, error: `YouTube search fetch failed: ${e?.message || e}` };
-    }
-    if (!searchRes.ok) {
-        const body = await searchRes.text().catch(() => '');
-        return { ok: false, error: `YouTube search HTTP ${searchRes.status}: ${body.slice(0, 200)}` };
-    }
-    const searchJson: any = await searchRes.json().catch(() => null);
-    const items: any[] = searchJson?.items || [];
-    const ids = items.map((i) => i?.id?.videoId).filter(Boolean) as string[];
-    if (ids.length === 0) return { ok: true, candidates: [] };
-
-    // 2. videos.list — duration + view count + channel + snippet.
-    const videosUrl =
-        `${API_BASE}/videos?part=contentDetails,statistics,snippet` +
-        `&id=${ids.join(',')}&key=${API_KEY}`;
-    let videosRes: Response;
-    try {
-        videosRes = await fetch(videosUrl, { cache: 'no-store' });
-    } catch (e: any) {
-        return { ok: false, error: `YouTube videos fetch failed: ${e?.message || e}` };
-    }
-    if (!videosRes.ok) {
-        const body = await videosRes.text().catch(() => '');
-        return { ok: false, error: `YouTube videos HTTP ${videosRes.status}: ${body.slice(0, 200)}` };
-    }
-    const videosJson: any = await videosRes.json().catch(() => null);
-    const vItems: any[] = videosJson?.items || [];
+    const res = await workerSearch(q, maxResults);
+    if (!res.ok) return { ok: false, error: res.error };
+    if (res.items.length === 0) return { ok: true, candidates: [] };
 
     const queryDetectsOpEd = OP_ED_PATTERN.test(q);
     const claimType = (options.claimType || 'OTHER').toUpperCase();
@@ -173,21 +198,9 @@ export async function searchYouTube(
         ? new Date(options.postPublishedAt).getTime()
         : Date.now();
 
-    const candidates: YouTubeCandidate[] = vItems.map((v: any) => {
-        const videoId: string = v.id;
-        const title: string = v.snippet?.title || '';
-        const channelTitle: string = v.snippet?.channelTitle || '';
-        const channelId: string = v.snippet?.channelId || '';
-        const publishedAt: string = v.snippet?.publishedAt || '';
-        const thumbnailUrl: string =
-            v.snippet?.thumbnails?.medium?.url ||
-            v.snippet?.thumbnails?.default?.url ||
-            '';
-        const durationSeconds = parseISO8601Duration(v.contentDetails?.duration || '');
-        const viewCount = parseInt(v.statistics?.viewCount || '0', 10);
-
-        const lcTitle = title.toLowerCase();
-        const lcChannel = channelTitle.toLowerCase();
+    const candidates: YouTubeCandidate[] = res.items.map((v) => {
+        const lcTitle = v.title.toLowerCase();
+        const lcChannel = v.channelTitle.toLowerCase();
 
         const pros: string[] = [];
         const risks: CandidateRisk[] = [];
@@ -195,18 +208,18 @@ export async function searchYouTube(
         const isOfficial = OFFICIAL_CHANNEL_TITLES.has(lcChannel);
         if (isOfficial) pros.push('Official channel');
 
-        const inDurationWindow = durationSeconds >= window[0] && durationSeconds <= window[1];
+        const inDurationWindow = v.durationSeconds >= window[0] && v.durationSeconds <= window[1];
         if (inDurationWindow) {
             pros.push('Duration fits');
-        } else if (durationSeconds > window[1]) {
+        } else if (v.durationSeconds > window[1]) {
             risks.push({
                 type: 'warn',
-                label: `Long video (${formatDuration(durationSeconds)} > ${formatDuration(window[1])})`,
+                label: `Long video (${formatDuration(v.durationSeconds)} > ${formatDuration(window[1])})`,
             });
-        } else if (durationSeconds > 0) {
+        } else if (v.durationSeconds > 0) {
             risks.push({
                 type: 'warn',
-                label: `Short video (${formatDuration(durationSeconds)} < ${formatDuration(window[0])})`,
+                label: `Short video (${formatDuration(v.durationSeconds)} < ${formatDuration(window[0])})`,
             });
         }
 
@@ -217,13 +230,13 @@ export async function searchYouTube(
             risks.push({ type: 'bad', label: 'Compilation / recap content' });
         }
 
-        const ageDays = publishedAt
-            ? Math.abs(postTime - new Date(publishedAt).getTime()) / (24 * 3600 * 1000)
+        const ageDays = v.publishedAt
+            ? Math.abs(postTime - new Date(v.publishedAt).getTime()) / (24 * 3600 * 1000)
             : Infinity;
         const recentBonus = ageDays < 14;
         if (recentBonus) pros.push('Recent upload');
 
-        if (durationSeconds > WORKER_HARD_CAP_SECONDS) {
+        if (v.durationSeconds > WORKER_HARD_CAP_SECONDS) {
             risks.push({
                 type: 'bad',
                 label: `Too long for worker (>${formatDuration(WORKER_HARD_CAP_SECONDS)})`,
@@ -236,20 +249,20 @@ export async function searchYouTube(
         if (recentBonus) score += 20;
         if (REACTION_PATTERN.test(lcTitle)) score -= 80;
         if (COMPILATION_PATTERN.test(lcTitle)) score -= 50;
-        if (durationSeconds > WORKER_HARD_CAP_SECONDS) score -= 150;
-        score += Math.log10(Math.max(viewCount, 1)) * 2;
+        if (v.durationSeconds > WORKER_HARD_CAP_SECONDS) score -= 150;
+        score += Math.log10(Math.max(v.viewCount, 1)) * 2;
 
         return {
-            videoId,
-            url: `https://www.youtube.com/watch?v=${videoId}`,
-            title,
-            channelTitle,
-            channelId,
-            durationSeconds,
-            durationText: durationSeconds > 0 ? formatDuration(durationSeconds) : '—',
-            viewCount,
-            publishedAt,
-            thumbnailUrl,
+            videoId: v.videoId,
+            url: `https://www.youtube.com/watch?v=${v.videoId}`,
+            title: v.title,
+            channelTitle: v.channelTitle,
+            channelId: v.channelId,
+            durationSeconds: v.durationSeconds,
+            durationText: v.durationSeconds > 0 ? formatDuration(v.durationSeconds) : '—',
+            viewCount: v.viewCount,
+            publishedAt: v.publishedAt,
+            thumbnailUrl: v.thumbnailUrl,
             score,
             pros,
             risks,
