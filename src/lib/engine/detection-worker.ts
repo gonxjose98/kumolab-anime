@@ -20,7 +20,7 @@ import {
 } from './intelligence-config';
 import { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } from './sources-config';
 import { logSchedulerRun } from '../logging/scheduler';
-import { logScraperDecision, logError, logAgentAction } from '../logging/structured-logger';
+import { logScraperDecision, logError, logAgentAction, logAction } from '../logging/structured-logger';
 import { createFingerprint } from './utils';
 
 // RSS positive keyword filter — only accept RSS items matching these terms
@@ -76,7 +76,11 @@ async function loadSourceHealth(sourceName: string): Promise<{ healthScore: numb
   }
 }
 
-async function updateSourceHealthDB(sourceName: string, sourceTier: number, success: boolean) {
+async function updateSourceHealthDB(
+  sourceName: string,
+  sourceTier: number,
+  success: boolean,
+): Promise<{ newFailures: number; shouldDisable: boolean }> {
   try {
     const existing = await loadSourceHealth(sourceName);
     const newHealth = success
@@ -103,9 +107,44 @@ async function updateSourceHealthDB(sourceName: string, sourceTier: number, succ
     }
 
     await supabaseAdmin.from('source_health').upsert(update, { onConflict: 'source_name' });
+    return { newFailures, shouldDisable };
   } catch (e) {
     console.error(`[DetectionWorker] Failed to update health for ${sourceName}:`, e);
+    return { newFailures: 0, shouldDisable: false };
   }
+}
+
+// Threshold of consecutive RSS failures before a source's flake is treated
+// as a real error rather than an operational blip. Below this, we log to
+// action_logs (operational state). At/above this, the dashboard's
+// "Errors 24h" counter lights up. Keeps single-tick network blips from
+// pretending to be incidents.
+const PERSISTENT_RSS_FAILURE_THRESHOLD = 3;
+
+// One log call per RSS fetch failure. Routes to action_logs by default;
+// escalates to error_logs once a source has flaked N times in a row.
+async function logRssFailure(
+  sourceName: string,
+  sourceUrl: string,
+  reason: string,
+  consecutiveFailures: number,
+) {
+  if (consecutiveFailures >= PERSISTENT_RSS_FAILURE_THRESHOLD) {
+    await logError({
+      source: 'detection-worker',
+      errorMessage: `RSS fetch failing persistently for ${sourceName} (${consecutiveFailures} consecutive)`,
+      context: { url: sourceUrl, reason, consecutiveFailures },
+    });
+    return;
+  }
+  await logAction({
+    action: 'source_fetch_failed',
+    entityType: 'source',
+    entityTitle: sourceName,
+    actor: 'detection-worker',
+    reason: reason.slice(0, 200),
+    details: { url: sourceUrl, consecutiveFailures },
+  });
 }
 
 // ─── RSS Fetch ──────────────────────────────────────────────
@@ -646,14 +685,14 @@ export async function runDetectionWorker(): Promise<{
         await updateSourceHealthDB(source.name, source.tier, true);
         console.log(`[DetectionWorker] ${source.name}: ${candidates.length} candidates`);
       } else {
-        await updateSourceHealthDB(source.name, source.tier, false);
+        const { newFailures } = await updateSourceHealthDB(source.name, source.tier, false);
         errors.push(`${source.name}: Failed to fetch`);
-        await logError({ source: 'detection-worker', errorMessage: `RSS fetch failed for ${source.name}`, context: { url: source.url } });
+        await logRssFailure(source.name, source.url, 'no_content', newFailures);
       }
     } catch (error: any) {
-      await updateSourceHealthDB(source.name, source.tier, false);
+      const { newFailures } = await updateSourceHealthDB(source.name, source.tier, false);
       errors.push(`${source.name}: ${error.message}`);
-      await logError({ source: 'detection-worker', errorMessage: error.message, context: { source: source.name } });
+      await logRssFailure(source.name, source.url, error?.message || 'exception', newFailures);
     }
   }
 
