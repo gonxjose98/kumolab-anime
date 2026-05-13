@@ -85,10 +85,24 @@ export async function POST(req: NextRequest) {
                 image_settings: {
                     ...existingSettings,
                     video: {
-                        trimStart,
-                        trimEnd,
-                        watermark: !!watermark,
-                        sourceUrl, // keep the pre-trim URL so the operator can re-cut
+                        // The trim we just applied is BAKED into the new
+                        // bucket file. Persist "no further trim" so reopening
+                        // the editor shows the full new clip; otherwise the
+                        // operator's stored start/end would re-cut the
+                        // already-trimmed video on the next save (double cut).
+                        trimStart: 0,
+                        trimEnd: result.duration_seconds,
+                        watermark: false,
+                        // Keep the pre-trim URL so a future feature could let
+                        // the operator restore from the original.
+                        sourceUrl,
+                        // Audit trail: what was actually applied this round.
+                        lastApplied: {
+                            trimStart,
+                            trimEnd,
+                            watermark: !!watermark,
+                            at: new Date().toISOString(),
+                        },
                     },
                 },
             })
