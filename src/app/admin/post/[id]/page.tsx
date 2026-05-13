@@ -2,6 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import VideoEditor from '@/components/admin/post/VideoEditor';
 
 interface XY { x: number; y: number }
 
@@ -155,15 +156,23 @@ export default function PostEditor() {
                     setSourceUrl('');
                 }
                 setImageUrl(data.image || '');
-                // Fire a preview render immediately with the default toggle
-                // state (all OFF). This makes the displayed image actually
-                // match the toggle UI on open — without it, the editor was
-                // showing whatever was last persisted to post.image (which
-                // for posts touched by the pre-fix editor still has overlays
-                // baked in). Render-on-open also makes Force Regenerate's
-                // result feel meaningful — the displayed image is now
-                // demonstrably "what these settings produce right now."
-                kickPreview(data);
+                // Video imports (social_ids.staged_video_url set, image null)
+                // don't have an image canvas to render — VideoEditor handles
+                // them. Skip the image preview render entirely; otherwise
+                // /api/admin/render-post-image gets called with no source
+                // and either errors or produces a blank.
+                const isVideoImport = !!data.social_ids?.staged_video_url && !data.image;
+                if (!isVideoImport) {
+                    // Fire a preview render immediately with the default toggle
+                    // state (all OFF). This makes the displayed image actually
+                    // match the toggle UI on open — without it, the editor was
+                    // showing whatever was last persisted to post.image (which
+                    // for posts touched by the pre-fix editor still has overlays
+                    // baked in). Render-on-open also makes Force Regenerate's
+                    // result feel meaningful — the displayed image is now
+                    // demonstrably "what these settings produce right now."
+                    kickPreview(data);
+                }
                 initialLoadDone.current = true;
             } catch (e: any) {
                 setError(e?.message || 'Post not found');
@@ -235,6 +244,11 @@ export default function PostEditor() {
         return json;
     }
 
+    // Video posts come from /api/admin/import-from-url. Their image column
+    // is null and their staged_video_url lives in social_ids. The image
+    // overlay editor doesn't apply to them — VideoEditor takes its place.
+    const isVideoPost = !!(post?.social_ids?.staged_video_url) && !post?.image;
+
     async function handleSave(opts: { thenApprove?: boolean } = {}) {
         // What you see is what publishes. We send the exact base64 bytes
         // the preview just rendered — the server uploads them as-is, no
@@ -246,25 +260,35 @@ export default function PostEditor() {
         // ran) we fall back to a server-side render with persist=true
         // using current settings. That path produces the same output as
         // the auto-render would have.
+        //
+        // Video posts skip the image render entirely — title + caption are
+        // the only mutable fields here; the video itself is processed via
+        // VideoEditor's own "Apply changes" button against /api/admin/video-process.
         const action = opts.thenApprove ? 'approve' : 'save';
         setBusy(action);
         setError(null);
         try {
-            const renderJson = await callJson('/api/admin/render-post-image', {
-                postId: id,
-                sourceUrl: sourceUrl || undefined,
-                title,
-                excerpt,
-                settings,
-                persist: true,
-                previewImage: lastPreviewBytes.current || undefined,
-            });
+            let imageBytesForSave: string | undefined;
+            if (!isVideoPost) {
+                const renderJson = await callJson('/api/admin/render-post-image', {
+                    postId: id,
+                    sourceUrl: sourceUrl || undefined,
+                    title,
+                    excerpt,
+                    settings,
+                    persist: true,
+                    previewImage: lastPreviewBytes.current || undefined,
+                });
+                imageBytesForSave = renderJson.image;
+            }
 
+            const putBody: Record<string, any> = { id, title, excerpt, content };
+            if (imageBytesForSave) putBody.image = imageBytesForSave;
             const res = await fetch('/api/posts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ id, title, excerpt, content, image: renderJson.image }),
+                body: JSON.stringify(putBody),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || json.success === false) {
@@ -498,39 +522,56 @@ export default function PostEditor() {
                 </div>
             )}
 
-            {/* ── 1. Image preview — front and center ──────────────── */}
-            <Card>
-                <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
-                    {imageUrl && !imageError ? (
-                        <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                key={imageUrl}
-                                src={imageUrl}
-                                alt={title}
-                                className="w-full h-full object-cover"
-                                onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
-                            />
-                            {busy === 'render' && (
-                                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                                    <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
-                                        Rendering…
-                                    </span>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                            <span className="text-xs" style={{ color: '#ff9999' }}>
-                                {imageError || 'No image set yet.'}
-                            </span>
-                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                Open "Image source" below to set one.
-                            </span>
-                        </div>
-                    )}
-                </div>
-            </Card>
+            {/* ── 1. Preview — video for imports, image for everything else ── */}
+            {isVideoPost ? (
+                <VideoEditor
+                    postId={id}
+                    initialVideoUrl={post.social_ids.staged_video_url}
+                    initialSettings={post.image_settings?.video}
+                    onProcessed={(newUrl) => {
+                        // Mirror the new URL onto local post state so other
+                        // parts of the page (Save, etc.) reflect the change
+                        // without a full reload.
+                        setPost((prev: any) => prev ? {
+                            ...prev,
+                            social_ids: { ...prev.social_ids, staged_video_url: newUrl },
+                        } : prev);
+                    }}
+                />
+            ) : (
+                <Card>
+                    <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
+                        {imageUrl && !imageError ? (
+                            <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    key={imageUrl}
+                                    src={imageUrl}
+                                    alt={title}
+                                    className="w-full h-full object-cover"
+                                    onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
+                                />
+                                {busy === 'render' && (
+                                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
+                                            Rendering…
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+                                <span className="text-xs" style={{ color: '#ff9999' }}>
+                                    {imageError || 'No image set yet.'}
+                                </span>
+                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                    Open "Image source" below to set one.
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             {/* ── 2. Title — prominent, magazine-style ─────────────── */}
             <Card className="p-5">
@@ -568,6 +609,10 @@ export default function PostEditor() {
             </Card>
 
             {/* ── 4. Overlay & image editing — collapsed by default ── */}
+            {/* Hidden entirely for video posts — the image canvas overlay
+                model doesn't apply to video imports; VideoEditor (Section 1)
+                already owns trim + watermark for that flow. */}
+            {!isVideoPost && (
             <Collapsible
                 title="Overlay & image editing"
                 hint="Customize the text rendered on the image, gradients, watermark, and layout"
@@ -752,8 +797,10 @@ export default function PostEditor() {
                     />
                 </div>
             </Collapsible>
+            )}
 
             {/* ── 5. Image source — collapsed by default ──────────── */}
+            {!isVideoPost && (
             <Collapsible
                 title="Image source"
                 hint="Replace the background image — upload, paste a URL, or reset to a fresh original"
@@ -841,6 +888,7 @@ export default function PostEditor() {
                     </Field>
                 </div>
             </Collapsible>
+            )}
 
             {/* ── 6. Quick actions ─────────────────────────────────── */}
             {isPending && (
