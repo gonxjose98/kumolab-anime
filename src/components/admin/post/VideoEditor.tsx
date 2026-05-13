@@ -8,16 +8,17 @@
  * editing sections when the post is a video import (social_ids.staged_video_url
  * is set and post.image is null).
  *
- * Self-contained — owns the video element, trim sliders, watermark toggle,
- * and the "Apply changes" call to /api/admin/video-process. After a
- * successful process, swaps the player source to the new bucket URL so the
- * operator can preview the trimmed result without leaving the page.
+ * Trim UX: iPhone / Instagram style — a horizontal filmstrip of thumbnails
+ * extracted from the video, with two draggable edge handles. The "kept"
+ * region between the handles is bright; everything outside is dimmed.
+ * Dragging a handle live-seeks the video so the operator sees the exact
+ * frame they're cutting to. No numeric inputs.
  *
  * Title + caption + Save/Approve stay in the parent page (work the same for
  * both image and video posts).
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface VideoSettings {
     trimStart: number;
@@ -27,13 +28,14 @@ interface VideoSettings {
 
 interface VideoEditorProps {
     postId: string;
-    /** Current staged video URL (changes after each successful process). */
     initialVideoUrl: string;
-    /** Persisted trim settings from posts.image_settings.video, if any. */
     initialSettings?: Partial<VideoSettings>;
-    /** Called when a process succeeds with the new URL, so parent can refresh post state. */
     onProcessed?: (newUrl: string, durationSeconds: number) => void;
 }
+
+const THUMB_COUNT = 8;
+const HANDLE_WIDTH_PX = 14;
+const TIMELINE_HEIGHT_PX = 72;
 
 export default function VideoEditor({
     postId,
@@ -42,6 +44,8 @@ export default function VideoEditor({
     onProcessed,
 }: VideoEditorProps) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const timelineRef = useRef<HTMLDivElement | null>(null);
+
     const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
     const [duration, setDuration] = useState<number | null>(null);
     const [trimStart, setTrimStart] = useState(initialSettings?.trimStart ?? 0);
@@ -50,11 +54,11 @@ export default function VideoEditor({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [info, setInfo] = useState<string | null>(null);
+    const [thumbs, setThumbs] = useState<string[]>([]);
+    const [draggingHandle, setDraggingHandle] = useState<'start' | 'end' | null>(null);
 
-    // Once the <video> element loads metadata, snap the end slider to the
-    // video's true duration if the operator hasn't moved it yet. We only
-    // do this on the first metadata load per video URL — once the operator
-    // has dragged the slider, their position is sticky.
+    // On first metadata load per URL: snap the end handle to the full
+    // duration if the operator hasn't already set one.
     const initialEndSetForUrl = useRef<string | null>(null);
     function handleLoadedMetadata() {
         const v = videoRef.current;
@@ -62,20 +66,117 @@ export default function VideoEditor({
         setDuration(v.duration);
         if (initialEndSetForUrl.current !== videoUrl) {
             initialEndSetForUrl.current = videoUrl;
-            // If no persisted trim, default to full clip.
             if (!initialSettings?.trimEnd || initialSettings.trimEnd === 0) {
                 setTrimEnd(v.duration);
             }
         }
     }
 
-    // Whenever videoUrl swaps to a freshly processed result, force the
-    // <video> element to reload from the new source.
+    // Force video element to re-fetch when we swap to a freshly processed result.
     useEffect(() => {
         const v = videoRef.current;
         if (!v) return;
         v.load();
+        // Reset thumbnails — they'll be re-extracted once new metadata loads.
+        setThumbs([]);
     }, [videoUrl]);
+
+    // Extract THUMB_COUNT thumbnails from the video using an offscreen
+    // <video> + canvas. Runs whenever the video URL or duration changes.
+    // If CORS blocks the canvas read (Supabase signed URLs usually serve
+    // permissive CORS for public buckets, but be defensive), the catch
+    // leaves thumbs empty and the timeline falls back to a flat bar.
+    useEffect(() => {
+        if (!duration || duration <= 0) return;
+        let cancelled = false;
+
+        const probe = document.createElement('video');
+        probe.crossOrigin = 'anonymous';
+        probe.muted = true;
+        probe.playsInline = true;
+        probe.preload = 'auto';
+        probe.src = videoUrl;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 90;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const extract = async () => {
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    probe.addEventListener('loadedmetadata', () => resolve(), { once: true });
+                    probe.addEventListener('error', () => reject(new Error('probe failed to load')), { once: true });
+                });
+                const out: string[] = [];
+                for (let i = 0; i < THUMB_COUNT; i++) {
+                    if (cancelled) return;
+                    const t = (duration * (i + 0.5)) / THUMB_COUNT;
+                    probe.currentTime = Math.min(t, duration - 0.05);
+                    await new Promise<void>((resolve) => {
+                        probe.addEventListener('seeked', () => resolve(), { once: true });
+                    });
+                    ctx.drawImage(probe, 0, 0, canvas.width, canvas.height);
+                    out.push(canvas.toDataURL('image/jpeg', 0.6));
+                }
+                if (!cancelled) setThumbs(out);
+            } catch (e) {
+                // Leave thumbs empty — UI falls back to flat bar
+                console.warn('[VideoEditor] thumbnail extraction failed:', e);
+            }
+        };
+        extract();
+
+        return () => {
+            cancelled = true;
+            probe.src = '';
+        };
+    }, [videoUrl, duration]);
+
+    // Drag handler — uses pointer events so mouse + touch both work.
+    const beginDrag = useCallback(
+        (handle: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
+            if (busy || !duration) return;
+            e.preventDefault();
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            setDraggingHandle(handle);
+        },
+        [busy, duration],
+    );
+
+    const handleMove = useCallback(
+        (e: React.PointerEvent<HTMLDivElement>) => {
+            if (!draggingHandle || !duration || !timelineRef.current) return;
+            const rect = timelineRef.current.getBoundingClientRect();
+            const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+            const t = (x / rect.width) * duration;
+            const MIN_GAP = 0.5;
+
+            if (draggingHandle === 'start') {
+                const next = Math.min(t, trimEnd - MIN_GAP);
+                setTrimStart(Math.max(0, next));
+                const v = videoRef.current;
+                if (v) v.currentTime = Math.max(0, next);
+            } else {
+                const next = Math.max(t, trimStart + MIN_GAP);
+                setTrimEnd(Math.min(duration, next));
+                const v = videoRef.current;
+                if (v) v.currentTime = Math.min(duration - 0.05, next);
+            }
+        },
+        [draggingHandle, duration, trimStart, trimEnd],
+    );
+
+    const endDrag = useCallback(
+        (e: React.PointerEvent<HTMLDivElement>) => {
+            if (draggingHandle) {
+                try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+            }
+            setDraggingHandle(null);
+        },
+        [draggingHandle],
+    );
 
     async function handleApply() {
         if (duration === null) {
@@ -98,26 +199,16 @@ export default function VideoEditor({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    postId,
-                    trimStart,
-                    trimEnd,
-                    watermark,
-                }),
+                body: JSON.stringify({ postId, trimStart, trimEnd, watermark }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || json.success === false) {
                 throw new Error(json.error || `Process failed (HTTP ${res.status})`);
             }
-            // Cache-bust the URL so the browser actually fetches the new bytes.
             const fresh = `${json.staged_video_url}?t=${Date.now()}`;
             setVideoUrl(fresh);
-            // New baseline: the trimmed video starts at 0 and runs for
-            // (trimEnd - trimStart) seconds. Reset the slider state so the
-            // operator can do a second trim on the already-trimmed clip if
-            // they want.
             const newDuration = trimEnd - trimStart;
-            initialEndSetForUrl.current = fresh; // prevent loadedmetadata from resetting end
+            initialEndSetForUrl.current = fresh;
             setTrimStart(0);
             setTrimEnd(newDuration);
             setDuration(newDuration);
@@ -133,27 +224,30 @@ export default function VideoEditor({
     function fmtTime(s: number): string {
         if (!isFinite(s)) return '—';
         const m = Math.floor(s / 60);
-        const sec = (s - m * 60);
+        const sec = s - m * 60;
         return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
     }
 
     const dur = duration ?? 0;
     const trimmedLen = Math.max(0, trimEnd - trimStart);
+    const startPct = dur > 0 ? (trimStart / dur) * 100 : 0;
+    const endPct = dur > 0 ? (trimEnd / dur) * 100 : 100;
+
+    const HANDLE_COLOR = '#9D7BFF'; // KumoLab purple, mirrors brand
+    const HANDLE_BORDER = 'rgba(157, 123, 255, 0.95)';
 
     return (
         <div className="space-y-3">
             {/* ── Video preview ─────────────────────────────────── */}
             <div
                 className="rounded-2xl overflow-hidden relative"
-                style={{
-                    background: '#0a0a14',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                }}
+                style={{ background: '#0a0a14', border: '1px solid rgba(255,255,255,0.06)' }}
             >
                 <video
                     ref={videoRef}
                     src={videoUrl}
                     onLoadedMetadata={handleLoadedMetadata}
+                    crossOrigin="anonymous"
                     controls
                     playsInline
                     className="w-full max-h-[600px] bg-black"
@@ -173,7 +267,7 @@ export default function VideoEditor({
                 )}
             </div>
 
-            {/* ── Trim controls ─────────────────────────────────── */}
+            {/* ── Trim timeline ─────────────────────────────────── */}
             <div
                 className="rounded-2xl p-5 space-y-4"
                 style={{
@@ -182,7 +276,7 @@ export default function VideoEditor({
                     backdropFilter: 'blur(20px)',
                 }}
             >
-                <div className="flex items-baseline gap-3">
+                <div className="flex items-baseline justify-between flex-wrap gap-2">
                     <span
                         className="text-[10px] font-bold uppercase tracking-[0.22em]"
                         style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
@@ -191,61 +285,152 @@ export default function VideoEditor({
                     </span>
                     {duration !== null && (
                         <span
-                            className="text-[10px] font-mono"
+                            className="text-[11px] font-mono"
                             style={{ color: 'var(--text-muted)' }}
                         >
-                            {fmtTime(trimStart)} → {fmtTime(trimEnd)} · {trimmedLen.toFixed(1)}s of {dur.toFixed(1)}s
+                            <span style={{ color: HANDLE_COLOR }}>{fmtTime(trimStart)}</span>
+                            {' → '}
+                            <span style={{ color: HANDLE_COLOR }}>{fmtTime(trimEnd)}</span>
+                            {' · '}
+                            {trimmedLen.toFixed(1)}s of {dur.toFixed(1)}s
                         </span>
                     )}
                 </div>
 
-                <div className="space-y-2">
-                    <label
-                        className="block text-[10px] uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                    >
-                        Start ({fmtTime(trimStart)})
-                    </label>
-                    <input
-                        type="range"
-                        min={0}
-                        max={dur}
-                        step={0.1}
-                        value={trimStart}
-                        disabled={busy || duration === null}
-                        onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            setTrimStart(v);
-                            if (v >= trimEnd) setTrimEnd(Math.min(dur, v + 0.5));
+                {/* The timeline itself */}
+                <div
+                    ref={timelineRef}
+                    className="relative w-full select-none"
+                    style={{
+                        height: `${TIMELINE_HEIGHT_PX}px`,
+                        background: '#0a0a14',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        touchAction: 'none',
+                    }}
+                    onPointerMove={handleMove}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                >
+                    {/* Filmstrip — thumbnails behind everything else */}
+                    <div className="absolute inset-0 flex">
+                        {thumbs.length > 0
+                            ? thumbs.map((src, i) => (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                      key={i}
+                                      src={src}
+                                      alt=""
+                                      draggable={false}
+                                      className="h-full flex-1 object-cover pointer-events-none"
+                                      style={{ minWidth: 0 }}
+                                  />
+                              ))
+                            : (
+                                <div
+                                    className="h-full w-full"
+                                    style={{
+                                        background:
+                                            'linear-gradient(90deg, rgba(123,97,255,0.10), rgba(0,212,255,0.10))',
+                                    }}
+                                />
+                            )}
+                    </div>
+
+                    {/* Left dim — covers the trimmed-away pre-roll */}
+                    <div
+                        className="absolute top-0 bottom-0 pointer-events-none"
+                        style={{
+                            left: 0,
+                            width: `${startPct}%`,
+                            background: 'rgba(0,0,0,0.65)',
                         }}
-                        className="w-full"
-                        style={{ accentColor: '#7b61ff' }}
                     />
+                    {/* Right dim — covers the trimmed-away tail */}
+                    <div
+                        className="absolute top-0 bottom-0 pointer-events-none"
+                        style={{
+                            left: `${endPct}%`,
+                            right: 0,
+                            background: 'rgba(0,0,0,0.65)',
+                        }}
+                    />
+
+                    {/* Kept-region outline */}
+                    <div
+                        className="absolute pointer-events-none"
+                        style={{
+                            left: `${startPct}%`,
+                            width: `${endPct - startPct}%`,
+                            top: 0,
+                            bottom: 0,
+                            borderTop: `3px solid ${HANDLE_BORDER}`,
+                            borderBottom: `3px solid ${HANDLE_BORDER}`,
+                            boxSizing: 'border-box',
+                        }}
+                    />
+
+                    {/* Start handle */}
+                    <div
+                        role="slider"
+                        aria-label="Trim start"
+                        aria-valuemin={0}
+                        aria-valuemax={dur}
+                        aria-valuenow={trimStart}
+                        onPointerDown={beginDrag('start')}
+                        className="absolute top-0 bottom-0 flex items-center justify-center"
+                        style={{
+                            left: `calc(${startPct}% - ${HANDLE_WIDTH_PX / 2}px)`,
+                            width: `${HANDLE_WIDTH_PX}px`,
+                            cursor: 'ew-resize',
+                            background: HANDLE_BORDER,
+                            touchAction: 'none',
+                            zIndex: 2,
+                        }}
+                    >
+                        <div
+                            className="rounded-sm"
+                            style={{
+                                width: '2px',
+                                height: '24px',
+                                background: 'rgba(255,255,255,0.9)',
+                            }}
+                        />
+                    </div>
+
+                    {/* End handle */}
+                    <div
+                        role="slider"
+                        aria-label="Trim end"
+                        aria-valuemin={0}
+                        aria-valuemax={dur}
+                        aria-valuenow={trimEnd}
+                        onPointerDown={beginDrag('end')}
+                        className="absolute top-0 bottom-0 flex items-center justify-center"
+                        style={{
+                            left: `calc(${endPct}% - ${HANDLE_WIDTH_PX / 2}px)`,
+                            width: `${HANDLE_WIDTH_PX}px`,
+                            cursor: 'ew-resize',
+                            background: HANDLE_BORDER,
+                            touchAction: 'none',
+                            zIndex: 2,
+                        }}
+                    >
+                        <div
+                            className="rounded-sm"
+                            style={{
+                                width: '2px',
+                                height: '24px',
+                                background: 'rgba(255,255,255,0.9)',
+                            }}
+                        />
+                    </div>
                 </div>
 
-                <div className="space-y-2">
-                    <label
-                        className="block text-[10px] uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                    >
-                        End ({fmtTime(trimEnd)})
-                    </label>
-                    <input
-                        type="range"
-                        min={0}
-                        max={dur}
-                        step={0.1}
-                        value={trimEnd}
-                        disabled={busy || duration === null}
-                        onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            setTrimEnd(v);
-                            if (v <= trimStart) setTrimStart(Math.max(0, v - 0.5));
-                        }}
-                        className="w-full"
-                        style={{ accentColor: '#7b61ff' }}
-                    />
-                </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Drag the purple handles to trim. The video previews where each handle lands.
+                </p>
 
                 <label
                     className="flex items-center gap-2 cursor-pointer pt-1"
@@ -258,7 +443,7 @@ export default function VideoEditor({
                         onChange={(e) => setWatermark(e.target.checked)}
                     />
                     <span className="text-xs">
-                        Burn in <span style={{ color: '#9D7BFF' }}>@KumoLabAnime</span> watermark (bottom-right)
+                        Burn in <span style={{ color: HANDLE_COLOR }}>@KumoLabAnime</span> watermark (bottom-right)
                     </span>
                 </label>
 
