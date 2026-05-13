@@ -33,6 +33,55 @@ const ffmpegPath = require('ffmpeg-static') as string;
 const BUCKET = 'blog-videos';
 const WATERMARK_TEXT = '@KumoLabAnime';
 
+/**
+ * Render the watermark text into a transparent PNG using @napi-rs/canvas,
+ * which the rest of the codebase already uses (same Outfit-Black font as
+ * the image overlays). We pre-render to PNG instead of using FFmpeg's
+ * `drawtext` filter because Vercel's bundled ffmpeg-static was built
+ * without libfreetype — drawtext fails with "No such filter: drawtext".
+ * The standard `overlay` filter accepts a PNG input and is always
+ * present in any ffmpeg build.
+ *
+ * Cached at module scope per process. Re-renders on cold start but is
+ * cheap (~50ms for this tiny canvas).
+ */
+let cachedWatermarkPng: Buffer | null = null;
+async function getWatermarkPng(): Promise<Buffer> {
+    if (cachedWatermarkPng) return cachedWatermarkPng;
+    const { createCanvas, GlobalFonts } = await import('@napi-rs/canvas');
+
+    const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+    if (fs.existsSync(outfitPath)) {
+        if (!GlobalFonts.registerFromPath(outfitPath, 'Outfit')) {
+            const fontBuffer = fs.readFileSync(outfitPath);
+            GlobalFonts.register(fontBuffer, 'Outfit');
+        }
+    }
+
+    const W = 600;
+    const H = 110;
+    const canvas = createCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    ctx.font = '700 56px Outfit, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    // Black halo for legibility against bright frames
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    ctx.strokeText(WATERMARK_TEXT, 12, H / 2);
+    // Reset shadow before white fill so it doesn't double-render
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillText(WATERMARK_TEXT, 12, H / 2);
+
+    const png = await canvas.encode('png');
+    cachedWatermarkPng = Buffer.from(png);
+    return cachedWatermarkPng;
+}
+
 export interface TrimOptions {
     /** Seconds into the source to start. Use 0 for "from beginning". */
     trimStart: number;
@@ -83,41 +132,28 @@ async function fetchBucketVideo(url: string): Promise<Buffer | null> {
  */
 function buildArgs(
     opts: TrimOptions,
-    fontPathEscaped: string | null,
+    watermarkPath: string | null,
     inputPath: string,
     outputPath: string,
 ): string[] {
     const duration = Math.max(0, opts.trimEnd - opts.trimStart);
-    const base: string[] = [
-        '-hide_banner',
-        '-loglevel', 'error',
-        '-y',
-        // Pre-input fast seek — works because input is a real file
-        '-ss', opts.trimStart.toFixed(3),
-        '-i', inputPath,
-        '-t', duration.toFixed(3),
-    ];
 
-    if (opts.watermark && fontPathEscaped) {
-        // Re-encode video to apply drawtext; audio stream-copies.
-        const drawtext = [
-            `drawtext=`,
-            `fontfile='${fontPathEscaped}'`,
-            `:text='${WATERMARK_TEXT}'`,
-            `:fontcolor=white@0.92`,
-            `:fontsize=42`,
-            `:borderw=3`,
-            `:bordercolor=black@0.8`,
-            `:shadowx=0`,
-            `:shadowy=2`,
-            `:shadowcolor=black@0.7`,
-            `:x=w-tw-40`,
-            `:y=h-th-60`,
-        ].join('');
-
+    if (opts.watermark && watermarkPath) {
+        // Two inputs: source video + watermark PNG. Overlay places the
+        // PNG bottom-right with a small margin. `overlay` is always present
+        // in any ffmpeg build (unlike `drawtext` which needs libfreetype).
+        // Audio stream-copies; video re-encodes to bake in the overlay.
         return [
-            ...base,
-            '-vf', drawtext,
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-y',
+            '-ss', opts.trimStart.toFixed(3),
+            '-i', inputPath,
+            '-i', watermarkPath,
+            '-t', duration.toFixed(3),
+            '-filter_complex', '[0:v][1:v]overlay=W-w-30:H-h-40[v]',
+            '-map', '[v]',
+            '-map', '0:a?',
             '-c:v', 'libx264',
             '-preset', 'veryfast',
             '-pix_fmt', 'yuv420p',
@@ -129,9 +165,14 @@ function buildArgs(
         ];
     }
 
-    // No watermark — stream-copy is the fast path.
+    // No watermark — stream-copy is the fast path. Fast-seek + duration.
     return [
-        ...base,
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-y',
+        '-ss', opts.trimStart.toFixed(3),
+        '-i', inputPath,
+        '-t', duration.toFixed(3),
         '-c', 'copy',
         '-movflags', '+faststart',
         outputPath,
@@ -202,17 +243,6 @@ export async function trimImportedVideo(
         return { error: 'Failed to fetch source video from bucket' };
     }
 
-    let fontPathEscaped: string | null = null;
-    if (opts.watermark) {
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
-        if (fs.existsSync(fontPath)) {
-            fontPathEscaped = fontPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-        } else {
-            console.warn('[VideoTrim] Outfit-Black.ttf missing — watermark will fall back to default font');
-            fontPathEscaped = ''; // empty fontfile = ffmpeg uses default
-        }
-    }
-
     // Vercel /tmp is writable (512 MB) and the only place we can use
     // seekable file I/O. Both -movflags +faststart on output and fast-seek
     // -ss on input require real files — they fail on stdin/stdout pipes.
@@ -220,11 +250,25 @@ export async function trimImportedVideo(
     const tmpId = crypto.randomBytes(6).toString('hex');
     const inputPath = path.join(tmpDir, `trim-in-${tmpId}.mp4`);
     const outputPath = path.join(tmpDir, `trim-out-${tmpId}.mp4`);
+    const watermarkPath = path.join(tmpDir, `trim-wm-${tmpId}.png`);
 
     const cleanup = () => {
         try { fs.unlinkSync(inputPath); } catch { /* noop */ }
         try { fs.unlinkSync(outputPath); } catch { /* noop */ }
+        try { fs.unlinkSync(watermarkPath); } catch { /* noop */ }
     };
+
+    let watermarkOnDisk: string | null = null;
+    if (opts.watermark) {
+        try {
+            const png = await getWatermarkPng();
+            fs.writeFileSync(watermarkPath, png);
+            watermarkOnDisk = watermarkPath;
+        } catch (e: any) {
+            console.warn('[VideoTrim] Watermark PNG render failed:', e?.message || e);
+            // Fall through — watermarkOnDisk stays null, ffmpeg runs trim-only.
+        }
+    }
 
     try {
         fs.writeFileSync(inputPath, sourceBuf);
@@ -238,7 +282,7 @@ export async function trimImportedVideo(
         return { error: 'Failed to stage source video on server' };
     }
 
-    const args = buildArgs(opts, fontPathEscaped, inputPath, outputPath);
+    const args = buildArgs(opts, watermarkOnDisk, inputPath, outputPath);
     const ff = await runFfmpegFileIO(args);
     if (ff.exitCode !== 0 || !fs.existsSync(outputPath)) {
         const summary = ff.spawnError
