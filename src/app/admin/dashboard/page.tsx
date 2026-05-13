@@ -329,7 +329,7 @@ export default async function DashboardPage() {
                                         </span>
                                     </div>
                                 </div>
-                                <PendingReviewActions postId={p.id} />
+                                <PendingReviewActions postId={p.id} postTitle={p.title} />
                             </li>
                         ))}
                     </ul>

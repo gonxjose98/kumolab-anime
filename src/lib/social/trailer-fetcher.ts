@@ -35,6 +35,15 @@ export interface TrailerStaged {
     title?: string;
 }
 
+export interface FetchYouTubeOptions {
+    // Skip the 9:16 letterbox + 60s trim FFmpeg pass. Used by operator-
+    // curated scrapes where the operator will trim/crop in the editor.
+    skipSocialProcessing?: boolean;
+    // Override the default 180s hard cap. Auto-publish keeps 180s; the
+    // scrape path allows up to 300s (5min) to fit longer OPs/trailers.
+    maxDurationSeconds?: number;
+}
+
 function extractVideoId(url: string): string | null {
     try {
         const u = new URL(url);
@@ -56,7 +65,11 @@ function workerEnv(): { url: string; secret: string } | null {
     return { url: url.replace(/\/$/, ''), secret };
 }
 
-export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Promise<TrailerStaged | null> {
+export async function fetchYouTubeToBucket(
+    sourceUrl: string,
+    slug: string,
+    options: FetchYouTubeOptions = {},
+): Promise<TrailerStaged | null> {
     const videoId = extractVideoId(sourceUrl);
     if (!videoId) {
         await logError({
@@ -129,8 +142,9 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
     title = infoRes.title;
     duration = infoRes.duration;
 
-    if (duration > 180) {
-        console.warn(`[TrailerFetcher] Video too long (${duration}s > 180s), skipping`);
+    const maxDuration = options.maxDurationSeconds ?? 180;
+    if (duration > maxDuration) {
+        console.warn(`[TrailerFetcher] Video too long (${duration}s > ${maxDuration}s), skipping`);
         return null;
     }
 
@@ -179,16 +193,20 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
     }
     console.log(`[TrailerFetcher] Worker delivered ${downloaded.length} bytes for ${videoId}`);
 
-    // 3. FFmpeg pass — 9:16 letterbox, KumoLab watermark, 60s trim.
+    // 3. FFmpeg pass — 9:16 letterbox, KumoLab watermark, 60s trim. Skipped
+    // when the caller is the operator-curated scrape path (they trim/crop
+    // in the editor).
     let finalBuffer = downloaded;
-    try {
-        const processed = await processForSocial(downloaded, { aspect: '9:16', maxSeconds: 60 });
-        if (processed && processed.length > 0) {
-            console.log(`[TrailerFetcher] FFmpeg pass: ${downloaded.length} → ${processed.length} bytes`);
-            finalBuffer = processed;
+    if (!options.skipSocialProcessing) {
+        try {
+            const processed = await processForSocial(downloaded, { aspect: '9:16', maxSeconds: 60 });
+            if (processed && processed.length > 0) {
+                console.log(`[TrailerFetcher] FFmpeg pass: ${downloaded.length} → ${processed.length} bytes`);
+                finalBuffer = processed;
+            }
+        } catch (e: any) {
+            console.warn('[TrailerFetcher] FFmpeg pass threw, uploading raw:', e?.message || e);
         }
-    } catch (e: any) {
-        console.warn('[TrailerFetcher] FFmpeg pass threw, uploading raw:', e?.message || e);
     }
 
     // 4. Upload to bucket.
@@ -210,7 +228,10 @@ export async function fetchYouTubeToBucket(sourceUrl: string, slug: string): Pro
         bucket_url: pub.publicUrl,
         bucket_path: bucketPath,
         video_id: videoId,
-        duration_seconds: Math.min(duration, 60),
+        // When the social-processing pass runs, the video gets trimmed to 60s.
+        // When it's skipped (scrape path), report the original duration so
+        // the editor's trim timeline shows the full clip.
+        duration_seconds: options.skipSocialProcessing ? duration : Math.min(duration, 60),
         bytes: finalBuffer.length,
         title,
     };

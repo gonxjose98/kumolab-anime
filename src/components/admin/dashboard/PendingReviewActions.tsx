@@ -2,13 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import FindVideoButton from './FindVideoButton';
 
 /**
- * Inline approve/decline buttons for a single pending post on the dashboard.
- * Approve schedules the post into the next available slot; decline writes a
- * declined fingerprint and removes the row. Both routes are admin-gated.
+ * Inline action cluster for a single pending post on the dashboard:
+ *   • Find Video — search YouTube and attach the result as a draft video
+ *   • Approve   — schedule the post into the next available slot
+ *   • Decline   — write a declined fingerprint and remove the row
+ *
+ * All routes are admin-gated.
  */
-export default function PendingReviewActions({ postId }: { postId: string }) {
+export default function PendingReviewActions({
+    postId,
+    postTitle,
+}: {
+    postId: string;
+    postTitle: string;
+}) {
     const [busy, setBusy] = useState<'approve' | 'decline' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
@@ -35,7 +45,8 @@ export default function PendingReviewActions({ postId }: { postId: string }) {
 
     return (
         <div className="flex flex-col gap-1.5 items-end">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+                <FindVideoButton postId={postId} postTitle={postTitle} />
                 <button
                     onClick={() => call('/api/admin/approve', 'approve')}
                     disabled={!!busy}
