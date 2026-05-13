@@ -73,10 +73,12 @@ async function fetchBucketVideo(url: string): Promise<Buffer | null> {
 
 /**
  * Build the FFmpeg argv for a trim+optional-watermark pass over stdin → stdout.
- * - Pre-input -ss is fast-seek (keyframe-aligned, may drift by <1s but is much
- *   faster than frame-accurate post-input -ss). Acceptable for operator trims
- *   where the operator can adjust if a transition is off by a fraction.
- * - When watermark is off, we use -c copy → instant trim, no re-encode.
+ * - -ss must come AFTER -i when input is pipe:0. stdin is not seekable, so
+ *   pre-input -ss fails immediately with the input being eaten. Post-input
+ *   -ss discards frames until the seek point — slower than fast-seek on a
+ *   real file but works on stdin. Operator clips are short (≤ a few minutes)
+ *   so the discard cost is negligible.
+ * - When watermark is off, we use -c copy → near-instant trim, no re-encode.
  * - When watermark is on, video stream must re-encode; audio copies.
  */
 function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] {
@@ -85,9 +87,9 @@ function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] 
         '-hide_banner',
         '-loglevel', 'error',
         '-y',
-        // Pre-input fast seek
-        '-ss', opts.trimStart.toFixed(3),
         '-i', 'pipe:0',
+        // Post-input seek + duration — works on non-seekable stdin
+        '-ss', opts.trimStart.toFixed(3),
         '-t', duration.toFixed(3),
     ];
 
@@ -133,14 +135,22 @@ function buildArgs(opts: TrimOptions, fontPathEscaped: string | null): string[] 
     ];
 }
 
-function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer | null> {
+interface FfmpegResult {
+    output: Buffer | null;
+    exitCode: number | null;
+    stderrTail: string;
+    spawnError?: string;
+}
+
+function runFfmpeg(input: Buffer, args: string[]): Promise<FfmpegResult> {
     return new Promise((resolve) => {
         let proc;
         try {
             proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
         } catch (e: any) {
-            console.error('[VideoTrim] spawn failed:', e?.message || e);
-            resolve(null);
+            const msg = e?.message || String(e);
+            console.error('[VideoTrim] spawn failed:', msg);
+            resolve({ output: null, exitCode: null, stderrTail: '', spawnError: msg });
             return;
         }
 
@@ -159,17 +169,17 @@ function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer | null> {
         proc.on('error', (e: Error) => {
             clearTimeout(timer);
             console.error('[VideoTrim] FFmpeg error:', e.message);
-            resolve(null);
+            resolve({ output: null, exitCode: null, stderrTail, spawnError: e.message });
         });
 
         proc.on('close', (code: number) => {
             clearTimeout(timer);
             if (code !== 0) {
                 console.error(`[VideoTrim] FFmpeg exited ${code}. Tail:\n${stderrTail}`);
-                resolve(null);
+                resolve({ output: null, exitCode: code, stderrTail });
                 return;
             }
-            resolve(Buffer.concat(chunks));
+            resolve({ output: Buffer.concat(chunks), exitCode: code, stderrTail });
         });
 
         proc.stdin.on('error', (e: Error) => {
@@ -205,15 +215,19 @@ export async function trimImportedVideo(
     }
 
     const args = buildArgs(opts, fontPathEscaped);
-    const out = await runFfmpeg(sourceBuf, args);
-    if (!out || out.length === 0) {
+    const ff = await runFfmpeg(sourceBuf, args);
+    if (!ff.output || ff.output.length === 0) {
+        const summary = ff.spawnError
+            ? `spawn failed: ${ff.spawnError}`
+            : `ffmpeg exited ${ff.exitCode}: ${ff.stderrTail.slice(-400) || 'no stderr'}`;
         await logError({
             source: 'video-trim.ffmpeg',
-            errorMessage: 'FFmpeg returned 0 bytes or failed',
-            context: { postId, opts },
+            errorMessage: `FFmpeg failed — ${summary}`,
+            context: { postId, opts, ffmpegArgs: args },
         }).catch(() => {});
-        return { error: 'Video processing failed — FFmpeg returned no output' };
+        return { error: `Video processing failed — ${summary.slice(0, 200)}` };
     }
+    const out = ff.output;
 
     // New bucket path so we never overwrite the original (operator may want
     // to retry with different trim points; the source must remain intact).
