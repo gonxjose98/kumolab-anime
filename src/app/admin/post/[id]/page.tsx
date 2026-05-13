@@ -156,12 +156,11 @@ export default function PostEditor() {
                     setSourceUrl('');
                 }
                 setImageUrl(data.image || '');
-                // Video imports (social_ids.staged_video_url set, image null)
-                // don't have an image canvas to render — VideoEditor handles
-                // them. Skip the image preview render entirely; otherwise
-                // /api/admin/render-post-image gets called with no source
-                // and either errors or produces a blank.
-                const isVideoImport = !!data.social_ids?.staged_video_url && !data.image;
+                // If a staged video exists at all, this post's editor is
+                // a video editor — skip the image preview render. Mirrors
+                // the isVideoPost check below so the initial render and
+                // the conditional UI stay in sync.
+                const isVideoImport = !!data.social_ids?.staged_video_url;
                 if (!isVideoImport) {
                     // Fire a preview render immediately with the default toggle
                     // state (all OFF). This makes the displayed image actually
@@ -244,10 +243,14 @@ export default function PostEditor() {
         return json;
     }
 
-    // Video posts come from /api/admin/import-from-url. Their image column
-    // is null and their staged_video_url lives in social_ids. The image
-    // overlay editor doesn't apply to them — VideoEditor takes its place.
-    const isVideoPost = !!(post?.social_ids?.staged_video_url) && !post?.image;
+    // Video posts have staged_video_url set on social_ids. Two paths
+    // land here: (1) import-from-url, which leaves image null; (2) the
+    // Find Video / scrape-attach flow on a screenshot post, which keeps
+    // image as the website hero but stages a video for social publish.
+    // Either way, if a staged video exists the operator wants to see
+    // and trim it — render VideoEditor regardless of whether an image
+    // is also present.
+    const isVideoPost = !!(post?.social_ids?.staged_video_url);
 
     async function handleSave(opts: { thenApprove?: boolean } = {}) {
         // What you see is what publishes. We send the exact base64 bytes
