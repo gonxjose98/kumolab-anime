@@ -192,11 +192,14 @@ export default function FindVideoButton({
                     onClick={closeModal}
                 >
                     <div
-                        className="rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col"
+                        className="rounded-2xl p-5 md:p-6 w-full max-w-2xl flex flex-col"
                         style={{
                             background: 'rgba(18, 18, 30, 0.95)',
                             border: '1px solid rgba(255,255,255,0.08)',
                             boxShadow: '0 12px 48px rgba(0,0,0,0.5)',
+                            // dvh handles iPhone's collapsing-URL-bar correctly;
+                            // svh fallback for browsers that don't support dvh.
+                            maxHeight: 'min(90svh, 90dvh)',
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -343,7 +346,10 @@ export default function FindVideoButton({
                             </div>
                         )}
 
-                        <div className="flex gap-2 justify-end pt-4 mt-2">
+                        <div
+                            className="flex gap-2 justify-end pt-3 mt-3 shrink-0"
+                            style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                        >
                             <button
                                 type="button"
                                 onClick={closeModal}
@@ -402,10 +408,17 @@ function CandidateRow({
 
     return (
         <li>
-            <button
-                type="button"
+            <div
+                role="button"
+                tabIndex={0}
                 onClick={onSelect}
-                className="w-full text-left flex gap-3 p-2.5 rounded-lg transition-all"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelect();
+                    }
+                }}
+                className="w-full text-left flex gap-3 p-2.5 rounded-lg transition-all cursor-pointer"
                 style={{ background: bg, border: `1px solid ${borderColor}` }}
             >
                 {c.thumbnailUrl ? (
@@ -481,7 +494,25 @@ function CandidateRow({
                         </div>
                     )}
                 </div>
-            </button>
+                <a
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="shrink-0 self-start px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
+                    style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.10)',
+                        color: '#7be0ff',
+                        fontFamily: 'var(--font-display)',
+                        textDecoration: 'none',
+                    }}
+                    title="Open on YouTube"
+                >
+                    Watch ↗
+                </a>
+            </div>
         </li>
     );
 }
