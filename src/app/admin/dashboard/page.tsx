@@ -3,7 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
-import { checkMetaTokenHealth, type MetaTokenHealth } from '@/lib/engine/token-health';
 import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +71,6 @@ async function fetchDashboardData() {
         { data: recentlyPublished },
         { data: sourceHealth },
         { data: recentActivity },
-        metaTokenHealth,
         healthSnapshot,
     ] = await Promise.all([
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
@@ -86,7 +84,6 @@ async function fetchDashboardData() {
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
-        checkMetaTokenHealth().catch((e): MetaTokenHealth => ({ ok: false, reason: e?.message ?? 'check failed' })),
         getHealthSnapshot().catch((e): HealthSnapshot => ({
             overall: 'crit',
             checks: [{ key: 'health', label: 'Health Monitor', level: 'crit', detail: `Snapshot failed: ${e?.message ?? 'unknown'}` }],
@@ -108,7 +105,6 @@ async function fetchDashboardData() {
         recentlyPublished: recentlyPublished || [],
         sourceHealth: sourceHealth || [],
         recentActivity: recentActivity || [],
-        metaTokenHealth,
         healthSnapshot,
     };
 }
@@ -232,9 +228,6 @@ export default async function DashboardPage() {
 
             {/* ── System Health ───────────────────────────────────── */}
             <HealthCard snapshot={data.healthSnapshot} />
-
-            {/* ── Platform tokens ──────────────────────────────────── */}
-            <PlatformTokenCard health={data.metaTokenHealth} />
 
             {/* ── Pending review ───────────────────────────────────── */}
             <Card className="p-5">
@@ -508,50 +501,6 @@ function HealthRow({ level, label, detail, actionable }: { level: HealthLevel; l
                 )}
             </div>
         </div>
-    );
-}
-
-function PlatformTokenCard({ health }: { health: MetaTokenHealth }) {
-    let accent: string;
-    let label: string;
-    let detail: string;
-
-    if (!health.ok) {
-        accent = '#ff4444';
-        label = 'Meta IG token: action needed';
-        detail = health.reason ?? 'token check failed';
-    } else if (health.daysUntilDataAccessExpiry !== null && health.daysUntilDataAccessExpiry !== undefined) {
-        const days = health.daysUntilDataAccessExpiry;
-        if (days < 7) accent = '#ff4444';
-        else if (days < 30) accent = '#ffaa00';
-        else accent = '#00ff88';
-        label = `Meta IG token: ${days} day${days === 1 ? '' : 's'} of data-access window left`;
-        detail = days < 30
-            ? 'Reauth Meta to refresh — see CLAUDE.md §12 for the token-mint flow.'
-            : 'Auto-refreshes whenever the publisher hits Meta. No action needed.';
-    } else {
-        accent = '#00ff88';
-        label = 'Meta IG token: valid (no expiry reported)';
-        detail = 'Token is valid; Meta did not return a data-access window. No action needed.';
-    }
-
-    return (
-        <Card className="p-4">
-            <div className="flex items-start gap-3">
-                <span
-                    className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                    style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
-                />
-                <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {label}
-                    </div>
-                    <div className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        {detail}
-                    </div>
-                </div>
-            </div>
-        </Card>
     );
 }
 
