@@ -15,7 +15,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { searchYouTube } from '@/lib/youtube/search';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+// Render free tier sleeps the yt-dlp worker after 15min idle. First
+// click after that period triggers a 30-90s cold start before /search
+// even responds. 30s here was too tight and produced a 504 from
+// Vercel's edge. 120s gives the worker time to wake + run yt-dlp
+// without ever bumping against the function timeout.
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
     try {
