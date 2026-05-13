@@ -4,7 +4,7 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-05-06 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Today's hardening pass closed the dedup gaps, idempotency hole, and silent-fail UX issues that surfaced in early Phase 2 traffic — see "Reliability & UX hardening (2026-05-05/06)" below. Manual upload button now lets Jose push reels/photos through the same 4-destination pipeline. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts.
+**Last updated:** 2026-05-07 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Hardening sprint closed the dedup gaps, idempotency hole, and silent-fail UX issues that surfaced in early Phase 2 traffic — see "Reliability & UX hardening (2026-05-05/06)" below. Manual upload button now lets Jose push reels/photos through the same 4-destination pipeline. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts. Merch storefront restored 2026-05-07 — single Printful private token (`KumoLab Production`, expires 2028-05-05) replaces two stale tokens; full read+manage scopes across orders/products/files so I can hide, modify, recommend, and place orders programmatically.
 
 ---
 
@@ -135,7 +135,7 @@ Non-video news now auto-publishes when multi-source verification passes, not jus
 - ✅ **Instagram** — live, direct Graph API. Reels for video posts (status_code poll up to 60s), image otherwise.
 - ✅ **Facebook Page** — live, direct Graph API. `/video_reels` 3-phase for video, `/photos` for image. Replaces the unreliable Meta Suite cross-post path. **No env-flag gating** — direct FB post is the canonical path.
 - ✅ **Threads** — live, direct Threads API via separate **KumoLab Threads** app. VIDEO/IMAGE/TEXT branching, status-poll on video, 60-day token refreshed weekly via cron.
-- ✅ **TikTok** — scaffold complete (`src/lib/social/tiktok-publisher.ts`). Uses PULL_FROM_URL so TikTok fetches the staged MP4 from our `blog-videos` bucket. **Awaits TikTok Developer App approval** (~2-4 weeks; auto-checked every 2 days via the scheduled remote agent).
+- 🛑 **TikTok** — **on hold (2026-05-13).** Three dev-app rejections in 9 weeks; the May 11 rejection was policy-level (`"App will not be approved for personal or company internal use. Not acceptable: Display posts from the TikTok account(s) you or your team manage on your website."`). TikTok's Content Posting API is designed for third-party tools where external users connect *their own* accounts — first-party automation of an owned account is rejected on principle, not by configuration. Jose's call: stop chasing API approval. Future path will be Playwright-based UI upload (browser automation against the kumolabanime TikTok web account), revisited once the rest of the pipeline is stable. Scaffold (`src/lib/social/tiktok-publisher.ts`) stays as a graceful no-op; no code rollback needed.
 - ✅ **YouTube Shorts** — scaffold complete (`src/lib/social/youtube-publisher.ts`). OAuth 2.0 refresh-token auth, `videos.insert` multipart upload. Awaits Jose's one-time OAuth consent + refresh token.
 - ✅ **Trailer re-upload pipeline** — `trailer-fetcher.ts` calls `kumolab-yt-dlp-worker` (Render-hosted Express service, Webshare residential proxy) which streams MP4 back. FFmpeg watermark/letterbox/60s-trim via `video-processor.ts`. Used by IG Reels, FB Reels, Threads VIDEO, TikTok, YT Shorts — one bucket URL feeds all platforms.
 - ⬜ **X (Twitter)** — **deferred** until revenue starts.
@@ -189,7 +189,7 @@ Folded into Jose's upcoming admin dashboard redesign (separate project). No read
 - ✅ Instagram — Reels (video) / image, direct API
 - ✅ Facebook Page — Reels (video) / photo, direct API
 - ✅ Threads — VIDEO / IMAGE / TEXT, direct API
-- 🟡 TikTok — code ready, awaiting developer app approval (auto-monitored every 2 days)
+- 🛑 TikTok — **on hold** (2026-05-13); policy-level dev-app rejection, future path is Playwright UI upload
 - 🟡 YouTube Shorts — code ready, awaiting one-time OAuth consent
 - ⬜ X — deferred until revenue
 
@@ -221,6 +221,15 @@ Phase 2 traffic surfaced a cluster of issues that had been latent. Closed in one
 - **System Health card on admin dashboard** (2026-05-05/06) — at-a-glance red/yellow/green for 7 checks: Worker reachability, Scraper freshness, Circuit Breaker, Stuck Posts, Publish Cadence vs prior 24h baseline, Meta Token expiry, Error Rate. Each red row shows actionable next-step text. Per Jose: dashboard-only, no external alerting (Telegram/Slack/Discord) — keeps moving parts to zero.
 - **Operational logs reclassified** (2026-05-05) — circuit-breaker trip events and `publisher.video-fetch` skips now write to `action_logs` (system state changes) instead of `error_logs`. The dashboard's "Errors 24h" stat now reflects actual faults.
 - **Blog UX polish** — YouTube cards on `/blog` now use static thumbnail (`maxres → sd → hq` cascade with placeholder detection) + play badge instead of letterboxed live iframes that black-barred portrait/landscape mismatches. FB/Threads link bug fixed (was missing `/blog/` prefix and 404'ing on click). FB algorithm downrank avoided by removing in-caption URLs.
+
+### Merch storefront restored (2026-05-07)
+
+`kumolabanime.com/merch` had been empty for weeks. Root cause: `PRINTFUL_ACCESS_TOKEN` was unset on Vercel `workspace-kumolab` (lost during the rebuild cutover); `src/lib/merch.ts::getProducts()` returns `[]` when the token is missing, so the page rendered with no error and no products.
+
+- **Single private token, full scope** — generated `KumoLab Production` at developers.printful.com via Playwright (Jose-assisted login). Expires 2028-05-05 (max 2-year window). Replaces two earlier tokens (`KumoLab DeepAgent Integration`, `KumoLabAnime`) which were deleted to avoid confusion.
+- **Scopes:** view + manage on orders, store products, store files. Webhooks not granted (KumoLab doesn't use Printful webhooks). Read + write so I can hide/unhide/archive products, modify variant retail prices, upload design files, manage orders, and browse the full Printful catalog for recommendations on Jose's request.
+- **Storage:** `.credentials/printful-api.md` (gitignored) holds the token + rotation runbook. Vercel env `PRINTFUL_ACCESS_TOKEN` set in Production + Preview. Production redeployed; merch page live with 6 products (Original Hoodie, Classic Hat, Cloud Hoodie, Classic Tee, Classic Backpack).
+- **Future-session memory** — `memory/reference_printful_token.md` documents capabilities + storage location so future Claude sessions know they have this access without re-discovery.
 
 ### Manual upload feature (2026-05-06)
 
