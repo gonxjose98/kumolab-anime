@@ -44,6 +44,29 @@ function compactViews(n: number): string {
     return `${n} views`;
 }
 
+// Strip news-article fluff from a post title so the pre-filled YouTube
+// search isn't poisoned by milestone phrasing ("Reaches 100M Streams")
+// or boilerplate verbs ("Reveals", "Announces"). Empirically: leaving
+// these in returns 0 ytsearch results; stripping them returns the
+// official OP/trailer on the first try.
+function cleanQueryForSearch(title: string): string {
+    let s = title
+        .replace(/['"‘’“”]/g, '')          // smart + plain quotes
+        .replace(/\s*\([^)]*\)/g, '')                          // (parentheticals)
+        .replace(/\s*\[[^\]]*\]/g, '')                         // [brackets]
+        // milestone tails: "Reaches 100 Million Streams", "Tops 1B Views"
+        .replace(
+            /\b(reaches|tops|hits|crosses|cracks|surpasses|breaks|passes|smashes)\s+[\d.,]+\s*(million|billion|trillion|m|b|k|thousand)?\s*(streams?|views?|copies|downloads?|plays?|sales?|fans?|subscribers?|followers?).*$/i,
+            '',
+        )
+        // leading verbs: "Reveals", "Announces", "Drops" — usually subject-less filler
+        .replace(/^\s*(reveals?|announces?|drops?|unveils?|debuts?|teases?|confirms?|shows off)\s+/i, '')
+        // trailing colons / hyphens with article-style continuations
+        .replace(/[—–:|]\s*[^—–:|]{0,40}$/i, '')
+        ;
+    return s.replace(/\s+/g, ' ').trim();
+}
+
 function relativeAge(iso: string): string {
     if (!iso) return '';
     const ms = Date.now() - new Date(iso).getTime();
@@ -63,14 +86,14 @@ export default function FindVideoButton({
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState(postTitle);
+    const [query, setQuery] = useState(cleanQueryForSearch(postTitle));
     const [step, setStep] = useState<Step>('idle');
     const [error, setError] = useState<string | null>(null);
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
 
     function reset() {
-        setQuery(postTitle);
+        setQuery(cleanQueryForSearch(postTitle));
         setStep('idle');
         setError(null);
         setCandidates([]);
