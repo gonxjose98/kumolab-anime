@@ -57,18 +57,33 @@ export default function VideoEditor({
     const [thumbs, setThumbs] = useState<string[]>([]);
     const [draggingHandle, setDraggingHandle] = useState<'start' | 'end' | null>(null);
 
-    // On first metadata load per URL: snap the end handle to the full
-    // duration if the operator hasn't already set one.
+    // Once the <video> loads metadata we know the true duration.
+    // - Always set duration state.
+    // - Clamp any persisted trim values to the new duration. Stale settings
+    //   are common: image_settings.video.trimEnd was saved against the
+    //   PRE-trim source duration, so after a previous "Apply changes" the
+    //   stored trimEnd is usually larger than the new clip's runtime.
+    //   Without this clamp the right handle renders off the timeline.
+    // - If the operator hasn't set an end, default to the full clip.
     const initialEndSetForUrl = useRef<string | null>(null);
     function handleLoadedMetadata() {
         const v = videoRef.current;
         if (!v || !isFinite(v.duration)) return;
-        setDuration(v.duration);
+        const trueDuration = v.duration;
+        setDuration(trueDuration);
         if (initialEndSetForUrl.current !== videoUrl) {
             initialEndSetForUrl.current = videoUrl;
-            if (!initialSettings?.trimEnd || initialSettings.trimEnd === 0) {
-                setTrimEnd(v.duration);
-            }
+            const persistedEnd = initialSettings?.trimEnd ?? 0;
+            const persistedStart = initialSettings?.trimStart ?? 0;
+            // Clamp end into [0, duration]. Treat 0/missing as "full clip".
+            const clampedEnd =
+                !persistedEnd || persistedEnd === 0
+                    ? trueDuration
+                    : Math.min(persistedEnd, trueDuration);
+            // Clamp start into [0, clampedEnd - 0.5s].
+            const clampedStart = Math.max(0, Math.min(persistedStart, clampedEnd - 0.5));
+            setTrimStart(clampedStart);
+            setTrimEnd(clampedEnd);
         }
     }
 
