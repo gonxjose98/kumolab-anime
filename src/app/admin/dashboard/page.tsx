@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
@@ -59,6 +60,10 @@ async function fetchDashboardData() {
     const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+    // Note: getHealthSnapshot() is intentionally NOT in this Promise.all.
+    // It can take up to 60s when the yt-dlp worker is cold-starting on
+    // Render free tier, and Meta's debug_token has no timeout. Streaming
+    // it via <Suspense> below keeps the rest of the dashboard instant.
     const [
         { count: publishedTotal },
         { count: published24h },
@@ -71,7 +76,6 @@ async function fetchDashboardData() {
         { data: recentlyPublished },
         { data: sourceHealth },
         { data: recentActivity },
-        healthSnapshot,
     ] = await Promise.all([
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).gte('published_at', last24h.toISOString()),
@@ -84,11 +88,6 @@ async function fetchDashboardData() {
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
-        getHealthSnapshot().catch((e): HealthSnapshot => ({
-            overall: 'crit',
-            checks: [{ key: 'health', label: 'Health Monitor', level: 'crit', detail: `Snapshot failed: ${e?.message ?? 'unknown'}` }],
-            checkedAt: new Date().toISOString(),
-        })),
     ]);
 
     return {
@@ -105,8 +104,58 @@ async function fetchDashboardData() {
         recentlyPublished: recentlyPublished || [],
         sourceHealth: sourceHealth || [],
         recentActivity: recentActivity || [],
-        healthSnapshot,
     };
+}
+
+async function StreamedHealthCard() {
+    const snapshot = await getHealthSnapshot().catch((e): HealthSnapshot => ({
+        overall: 'crit',
+        checks: [{ key: 'health', label: 'Health Monitor', level: 'crit', detail: `Snapshot failed: ${e?.message ?? 'unknown'}` }],
+        checkedAt: new Date().toISOString(),
+    }));
+    return <HealthCard snapshot={snapshot} />;
+}
+
+function HealthCardSkeleton() {
+    return (
+        <Card className="p-5">
+            <div className="flex items-baseline justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <span
+                        className="w-2.5 h-2.5 rounded-full animate-pulse"
+                        style={{ background: '#9ca3af', boxShadow: '0 0 10px #9ca3af80' }}
+                    />
+                    <span
+                        className="text-[10px] font-bold uppercase tracking-[0.25em]"
+                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
+                    >
+                        System Health
+                    </span>
+                </div>
+                <span
+                    className="text-[10px] font-bold uppercase tracking-[0.2em]"
+                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
+                >
+                    Checking…
+                </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="flex items-start gap-3 p-2.5 rounded-lg animate-pulse"
+                        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#3a3a4a' }} />
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="h-2.5 rounded w-1/3" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                            <div className="h-2 rounded w-2/3" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
 }
 
 // ─── UI primitives ────────────────────────────────────────────
@@ -226,8 +275,10 @@ export default async function DashboardPage() {
                 />
             </div>
 
-            {/* ── System Health ───────────────────────────────────── */}
-            <HealthCard snapshot={data.healthSnapshot} />
+            {/* ── System Health (streamed via Suspense) ───────────── */}
+            <Suspense fallback={<HealthCardSkeleton />}>
+                <StreamedHealthCard />
+            </Suspense>
 
             {/* ── Pending review ───────────────────────────────────── */}
             <Card className="p-5">
