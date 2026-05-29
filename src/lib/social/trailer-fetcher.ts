@@ -21,7 +21,7 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { processForSocial } from './video-processor';
-import { logError } from '../logging/structured-logger';
+import { logError, logAction } from '../logging/structured-logger';
 
 const BUCKET = 'blog-videos';
 const MAX_BYTES = 80 * 1024 * 1024;
@@ -55,6 +55,32 @@ function extractVideoId(url: string): string | null {
         const short = u.pathname.match(/\/shorts\/([^/]+)/);
         if (short) return short[1];
     } catch { /* fall through */ }
+    return null;
+}
+
+/**
+ * yt-dlp /info failures split into two kinds:
+ *   • Content conditions — geo-blocked, unaired premiere, private/members-
+ *     only, removed/terminated, age-gated. Nothing the operator can fix, and
+ *     they recur every publish cycle (a premiere is retried hourly until it
+ *     airs; a Japan-only trailer forever). These are operational skips, not
+ *     faults — same philosophy as the publisher's no-screenshot skip.
+ *   • Infrastructure faults — timeouts, real 5xx with no yt-dlp signature,
+ *     the "sign in to confirm you're not a bot" IP wall (rotate the proxy),
+ *     missing config. These ARE actionable and must surface as errors.
+ *
+ * Returns a short reason code for content conditions, or null when the
+ * failure should be treated as a real error.
+ */
+function classifyNonActionableInfoFailure(detail: string): string | null {
+    const d = detail.toLowerCase();
+    // NOTE: "sign in to confirm you're not a bot" is deliberately NOT here —
+    // it means the worker's IP got flagged, which is actionable (rotate proxy).
+    if (/not made this video available in your country|available in your country|video is available in /.test(d)) return 'geo_restricted';
+    if (/premieres in|will begin in|this live event|premiere will begin/.test(d)) return 'premiere_not_aired';
+    if (/private video|members[- ]only|join this channel to get access/.test(d)) return 'private_or_members_only';
+    if (/video unavailable|has been removed|no longer available|account associated with this video has been terminated|removed by the uploader/.test(d)) return 'video_unavailable';
+    if (/age-restricted|confirm your age|inappropriate for some users/.test(d)) return 'age_restricted';
     return null;
 }
 
@@ -132,11 +158,27 @@ export async function fetchYouTubeToBucket(
         infoRes = await callInfo();
     }
     if (!infoRes.ok) {
-        await logError({
-            source: 'trailer-fetcher.info',
-            errorMessage: `worker /info failed: ${infoRes.err.slice(0, 250)}`,
-            context: { videoId, sourceUrl, slug, worker: worker.url },
-        }).catch(() => {});
+        const reason = classifyNonActionableInfoFailure(infoRes.err);
+        if (reason) {
+            // Content condition (geo-block, unaired premiere, private,
+            // removed, age-gated) — operational skip, not a fault. Route to
+            // action_logs so it doesn't pollute the dashboard's Errors 24h
+            // counter. The caller treats a null return as a clean skip.
+            await logAction({
+                action: 'source_fetch_failed',
+                entityType: 'post',
+                entityTitle: slug,
+                reason: `youtube fetch skipped: ${reason}`,
+                details: { videoId, sourceUrl, slug, detail: infoRes.err.slice(0, 250) },
+            }).catch(() => {});
+        } else {
+            // Genuine worker/infra fault — surface it.
+            await logError({
+                source: 'trailer-fetcher.info',
+                errorMessage: `worker /info failed: ${infoRes.err.slice(0, 250)}`,
+                context: { videoId, sourceUrl, slug, worker: worker.url },
+            }).catch(() => {});
+        }
         return null;
     }
     title = infoRes.title;
