@@ -22,12 +22,23 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
-        const { postId, trimStart, trimEnd, watermark } = (body || {}) as {
-            postId?: string;
-            trimStart?: number;
-            trimEnd?: number;
-            watermark?: boolean;
-        };
+        const { postId, trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity } =
+            (body || {}) as {
+                postId?: string;
+                trimStart?: number;
+                trimEnd?: number;
+                watermark?: boolean;
+                backgroundFill?: boolean;
+                fillStyle?: 'black' | 'white' | 'blur';
+                blurIntensity?: number;
+            };
+
+        const safeFillStyle: 'black' | 'white' | 'blur' =
+            fillStyle === 'black' || fillStyle === 'blur' ? fillStyle : 'white';
+        const safeBlurIntensity =
+            typeof blurIntensity === 'number' && isFinite(blurIntensity)
+                ? Math.min(40, Math.max(2, Math.round(blurIntensity)))
+                : 20;
 
         if (!postId || typeof postId !== 'string') {
             return NextResponse.json({ success: false, error: 'postId is required' }, { status: 400 });
@@ -69,6 +80,9 @@ export async function POST(req: NextRequest) {
             trimStart,
             trimEnd,
             watermark: !!watermark,
+            backgroundFill: !!backgroundFill,
+            fillStyle: safeFillStyle,
+            blurIntensity: safeBlurIntensity,
         });
 
         if (isTrimError(result)) {
@@ -99,10 +113,16 @@ export async function POST(req: NextRequest) {
                         trimStart,
                         trimEnd,
                         watermark: !!watermark,
+                        backgroundFill: !!backgroundFill,
+                        fillStyle: safeFillStyle,
+                        blurIntensity: safeBlurIntensity,
                         lastApplied: {
                             trimStart,
                             trimEnd,
                             watermark: !!watermark,
+                            backgroundFill: !!backgroundFill,
+                            fillStyle: safeFillStyle,
+                            blurIntensity: safeBlurIntensity,
                             at: new Date().toISOString(),
                         },
                     },

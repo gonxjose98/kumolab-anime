@@ -82,6 +82,8 @@ async function getWatermarkPng(): Promise<Buffer> {
     return cachedWatermarkPng;
 }
 
+export type FillStyle = 'black' | 'white' | 'blur';
+
 export interface TrimOptions {
     /** Seconds into the source to start. Use 0 for "from beginning". */
     trimStart: number;
@@ -89,7 +91,21 @@ export interface TrimOptions {
     trimEnd: number;
     /** Burn @KumoLabAnime into the bottom-right corner. Default off. */
     watermark: boolean;
+    /**
+     * Background Fill — when true, fit the FULL clip (no crop/zoom) inside a
+     * true 9:16 (1080×1920) canvas and fill the empty top/bottom space with
+     * `fillStyle`. When false (default), the source aspect ratio is preserved
+     * and no 9:16 conversion happens — the historical editor behavior.
+     */
+    backgroundFill?: boolean;
+    /** Fill colour/style for the empty canvas space. Default 'white'. */
+    fillStyle?: FillStyle;
+    /** gblur sigma for the 'blur' fill (clamped 2–40). Default 20. */
+    blurIntensity?: number;
 }
+
+const FILL_W = 1080;
+const FILL_H = 1920;
 
 export interface TrimResult {
     bucket_url: string;
@@ -130,6 +146,57 @@ async function fetchBucketVideo(url: string): Promise<Buffer | null> {
  *     ffmpeg errors with "muxer does not support non seekable output")
  * Both of these die when piping through stdin/stdout.
  */
+/**
+ * Compose the video filter chain. Returns the chain segments joined later
+ * into -filter_complex, plus the label of the final video stream. Built
+ * from two optional stages, in order:
+ *
+ *   1. Background Fill — fit the full clip inside 1080×1920 (no crop) and
+ *      fill the gaps. 'black'/'white' use scale+pad; 'blur' splits the
+ *      source, makes a zoomed-cover blurred copy as the backdrop, and
+ *      overlays the contained clip centered on top. Only filters present
+ *      in every ffmpeg-static build are used (split/scale/crop/pad/gblur/
+ *      overlay) — drawtext/libfreetype are NOT available here.
+ *   2. Watermark — overlays the pre-rendered PNG bottom-right.
+ *
+ * If neither stage applies the source stream [0:v] is returned untouched
+ * (the caller then takes the stream-copy fast path).
+ */
+function buildVideoFilter(
+    opts: TrimOptions,
+    hasWatermark: boolean,
+): { chain: string[]; finalLabel: string } {
+    const chain: string[] = [];
+    let label = '[0:v]';
+
+    if (opts.backgroundFill) {
+        const style: FillStyle = opts.fillStyle || 'white';
+        if (style === 'blur') {
+            const sigma = Math.min(40, Math.max(2, Math.round(opts.blurIntensity ?? 20)));
+            // Split source → cover-blurred backdrop + contained foreground,
+            // then center the foreground over the backdrop.
+            chain.push('[0:v]split=2[bg][fg]');
+            chain.push(`[bg]scale=${FILL_W}:${FILL_H}:force_original_aspect_ratio=increase,crop=${FILL_W}:${FILL_H},gblur=sigma=${sigma}[bgb]`);
+            chain.push(`[fg]scale=${FILL_W}:${FILL_H}:force_original_aspect_ratio=decrease[fgs]`);
+            chain.push('[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1[vf]');
+        } else {
+            // black | white — solid pad around the contained clip.
+            const color = style === 'black' ? 'black' : 'white';
+            chain.push(`[0:v]scale=${FILL_W}:${FILL_H}:force_original_aspect_ratio=decrease,pad=${FILL_W}:${FILL_H}:(ow-iw)/2:(oh-ih)/2:color=${color},setsar=1[vf]`);
+        }
+        label = '[vf]';
+    }
+
+    if (hasWatermark) {
+        // overlay is always present (unlike drawtext). Watermark sits
+        // bottom-right of whatever canvas the fill stage produced.
+        chain.push(`${label}[1:v]overlay=W-w-30:H-h-40[v]`);
+        label = '[v]';
+    }
+
+    return { chain, finalLabel: label };
+}
+
 function buildArgs(
     opts: TrimOptions,
     watermarkPath: string | null,
@@ -137,46 +204,51 @@ function buildArgs(
     outputPath: string,
 ): string[] {
     const duration = Math.max(0, opts.trimEnd - opts.trimStart);
+    const hasWatermark = !!(opts.watermark && watermarkPath);
+    const needsReencode = hasWatermark || !!opts.backgroundFill;
 
-    if (opts.watermark && watermarkPath) {
-        // Two inputs: source video + watermark PNG. Overlay places the
-        // PNG bottom-right with a small margin. `overlay` is always present
-        // in any ffmpeg build (unlike `drawtext` which needs libfreetype).
-        // Audio stream-copies; video re-encodes to bake in the overlay.
+    // Fast path: nothing to bake in → stream-copy. Fast-seek + duration.
+    if (!needsReencode) {
         return [
             '-hide_banner',
             '-loglevel', 'error',
             '-y',
             '-ss', opts.trimStart.toFixed(3),
             '-i', inputPath,
-            '-i', watermarkPath,
             '-t', duration.toFixed(3),
-            '-filter_complex', '[0:v][1:v]overlay=W-w-30:H-h-40[v]',
-            '-map', '[v]',
-            '-map', '0:a?',
-            '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-pix_fmt', 'yuv420p',
-            '-profile:v', 'high',
-            '-level', '4.1',
-            '-c:a', 'copy',
+            '-c', 'copy',
             '-movflags', '+faststart',
             outputPath,
         ];
     }
 
-    // No watermark — stream-copy is the fast path. Fast-seek + duration.
-    return [
+    const { chain, finalLabel } = buildVideoFilter(opts, hasWatermark);
+
+    // Inputs: source always; watermark PNG only when overlaying it. Audio
+    // stream-copies regardless; only the video stream re-encodes.
+    const args = [
         '-hide_banner',
         '-loglevel', 'error',
         '-y',
         '-ss', opts.trimStart.toFixed(3),
         '-i', inputPath,
+    ];
+    if (hasWatermark) args.push('-i', watermarkPath!);
+    args.push(
         '-t', duration.toFixed(3),
-        '-c', 'copy',
+        '-filter_complex', chain.join(';'),
+        '-map', finalLabel,
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-pix_fmt', 'yuv420p',
+        '-profile:v', 'high',
+        '-level', '4.1',
+        '-c:a', 'copy',
         '-movflags', '+faststart',
         outputPath,
-    ];
+    );
+    return args;
 }
 
 interface FfmpegResult {

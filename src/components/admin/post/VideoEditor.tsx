@@ -27,10 +27,15 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+type FillStyle = 'black' | 'white' | 'blur';
+
 interface VideoSettings {
     trimStart: number;
     trimEnd: number;
     watermark: boolean;
+    backgroundFill: boolean;
+    fillStyle: FillStyle;
+    blurIntensity: number;
 }
 
 interface VideoEditorProps {
@@ -52,6 +57,7 @@ export default function VideoEditor({
     onProcessed,
 }: VideoEditorProps) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const bgVideoRef = useRef<HTMLVideoElement | null>(null);
     const timelineRef = useRef<HTMLDivElement | null>(null);
 
     // The video element is locked to the original; we never swap its src on
@@ -62,6 +68,14 @@ export default function VideoEditor({
     const [trimStart, setTrimStart] = useState(initialSettings?.trimStart ?? 0);
     const [trimEnd, setTrimEnd] = useState(initialSettings?.trimEnd ?? 0);
     const [watermark, setWatermark] = useState(!!initialSettings?.watermark);
+    // Background Fill — defaults OFF (independent of other toggles), matching
+    // the rest of the editor. When ON, export becomes true 9:16 with the full
+    // clip centered and the gaps filled by `fillStyle`.
+    const [backgroundFill, setBackgroundFill] = useState(!!initialSettings?.backgroundFill);
+    const [fillStyle, setFillStyle] = useState<FillStyle>(initialSettings?.fillStyle ?? 'white');
+    const [blurIntensity, setBlurIntensity] = useState(
+        typeof initialSettings?.blurIntensity === 'number' ? initialSettings.blurIntensity : 20,
+    );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [info, setInfo] = useState<string | null>(null);
@@ -224,6 +238,42 @@ export default function VideoEditor({
         };
     }, [videoUrl, duration]);
 
+    // Keep the blurred backdrop <video> in lockstep with the main clip while
+    // the 'blur' fill preview is showing. Only mounted when needed, so this
+    // re-binds whenever the backdrop appears/disappears. The backdrop is
+    // muted + non-interactive; the main video stays the single source of
+    // truth for trim, thumbnails, and playback controls.
+    const showBlurPreview = backgroundFill && fillStyle === 'blur';
+    useEffect(() => {
+        if (!showBlurPreview) return;
+        const main = videoRef.current;
+        const bg = bgVideoRef.current;
+        if (!main || !bg) return;
+
+        const resync = () => {
+            if (Math.abs(bg.currentTime - main.currentTime) > 0.18) {
+                bg.currentTime = main.currentTime;
+            }
+        };
+        const onPlay = () => { resync(); bg.play().catch(() => {}); };
+        const onPause = () => { bg.pause(); };
+        const onSeeking = () => { bg.currentTime = main.currentTime; };
+
+        bg.currentTime = main.currentTime;
+        if (!main.paused) bg.play().catch(() => {});
+
+        main.addEventListener('play', onPlay);
+        main.addEventListener('pause', onPause);
+        main.addEventListener('seeking', onSeeking);
+        main.addEventListener('timeupdate', resync);
+        return () => {
+            main.removeEventListener('play', onPlay);
+            main.removeEventListener('pause', onPause);
+            main.removeEventListener('seeking', onSeeking);
+            main.removeEventListener('timeupdate', resync);
+        };
+    }, [showBlurPreview, videoUrl]);
+
     // Drag handler — uses pointer events so mouse + touch both work.
     const beginDrag = useCallback(
         (handle: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
@@ -289,7 +339,15 @@ export default function VideoEditor({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ postId, trimStart, trimEnd, watermark }),
+                body: JSON.stringify({
+                    postId,
+                    trimStart,
+                    trimEnd,
+                    watermark,
+                    backgroundFill,
+                    fillStyle,
+                    blurIntensity,
+                }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || json.success === false) {
@@ -300,7 +358,10 @@ export default function VideoEditor({
             // the original; that URL is now what the publisher will use, but
             // it never replaces the video element's source here.
             const newDuration = trimEnd - trimStart;
-            setInfo(`Saved a ${newDuration.toFixed(1)}s clip${watermark ? ' with watermark' : ''} (${(json.bytes / 1024 / 1024).toFixed(1)} MB). Adjust the handles and Apply again to re-cut from the original.`);
+            const fillNote = backgroundFill
+                ? `, 9:16 ${fillStyle === 'blur' ? `blur (${blurIntensity})` : fillStyle} fill`
+                : '';
+            setInfo(`Saved a ${newDuration.toFixed(1)}s clip${watermark ? ' with watermark' : ''}${fillNote} (${(json.bytes / 1024 / 1024).toFixed(1)} MB). Adjust the handles and Apply again to re-cut from the original.`);
             onProcessed?.(json.staged_video_url, newDuration);
         } catch (e: any) {
             setError(e?.message || 'Process failed');
@@ -331,15 +392,73 @@ export default function VideoEditor({
                 className="rounded-2xl overflow-hidden relative"
                 style={{ background: '#0a0a14', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-                <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    crossOrigin="anonymous"
-                    controls
-                    playsInline
-                    className="w-full max-h-[600px] bg-black"
-                />
+                {/* When Background Fill is ON the preview frame is locked to a
+                    true 9:16 canvas so the operator sees the exact export: the
+                    full clip centered (object-fit:contain) over the chosen fill
+                    layer. For 'blur', a muted backdrop <video> (synced above)
+                    sits behind, mirroring FFmpeg's cover-blur. */}
+                <div
+                    style={
+                        backgroundFill
+                            ? {
+                                  aspectRatio: '9 / 16',
+                                  maxHeight: 600,
+                                  margin: '0 auto',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  background:
+                                      fillStyle === 'white'
+                                          ? '#ffffff'
+                                          : fillStyle === 'black'
+                                            ? '#000000'
+                                            : '#0a0a14',
+                              }
+                            : undefined
+                    }
+                >
+                    {showBlurPreview && (
+                        <video
+                            key="bg"
+                            ref={bgVideoRef}
+                            src={videoUrl}
+                            muted
+                            playsInline
+                            aria-hidden
+                            crossOrigin="anonymous"
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                filter: `blur(${blurIntensity}px)`,
+                                transform: 'scale(1.08)',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                    )}
+                    <video
+                        key="main"
+                        ref={videoRef}
+                        src={videoUrl}
+                        onLoadedMetadata={handleLoadedMetadata}
+                        crossOrigin="anonymous"
+                        controls
+                        playsInline
+                        className={backgroundFill ? 'bg-black' : 'w-full max-h-[600px] bg-black'}
+                        style={
+                            backgroundFill
+                                ? {
+                                      position: 'relative',
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'contain',
+                                      zIndex: 1,
+                                  }
+                                : undefined
+                        }
+                    />
+                </div>
                 {busy && (
                     <div
                         className="absolute inset-0 flex items-center justify-center"
@@ -534,6 +653,84 @@ export default function VideoEditor({
                         Burn in <span style={{ color: HANDLE_COLOR }}>@KumoLabAnime</span> watermark (bottom-right)
                     </span>
                 </label>
+
+                {/* ── Background Fill ───────────────────────────────── */}
+                <div className="space-y-3 pt-1">
+                    <label
+                        className="flex items-center gap-2 cursor-pointer"
+                        style={{ color: 'var(--text-secondary)' }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={backgroundFill}
+                            disabled={busy}
+                            onChange={(e) => setBackgroundFill(e.target.checked)}
+                        />
+                        <span className="text-xs">
+                            Background Fill — fit the full clip to{' '}
+                            <span style={{ color: HANDLE_COLOR }}>9:16</span>, fill the gaps (no crop)
+                        </span>
+                    </label>
+
+                    {backgroundFill && (
+                        <div className="pl-6 space-y-3">
+                            <div className="flex items-center gap-2">
+                                {(['black', 'white', 'blur'] as FillStyle[]).map((s) => {
+                                    const active = fillStyle === s;
+                                    return (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            disabled={busy}
+                                            onClick={() => setFillStyle(s)}
+                                            className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                            style={{
+                                                background: active
+                                                    ? 'rgba(123,97,255,0.25)'
+                                                    : 'rgba(255,255,255,0.04)',
+                                                border: `1px solid ${active ? 'rgba(123,97,255,0.60)' : 'rgba(255,255,255,0.08)'}`,
+                                                color: active ? '#fff' : 'var(--text-secondary)',
+                                                fontFamily: 'var(--font-display)',
+                                            }}
+                                        >
+                                            {s}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {fillStyle === 'blur' && (
+                                <div className="flex items-center gap-3">
+                                    <span
+                                        className="text-[10px] uppercase tracking-wider"
+                                        style={{ color: 'var(--text-muted)' }}
+                                    >
+                                        Blur
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={2}
+                                        max={40}
+                                        step={1}
+                                        value={blurIntensity}
+                                        disabled={busy}
+                                        onChange={(e) => setBlurIntensity(Number(e.target.value))}
+                                        className="flex-1"
+                                        style={{ accentColor: HANDLE_COLOR }}
+                                    />
+                                    <span className="text-[10px] font-mono w-6 text-right" style={{ color: HANDLE_COLOR }}>
+                                        {blurIntensity}
+                                    </span>
+                                </div>
+                            )}
+
+                            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                Exports true 9:16 (1080×1920). The whole clip stays visible; the
+                                {fillStyle === 'blur' ? ' blurred clip' : ` ${fillStyle}`} fills the space above/below.
+                            </p>
+                        </div>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-3 pt-2">
                     <button
