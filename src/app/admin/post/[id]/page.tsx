@@ -490,6 +490,10 @@ export default function PostEditor() {
                         </span>
                     </div>
                 </div>
+                {/* Cancel · Save draft · Save. Save draft keeps the post
+                    pending; Save approves + auto-schedules (pending posts).
+                    For non-pending posts there's nothing to approve, so a
+                    single plain Save. */}
                 <div className="flex gap-2">
                     <button
                         onClick={handleCancel}
@@ -504,34 +508,51 @@ export default function PostEditor() {
                     >
                         Cancel
                     </button>
-                    {isPending && (
+                    {isPending ? (
+                        <>
+                            <button
+                                onClick={() => handleSave()}
+                                disabled={!!busy}
+                                className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
+                                    border: '1px solid rgba(123,97,255,0.30)',
+                                    color: '#fff',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                {busy === 'save' ? 'Saving…' : 'Save draft'}
+                            </button>
+                            <button
+                                onClick={() => handleSave({ thenApprove: true })}
+                                disabled={!!busy}
+                                title="Save and approve — auto-schedules the post for publishing"
+                                className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(0,255,136,0.20), rgba(0,212,170,0.12))',
+                                    border: '1px solid rgba(0,255,136,0.35)',
+                                    color: '#7af0a8',
+                                    fontFamily: 'var(--font-display)',
+                                }}
+                            >
+                                {busy === 'approve' ? 'Saving…' : 'Save'}
+                            </button>
+                        </>
+                    ) : (
                         <button
-                            onClick={() => handleSave({ thenApprove: true })}
+                            onClick={() => handleSave()}
                             disabled={!!busy}
                             className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(0,255,136,0.20), rgba(0,212,170,0.12))',
-                                border: '1px solid rgba(0,255,136,0.35)',
-                                color: '#7af0a8',
+                                background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
+                                border: '1px solid rgba(123,97,255,0.30)',
+                                color: '#fff',
                                 fontFamily: 'var(--font-display)',
                             }}
                         >
-                            {busy === 'approve' ? 'Approving…' : 'Save + Approve'}
+                            {busy === 'save' ? 'Saving…' : 'Save'}
                         </button>
                     )}
-                    <button
-                        onClick={() => handleSave()}
-                        disabled={!!busy}
-                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
-                            border: '1px solid rgba(123,97,255,0.30)',
-                            color: '#fff',
-                            fontFamily: 'var(--font-display)',
-                        }}
-                    >
-                        {busy === 'save' ? 'Saving…' : 'Save'}
-                    </button>
                 </div>
             </div>
 

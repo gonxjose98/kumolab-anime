@@ -104,7 +104,6 @@ export default function VideoEditor({
     // Which centre guide lines are currently active (shown while a snapped
     // overlay is being dragged).
     const [snapGuides, setSnapGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
-    const [savingDraft, setSavingDraft] = useState(false);
     // Trim is collapsed by default — it's the secondary control now.
     const [trimOpen, setTrimOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -380,46 +379,6 @@ export default function VideoEditor({
     // Clean blank blocks, trim text — used by both draft-save and Apply.
     function cleanedOverlays() {
         return overlays.map((o) => ({ ...o, text: o.text.trim() })).filter((o) => o.text.length > 0);
-    }
-
-    // Save draft — persist text / trim / fill to the post WITHOUT rendering.
-    // Fast (no FFmpeg, no bucket write). Stays on the page so the operator
-    // keeps editing; reopening the post restores everything.
-    async function handleSaveDraft() {
-        if (duration === null) {
-            setError('Video still loading — give it a second and try again.');
-            return;
-        }
-        setSavingDraft(true);
-        setError(null);
-        setInfo(null);
-        try {
-            const res = await fetch('/api/admin/video-process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    postId,
-                    draftOnly: true,
-                    trimStart,
-                    trimEnd,
-                    watermark,
-                    backgroundFill,
-                    fillStyle,
-                    blurIntensity,
-                    textOverlays: cleanedOverlays(),
-                }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || json.success === false) {
-                throw new Error(json.error || `Draft save failed (HTTP ${res.status})`);
-            }
-            setInfo('Draft saved — your text, trim & fill are stored. Hit “Apply changes” when you’re ready to render them into the video.');
-        } catch (e: any) {
-            setError(e?.message || 'Draft save failed');
-        } finally {
-            setSavingDraft(false);
-        }
     }
 
     async function handleApply() {
@@ -851,31 +810,21 @@ export default function VideoEditor({
                     </div>
                 </div>
 
-                {/* Save draft + Apply */}
-                <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                            type="button"
-                            onClick={handleSaveDraft}
-                            disabled={busy || savingDraft || duration === null}
-                            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                        >
-                            {savingDraft ? 'Saving…' : 'Save draft'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleApply}
-                            disabled={busy || savingDraft || duration === null}
-                            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                            style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.20), rgba(123,97,255,0.15))', border: '1px solid rgba(123,97,255,0.40)', color: '#fff', fontFamily: 'var(--font-display)' }}
-                        >
-                            {busy ? 'Processing…' : 'Apply changes'}
-                        </button>
-                    </div>
-                    <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                        <strong style={{ color: 'var(--text-secondary)' }}>Save draft</strong> stores your text + settings to come back to (instant, no render). <strong style={{ color: 'var(--text-secondary)' }}>Apply changes</strong> renders them into the video (FFmpeg, ~5–20s).
-                    </p>
+                {/* Apply — renders the edits into the video. Saving (without
+                    rendering) lives in the top bar's "Save draft". */}
+                <div className="flex items-center gap-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <button
+                        type="button"
+                        onClick={handleApply}
+                        disabled={busy || duration === null}
+                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.20), rgba(123,97,255,0.15))', border: '1px solid rgba(123,97,255,0.40)', color: '#fff', fontFamily: 'var(--font-display)' }}
+                    >
+                        {busy ? 'Processing…' : 'Apply changes'}
+                    </button>
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        Renders text / watermark / fill into the video (FFmpeg, ~5–20s). Trim-only is instant. Use <strong style={{ color: 'var(--text-secondary)' }}>Save draft</strong> up top to save without rendering.
+                    </span>
                 </div>
 
                 {error && (
