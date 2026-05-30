@@ -445,7 +445,13 @@ export default function VideoEditor({
                         crossOrigin="anonymous"
                         controls
                         playsInline
-                        className={backgroundFill ? 'bg-black' : 'w-full max-h-[600px] bg-black'}
+                        // In fill mode the video must be transparent, NOT
+                        // bg-black: with object-fit:contain the element box is
+                        // the full 9:16 frame, so an opaque background paints
+                        // over the letterbox gaps and hides the white/black/
+                        // blur fill behind it. Transparent lets the frame fill
+                        // (or the blurred backdrop) show through the gaps.
+                        className={backgroundFill ? '' : 'w-full max-h-[600px] bg-black'}
                         style={
                             backgroundFill
                                 ? {
@@ -454,6 +460,7 @@ export default function VideoEditor({
                                       height: '100%',
                                       objectFit: 'contain',
                                       zIndex: 1,
+                                      background: 'transparent',
                                   }
                                 : undefined
                         }
