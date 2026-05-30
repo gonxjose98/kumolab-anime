@@ -22,7 +22,7 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
-        const { postId, trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity } =
+        const { postId, trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity, textOverlays } =
             (body || {}) as {
                 postId?: string;
                 trimStart?: number;
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
                 backgroundFill?: boolean;
                 fillStyle?: 'black' | 'white' | 'blur';
                 blurIntensity?: number;
+                textOverlays?: Array<{ text?: string; xPct?: number; yPct?: number; color?: string; sizePct?: number }>;
             };
 
         const safeFillStyle: 'black' | 'white' | 'blur' =
@@ -39,6 +40,21 @@ export async function POST(req: NextRequest) {
             typeof blurIntensity === 'number' && isFinite(blurIntensity)
                 ? Math.min(40, Math.max(2, Math.round(blurIntensity)))
                 : 20;
+
+        // Sanitise text overlays — clamp positions/sizes, validate colour,
+        // drop blanks, cap at 8 blocks. Never trust client geometry.
+        const num = (v: any, min: number, max: number, dflt: number) =>
+            typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(min, v)) : dflt;
+        const safeTextOverlays = (Array.isArray(textOverlays) ? textOverlays : [])
+            .filter((o) => o && typeof o.text === 'string' && o.text.trim().length > 0)
+            .slice(0, 8)
+            .map((o) => ({
+                text: String(o.text).slice(0, 120),
+                xPct: num(o.xPct, 0, 1, 0.5),
+                yPct: num(o.yPct, 0, 1, 0.1),
+                color: typeof o.color === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(o.color.trim()) ? o.color.trim() : '#ffffff',
+                sizePct: num(o.sizePct, 0.02, 0.12, 0.045),
+            }));
 
         if (!postId || typeof postId !== 'string') {
             return NextResponse.json({ success: false, error: 'postId is required' }, { status: 400 });
@@ -83,6 +99,7 @@ export async function POST(req: NextRequest) {
             backgroundFill: !!backgroundFill,
             fillStyle: safeFillStyle,
             blurIntensity: safeBlurIntensity,
+            textOverlays: safeTextOverlays,
         });
 
         if (isTrimError(result)) {
@@ -116,6 +133,7 @@ export async function POST(req: NextRequest) {
                         backgroundFill: !!backgroundFill,
                         fillStyle: safeFillStyle,
                         blurIntensity: safeBlurIntensity,
+                        textOverlays: safeTextOverlays,
                         lastApplied: {
                             trimStart,
                             trimEnd,
@@ -123,6 +141,7 @@ export async function POST(req: NextRequest) {
                             backgroundFill: !!backgroundFill,
                             fillStyle: safeFillStyle,
                             blurIntensity: safeBlurIntensity,
+                            textOverlays: safeTextOverlays,
                             at: new Date().toISOString(),
                         },
                     },

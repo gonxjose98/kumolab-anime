@@ -84,6 +84,19 @@ async function getWatermarkPng(): Promise<Buffer> {
 
 export type FillStyle = 'black' | 'white' | 'blur';
 
+export interface TextOverlayInput {
+    /** The text to burn in (may contain emoji). */
+    text: string;
+    /** Centre X as a fraction (0–1) of the 1080×1920 canvas. */
+    xPct: number;
+    /** Centre Y as a fraction (0–1) of the 1080×1920 canvas. */
+    yPct: number;
+    /** Hex colour, e.g. "#ffffff". */
+    color: string;
+    /** Font size as a fraction of canvas height (0.02–0.12). */
+    sizePct: number;
+}
+
 export interface TrimOptions {
     /** Seconds into the source to start. Use 0 for "from beginning". */
     trimStart: number;
@@ -102,10 +115,93 @@ export interface TrimOptions {
     fillStyle?: FillStyle;
     /** gblur sigma for the 'blur' fill (clamped 2–40). Default 20. */
     blurIntensity?: number;
+    /**
+     * Text overlays burned into the export. Positions are normalised to the
+     * 1080×1920 canvas, so any overlay forces the 9:16 canvas (black fill when
+     * Background Fill is off) so the text has somewhere to sit.
+     */
+    textOverlays?: TextOverlayInput[];
 }
 
 const FILL_W = 1080;
 const FILL_H = 1920;
+
+const clamp01 = (v: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, typeof v === 'number' && isFinite(v) ? v : min));
+
+// Accept only #rgb / #rrggbb; fall back to white. Guards the canvas fillStyle
+// against anything weird arriving from the client.
+function sanitizeColor(c: string): string {
+    return typeof c === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c.trim()) ? c.trim() : '#ffffff';
+}
+
+// Register the display font + the bundled colour-emoji font once. Vercel's
+// Linux runtime has NO colour-emoji font, so emoji in burned text would render
+// as tofu without this. @napi-rs/canvas (Skia) renders Noto Color Emoji's
+// colour glyphs natively — verified by rendering a sample PNG.
+let overlayFontsRegistered = false;
+function registerOverlayFonts(GlobalFonts: any) {
+    if (overlayFontsRegistered) return;
+    const outfitPath = path.join(process.cwd(), 'public', 'fonts', 'Outfit-Black.ttf');
+    if (fs.existsSync(outfitPath)) {
+        if (!GlobalFonts.registerFromPath(outfitPath, 'Outfit')) {
+            try { GlobalFonts.register(fs.readFileSync(outfitPath), 'Outfit'); } catch { /* noop */ }
+        }
+    }
+    const emojiPath = path.join(process.cwd(), 'public', 'fonts', 'NotoColorEmoji.ttf');
+    if (fs.existsSync(emojiPath)) {
+        if (!GlobalFonts.registerFromPath(emojiPath, 'Noto Color Emoji')) {
+            try { GlobalFonts.register(fs.readFileSync(emojiPath), 'Noto Color Emoji'); } catch { /* noop */ }
+        }
+    }
+    overlayFontsRegistered = true;
+}
+
+/**
+ * Composite every text overlay onto a single transparent 1080×1920 PNG, so
+ * the FFmpeg side only needs one extra input + one overlay=0:0 (vs N inputs).
+ * Each block is drawn centred at (xPct, yPct) with a dark halo for legibility,
+ * and emoji render in colour via the bundled Noto font. Returns null when
+ * there's nothing to draw.
+ */
+async function renderTextOverlaysPng(overlays: TextOverlayInput[] | undefined): Promise<Buffer | null> {
+    const valid = (overlays || []).filter(
+        (o) => o && typeof o.text === 'string' && o.text.trim().length > 0,
+    );
+    if (valid.length === 0) return null;
+
+    const { createCanvas, GlobalFonts } = await import('@napi-rs/canvas');
+    registerOverlayFonts(GlobalFonts);
+
+    const canvas = createCanvas(FILL_W, FILL_H);
+    const ctx = canvas.getContext('2d');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (const o of valid) {
+        const fontPx = Math.round(clamp01(o.sizePct, 0.02, 0.12) * FILL_H);
+        ctx.font = `800 ${fontPx}px Outfit, "Noto Color Emoji", sans-serif`;
+        const x = clamp01(o.xPct, 0, 1) * FILL_W;
+        const y = clamp01(o.yPct, 0, 1) * FILL_H;
+        const text = o.text.trim();
+
+        // Dark halo (stroke + shadow) so light text stays legible over a
+        // bright clip or a white fill bar.
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(3, fontPx * 0.12);
+        ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = fontPx * 0.18;
+        ctx.shadowOffsetY = Math.round(fontPx * 0.03);
+        ctx.strokeText(text, x, y);
+
+        ctx.shadowColor = 'transparent';
+        ctx.fillStyle = sanitizeColor(o.color);
+        ctx.fillText(text, x, y);
+    }
+
+    return canvas.toBuffer('image/png');
+}
 
 export interface TrimResult {
     bucket_url: string;
@@ -165,12 +261,20 @@ async function fetchBucketVideo(url: string): Promise<Buffer | null> {
 function buildVideoFilter(
     opts: TrimOptions,
     hasWatermark: boolean,
+    hasText: boolean,
+    wmInputIdx: number,
+    textInputIdx: number,
 ): { chain: string[]; finalLabel: string } {
     const chain: string[] = [];
     let label = '[0:v]';
 
-    if (opts.backgroundFill) {
-        const style: FillStyle = opts.fillStyle || 'white';
+    // Text overlays are positioned on the 1080×1920 canvas, so any text forces
+    // the fill stage (black fill when Background Fill is off) — that's what
+    // gives the text its canvas to sit on.
+    const useCanvas = !!opts.backgroundFill || hasText;
+
+    if (useCanvas) {
+        const style: FillStyle = opts.backgroundFill ? (opts.fillStyle || 'white') : 'black';
         if (style === 'blur') {
             const sigma = Math.min(40, Math.max(2, Math.round(opts.blurIntensity ?? 20)));
             // Split source → cover-blurred backdrop + contained foreground,
@@ -190,8 +294,15 @@ function buildVideoFilter(
     if (hasWatermark) {
         // overlay is always present (unlike drawtext). Watermark sits
         // bottom-right of whatever canvas the fill stage produced.
-        chain.push(`${label}[1:v]overlay=W-w-30:H-h-40[v]`);
-        label = '[v]';
+        chain.push(`${label}[${wmInputIdx}:v]overlay=W-w-30:H-h-40[vw]`);
+        label = '[vw]';
+    }
+
+    if (hasText) {
+        // The text PNG is a full 1080×1920 canvas, so overlay at 0:0. Sits on
+        // top of the fill + watermark.
+        chain.push(`${label}[${textInputIdx}:v]overlay=0:0[vt]`);
+        label = '[vt]';
     }
 
     return { chain, finalLabel: label };
@@ -200,12 +311,14 @@ function buildVideoFilter(
 function buildArgs(
     opts: TrimOptions,
     watermarkPath: string | null,
+    textPath: string | null,
     inputPath: string,
     outputPath: string,
 ): string[] {
     const duration = Math.max(0, opts.trimEnd - opts.trimStart);
     const hasWatermark = !!(opts.watermark && watermarkPath);
-    const needsReencode = hasWatermark || !!opts.backgroundFill;
+    const hasText = !!textPath;
+    const needsReencode = hasWatermark || !!opts.backgroundFill || hasText;
 
     // Fast path: nothing to bake in → stream-copy. Fast-seek + duration.
     if (!needsReencode) {
@@ -222,10 +335,11 @@ function buildArgs(
         ];
     }
 
-    const { chain, finalLabel } = buildVideoFilter(opts, hasWatermark);
+    // Input order: video (0), watermark PNG (1 if present), text PNG (next).
+    const wmInputIdx = 1;
+    const textInputIdx = hasWatermark ? 2 : 1;
+    const { chain, finalLabel } = buildVideoFilter(opts, hasWatermark, hasText, wmInputIdx, textInputIdx);
 
-    // Inputs: source always; watermark PNG only when overlaying it. Audio
-    // stream-copies regardless; only the video stream re-encodes.
     const args = [
         '-hide_banner',
         '-loglevel', 'error',
@@ -234,6 +348,7 @@ function buildArgs(
         '-i', inputPath,
     ];
     if (hasWatermark) args.push('-i', watermarkPath!);
+    if (hasText) args.push('-i', textPath!);
     args.push(
         '-t', duration.toFixed(3),
         '-filter_complex', chain.join(';'),
@@ -323,11 +438,13 @@ export async function trimImportedVideo(
     const inputPath = path.join(tmpDir, `trim-in-${tmpId}.mp4`);
     const outputPath = path.join(tmpDir, `trim-out-${tmpId}.mp4`);
     const watermarkPath = path.join(tmpDir, `trim-wm-${tmpId}.png`);
+    const textPath = path.join(tmpDir, `trim-txt-${tmpId}.png`);
 
     const cleanup = () => {
         try { fs.unlinkSync(inputPath); } catch { /* noop */ }
         try { fs.unlinkSync(outputPath); } catch { /* noop */ }
         try { fs.unlinkSync(watermarkPath); } catch { /* noop */ }
+        try { fs.unlinkSync(textPath); } catch { /* noop */ }
     };
 
     let watermarkOnDisk: string | null = null;
@@ -342,6 +459,19 @@ export async function trimImportedVideo(
         }
     }
 
+    // Composite all text overlays into one 1080×1920 transparent PNG.
+    let textOnDisk: string | null = null;
+    try {
+        const png = await renderTextOverlaysPng(opts.textOverlays);
+        if (png) {
+            fs.writeFileSync(textPath, png);
+            textOnDisk = textPath;
+        }
+    } catch (e: any) {
+        console.warn('[VideoTrim] Text overlay PNG render failed:', e?.message || e);
+        // Fall through — textOnDisk stays null, text is simply not burned in.
+    }
+
     try {
         fs.writeFileSync(inputPath, sourceBuf);
     } catch (e: any) {
@@ -354,7 +484,7 @@ export async function trimImportedVideo(
         return { error: 'Failed to stage source video on server' };
     }
 
-    const args = buildArgs(opts, watermarkOnDisk, inputPath, outputPath);
+    const args = buildArgs(opts, watermarkOnDisk, textOnDisk, inputPath, outputPath);
     const ff = await runFfmpegFileIO(args);
     if (ff.exitCode !== 0 || !fs.existsSync(outputPath)) {
         const summary = ff.spawnError
