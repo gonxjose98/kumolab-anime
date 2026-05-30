@@ -525,97 +525,140 @@ export default function PostEditor() {
                 </div>
             )}
 
-            {/* ── 1. Preview — video for imports, image for everything else ── */}
+            {/* ── Title + Caption ──────────────────────────────────
+                For video posts these live in a SINGLE bubble at the very
+                top (Title above Caption), then the video editor below.
+                Image posts keep the original order: preview → Title → Caption. */}
             {isVideoPost ? (
-                <VideoEditor
-                    postId={id}
-                    // Always load the immutable original. staged_video_url is
-                    // the publisher's current trimmed file; the editor needs
-                    // the full source to let the operator re-trim freely.
-                    // Legacy posts (imported before original_video_url existed)
-                    // fall back to staged_video_url, which on a never-trimmed
-                    // post is identical to the original.
-                    initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
-                    initialSettings={post.image_settings?.video}
-                    onProcessed={(newUrl) => {
-                        // Mirror the new URL onto local post state so other
-                        // parts of the page (Save, etc.) reflect the change
-                        // without a full reload.
-                        setPost((prev: any) => prev ? {
-                            ...prev,
-                            social_ids: { ...prev.social_ids, staged_video_url: newUrl },
-                        } : prev);
-                    }}
-                />
+                <>
+                    {/* One combined bubble: Title on top, Caption below. */}
+                    <Card className="p-5 space-y-5">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                                Title
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={e => setTitle(e.target.value)}
+                                onBlur={() => handleRegenerate({ silent: true })}
+                                className="w-full bg-transparent text-lg md:text-xl font-bold leading-snug focus:outline-none"
+                                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+                            />
+                            <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                Headline on the website + first line of social captions.
+                            </p>
+                        </div>
+                        <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                                Caption
+                            </label>
+                            <textarea
+                                value={content}
+                                onChange={e => setContent(e.target.value)}
+                                rows={5}
+                                className="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-none"
+                                style={{ color: 'var(--text-primary)' }}
+                            />
+                            <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                Body on the website + caption below the title on Instagram, Facebook, and Threads.
+                            </p>
+                        </div>
+                    </Card>
+
+                    <VideoEditor
+                        postId={id}
+                        // Always load the immutable original. staged_video_url is
+                        // the publisher's current trimmed file; the editor needs
+                        // the full source to let the operator re-trim freely.
+                        // Legacy posts (imported before original_video_url existed)
+                        // fall back to staged_video_url, which on a never-trimmed
+                        // post is identical to the original.
+                        initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
+                        initialSettings={post.image_settings?.video}
+                        onProcessed={(newUrl) => {
+                            // Mirror the new URL onto local post state so other
+                            // parts of the page (Save, etc.) reflect the change
+                            // without a full reload.
+                            setPost((prev: any) => prev ? {
+                                ...prev,
+                                social_ids: { ...prev.social_ids, staged_video_url: newUrl },
+                            } : prev);
+                        }}
+                    />
+                </>
             ) : (
-                <Card>
-                    <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
-                        {imageUrl && !imageError ? (
-                            <>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    key={imageUrl}
-                                    src={imageUrl}
-                                    alt={title}
-                                    className="w-full h-full object-cover"
-                                    onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
-                                />
-                                {busy === 'render' && (
-                                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
-                                            Rendering…
-                                        </span>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                                <span className="text-xs" style={{ color: '#ff9999' }}>
-                                    {imageError || 'No image set yet.'}
-                                </span>
-                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                    Open "Image source" below to set one.
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </Card>
+                <>
+                    {/* ── Image preview ─────────────────────────────── */}
+                    <Card>
+                        <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
+                            {imageUrl && !imageError ? (
+                                <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        key={imageUrl}
+                                        src={imageUrl}
+                                        alt={title}
+                                        className="w-full h-full object-cover"
+                                        onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
+                                    />
+                                    {busy === 'render' && (
+                                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                                            <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
+                                                Rendering…
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+                                    <span className="text-xs" style={{ color: '#ff9999' }}>
+                                        {imageError || 'No image set yet.'}
+                                    </span>
+                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                        Open "Image source" below to set one.
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
+                    {/* ── Title — prominent, magazine-style ─────────── */}
+                    <Card className="p-5">
+                        <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                            Title
+                        </label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            onBlur={() => handleRegenerate({ silent: true })}
+                            className="w-full bg-transparent text-lg md:text-xl font-bold leading-snug focus:outline-none"
+                            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+                        />
+                        <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            Headline on the website + first line of social captions.
+                        </p>
+                    </Card>
+
+                    {/* ── Caption — the body that publishes ─────────── */}
+                    <Card className="p-5">
+                        <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                            Caption
+                        </label>
+                        <textarea
+                            value={content}
+                            onChange={e => setContent(e.target.value)}
+                            rows={5}
+                            className="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-none"
+                            style={{ color: 'var(--text-primary)' }}
+                        />
+                        <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            Body on the website + caption below the title on Instagram, Facebook, and Threads.
+                        </p>
+                    </Card>
+                </>
             )}
-
-            {/* ── 2. Title — prominent, magazine-style ─────────────── */}
-            <Card className="p-5">
-                <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
-                    Title
-                </label>
-                <input
-                    type="text"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    onBlur={() => handleRegenerate({ silent: true })}
-                    className="w-full bg-transparent text-lg md:text-xl font-bold leading-snug focus:outline-none"
-                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
-                />
-                <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    Headline on the website + first line of social captions.
-                </p>
-            </Card>
-
-            {/* ── 3. Caption — the body that publishes ─────────────── */}
-            <Card className="p-5">
-                <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
-                    Caption
-                </label>
-                <textarea
-                    value={content}
-                    onChange={e => setContent(e.target.value)}
-                    rows={5}
-                    className="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-none"
-                    style={{ color: 'var(--text-primary)' }}
-                />
-                <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    Body on the website + caption below the title on Instagram, Facebook, and Threads.
-                </p>
-            </Card>
 
             {/* ── 4. Overlay & image editing — collapsed by default ── */}
             {/* Hidden entirely for video posts — the image canvas overlay
