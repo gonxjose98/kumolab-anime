@@ -22,7 +22,7 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
-        const { postId, trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity, textOverlays } =
+        const { postId, trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity, textOverlays, draftOnly } =
             (body || {}) as {
                 postId?: string;
                 trimStart?: number;
@@ -32,6 +32,10 @@ export async function POST(req: NextRequest) {
                 fillStyle?: 'black' | 'white' | 'blur';
                 blurIntensity?: number;
                 textOverlays?: Array<{ text?: string; xPct?: number; yPct?: number; color?: string; sizePct?: number }>;
+                // When true, persist the editor settings (trim/fill/text/etc.)
+                // to image_settings.video WITHOUT re-rendering the video. This
+                // is the "Save draft" path — fast, no FFmpeg, no bucket write.
+                draftOnly?: boolean;
             };
 
         const safeFillStyle: 'black' | 'white' | 'blur' =
@@ -74,6 +78,37 @@ export async function POST(req: NextRequest) {
 
         if (fetchErr || !post) {
             return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 });
+        }
+
+        // ── Draft save ─────────────────────────────────────────
+        // Persist the editor's current settings without touching the staged
+        // video. Keeps the existing `lastApplied` snapshot (the last actually-
+        // rendered state) intact — only the working draft fields change.
+        if (draftOnly) {
+            const existingSettings = (post.image_settings as Record<string, any>) || {};
+            const existingVideo = (existingSettings.video as Record<string, any>) || {};
+            const { error: draftErr } = await supabaseAdmin
+                .from('posts')
+                .update({
+                    image_settings: {
+                        ...existingSettings,
+                        video: {
+                            ...existingVideo,
+                            trimStart,
+                            trimEnd,
+                            watermark: !!watermark,
+                            backgroundFill: !!backgroundFill,
+                            fillStyle: safeFillStyle,
+                            blurIntensity: safeBlurIntensity,
+                            textOverlays: safeTextOverlays,
+                        },
+                    },
+                })
+                .eq('id', postId);
+            if (draftErr) {
+                return NextResponse.json({ success: false, error: `Draft save failed: ${draftErr.message}` }, { status: 500 });
+            }
+            return NextResponse.json({ success: true, draft: true });
         }
 
         // Always cut from the original — never from a previously-trimmed

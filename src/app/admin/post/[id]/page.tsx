@@ -101,6 +101,9 @@ export default function PostEditor() {
     // the server so what publishes is byte-for-byte what the user just saw,
     // not a fresh render that might drift.
     const lastPreviewBytes = useRef<string | null>(null);
+    // Latest VideoEditor settings snapshot (text overlays, trim, fill…), so the
+    // top-bar Save can persist the in-progress video draft for video posts.
+    const videoSettingsRef = useRef<any>(null);
 
     // The post + post mutation paths go through /api/posts because RLS is
     // service-role-only — a direct anon-key client read returns zero rows
@@ -283,6 +286,22 @@ export default function PostEditor() {
                     previewImage: lastPreviewBytes.current || undefined,
                 });
                 imageBytesForSave = renderJson.image;
+            }
+
+            // Video posts: persist the in-progress editor draft (text overlays,
+            // trim, fill) before saving title/caption, so Save never silently
+            // drops unrendered text. Lightweight — no FFmpeg, no bucket write.
+            if (isVideoPost && videoSettingsRef.current) {
+                const draftRes = await fetch('/api/admin/video-process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ postId: id, draftOnly: true, ...videoSettingsRef.current }),
+                });
+                const draftJson = await draftRes.json().catch(() => ({}));
+                if (!draftRes.ok || draftJson.success === false) {
+                    throw new Error(draftJson.error || `Could not save video draft (HTTP ${draftRes.status})`);
+                }
             }
 
             const putBody: Record<string, any> = { id, title, excerpt, content };
@@ -576,6 +595,7 @@ export default function PostEditor() {
                         // post is identical to the original.
                         initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
                         initialSettings={post.image_settings?.video}
+                        onSettingsChange={(s) => { videoSettingsRef.current = s; }}
                         onProcessed={(newUrl) => {
                             // Mirror the new URL onto local post state so other
                             // parts of the page (Save, etc.) reflect the change
