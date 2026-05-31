@@ -255,7 +255,7 @@ export default function PostEditor() {
     // is also present.
     const isVideoPost = !!(post?.social_ids?.staged_video_url);
 
-    async function handleSave(opts: { thenApprove?: boolean } = {}) {
+    async function handleSave(opts: { thenApprove?: boolean; asDraft?: boolean } = {}) {
         // What you see is what publishes. We send the exact base64 bytes
         // the preview just rendered — the server uploads them as-is, no
         // second render. The settings snapshot still gets persisted so a
@@ -306,6 +306,12 @@ export default function PostEditor() {
 
             const putBody: Record<string, any> = { id, title, excerpt, content };
             if (imageBytesForSave) putBody.image = imageBytesForSave;
+            // "Save draft" parks the post in the Draft tab (out of Pending) so
+            // the operator can come back to it. Only applied to a post that's
+            // still pre-publish — never demote an approved/published post.
+            if (opts.asDraft && (post.status === 'pending' || post.status === 'draft')) {
+                putBody.status = 'draft';
+            }
             const res = await fetch('/api/posts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -473,6 +479,9 @@ export default function PostEditor() {
     }
 
     const isPending = post.status === 'pending';
+    // Pre-publish posts (pending or saved-as-draft) get the full
+    // Cancel · Save draft · Save layout; everything else just Cancel · Save.
+    const isDraftable = post.status === 'pending' || post.status === 'draft';
     const claimLabel = (post.claim_type || 'OTHER').replace(/_/g, ' ');
 
     return (
@@ -508,10 +517,10 @@ export default function PostEditor() {
                     >
                         Cancel
                     </button>
-                    {isPending ? (
+                    {isDraftable ? (
                         <>
                             <button
-                                onClick={() => handleSave()}
+                                onClick={() => handleSave({ asDraft: true })}
                                 disabled={!!busy}
                                 className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
                                 style={{

@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
             claim_type: isVideo ? 'TRAILER_DROP' : 'OTHER',
             source: 'KumoLab Manual Upload',
             source_url: null, // Not a YouTube source — bypasses trailer-fetcher
-            status: isDraft ? 'pending' : 'published',
+            status: isDraft ? 'draft' : 'published',
             is_published: !isDraft,
             timestamp: now.toISOString(),
             published_at: isDraft ? null : now.toISOString(),
