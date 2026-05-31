@@ -19,11 +19,11 @@ type Post = {
     scheduled_post_time?: string | null;
 };
 
-type Filter = 'all' | 'pending' | 'approved' | 'published';
+type Filter = 'pending' | 'draft' | 'approved' | 'published';
 
 const FILTERS: { key: Filter; label: string; accent: string }[] = [
-    { key: 'all',       label: 'All',       accent: '#7b61ff' },
     { key: 'pending',   label: 'Pending',   accent: '#ffaa00' },
+    { key: 'draft',     label: 'Draft',     accent: '#a78bfa' },
     { key: 'approved',  label: 'Scheduled', accent: '#00d4ff' },
     { key: 'published', label: 'Published', accent: '#00ff88' },
 ];
@@ -50,9 +50,18 @@ const CLAIM_COLOR: Record<string, string> = {
 };
 const STATUS_COLOR: Record<string, string> = {
     pending: '#ffaa00',
+    draft: '#a78bfa',
     approved: '#00d4ff',
     published: '#00ff88',
     declined: '#9ca3af',
+};
+// Short, human status label shown in the list rows.
+const STATUS_LABEL: Record<string, string> = {
+    pending: 'Pending',
+    draft: 'Draft',
+    approved: 'Scheduled',
+    published: 'Published',
+    declined: 'Declined',
 };
 
 function timeAgo(iso: string | null | undefined): string {
@@ -80,24 +89,24 @@ function thumbUrl(p: Post): string | null {
 
 export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const router = useRouter();
-    const [filter, setFilter] = useState<Filter>('all');
+    const [filter, setFilter] = useState<Filter>('pending');
     const [aiOpen, setAiOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
 
     const counts = useMemo(() => {
-        const c = { all: initialPosts.length, pending: 0, approved: 0, published: 0 };
+        const c: Record<Filter, number> = { pending: 0, draft: 0, approved: 0, published: 0 };
         for (const p of initialPosts) {
-            if (p.status === 'pending') c.pending++;
-            else if (p.status === 'approved') c.approved++;
-            else if (p.status === 'published') c.published++;
+            if (p.status && p.status in c) c[p.status as Filter]++;
         }
         return c;
     }, [initialPosts]);
 
-    const visible = useMemo(() => {
-        if (filter === 'all') return initialPosts;
-        return initialPosts.filter(p => p.status === filter);
-    }, [filter, initialPosts]);
+    // Each post belongs to exactly one tab by its status — nothing shows in
+    // more than one place (no more "All" catch-all).
+    const visible = useMemo(
+        () => initialPosts.filter(p => p.status === filter),
+        [filter, initialPosts],
+    );
 
     return (
         <div className="max-w-6xl mx-auto space-y-5">
@@ -178,15 +187,23 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
                 })}
             </div>
 
-            {/* Posts grid */}
+            {/* Posts list — compact, scannable rows */}
             {visible.length === 0 ? (
                 <div className="text-center py-16 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    No posts in this view.
+                    No {FILTERS.find(f => f.key === filter)?.label.toLowerCase()} posts.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {visible.map(p => (
-                        <PostCard key={p.id} post={p} onClick={() => router.push(`/admin/post/${p.id}`)} />
+                <div
+                    className="rounded-xl overflow-hidden"
+                    style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(12,12,24,0.45)', backdropFilter: 'blur(20px)' }}
+                >
+                    {visible.map((p, i) => (
+                        <PostRow
+                            key={p.id}
+                            post={p}
+                            last={i === visible.length - 1}
+                            onClick={() => router.push(`/admin/post/${p.id}`)}
+                        />
                     ))}
                 </div>
             )}
@@ -197,108 +214,72 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     );
 }
 
-function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
+function PostRow({ post, last, onClick }: { post: Post; last: boolean; onClick: () => void }) {
     const claimKey = (post.claim_type || 'OTHER').toUpperCase();
     const claimColor = CLAIM_COLOR[claimKey] || CLAIM_COLOR.OTHER;
     const claimLabel = CLAIM_LABEL[claimKey] || CLAIM_LABEL.OTHER;
-    const statusColor = STATUS_COLOR[post.status || ''] || '#9ca3af';
+    const status = post.status || '';
+    const statusColor = STATUS_COLOR[status] || '#9ca3af';
+    const statusLabel = STATUS_LABEL[status] || status || '—';
     const thumb = thumbUrl(post);
-    const stagedVideoUrl = post.social_ids?.staged_video_url as string | undefined;
+    const isVideo = !!(post.social_ids?.staged_video_url || post.youtube_video_id);
     const ts = post.published_at || post.scheduled_post_time || post.timestamp;
 
     return (
         <button
             onClick={onClick}
-            className="text-left rounded-xl overflow-hidden transition-all hover:-translate-y-0.5 group"
-            style={{
-                background: 'rgba(12, 12, 24, 0.55)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(20px)',
-            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.035]"
+            style={{ borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.05)' }}
         >
-            <div className="aspect-[4/5] w-full relative overflow-hidden" style={{ background: '#0a0a14' }}>
+            {/* Thumbnail — light: image when we have one, ▶ placeholder for
+                videos without a poster. No <video> elements in the list. */}
+            <div
+                className="relative shrink-0 rounded-md overflow-hidden"
+                style={{ width: 46, height: 46, background: '#0a0a14', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
                 {thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt={post.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                ) : stagedVideoUrl ? (
-                    <>
-                        <video
-                            src={stagedVideoUrl}
-                            muted
-                            playsInline
-                            preload="auto"
-                            // Mobile Safari refuses to render a .mov first
-                            // frame from preload="metadata" alone. Forcing a
-                            // tiny seek on loadedmetadata forces a paint of
-                            // the actual frame at 0.1s — works on both
-                            // Safari and Chrome. We don't autoplay because
-                            // this is the admin grid (potentially many at
-                            // once); just need a poster.
-                            onLoadedMetadata={(e) => {
-                                try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
-                            }}
-                            className="w-full h-full object-cover"
-                            style={{ background: '#000' }}
-                        />
-                        <span
-                            className="absolute top-2 right-2 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                            style={{
-                                background: 'rgba(0,0,0,0.55)',
-                                backdropFilter: 'blur(4px)',
-                                border: '1px solid rgba(255,255,255,0.18)',
-                                color: '#fff',
-                            }}
-                        >
-                            ▶ Video
-                        </span>
-                    </>
+                    <img src={thumb} alt="" className="w-full h-full object-cover" />
                 ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                            no image
-                        </span>
+                    <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        {isVideo ? '▶' : '—'}
                     </div>
                 )}
-                <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-2">
+                {isVideo && thumb && (
                     <span
-                        className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                        style={{
-                            background: `${claimColor}25`,
-                            border: `1px solid ${claimColor}50`,
-                            color: claimColor,
-                            backdropFilter: 'blur(8px)',
-                        }}
+                        className="absolute bottom-0.5 right-0.5 text-[7px] leading-none px-1 py-0.5 rounded"
+                        style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
                     >
-                        {claimLabel}
+                        ▶
                     </span>
-                    <span
-                        className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                        style={{
-                            background: `${statusColor}25`,
-                            border: `1px solid ${statusColor}50`,
-                            color: statusColor,
-                            backdropFilter: 'blur(8px)',
-                        }}
-                    >
-                        {post.status || '—'}
-                    </span>
-                </div>
+                )}
             </div>
-            <div className="p-3">
-                <p className="text-xs font-semibold leading-snug line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+
+            {/* Title + source · time */}
+            <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
                     {post.title}
                 </p>
-                <div className="flex items-center justify-between gap-2 mt-2">
-                    <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                        {post.source || '—'}
-                    </span>
-                    {ts && (
-                        <span className="text-[9px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
-                            {timeAgo(ts)}
-                        </span>
-                    )}
-                </div>
+                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {post.source || '—'}{ts ? ` · ${timeAgo(ts)}` : ''}
+                </p>
             </div>
+
+            {/* Claim type — subtle, hidden on small screens */}
+            <span
+                className="hidden sm:inline text-[9px] font-bold uppercase tracking-wider shrink-0"
+                style={{ color: claimColor }}
+            >
+                {claimLabel}
+            </span>
+
+            {/* Status dot + label */}
+            <span className="flex items-center gap-1.5 shrink-0 w-[84px] justify-end">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor }} />
+                <span className="text-[10px] font-semibold" style={{ color: statusColor }}>
+                    {statusLabel}
+                </span>
+            </span>
         </button>
     );
 }
