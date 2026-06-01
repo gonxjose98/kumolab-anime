@@ -342,6 +342,11 @@ export default function PostEditor() {
     }
 
     async function handleRegenerate(opts: { silent?: boolean } = {}) {
+        // Video posts have no image to render — the VideoEditor owns their
+        // preview. Bail before hitting the image endpoint, otherwise a mere
+        // title edit (title onBlur fires this) errors with "no image to
+        // render from".
+        if (isVideoPost) return;
         // Preview-only render. Returns a base64 data URL we display in the
         // <img> tag. Nothing is written to Storage or the DB until the
         // user hits Save. This means the user can experiment freely with
@@ -367,7 +372,9 @@ export default function PostEditor() {
                 lastPreviewBytes.current = json.image;
             }
         } catch (e: any) {
-            setError(e?.message || 'Render failed');
+            // A silent render is a background nicety (e.g. title onBlur) — never
+            // surface its failure to the operator. Only explicit renders alert.
+            if (!opts.silent) setError(e?.message || 'Render failed');
         } finally {
             setBusy(null);
         }
