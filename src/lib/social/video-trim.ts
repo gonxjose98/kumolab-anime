@@ -390,10 +390,16 @@ function runFfmpegFileIO(args: string[]): Promise<FfmpegResult> {
             stderrTail = (stderrTail + c.toString()).slice(-2000);
         });
 
+        // 90s was too tight: a long clip (100s+) with a blur fill re-encodes
+        // far slower on Vercel's serverless CPU than locally, blowing past the
+        // kill timer → "ffmpeg exited null: no stderr". The route allows 300s,
+        // so give FFmpeg 230s and leave headroom for the bucket download +
+        // upload around it.
+        const FFMPEG_TIMEOUT_MS = 230_000;
         const timer = setTimeout(() => {
-            console.error('[VideoTrim] FFmpeg exceeded 90s, killing');
+            console.error(`[VideoTrim] FFmpeg exceeded ${FFMPEG_TIMEOUT_MS / 1000}s, killing`);
             try { proc.kill('SIGKILL'); } catch { /* noop */ }
-        }, 90_000);
+        }, FFMPEG_TIMEOUT_MS);
 
         proc.on('error', (e: Error) => {
             clearTimeout(timer);
@@ -487,16 +493,25 @@ export async function trimImportedVideo(
     const args = buildArgs(opts, watermarkOnDisk, textOnDisk, inputPath, outputPath);
     const ff = await runFfmpegFileIO(args);
     if (ff.exitCode !== 0 || !fs.existsSync(outputPath)) {
+        // exitCode null + no stderr + no spawn error == we SIGKILLed it on the
+        // timeout. Surface a useful, actionable message instead of the raw
+        // "ffmpeg exited null: no stderr".
+        const timedOut = ff.exitCode === null && !ff.spawnError && !ff.stderrTail.trim();
         const summary = ff.spawnError
             ? `spawn failed: ${ff.spawnError}`
-            : `ffmpeg exited ${ff.exitCode}: ${ff.stderrTail.slice(-400) || 'no stderr'}`;
+            : timedOut
+                ? 'processing timed out — the clip is likely too long for this effect'
+                : `ffmpeg exited ${ff.exitCode}: ${ff.stderrTail.slice(-400) || 'no stderr'}`;
         cleanup();
         await logError({
             source: 'video-trim.ffmpeg',
             errorMessage: `FFmpeg failed — ${summary}`,
             context: { postId, opts, ffmpegArgs: args },
         }).catch(() => {});
-        return { error: `Video processing failed — ${summary.slice(0, 200)}` };
+        const userMsg = timedOut
+            ? 'Video processing timed out — the clip may be too long, especially with a Blur fill. Trim it shorter (use the Trim handles), then Apply again.'
+            : `Video processing failed — ${summary.slice(0, 200)}`;
+        return { error: userMsg };
     }
 
     let out: Buffer;
