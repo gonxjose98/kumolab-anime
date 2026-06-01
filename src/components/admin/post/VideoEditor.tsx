@@ -782,7 +782,7 @@ export default function VideoEditor({
                     <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
                         <input type="checkbox" checked={watermark} disabled={busy} onChange={(e) => setWatermark(e.target.checked)} />
                         <span className="text-xs">
-                            Burn in <span style={{ color: HANDLE_COLOR }}>@KumoLabAnime</span> watermark (bottom-right)
+                            Burn in <span style={{ color: HANDLE_COLOR }}>@kumolabanime</span> watermark (bottom-right)
                         </span>
                     </label>
 

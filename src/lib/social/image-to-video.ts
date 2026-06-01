@@ -36,7 +36,7 @@ const TARGET_W = 1080;
 const TARGET_H = 1920;
 const DURATION_SEC = 12;
 const FPS = 30;
-const WATERMARK_TEXT = '@KumoLabAnime';
+const WATERMARK_TEXT = '@kumolabanime';
 
 export interface ImageToVideoOptions {
     durationSec?: number;
