@@ -134,6 +134,7 @@ export default function VideoEditor({
         settingsSignature((initialSettings as any)?.lastApplied || null),
     );
     const [outputOpen, setOutputOpen] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     // Trim is collapsed by default — it's the secondary control now.
     const [trimOpen, setTrimOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -210,13 +211,14 @@ export default function VideoEditor({
             rafId = requestAnimationFrame(tick);
         };
         const onPlay = () => {
+            setIsPlaying(true);
             const start = trimStartRef.current;
             const end = trimEndRef.current;
             if (v.currentTime < start || v.currentTime >= end - 0.05) v.currentTime = start;
             cancelAnimationFrame(rafId);
             rafId = requestAnimationFrame(tick);
         };
-        const onPause = () => { cancelAnimationFrame(rafId); rafId = 0; };
+        const onPause = () => { setIsPlaying(false); cancelAnimationFrame(rafId); rafId = 0; };
         const onSeeking = () => {
             if (draggingHandleRef.current) return;
             const start = trimStartRef.current;
@@ -411,6 +413,13 @@ export default function VideoEditor({
         setDraggingOverlay(id);
     };
 
+    function togglePlay() {
+        const v = videoRef.current;
+        if (!v) return;
+        if (v.paused) v.play().catch(() => {});
+        else v.pause();
+    }
+
     // Clean blank blocks, trim text — used by both draft-save and Apply.
     function cleanedOverlays() {
         return overlays.map((o) => ({ ...o, text: o.text.trim() })).filter((o) => o.text.length > 0);
@@ -541,20 +550,18 @@ export default function VideoEditor({
                         ref={videoRef}
                         src={videoUrl}
                         onLoadedMetadata={handleLoadedMetadata}
+                        onClick={togglePlay}
                         crossOrigin="anonymous"
-                        controls
-                        // Native fullscreen shows ONLY the raw video element —
-                        // the text/fill overlays are DOM siblings and vanish.
-                        // Disable it; "Preview output" plays the real rendered
-                        // file instead.
-                        controlsList="nofullscreen"
-                        disablePictureInPicture
+                        // No native `controls`: its fullscreen button shows only
+                        // the raw clip (overlays are DOM siblings) and on iOS it
+                        // can't be removed. We use custom tap-to-play + a single
+                        // Enlarge button that opens the real rendered output.
                         playsInline
                         // In canvas mode the video must be transparent, NOT
                         // bg-black: object-fit:contain makes the element box the
                         // whole 9:16 frame, so an opaque background would paint
                         // over the fill behind it.
-                        className={showCanvas ? '' : 'w-full max-h-[600px] bg-black'}
+                        className={showCanvas ? 'cursor-pointer' : 'w-full max-h-[600px] bg-black cursor-pointer'}
                         style={
                             showCanvas
                                 ? {
@@ -607,10 +614,52 @@ export default function VideoEditor({
                         <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, transform: 'translateY(-0.5px)', background: 'rgba(157,123,255,0.95)', boxShadow: '0 0 4px rgba(157,123,255,0.8)', zIndex: 5, pointerEvents: 'none' }} />
                     )}
                 </div>
+
+                {/* Tap-to-play indicator — a small centred button so it never
+                    blocks dragging text overlays in the bars. */}
+                {!isPlaying && !busy && (
+                    <button
+                        type="button"
+                        onClick={togglePlay}
+                        aria-label="Play"
+                        className="absolute flex items-center justify-center rounded-full"
+                        style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 5, width: 56, height: 56, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: 20, paddingLeft: 4 }}
+                    >
+                        ▶
+                    </button>
+                )}
+
+                {/* Single Enlarge button — opens the REAL rendered output.
+                    Replaces the native fullscreen (which only showed the raw
+                    clip). Amber dot when the output is behind the live edits. */}
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setOutputOpen(true); }}
+                    disabled={!stagedUrl}
+                    title={
+                        !stagedUrl
+                            ? 'Hit Apply changes first to render an output'
+                            : outputDirty
+                                ? 'Enlarge — shows the rendered output (your latest edits aren’t baked in yet)'
+                                : 'Enlarge — shows the rendered output (what publishes)'
+                    }
+                    aria-label="Enlarge — preview rendered output"
+                    className="absolute top-2 right-2 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.1] disabled:opacity-40"
+                    style={{ zIndex: 6, width: 34, height: 34, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', fontSize: 15 }}
+                >
+                    ⛶
+                    {stagedUrl && outputDirty && (
+                        <span
+                            className="absolute -top-1 -right-1 rounded-full"
+                            style={{ width: 9, height: 9, background: '#ffaa00', border: '1.5px solid #0a0a14' }}
+                        />
+                    )}
+                </button>
+
                 {busy && (
                     <div
                         className="absolute inset-0 flex items-center justify-center"
-                        style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+                        style={{ zIndex: 7, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
                     >
                         <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
                             Processing video…
@@ -619,43 +668,16 @@ export default function VideoEditor({
                 )}
             </div>
 
-            {/* ── Preview output — the REAL rendered file that publishes ──
-                The preview above is a live mock-up (text/fill layered over the
-                raw clip). This plays the actual staged render so the operator
-                can confirm exactly what goes out. */}
-            <button
-                type="button"
-                onClick={() => setOutputOpen(true)}
-                disabled={!stagedUrl}
-                className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-left transition-all hover:bg-white/[0.04] disabled:opacity-50"
-                style={cardStyle}
-            >
-                <span className="text-sm">⛶</span>
-                <span className="flex-1 min-w-0">
-                    <span className="block text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
-                        Preview output
-                    </span>
-                    <span className="block text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {!stagedUrl
-                            ? 'No render yet — hit Apply changes first'
-                            : outputDirty
-                                ? 'Shows the last render — your latest edits aren’t baked in yet'
-                                : 'Plays the exact file that will publish'}
-                    </span>
-                </span>
-                {stagedUrl && (
-                    <span
-                        className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded shrink-0"
-                        style={
-                            outputDirty
-                                ? { background: 'rgba(255,170,0,0.12)', border: '1px solid rgba(255,170,0,0.35)', color: '#ffcc66' }
-                                : { background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.35)', color: '#7af0a8' }
-                        }
-                    >
-                        {outputDirty ? '⚠ Needs Apply' : '✓ Up to date'}
-                    </span>
-                )}
-            </button>
+            {/* Output status — the ⛶ Enlarge button on the preview plays the
+                real rendered file; this line says whether that output is
+                current with the live edits. */}
+            <p className="text-[10px] px-1" style={{ color: outputDirty ? '#ffcc66' : 'var(--text-muted)' }}>
+                {!stagedUrl
+                    ? 'No render yet — hit Apply changes, then tap ⛶ to preview the real output.'
+                    : outputDirty
+                        ? '⚠ Edits not rendered yet — hit Apply changes, then tap ⛶ to preview exactly what publishes.'
+                        : '✓ Output is up to date — tap ⛶ on the preview to see exactly what publishes.'}
+            </p>
 
             {/* ── Controls ──────────────────────────────────────── */}
             <div className="rounded-2xl p-5 space-y-4" style={cardStyle}>
