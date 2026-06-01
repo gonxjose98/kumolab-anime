@@ -49,6 +49,8 @@ interface VideoEditorProps {
     postId: string;
     /** Immutable original video URL — editor always loads from here. */
     initialVideoUrl: string;
+    /** Current rendered output (staged_video_url) — what actually publishes. */
+    initialStagedUrl?: string | null;
     initialSettings?: Partial<VideoSettings>;
     onProcessed?: (newUrl: string, durationSeconds: number) => void;
     /**
@@ -72,9 +74,29 @@ function newId(): string {
     try { return crypto.randomUUID(); } catch { return `t-${Date.now()}-${Math.floor(Math.random() * 1e6)}`; }
 }
 
+// Stable signature of the render-affecting settings, so we can tell whether
+// the staged output reflects the current edits (vs needing another Apply).
+function settingsSignature(s: {
+    trimStart?: number; trimEnd?: number; watermark?: boolean;
+    backgroundFill?: boolean; fillStyle?: string; blurIntensity?: number;
+    textOverlays?: Array<{ text: string; xPct: number; yPct: number; color: string; sizePct: number }>;
+} | null | undefined): string {
+    if (!s) return '∅';
+    const r2 = (n: number | undefined) => Math.round((n ?? 0) * 100) / 100;
+    const r3 = (n: number) => Math.round(n * 1000) / 1000;
+    const overlays = (s.textOverlays || [])
+        .map((o) => ({ text: (o.text || '').trim(), x: r3(o.xPct), y: r3(o.yPct), c: o.color, sz: r3(o.sizePct) }))
+        .filter((o) => o.text.length > 0);
+    return JSON.stringify({
+        a: r2(s.trimStart), b: r2(s.trimEnd), w: !!s.watermark,
+        f: !!s.backgroundFill, fs: s.fillStyle || 'white', bi: s.blurIntensity ?? 20, o: overlays,
+    });
+}
+
 export default function VideoEditor({
     postId,
     initialVideoUrl,
+    initialStagedUrl,
     initialSettings,
     onProcessed,
     onSettingsChange,
@@ -104,6 +126,14 @@ export default function VideoEditor({
     // Which centre guide lines are currently active (shown while a snapped
     // overlay is being dragged).
     const [snapGuides, setSnapGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+    // Rendered-output preview: the staged file is the literal thing that
+    // publishes. We track it + the signature of the settings it was rendered
+    // with, so we can flag when the live edits aren't baked in yet.
+    const [stagedUrl, setStagedUrl] = useState<string | null>(initialStagedUrl || null);
+    const [renderedSig, setRenderedSig] = useState<string>(
+        settingsSignature((initialSettings as any)?.lastApplied || null),
+    );
+    const [outputOpen, setOutputOpen] = useState(false);
     // Trim is collapsed by default — it's the secondary control now.
     const [trimOpen, setTrimOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -118,6 +148,11 @@ export default function VideoEditor({
     const showCanvas = backgroundFill || overlays.length > 0;
     const effFillStyle: FillStyle = backgroundFill ? fillStyle : 'black';
     const showBlurPreview = backgroundFill && fillStyle === 'blur';
+
+    // Does the rendered output reflect the current edits? If not, the staged
+    // file (what publishes) is stale and needs another Apply.
+    const currentSig = settingsSignature({ trimStart, trimEnd, watermark, backgroundFill, fillStyle, blurIntensity, textOverlays: overlays });
+    const outputDirty = currentSig !== renderedSig;
 
     const initialClampDone = useRef(false);
     function handleLoadedMetadata() {
@@ -413,6 +448,11 @@ export default function VideoEditor({
             if (!res.ok || json.success === false) {
                 throw new Error(json.error || `Process failed (HTTP ${res.status})`);
             }
+            // The staged file now reflects exactly these settings — record it
+            // as the rendered output so "Preview output" shows the real thing
+            // and the dirty flag clears.
+            setStagedUrl(json.staged_video_url);
+            setRenderedSig(currentSig);
             const newDuration = trimEnd - trimStart;
             const fillNote = backgroundFill
                 ? `, 9:16 ${fillStyle === 'blur' ? `blur (${blurIntensity})` : fillStyle} fill`
@@ -503,6 +543,12 @@ export default function VideoEditor({
                         onLoadedMetadata={handleLoadedMetadata}
                         crossOrigin="anonymous"
                         controls
+                        // Native fullscreen shows ONLY the raw video element —
+                        // the text/fill overlays are DOM siblings and vanish.
+                        // Disable it; "Preview output" plays the real rendered
+                        // file instead.
+                        controlsList="nofullscreen"
+                        disablePictureInPicture
                         playsInline
                         // In canvas mode the video must be transparent, NOT
                         // bg-black: object-fit:contain makes the element box the
@@ -572,6 +618,44 @@ export default function VideoEditor({
                     </div>
                 )}
             </div>
+
+            {/* ── Preview output — the REAL rendered file that publishes ──
+                The preview above is a live mock-up (text/fill layered over the
+                raw clip). This plays the actual staged render so the operator
+                can confirm exactly what goes out. */}
+            <button
+                type="button"
+                onClick={() => setOutputOpen(true)}
+                disabled={!stagedUrl}
+                className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-left transition-all hover:bg-white/[0.04] disabled:opacity-50"
+                style={cardStyle}
+            >
+                <span className="text-sm">⛶</span>
+                <span className="flex-1 min-w-0">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                        Preview output
+                    </span>
+                    <span className="block text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {!stagedUrl
+                            ? 'No render yet — hit Apply changes first'
+                            : outputDirty
+                                ? 'Shows the last render — your latest edits aren’t baked in yet'
+                                : 'Plays the exact file that will publish'}
+                    </span>
+                </span>
+                {stagedUrl && (
+                    <span
+                        className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded shrink-0"
+                        style={
+                            outputDirty
+                                ? { background: 'rgba(255,170,0,0.12)', border: '1px solid rgba(255,170,0,0.35)', color: '#ffcc66' }
+                                : { background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.35)', color: '#7af0a8' }
+                        }
+                    >
+                        {outputDirty ? '⚠ Needs Apply' : '✓ Up to date'}
+                    </span>
+                )}
+            </button>
 
             {/* ── Controls ──────────────────────────────────────── */}
             <div className="rounded-2xl p-5 space-y-4" style={cardStyle}>
@@ -838,6 +922,43 @@ export default function VideoEditor({
                     </div>
                 )}
             </div>
+
+            {/* ── Output modal — the actual rendered file ─────────── */}
+            {outputOpen && stagedUrl && (
+                <div
+                    className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+                    onClick={() => setOutputOpen(false)}
+                >
+                    <div className="w-full max-w-md flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: '#fff', fontFamily: 'var(--font-display)' }}>
+                                Final output — what publishes
+                            </span>
+                            <button onClick={() => setOutputOpen(false)} className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                                Close
+                            </button>
+                        </div>
+                        {outputDirty && (
+                            <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: 'rgba(255,170,0,0.10)', border: '1px solid rgba(255,170,0,0.30)', color: '#ffcc66' }}>
+                                ⚠ This is the last render. Your latest edits aren’t baked in yet — close, hit “Apply changes”, then preview again.
+                            </div>
+                        )}
+                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                        <video
+                            src={stagedUrl}
+                            controls
+                            autoPlay
+                            playsInline
+                            className="w-full rounded-xl"
+                            style={{ maxHeight: '78vh', background: '#000' }}
+                        />
+                        <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>
+                            This is the actual file. Fullscreen here shows exactly what your audience sees.
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

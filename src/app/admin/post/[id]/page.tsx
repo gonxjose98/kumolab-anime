@@ -624,6 +624,7 @@ export default function PostEditor() {
                         // fall back to staged_video_url, which on a never-trimmed
                         // post is identical to the original.
                         initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
+                        initialStagedUrl={post.social_ids.staged_video_url}
                         initialSettings={post.image_settings?.video}
                         onSettingsChange={(s) => { videoSettingsRef.current = s; }}
                         onProcessed={(newUrl) => {
