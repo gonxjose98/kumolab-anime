@@ -211,3 +211,30 @@ export function isSocialVideoError(
 ): r is SocialVideoError {
     return (r as SocialVideoError).error !== undefined;
 }
+
+/**
+ * Metadata-only fetch — the source post's text (title + description) without
+ * downloading the video. Used by the re-draft path so we can regenerate a
+ * title/caption from the original tweet text. Returns '' on any failure.
+ */
+export async function fetchSocialPostText(sourceUrl: string): Promise<string> {
+    const worker = workerEnv();
+    if (!worker) return '';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000);
+    try {
+        const r = await fetch(`${worker.url}/info`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${worker.secret}` },
+            body: JSON.stringify({ url: sourceUrl }),
+            signal: ctrl.signal,
+        });
+        if (!r.ok) return '';
+        const j = await r.json();
+        return (j.description || j.fulltitle || j.title || '').toString().slice(0, 2000);
+    } catch {
+        return '';
+    } finally {
+        clearTimeout(timer);
+    }
+}
