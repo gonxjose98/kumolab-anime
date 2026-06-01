@@ -144,6 +144,18 @@ function buildProviderChain(): Provider[] {
     return chain;
 }
 
+// HARD RULE: no em/en/bar dashes anywhere in generated titles or captions.
+// Enforced deterministically (prompts ask for it too, but LLMs slip). A
+// dash with surrounding text becomes a colon; a plain hyphen "-" is fine and
+// left untouched.
+export function stripDashes(s: string): string {
+    if (!s) return s;
+    let out = s.replace(/\s*[—–―]\s*/g, ': ');
+    out = out.replace(/:\s*:/g, ':').replace(/\s{2,}/g, ' ').replace(/\s+([:.,!?;])/g, '$1').trim();
+    out = out.replace(/:\s*$/, '').trim();
+    return out;
+}
+
 export class AntigravityAI {
     private static instance: AntigravityAI;
     private chain: Provider[];
@@ -388,14 +400,14 @@ Return ONLY the formatted single-line title. No explanation. No code blocks. No 
         try {
             const result = await this.sendCompletionRequest(messages, false);
             const response = result.choices?.[0]?.message?.content?.trim();
-            return response || rawTitle;
+            return stripDashes(response || rawTitle);
         } catch (e: any) {
             await logError({
                 source: 'engine.ai.format-title',
                 errorMessage: `formatKumoLabTitle failed (${(e?.message || e).slice(0, 200)}); using raw title`,
                 context: { title: rawTitle.substring(0, 120) },
             }).catch(() => {});
-            return rawTitle;
+            return stripDashes(rawTitle);
         }
     }
 
@@ -476,7 +488,7 @@ Never exceed 4 sentences.`,
             const result = await this.sendCompletionRequest(messages, false);
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) throw new Error('empty caption');
-            const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+            const cleaned = stripDashes(raw.replace(/^["']|["']$/g, '').trim());
             return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
         } catch (e: any) {
             await logError({
@@ -484,7 +496,7 @@ Never exceed 4 sentences.`,
                 errorMessage: `generateCaption failed (${(e?.message || e).slice(0, 200)}); using deterministic fallback`,
                 context: { title: title.substring(0, 120), claim_type: claim },
             }).catch(() => {});
-            return buildFallbackCaption({ title, claim_type: claim, source });
+            return stripDashes(buildFallbackCaption({ title, claim_type: claim, source }));
         }
     }
 
@@ -513,13 +525,15 @@ HOW TO BUILD THE TITLE:
 3. NEVER fabricate news (release/trailer/announcement/premiere/illustration/date/platform), and NEVER guess an anime/character the text doesn't support. A WRONG name is far worse than no name — that is the #1 rule.
 4. Not cringe, not over-hyped, no clickbait. Sharp, clean, lightly confident.
 
-FORMAT: single line, headline-style capitalization, no emojis, no hashtags, no surrounding quotes (except the single-quotes around an anime name). Use " — " to join the anime name to the line when natural.
+FORMAT: single line, headline-style capitalization, no emojis, no hashtags, no surrounding quotes (except the single-quotes around an anime name). Join the anime name to the line with a COLON ":" when natural.
+
+HARD RULE: NEVER use an em dash or en dash ( — or – ) anywhere in the title. Use a colon, a comma, or restructure. A plain hyphen "-" is fine.
 
 EXAMPLES (source text → title):
-"Muichiro stole the moment." → 'Demon Slayer' — Muichiro Stole the Moment
-"The way Gojo did Hanami needs to be studied cause bro had NO chill 🤣" → 'Jujutsu Kaisen' — The Way Gojo Did Hanami Needs to Be Studied
-"Dante is back, and hell isn't ready 🔥" → 'Devil May Cry' — Dante Is Back, and Hell Isn't Ready
-"Too fast for limits, too sharp for control. Mumei from Kabaneri of the iron Fortress" → 'Kabaneri of the Iron Fortress' Mumei — Too Fast for Limits, Too Sharp for Control
+"Muichiro stole the moment." → 'Demon Slayer': Muichiro Stole the Moment
+"The way Gojo did Hanami needs to be studied cause bro had NO chill 🤣" → 'Jujutsu Kaisen': The Way Gojo Did Hanami Needs to Be Studied
+"Dante is back, and hell isn't ready 🔥" → 'Devil May Cry': Dante Is Back, and Hell Isn't Ready
+"Too fast for limits, too sharp for control. Mumei from Kabaneri of the iron Fortress" → 'Kabaneri of the Iron Fortress' Mumei: Too Fast for Limits, Too Sharp for Control
 "This is what PEAK anime look like" → This Is What Peak Anime Looks Like
 "Peak fight 😭" → Peak Fight Scene
 
@@ -532,7 +546,7 @@ Return ONLY the title.`,
             const response = result.choices?.[0]?.message?.content?.trim();
             // Strip ONLY a pair of double-quotes wrapping the whole title —
             // never the single-quotes around the anime name ('Fire Force').
-            return (response || '').replace(/[\r\n]+/g, ' ').trim().replace(/^"(.+)"$/, '$1').trim();
+            return stripDashes((response || '').replace(/[\r\n]+/g, ' ').trim().replace(/^"(.+)"$/, '$1').trim());
         } catch (e: any) {
             await logError({
                 source: 'engine.ai.highlight-title',
@@ -557,7 +571,8 @@ You get "OPERATOR NOTES" (extra context, may be empty) and "SOURCE POST TEXT" (t
 
 RULES:
 - Only add a caption if the SOURCE POST TEXT has something to say BEYOND the title — an extra line, a bit of emotion or detail. If the source is just the anime name or a 2–3 word phrase (e.g. "Peak fight", "Anime: Vivy"), return an EMPTY string. No caption is better than filler.
-- ONE short sentence. Minimal — nothing major. Clean the original line up; strip URLs, @handles, hashtags, emojis.
+- ONE short sentence. Minimal, nothing major. Clean the original line up; strip URLs, @handles, hashtags, emojis.
+- NEVER use an em dash or en dash ( — or – ) anywhere. Use a comma or a period. A plain hyphen "-" is fine.
 - NEVER fabricate news, and NEVER add an anime/character name the source doesn't support.
 - Not cringe, no corporate filler, no "check it out", no "fans are loving it".
 
@@ -575,7 +590,7 @@ Return ONLY the caption, or an empty string.`,
             const result = await this.sendCompletionRequest(messages, false);
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) return '';
-            const cleaned = raw.trim().replace(/^"([\s\S]+)"$/, '$1').trim();
+            const cleaned = stripDashes(raw.trim().replace(/^"([\s\S]+)"$/, '$1').trim());
             return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
         } catch (e: any) {
             await logError({
