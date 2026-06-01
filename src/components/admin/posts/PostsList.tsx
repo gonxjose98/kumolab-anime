@@ -48,22 +48,6 @@ const CLAIM_COLOR: Record<string, string> = {
     STAFF_UPDATE: '#00ff88',
     OTHER: '#9ca3af',
 };
-const STATUS_COLOR: Record<string, string> = {
-    pending: '#ffaa00',
-    draft: '#a78bfa',
-    approved: '#00d4ff',
-    published: '#00ff88',
-    declined: '#9ca3af',
-};
-// Short, human status label shown in the list rows.
-const STATUS_LABEL: Record<string, string> = {
-    pending: 'Pending',
-    draft: 'Draft',
-    approved: 'Scheduled',
-    published: 'Published',
-    declined: 'Declined',
-};
-
 function timeAgo(iso: string | null | undefined): string {
     if (!iso) return '';
     const ms = Date.now() - new Date(iso).getTime();
@@ -92,6 +76,7 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const [filter, setFilter] = useState<Filter>('pending');
     const [aiOpen, setAiOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
+    const [reschedulePost, setReschedulePost] = useState<Post | null>(null);
 
     const counts = useMemo(() => {
         const c: Record<Filter, number> = { pending: 0, draft: 0, approved: 0, published: 0 };
@@ -203,6 +188,7 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
                             post={p}
                             last={i === visible.length - 1}
                             onClick={() => router.push(`/admin/post/${p.id}`)}
+                            onReschedule={() => setReschedulePost(p)}
                         />
                     ))}
                 </div>
@@ -210,60 +196,78 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
 
             {aiOpen && <AiAssistModal onClose={() => setAiOpen(false)} />}
             {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} onSuccess={() => { setUploadOpen(false); router.refresh(); }} />}
+            {reschedulePost && (
+                <RescheduleModal
+                    post={reschedulePost}
+                    onClose={() => setReschedulePost(null)}
+                    onSaved={() => { setReschedulePost(null); router.refresh(); }}
+                />
+            )}
         </div>
     );
 }
 
-function PostRow({ post, last, onClick }: { post: Post; last: boolean; onClick: () => void }) {
+// Friendly local date/time for a scheduled slot, e.g. "Jun 2 · 3:00 PM".
+function formatSchedule(iso: string): string {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' ·');
+}
+// ISO (UTC) → value for <input type="datetime-local"> in the operator's local tz.
+function toLocalInputValue(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: boolean; onClick: () => void; onReschedule: () => void }) {
     const claimKey = (post.claim_type || 'OTHER').toUpperCase();
     const claimColor = CLAIM_COLOR[claimKey] || CLAIM_COLOR.OTHER;
     const claimLabel = CLAIM_LABEL[claimKey] || CLAIM_LABEL.OTHER;
-    const status = post.status || '';
-    const statusColor = STATUS_COLOR[status] || '#9ca3af';
-    const statusLabel = STATUS_LABEL[status] || status || '—';
     const thumb = thumbUrl(post);
     const isVideo = !!(post.social_ids?.staged_video_url || post.youtube_video_id);
-    const ts = post.published_at || post.scheduled_post_time || post.timestamp;
+    const isScheduled = post.status === 'approved' && !!post.scheduled_post_time;
+    // Time shown in the meta line. Scheduled posts show their slot in a
+    // tappable chip on the right instead (a future scheduled_post_time would
+    // read as "just now" here), so the meta is just the source.
+    const ts = post.published_at || post.timestamp;
 
     return (
-        <button
-            onClick={onClick}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.035]"
+        <div
+            className="group w-full flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.035]"
             style={{ borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.05)' }}
         >
-            {/* Thumbnail — light: image when we have one, ▶ placeholder for
-                videos without a poster. No <video> elements in the list. */}
-            <div
-                className="relative shrink-0 rounded-md overflow-hidden"
-                style={{ width: 46, height: 46, background: '#0a0a14', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
-                {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="" className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {isVideo ? '▶' : '—'}
-                    </div>
-                )}
-                {isVideo && thumb && (
-                    <span
-                        className="absolute bottom-0.5 right-0.5 text-[7px] leading-none px-1 py-0.5 rounded"
-                        style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
-                    >
-                        ▶
-                    </span>
-                )}
-            </div>
-
-            {/* Title + source · time */}
-            <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
-                    {post.title}
-                </p>
-                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {post.source || '—'}{ts ? ` · ${timeAgo(ts)}` : ''}
-                </p>
-            </div>
+            {/* Main clickable area → editor */}
+            <button onClick={onClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <div
+                    className="relative shrink-0 rounded-md overflow-hidden"
+                    style={{ width: 46, height: 46, background: '#0a0a14', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                    {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                            {isVideo ? '▶' : '—'}
+                        </div>
+                    )}
+                    {isVideo && thumb && (
+                        <span
+                            className="absolute bottom-0.5 right-0.5 text-[7px] leading-none px-1 py-0.5 rounded"
+                            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                        >
+                            ▶
+                        </span>
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
+                        {post.title}
+                    </p>
+                    <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {post.source || '—'}{!isScheduled && ts ? ` · ${timeAgo(ts)}` : ''}
+                    </p>
+                </div>
+            </button>
 
             {/* Claim type — subtle, hidden on small screens */}
             <span
@@ -273,14 +277,115 @@ function PostRow({ post, last, onClick }: { post: Post; last: boolean; onClick: 
                 {claimLabel}
             </span>
 
-            {/* Status dot + label */}
-            <span className="flex items-center gap-1.5 shrink-0 w-[84px] justify-end">
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor }} />
-                <span className="text-[10px] font-semibold" style={{ color: statusColor }}>
-                    {statusLabel}
-                </span>
-            </span>
-        </button>
+            {/* Scheduled posts: tappable slot chip → reschedule. (No redundant
+                status tag — the tab already says the status.) */}
+            {isScheduled && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onReschedule(); }}
+                    title="Tap to change the scheduled date & time"
+                    className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:-translate-y-0.5"
+                    style={{ background: 'rgba(0,212,255,0.10)', border: '1px solid rgba(0,212,255,0.30)', color: '#7adfff' }}
+                >
+                    <span suppressHydrationWarning>{formatSchedule(post.scheduled_post_time!)}</span>
+                    <span style={{ opacity: 0.7 }}>✎</span>
+                </button>
+            )}
+        </div>
+    );
+}
+
+function RescheduleModal({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: () => void }) {
+    const [value, setValue] = useState(post.scheduled_post_time ? toLocalInputValue(post.scheduled_post_time) : '');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function save() {
+        if (!value) { setError('Pick a date & time'); return; }
+        const when = new Date(value);
+        if (isNaN(when.getTime())) { setError('Invalid date & time'); return; }
+        setBusy(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/posts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id: post.id, scheduled_post_time: when.toISOString() }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) throw new Error(json.error || `Reschedule failed (HTTP ${res.status})`);
+            onSaved();
+        } catch (e: any) {
+            setError(e?.message || 'Reschedule failed');
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4"
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
+            onClick={onClose}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-sm rounded-t-2xl md:rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(12, 12, 24, 0.97)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+            >
+                <div className="p-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-bold uppercase tracking-[0.2em]" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                            Reschedule
+                        </h2>
+                        <button onClick={onClose} className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                            Close
+                        </button>
+                    </div>
+                    <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-muted)' }}>{post.title}</p>
+                </div>
+                <div className="p-5 space-y-4">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                            Publish date & time
+                        </label>
+                        <input
+                            type="datetime-local"
+                            value={value}
+                            disabled={busy}
+                            onChange={e => { setValue(e.target.value); setError(null); }}
+                            className="w-full px-3 py-2.5 rounded-lg text-sm"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+                        />
+                        <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                            Your local time. The post publishes on the next cron tick after this.
+                        </p>
+                    </div>
+                    {error && (
+                        <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff7777' }}>
+                            {error}
+                        </div>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            onClick={onClose}
+                            disabled={busy}
+                            className="px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
+                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={save}
+                            disabled={busy || !value}
+                            className="flex-1 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
+                            style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.20), rgba(123,97,255,0.18))', border: '1px solid rgba(0,212,255,0.40)', color: '#fff', fontFamily: 'var(--font-display)' }}
+                        >
+                            {busy ? 'Saving…' : 'Save schedule'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
