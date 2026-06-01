@@ -498,43 +498,30 @@ Never exceed 4 sentences.`,
         const messages = [
             {
                 role: 'system',
-                content: `You write punchy, scroll-stopping titles for KumoLab, an anime brand, for short video clips reposted as HIGHLIGHTS — standout fight scenes, sakuga, and aesthetic moments. These are NOT news.
+                content: `You clean up the original social caption of an anime HIGHLIGHT clip into a short, sensible KumoLab title. These are reposts of standout scenes (fights, sakuga, aesthetic moments) — NOT news.
 
-You are given two sections:
-- "OPERATOR NOTES" — the ONLY trusted source for naming the anime / character.
-- "SOURCE POST TEXT" — a social caption. Useful ONLY for the scene's vibe/energy. It is UNRELIABLE for identification.
+You get two sections:
+- "OPERATOR NOTES" — extra context the operator typed (may be empty).
+- "SOURCE POST TEXT" — the ORIGINAL caption from the X/IG post. This is your main material.
 
-ABSOLUTE RULES — breaking these destroys the brand's credibility:
-1. NEVER state, guess, or imply the name of any anime, character, studio, voice actor, or person UNLESS that exact name appears in OPERATOR NOTES. Do NOT infer the anime from the SOURCE POST TEXT, from the visuals, or from your own knowledge. A wrong name is far worse than no name.
-2. If OPERATOR NOTES does not give an anime name, write the title about the SCENE / ANIMATION ITSELF with NO proper nouns at all — no quoted titles, no character names.
-3. NEVER fabricate news: no release, trailer, PV, announcement, premiere, illustration, key visual, date, or platform — unless OPERATOR NOTES explicitly states it.
+HOW TO BUILD THE TITLE:
+1. Base it on the SOURCE POST TEXT (and OPERATOR NOTES). Keep its meaning and any anime/character names it states. Then clean it into a proper title: fix grammar + capitalization, and remove URLs, @handles, hashtags, and emojis. Keep it short.
+2. NAMES — only what the text supports:
+   - If the text names the anime, use it (wrap in single quotes: 'Anime Name').
+   - If the text names a character that is UNMISTAKABLY from one anime (e.g. Gojo→Jujutsu Kaisen, Muichiro→Demon Slayer, Mumei→Kabaneri, Dante→Devil May Cry), you MAY add that anime in single quotes.
+   - If the text names NO anime and NO clearly-identifiable character (e.g. "peak fight", "this is what peak anime looks like"), do NOT invent or guess a name — just tidy the line into a sensible short title.
+3. NEVER fabricate news (release/trailer/announcement/premiere/illustration/date/platform), and NEVER guess an anime/character the text doesn't support. A WRONG name is far worse than no name — that is the #1 rule.
+4. Not cringe, not over-hyped, no clickbait. Sharp, clean, lightly confident.
 
-WHAT TO WRITE:
-- ONE bold, scroll-stopping title with real personality — the kind of line that makes someone stop and tap. Think confident anime-fan-page energy: reactions, flexes, hot takes about how good it looks.
-- Hype hard, but stay TRUE to the visuals ("the weight on every hit is unreal") — never a fake fact.
-- If OPERATOR NOTES names the anime, wrap it in single quotes 'Anime Name' and feature it (plus the character if given).
-- Voice: sharp, culturally fluent, a little provocative. Confident, not corporate, not cringe.
+FORMAT: single line, headline-style capitalization, no emojis, no hashtags, no surrounding quotes (except the single-quotes around an anime name). Use " — " to join the anime name to the line when natural.
 
-VARIETY — THIS MATTERS:
-- Do NOT use a formula. NEVER start titles with "This Fight…", "The Animation in This…", or "This [X] Is [Insane/Unreal]". Repetitive openers are boring and unusable.
-- Vary the angle every time: a reaction ("They cooked."), a flex ("Pause it anywhere, it's a wallpaper."), a hot take, a callout, a challenge, a one-liner. Lead with verbs, exclamations, or a bold claim — not "This".
-- The example titles below are STYLE references ONLY. NEVER output any of them verbatim or nearly word-for-word (especially "Absolute Cinema"). Every title must be original to THIS clip — anchor it on a concrete detail you can infer from the SOURCE POST TEXT's vibe (sword, gunplay, speed, color, impact) when possible.
-
-FORMAT: single line, headline-style capitalization, no line breaks, no emojis, no hashtags, no surrounding quotes, at most one " • ".
-
-EXAMPLES — no anime named (the energy + variety to match; NEVER invent a name):
-They Did Not Have to Animate This This Hard
-Absolute Cinema. No Other Way to Say It.
-Whoever Storyboarded This Deserves a Raise
-Pause It Anywhere — Every Frame Is a Wallpaper
-The Sword Work Here Goes Beyond Words
-Peak Sakuga, No Notes
-This Has No Right Looking This Clean
-Nobody Is Talking About This Cut Enough
-Frame for Frame, This Is Flawless
-
-EXAMPLE — OPERATOR NOTES say "Demon Slayer, Muichiro fight":
-'Demon Slayer' Muichiro's Cut Is the Cleanest Sakuga of the Season
+EXAMPLES (source text → title):
+"Muichiro stole the moment." → 'Demon Slayer' — Muichiro Stole the Moment
+"The way Gojo did Hanami needs to be studied cause bro had NO chill 🤣" → 'Jujutsu Kaisen' — The Way Gojo Did Hanami Needs to Be Studied
+"Dante is back, and hell isn't ready 🔥" → 'Devil May Cry' — Dante Is Back, and Hell Isn't Ready
+"Too fast for limits, too sharp for control. Mumei from Kabaneri of the iron Fortress" → 'Kabaneri of the Iron Fortress' Mumei — Too Fast for Limits, Too Sharp for Control
+"This is what PEAK anime look like" → This Is What Peak Anime Looks Like
+"Peak fight 😭" → Peak Fight Scene
 
 Return ONLY the title.`,
             },
@@ -564,18 +551,23 @@ Return ONLY the title.`,
         const messages = [
             {
                 role: 'system',
-                content: `You write short captions for KumoLab anime HIGHLIGHT clips — standout fight scenes, sakuga, and aesthetic moments reposted from X/IG. These are NOT news.
+                content: `You write a SHORT caption for an anime HIGHLIGHT clip, derived from its ORIGINAL social caption. Reposts of standout scenes, not news.
 
-You are given "OPERATOR NOTES" (the only trusted source for naming the anime/character) and "SOURCE POST TEXT" (vibe only, UNRELIABLE for identification).
+You get "OPERATOR NOTES" (extra context, may be empty) and "SOURCE POST TEXT" (the original caption — your material).
 
-ABSOLUTE RULES:
-- NEVER name or imply any anime, character, studio, or person unless that exact name appears in OPERATOR NOTES. Do NOT infer it from the source text or your own knowledge. A wrong name destroys credibility — when unsure, name nothing.
-- NEVER invent a release, trailer, announcement, premiere, date, or platform. Caption the MOMENT, not an event.
-- 1–3 short sentences. Hook first. Say what makes the scene/animation hit — movement, choreography, weight, tension, color.
-- Hype is welcome but must be true ("the fluidity here is absurd"), never clickbait or a fake claim.
-- Voice: sharp, culturally fluent anime-fan editorial. No corporate, no cringe, no hashtags, no emojis, no "check it out", no "fans are loving it".
+RULES:
+- Only add a caption if the SOURCE POST TEXT has something to say BEYOND the title — an extra line, a bit of emotion or detail. If the source is just the anime name or a 2–3 word phrase (e.g. "Peak fight", "Anime: Vivy"), return an EMPTY string. No caption is better than filler.
+- ONE short sentence. Minimal — nothing major. Clean the original line up; strip URLs, @handles, hashtags, emojis.
+- NEVER fabricate news, and NEVER add an anime/character name the source doesn't support.
+- Not cringe, no corporate filler, no "check it out", no "fans are loving it".
 
-Return ONLY the caption.`,
+EXAMPLES (source → caption):
+"Too fast for limits, too sharp for control. This is what unstoppable looks like. Mumei from Kabaneri" → This is what unstoppable looks like.
+"The way Gojo did Hanami... bro had absolutely NO chill 🤣" → Gojo gave Hanami absolutely no chill.
+"Muichiro stole the moment." → (empty — the title already says it)
+"Anime: Vivy: Fluorite Eye's Song" → (empty)
+
+Return ONLY the caption, or an empty string.`,
             },
             { role: 'user', content: rawContext.slice(0, 1800) },
         ];
