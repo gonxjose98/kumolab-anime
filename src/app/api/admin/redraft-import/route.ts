@@ -28,11 +28,21 @@ export async function POST(req: NextRequest) {
 
         const { data: post, error: fetchErr } = await supabaseAdmin
             .from('posts')
-            .select('id, source_url, social_ids')
+            .select('id, source_url, social_ids, status')
             .eq('id', postId)
             .single();
         if (fetchErr || !post) {
             return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 });
+        }
+
+        // Only re-draft posts that are still pre-publish. Never rewrite the
+        // title of an approved/scheduled/published post — that drifts from
+        // what already went (or is about to go) out.
+        if (post.status !== 'draft' && post.status !== 'pending') {
+            return NextResponse.json(
+                { success: false, error: `Post is ${post.status} — re-draft only works on draft/pending posts.` },
+                { status: 400 },
+            );
         }
 
         const sourceUrl = (post.source_url || '') as string;
