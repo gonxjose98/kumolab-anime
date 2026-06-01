@@ -500,43 +500,40 @@ Never exceed 4 sentences.`,
                 role: 'system',
                 content: `You write punchy, scroll-stopping titles for KumoLab, an anime brand, for short video clips reposted as HIGHLIGHTS — standout fight scenes, sakuga, and aesthetic moments. These are NOT news.
 
-NEVER FABRICATE NEWS (most important rule):
-- Do NOT invent or imply a release, trailer, PV, announcement, premiere, illustration, key visual, episode drop, date, studio statement, or streaming platform.
-- Do NOT use words like "Released", "New Trailer", "Announced", "Premieres", "Illustration", "Key Visual", "Official", or any date/platform — UNLESS the provided context explicitly states it as real news.
-- These are just great-looking scenes. Title the MOMENT, not an event.
+You are given two sections:
+- "OPERATOR NOTES" — the ONLY trusted source for naming the anime / character.
+- "SOURCE POST TEXT" — a social caption. Useful ONLY for the scene's vibe/energy. It is UNRELIABLE for identification.
+
+ABSOLUTE RULES — breaking these destroys the brand's credibility:
+1. NEVER state, guess, or imply the name of any anime, character, studio, voice actor, or person UNLESS that exact name appears in OPERATOR NOTES. Do NOT infer the anime from the SOURCE POST TEXT, from the visuals, or from your own knowledge. A wrong name is far worse than no name.
+2. If OPERATOR NOTES does not give an anime name, write the title about the SCENE / ANIMATION ITSELF with NO proper nouns at all — no quoted titles, no character names.
+3. NEVER fabricate news: no release, trailer, PV, announcement, premiere, illustration, key visual, date, or platform — unless OPERATOR NOTES explicitly states it.
 
 WHAT TO WRITE:
-- ONE punchy title that hypes the animation / the fight / the moment and makes someone stop scrolling and watch.
-- Hype is encouraged here — but it must be TRUE ("this scene goes hard", "the animation is unreal"), never a fake factual claim.
-- If the context clearly identifies the anime (and character), wrap the anime name in single quotes: 'Anime Name', and lead with it when natural.
-- If the anime is NOT identifiable from the context, do NOT guess or invent a name — write a hype title about the scene itself.
-- Voice: sharp, culturally fluent, modern anime-fan editorial. Confident, not corporate, not cringe, no clickbait lies.
+- ONE punchy, TRUE title that hypes the animation / the fight / the moment so someone stops scrolling and watches.
+- Hype is good, but it must be true about the visuals ("the animation here is unreal"), never a fake fact.
+- If OPERATOR NOTES names the anime, wrap it in single quotes 'Anime Name' and feature it (plus the character if given).
+- Voice: sharp, culturally fluent, modern anime-fan editorial. Confident, not corporate, not cringe.
 
-FORMAT:
-- Single line. Headline-style capitalization. No line breaks.
-- No emojis, no hashtags, no surrounding quotes around the whole output. At most one " • " separator.
+FORMAT: single line, headline-style capitalization, no line breaks, no emojis, no hashtags, no surrounding quotes, at most one " • ".
 
-GOOD (scene hype, truthful):
-'Jujutsu Kaisen' Gojo vs. Hanami Still Goes Absolutely Insane
+EXAMPLE — OPERATOR NOTES say "Demon Slayer, Muichiro fight":
 'Demon Slayer' Muichiro's Cut Is Pure Sakuga
-The Animation in This 'Vivy' Scene Is Unreal
-'Kabaneri of the Iron Fortress' Mumei Steals Every Frame
-One of the Cleanest Fight Scenes You'll See Today
 
-BAD (never — fabricated news):
-'Demon Slayer' New Muichiro Illustration Released
-'Devil May Cry' Official Trailer Released • Premieres April 2026
+EXAMPLE — no anime in OPERATOR NOTES (NEVER invent one):
+This Is Some of the Cleanest Sakuga You'll See Today
+The Animation in This Fight Goes Absolutely Insane
 
 Return ONLY the title.`,
             },
-            { role: 'user', content: `Clip context: ${rawContext.slice(0, 1500)}` },
+            { role: 'user', content: rawContext.slice(0, 1800) },
         ];
         try {
             const result = await this.sendCompletionRequest(messages, false);
             const response = result.choices?.[0]?.message?.content?.trim();
             // Strip ONLY a pair of double-quotes wrapping the whole title —
             // never the single-quotes around the anime name ('Fire Force').
-            return (response || '').replace(/[\r\n]+/g, ' ').trim().replace(/^"(.+)"$/s, '$1').trim();
+            return (response || '').replace(/[\r\n]+/g, ' ').trim().replace(/^"(.+)"$/, '$1').trim();
         } catch (e: any) {
             await logError({
                 source: 'engine.ai.highlight-title',
@@ -557,22 +554,24 @@ Return ONLY the title.`,
                 role: 'system',
                 content: `You write short captions for KumoLab anime HIGHLIGHT clips — standout fight scenes, sakuga, and aesthetic moments reposted from X/IG. These are NOT news.
 
-RULES:
-- NEVER invent a release, trailer, announcement, premiere, date, studio statement, or platform. Caption the MOMENT, not an event.
-- 1–3 short sentences. Hook first. Say what makes the scene/animation hit — movement, choreography, color, weight, tension.
+You are given "OPERATOR NOTES" (the only trusted source for naming the anime/character) and "SOURCE POST TEXT" (vibe only, UNRELIABLE for identification).
+
+ABSOLUTE RULES:
+- NEVER name or imply any anime, character, studio, or person unless that exact name appears in OPERATOR NOTES. Do NOT infer it from the source text or your own knowledge. A wrong name destroys credibility — when unsure, name nothing.
+- NEVER invent a release, trailer, announcement, premiere, date, or platform. Caption the MOMENT, not an event.
+- 1–3 short sentences. Hook first. Say what makes the scene/animation hit — movement, choreography, weight, tension, color.
 - Hype is welcome but must be true ("the fluidity here is absurd"), never clickbait or a fake claim.
-- If the anime is named in the context you may reference it; if not, don't fabricate a name.
 - Voice: sharp, culturally fluent anime-fan editorial. No corporate, no cringe, no hashtags, no emojis, no "check it out", no "fans are loving it".
 
 Return ONLY the caption.`,
             },
-            { role: 'user', content: `Clip context: ${rawContext.slice(0, 1500)}` },
+            { role: 'user', content: rawContext.slice(0, 1800) },
         ];
         try {
             const result = await this.sendCompletionRequest(messages, false);
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) return '';
-            const cleaned = raw.trim().replace(/^"(.+)"$/s, '$1').trim();
+            const cleaned = raw.trim().replace(/^"([\s\S]+)"$/, '$1').trim();
             return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
         } catch (e: any) {
             await logError({
