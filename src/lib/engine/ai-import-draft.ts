@@ -40,13 +40,17 @@ export async function draftImportedPost(input: ImportDraftInput): Promise<Import
     // — they're the operator's editorial brief and should dominate when
     // they conflict with whatever the original post said. originalText is
     // appended as supplementary detail.
-    const noteBlock = input.userNotes.trim()
-        ? `Operator note: ${input.userNotes.trim()}\n\n`
-        : '';
+    // Two clearly-labelled sections. The highlight prompts only ever take an
+    // anime/character NAME from OPERATOR NOTES — the source text is vibe-only,
+    // because inferring the anime from a tweet caption produces confidently-
+    // wrong names (Power→"Fire Force"), which is worse than no name at all.
+    const operatorBlock = input.userNotes.trim()
+        ? `OPERATOR NOTES (trusted — the only source for the anime/character name): ${input.userNotes.trim()}`
+        : `OPERATOR NOTES: (none — do NOT name any anime or character; write generic scene hype)`;
     const sourceBlock = input.originalText.trim()
-        ? `Original ${input.platform.toUpperCase()} post text: ${input.originalText.trim().slice(0, 1500)}`
-        : `(No source text available — generate from operator note only.)`;
-    const rawContext = `${noteBlock}${sourceBlock}`;
+        ? `SOURCE POST TEXT (vibe only — do NOT use to name the anime, it is unreliable): ${input.originalText.trim().slice(0, 1200)}`
+        : `SOURCE POST TEXT: (none)`;
+    const rawContext = `${operatorBlock}\n\n${sourceBlock}`;
 
     // The title formatter expects a (rawTitle, rawContent) pair. Use the
     // first ~80 chars of the operator note as the working title — if none
