@@ -15,7 +15,8 @@
  *   6. Return { editorUrl } so the modal can redirect to /admin/post/[id]
  *
  * No duplicate detection (operator-curated by design — Jose's call).
- * No auto-publish — always lands as 'pending' for review.
+ * No auto-publish — always lands as 'draft' (operator-curated work-in-
+ * progress) so it shows in the Posts → Draft tab to finish + approve.
  * Auth: middleware gates /api/admin/* by Supabase session.
  */
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
         //   - social_ids.staged_video_url: bucket URL — publisher will pick
         //     this up via the patched _prestagedVideoUrl fallback path
         //   - claim_type: OTHER (operator-curated, bypasses auto-approval)
-        //   - status: 'pending' so it lands in the review queue
+        //   - status: 'draft' so it lands in the Draft tab to finish + approve
         const { error: insertErr } = await supabaseAdmin.from('posts').insert({
             id: postId,
             slug,
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
             claim_type: 'OTHER',
             source: platform === 'x' ? 'X Import' : 'Instagram Import',
             source_url: url,
-            status: 'pending',
+            status: 'draft',
             is_published: false,
             timestamp: now.toISOString(),
             published_at: null,
