@@ -31,7 +31,7 @@ import { logError } from '../logging/structured-logger';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath = require('ffmpeg-static') as string;
 const BUCKET = 'blog-videos';
-const WATERMARK_TEXT = '@KumoLabAnime';
+const WATERMARK_TEXT = '@kumolabanime';
 
 /**
  * Render the watermark text into a transparent PNG using @napi-rs/canvas,
@@ -102,7 +102,7 @@ export interface TrimOptions {
     trimStart: number;
     /** Seconds into the source to end at. Use sourceDuration for "to end". */
     trimEnd: number;
-    /** Burn @KumoLabAnime into the bottom-right corner. Default off. */
+    /** Burn @kumolabanime into the bottom-right corner. Default off. */
     watermark: boolean;
     /**
      * Background Fill — when true, fit the FULL clip (no crop/zoom) inside a

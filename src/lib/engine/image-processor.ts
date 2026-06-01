@@ -10,7 +10,7 @@ import path from 'path';
 
 // Aesthetics
 const KUMOLAB_PURPLE = '#9D7BFF'; // Vibrant Lavender/Purple from reference
-const HANDLE_TEXT = '@KumoLabAnime';
+const HANDLE_TEXT = '@kumolabanime';
 
 // Ensure font availability
 // Image-only imports

@@ -23,7 +23,7 @@ const ffmpegPath = require('ffmpeg-static') as string;
 
 const TARGET_W = 1080;
 const TARGET_H = 1920;
-const WATERMARK_TEXT = '@KumoLabAnime';
+const WATERMARK_TEXT = '@kumolabanime';
 
 export interface ProcessOptions {
     maxSeconds?: number;       // hard-trim ceiling (default 60s — Reels feed video)

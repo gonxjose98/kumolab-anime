@@ -774,7 +774,7 @@ export default function PostEditor() {
                         />
                         <Toggle
                             label="Show watermark"
-                            hint="@KumoLabAnime mark"
+                            hint="@kumolabanime mark"
                             value={settings.applyWatermark}
                             onChange={v => setSettings(s => ({ ...s, applyWatermark: v }))}
                         />

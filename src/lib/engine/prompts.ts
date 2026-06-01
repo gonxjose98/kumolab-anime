@@ -206,7 +206,7 @@ TEXT CONTENT & HIERARCHY
 - No hype language
 
 3) HANDLE / BRANDING
-- Small “@KumoLabAnime”
+- Small “@kumolabanime”
 - White
 - Positioned subtly within the same text zone
 - Must NOT draw attention
