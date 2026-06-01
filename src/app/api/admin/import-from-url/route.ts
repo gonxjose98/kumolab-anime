@@ -29,6 +29,7 @@ import {
     isSocialVideoError,
 } from '@/lib/social/social-video-fetcher';
 import { draftImportedPost } from '@/lib/engine/ai-import-draft';
+import { generateVideoPoster } from '@/lib/social/video-poster';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -79,6 +80,11 @@ export async function POST(req: NextRequest) {
             .slice(0, 80) || slugSeed;
         const slug = `${slugBase}-${postId.split('-')[0]}`;
 
+        // Grab a representative frame for the admin thumbnail (best-effort —
+        // never blocks the import). Stored in posts.image; isVideoPost keys off
+        // staged_video_url so this doesn't change the editor flow.
+        const posterUrl = await generateVideoPoster(staged.bucket_url, postId, staged.duration_seconds).catch(() => null);
+
         const now = new Date();
         const captionTrimmed = draft.caption.slice(0, 5000);
 
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
             title: draft.title,
             content: draft.caption,
             excerpt: captionTrimmed.slice(0, 280),
-            image: null,
+            image: posterUrl,
             type: 'INTEL',
             claim_type: 'OTHER',
             source: platform === 'x' ? 'X Import' : 'Instagram Import',
