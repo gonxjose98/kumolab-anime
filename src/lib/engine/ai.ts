@@ -489,6 +489,102 @@ Never exceed 4 sentences.`,
     }
 
     /**
+     * Title for an operator-imported HIGHLIGHT clip (a standout fight scene /
+     * sakuga / aesthetic moment from X or IG) — NOT news. Attention-grabbing
+     * scene hype, but it must never fabricate a release/trailer/announcement.
+     * Returns '' on failure so the caller can fall back.
+     */
+    public async formatHighlightTitle(rawContext: string): Promise<string> {
+        const messages = [
+            {
+                role: 'system',
+                content: `You write punchy, scroll-stopping titles for KumoLab, an anime brand, for short video clips reposted as HIGHLIGHTS — standout fight scenes, sakuga, and aesthetic moments. These are NOT news.
+
+NEVER FABRICATE NEWS (most important rule):
+- Do NOT invent or imply a release, trailer, PV, announcement, premiere, illustration, key visual, episode drop, date, studio statement, or streaming platform.
+- Do NOT use words like "Released", "New Trailer", "Announced", "Premieres", "Illustration", "Key Visual", "Official", or any date/platform — UNLESS the provided context explicitly states it as real news.
+- These are just great-looking scenes. Title the MOMENT, not an event.
+
+WHAT TO WRITE:
+- ONE punchy title that hypes the animation / the fight / the moment and makes someone stop scrolling and watch.
+- Hype is encouraged here — but it must be TRUE ("this scene goes hard", "the animation is unreal"), never a fake factual claim.
+- If the context clearly identifies the anime (and character), wrap the anime name in single quotes: 'Anime Name', and lead with it when natural.
+- If the anime is NOT identifiable from the context, do NOT guess or invent a name — write a hype title about the scene itself.
+- Voice: sharp, culturally fluent, modern anime-fan editorial. Confident, not corporate, not cringe, no clickbait lies.
+
+FORMAT:
+- Single line. Headline-style capitalization. No line breaks.
+- No emojis, no hashtags, no surrounding quotes around the whole output. At most one " • " separator.
+
+GOOD (scene hype, truthful):
+'Jujutsu Kaisen' Gojo vs. Hanami Still Goes Absolutely Insane
+'Demon Slayer' Muichiro's Cut Is Pure Sakuga
+The Animation in This 'Vivy' Scene Is Unreal
+'Kabaneri of the Iron Fortress' Mumei Steals Every Frame
+One of the Cleanest Fight Scenes You'll See Today
+
+BAD (never — fabricated news):
+'Demon Slayer' New Muichiro Illustration Released
+'Devil May Cry' Official Trailer Released • Premieres April 2026
+
+Return ONLY the title.`,
+            },
+            { role: 'user', content: `Clip context: ${rawContext.slice(0, 1500)}` },
+        ];
+        try {
+            const result = await this.sendCompletionRequest(messages, false);
+            const response = result.choices?.[0]?.message?.content?.trim();
+            // Strip ONLY a pair of double-quotes wrapping the whole title —
+            // never the single-quotes around the anime name ('Fire Force').
+            return (response || '').replace(/[\r\n]+/g, ' ').trim().replace(/^"(.+)"$/s, '$1').trim();
+        } catch (e: any) {
+            await logError({
+                source: 'engine.ai.highlight-title',
+                errorMessage: `formatHighlightTitle failed (${(e?.message || e).slice(0, 200)})`,
+                context: { context: rawContext.slice(0, 120) },
+            }).catch(() => {});
+            return '';
+        }
+    }
+
+    /**
+     * Caption for an operator-imported HIGHLIGHT clip. Hypes the moment, never
+     * fabricates news. Returns '' on failure (operator fills it in).
+     */
+    public async generateHighlightCaption(rawContext: string): Promise<string> {
+        const messages = [
+            {
+                role: 'system',
+                content: `You write short captions for KumoLab anime HIGHLIGHT clips — standout fight scenes, sakuga, and aesthetic moments reposted from X/IG. These are NOT news.
+
+RULES:
+- NEVER invent a release, trailer, announcement, premiere, date, studio statement, or platform. Caption the MOMENT, not an event.
+- 1–3 short sentences. Hook first. Say what makes the scene/animation hit — movement, choreography, color, weight, tension.
+- Hype is welcome but must be true ("the fluidity here is absurd"), never clickbait or a fake claim.
+- If the anime is named in the context you may reference it; if not, don't fabricate a name.
+- Voice: sharp, culturally fluent anime-fan editorial. No corporate, no cringe, no hashtags, no emojis, no "check it out", no "fans are loving it".
+
+Return ONLY the caption.`,
+            },
+            { role: 'user', content: `Clip context: ${rawContext.slice(0, 1500)}` },
+        ];
+        try {
+            const result = await this.sendCompletionRequest(messages, false);
+            const raw = result.choices?.[0]?.message?.content?.trim();
+            if (!raw) return '';
+            const cleaned = raw.trim().replace(/^"(.+)"$/s, '$1').trim();
+            return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
+        } catch (e: any) {
+            await logError({
+                source: 'engine.ai.highlight-caption',
+                errorMessage: `generateHighlightCaption failed (${(e?.message || e).slice(0, 200)})`,
+                context: { context: rawContext.slice(0, 120) },
+            }).catch(() => {});
+            return '';
+        }
+    }
+
+    /**
      * Tone + safety gate. On full-chain failure runs a deterministic
      * heuristic instead of failing closed — KumoLab's English-source
      * pipeline keeps publishing without any LLM access.

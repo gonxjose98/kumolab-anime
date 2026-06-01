@@ -119,6 +119,9 @@ export async function POST(req: NextRequest) {
                 import_platform: platform,
                 import_bytes: staged.bytes,
                 import_duration_seconds: staged.duration_seconds,
+                // Keep the source post text so a re-draft doesn't need to
+                // re-hit the worker for metadata.
+                original_text: (staged.original_description || staged.original_title || '').slice(0, 2000),
             },
         });
 

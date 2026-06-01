@@ -56,14 +56,12 @@ export async function draftImportedPost(input: ImportDraftInput): Promise<Import
         .replace(/\s+/g, ' ')
         .slice(0, 120);
 
+    // Imports are HIGHLIGHT clips (fight scenes, sakuga, aesthetic moments) —
+    // NOT news. Use the highlight prompts so we hype the scene without
+    // fabricating a release / trailer / announcement.
     const [title, caption] = await Promise.all([
-        ai.formatKumoLabTitle(rawTitle, rawContext),
-        ai.generateCaption({
-            title: rawTitle,
-            content: rawContext,
-            claim_type: 'OTHER',
-            source: input.platform === 'x' ? 'X' : 'Instagram',
-        }),
+        ai.formatHighlightTitle(rawContext),
+        ai.generateHighlightCaption(rawContext),
     ]);
 
     return {
