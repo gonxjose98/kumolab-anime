@@ -591,6 +591,9 @@ Return ONLY the caption, or an empty string.`,
             const raw = result.choices?.[0]?.message?.content?.trim();
             if (!raw) return '';
             const cleaned = stripDashes(raw.trim().replace(/^"([\s\S]+)"$/, '$1').trim());
+            // The model sometimes echoes the "(empty)" placeholder from the
+            // prompt instead of returning a blank — treat those as no caption.
+            if (/^\(?\s*(empty|none|no caption|n\/a|null)\s*\)?\.?$/i.test(cleaned)) return '';
             return cleaned.length > 500 ? cleaned.substring(0, 497).trim() + '…' : cleaned;
         } catch (e: any) {
             await logError({
