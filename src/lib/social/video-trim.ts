@@ -58,24 +58,38 @@ async function getWatermarkPng(): Promise<Buffer> {
         }
     }
 
-    const W = 600;
-    const H = 110;
+    // Small but legible. The PNG is overlaid 1:1 (no scaling) bottom-right of
+    // a 1080-wide canvas, so the font size here IS the on-screen size. 34px
+    // reads clearly on a phone without dominating the frame. The canvas is
+    // sized tightly to the measured text (+ padding for the stroke/shadow) so
+    // the overlay's W-w-30 placement keeps the mark flush bottom-right with no
+    // dead transparent margin pushing it off-corner.
+    const FONT_SIZE = 34;
+    const PAD = 10;
+
+    // Measure first on a throwaway context (canvas dims are fixed at creation).
+    const measureCtx = createCanvas(8, 8).getContext('2d');
+    measureCtx.font = `700 ${FONT_SIZE}px Outfit, sans-serif`;
+    const textW = Math.ceil(measureCtx.measureText(WATERMARK_TEXT).width);
+
+    const W = textW + PAD * 2;
+    const H = FONT_SIZE + PAD * 2;
     const canvas = createCanvas(W, H);
     const ctx = canvas.getContext('2d');
-    ctx.font = '700 56px Outfit, sans-serif';
+    ctx.font = `700 ${FONT_SIZE}px Outfit, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     // Black halo for legibility against bright frames
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0,0,0,0.85)';
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    ctx.strokeText(WATERMARK_TEXT, 12, H / 2);
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1;
+    ctx.strokeText(WATERMARK_TEXT, PAD, H / 2);
     // Reset shadow before white fill so it doesn't double-render
     ctx.shadowColor = 'transparent';
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.fillText(WATERMARK_TEXT, 12, H / 2);
+    ctx.fillText(WATERMARK_TEXT, PAD, H / 2);
 
     const png = await canvas.encode('png');
     cachedWatermarkPng = Buffer.from(png);
