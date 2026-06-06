@@ -59,10 +59,13 @@ export async function GET(req: NextRequest) {
         }
 
         if (worker === 'processing') {
-            console.log('[Cron] Running Processing Worker + Scheduled Publisher...');
-            // Publish any approved scheduled posts first
-            await publishScheduledPosts();
-            // Then process new candidates
+            console.log('[Cron] Running Processing Worker...');
+            // Publishing is its OWN cron now (worker=publish). It used to run
+            // here first, but a slow video publish (download MP4 → IG upload →
+            // poll → FB/Threads) stacked onto the processing cycle could push
+            // this single request past the caller's ~100s Cloudflare limit
+            // (backstop → HTTP 524) and risked nearing Vercel's 300s ceiling.
+            // Decoupled so each worker stays fast and predictable.
             const result = await runProcessingWorker();
             return NextResponse.json({
                 success: true,
@@ -75,6 +78,17 @@ export async function GET(req: NextRequest) {
                     errors: result.errors.length
                 }
             });
+        }
+
+        if (worker === 'publish') {
+            // Dedicated publisher. Decoupled from processing so a slow video
+            // publish can't time out that request. Runs on its own hourly cron
+            // (see vercel.json). publishScheduledPosts is idempotent per-post
+            // (flips status='published' up-front + per-post publisher lock), so
+            // overlapping ticks can't double-publish.
+            console.log('[Cron] Running Scheduled Publisher...');
+            await publishScheduledPosts();
+            return NextResponse.json({ success: true, worker: 'publish' });
         }
 
         if (worker === 'dailydrops') {
@@ -319,7 +333,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social']
         }, { status: 400 });
 
     } catch (error: any) {
