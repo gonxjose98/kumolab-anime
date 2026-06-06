@@ -7,6 +7,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/admin';
+import { randomUUID } from 'crypto';
 import {
   SCORING_WEIGHTS,
   SCORING_PENALTIES,
@@ -481,6 +482,56 @@ async function finishCandidate(
 
 // ─── Main Worker ────────────────────────────────────────────
 
+// ─── Single-runner lock (worker_locks PK = lock_key) ──────────
+// Vercel cron and the remote-agent backstop can both invoke the processing
+// endpoint in the same window. Without a guard they'd grind the same FIFO
+// candidates concurrently and could each insert a post for the same item.
+//
+// FAIL-OPEN BY DESIGN: this can only ever cause a SKIP when another run is
+// genuinely in flight (Postgres unique_violation on the PK). Any other
+// outcome — DB error, network blip, missing row — proceeds WITHOUT a lock,
+// i.e. exactly the pre-lock behavior. A lock bug can never halt the pipeline.
+const PROCESSING_LOCK_KEY = 'processing_worker_running';
+// TTL > cycle budget (150s) and the function's 300s maxDuration, so a run
+// that crashes without releasing self-heals: the row's expires_at lapses and
+// the next cycle clears it before re-acquiring.
+const PROCESSING_LOCK_TTL_MS = 300_000;
+
+async function acquireProcessingLock(token: string): Promise<{ acquired: boolean; holding: boolean }> {
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + PROCESSING_LOCK_TTL_MS).toISOString();
+  try {
+    // Clear an expired lock first so a previously-crashed run can't block forever.
+    await supabaseAdmin.from('worker_locks').delete().eq('lock_key', PROCESSING_LOCK_KEY).lt('expires_at', nowIso);
+    // Atomic gate: the PK on lock_key makes a second concurrent insert fail.
+    const { error } = await supabaseAdmin.from('worker_locks').insert({
+      lock_key: PROCESSING_LOCK_KEY,
+      locked_by: `processing:${token}`,
+      locked_at: nowIso,
+      expires_at: expiresAt,
+    });
+    if (!error) return { acquired: true, holding: true };
+    if (error.code === '23505') return { acquired: false, holding: false }; // another fresh run holds it
+    console.warn(`[ProcessingWorker] lock acquire error (${error.code}); proceeding without lock: ${error.message}`);
+    return { acquired: true, holding: false }; // fail open
+  } catch (e: any) {
+    console.warn(`[ProcessingWorker] lock acquire threw; proceeding without lock: ${e?.message}`);
+    return { acquired: true, holding: false }; // fail open
+  }
+}
+
+async function releaseProcessingLock(token: string): Promise<void> {
+  try {
+    // Only ever delete OUR OWN lock row (match on token), never another run's.
+    await supabaseAdmin.from('worker_locks').delete()
+      .eq('lock_key', PROCESSING_LOCK_KEY)
+      .eq('locked_by', `processing:${token}`);
+  } catch (e: any) {
+    // Non-fatal — expires_at guarantees the lock is reclaimable next cycle.
+    console.warn(`[ProcessingWorker] lock release failed (will expire): ${e?.message}`);
+  }
+}
+
 export async function runProcessingWorker(): Promise<{ processed: number; accepted: number; rejected: number; duplicates: number; deferred: number; errors: string[] }> {
   console.log('[ProcessingWorker] Starting processing cycle...');
   const startTime = Date.now();
@@ -499,6 +550,20 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
   // publishScheduledPosts() (which runs before this in the cron route) plus one
   // in-flight candidate finishing after the check. Override via env.
   const CYCLE_BUDGET_MS = Number(process.env.KUMOLAB_PROCESSING_BUDGET_MS) || 150_000;
+
+  // Claim the single-runner lock. acquireProcessingLock never throws and is
+  // fail-open: !acquired means a concurrent run genuinely holds the lock.
+  const lockToken = randomUUID();
+  const lock = await acquireProcessingLock(lockToken);
+  if (!lock.acquired) {
+    console.warn('[ProcessingWorker] Another processing run holds the lock — skipping this cycle.');
+    try {
+      await logAgentAction({ agentName: 'Scraper', action: 'skipped processing cycle', details: 'another run already in progress' });
+    } catch { /* noop — observability only */ }
+    return stats;
+  }
+
+  try {
 
   // Circuit breaker check — evaluates correction velocity. If it trips, auto-publish pauses.
   try {
@@ -672,6 +737,12 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
     stats.errors.push(error.message);
     await logSchedulerRun('processing', 'error', error.message, { error: error.message });
     await logError({ source: 'processing-worker', errorMessage: error.message, stackTrace: error.stack });
+  }
+
+  } finally {
+    // Always release our own lock so the next cycle can run immediately
+    // (rather than waiting for the TTL). No-op when we failed open.
+    if (lock.holding) await releaseProcessingLock(lockToken);
   }
 
   return stats;
