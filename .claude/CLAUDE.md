@@ -122,8 +122,12 @@ Admin Dashboard (/admin)
   → Approve → scheduled_post_time set → publisher picks up on cron
   → Decline → DELETE post + INSERT seen_fingerprints (origin='declined')
 
-Scheduled Publisher (hourly, piggy-backs on processing worker)
+Scheduled Publisher (own cron, hourly @ :20 — worker=publish)
   → src/lib/engine/engine.ts::publishScheduledPosts
+  → Decoupled from the processing worker (was piggy-backed). A slow video
+    publish stacked on processing could push that single request past the
+    backstop caller's ~100s Cloudflare limit (HTTP 524) / Vercel's 300s, so
+    publishing now runs as its own fast, isolated cron.
   → Checks circuit-breaker pause state; skips cycle if tripped
   → For each approved post past scheduled_post_time:
       ▸ set status='published', published_at, expires_at (+60d by default)
@@ -156,7 +160,8 @@ All routed through `src/app/api/cron/route.ts`.
 | Worker | Schedule | Path |
 | --- | --- | --- |
 | `detection` | Every 30 min | `/api/cron?worker=detection` |
-| `processing` | Every hour | `/api/cron?worker=processing` |
+| `processing` | Every hour (:00) | `/api/cron?worker=processing` |
+| `publish` | Every hour (:20) | `/api/cron?worker=publish` |
 | `dailydrops` | 11:00 UTC | `/api/cron?worker=dailydrops` |
 | `daily-report` | 04:00 UTC | `/api/cron?worker=daily-report` |
 | `cleanup` | 03:00 UTC | `/api/cron?worker=cleanup` |
