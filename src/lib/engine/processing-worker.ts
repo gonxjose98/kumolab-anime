@@ -481,10 +481,24 @@ async function finishCandidate(
 
 // ─── Main Worker ────────────────────────────────────────────
 
-export async function runProcessingWorker(): Promise<{ processed: number; accepted: number; rejected: number; duplicates: number; errors: string[] }> {
+export async function runProcessingWorker(): Promise<{ processed: number; accepted: number; rejected: number; duplicates: number; deferred: number; errors: string[] }> {
   console.log('[ProcessingWorker] Starting processing cycle...');
   const startTime = Date.now();
-  const stats = { processed: 0, accepted: 0, rejected: 0, duplicates: 0, errors: [] as string[] };
+  const stats = { processed: 0, accepted: 0, rejected: 0, duplicates: 0, deferred: 0, errors: [] as string[] };
+
+  // Wall-clock budget for the candidate loop. Each candidate makes several
+  // SEQUENTIAL AI calls (translate, title-format, caption, tone/safety), and
+  // every AI call can walk the whole provider chain at up to 25s per provider
+  // when the primary is slow/hung. So cycle time scales with candidate count
+  // and degrades hard when AI is limping. Without a ceiling, a detection burst
+  // (we've seen 22 at once) could run the function past Vercel's 300s
+  // maxDuration and DROP candidates mid-flight. Instead, stop starting new
+  // candidates once we're near the budget and let the rest ride to the next
+  // hourly run — FIFO order is preserved and candidates aren't deleted until
+  // processed, so nothing is lost. Default 150s leaves headroom under 300s for
+  // publishScheduledPosts() (which runs before this in the cron route) plus one
+  // in-flight candidate finishing after the check. Override via env.
+  const CYCLE_BUDGET_MS = Number(process.env.KUMOLAB_PROCESSING_BUDGET_MS) || 150_000;
 
   // Circuit breaker check — evaluates correction velocity. If it trips, auto-publish pauses.
   try {
@@ -510,7 +524,16 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
 
     console.log(`[ProcessingWorker] Processing ${candidates.length} candidates (FIFO)...`);
 
-    for (const candidate of candidates) {
+    for (const [idx, candidate] of candidates.entries()) {
+      // Time-budget guard: stop starting new candidates if we're near the
+      // ceiling. The remainder stays queued (pending_processing) for the next
+      // hourly cycle — FIFO preserves order, so the oldest still go first.
+      const elapsed = Date.now() - startTime;
+      if (elapsed > CYCLE_BUDGET_MS) {
+        stats.deferred = candidates.length - idx;
+        console.warn(`[ProcessingWorker] Time budget ${CYCLE_BUDGET_MS}ms reached after ${elapsed}ms (${idx} processed); deferring ${stats.deferred} candidate(s) to next cycle`);
+        break;
+      }
       try {
         stats.processed++;
         const score = calculateContentScore(candidate);
@@ -641,8 +664,9 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
     }
 
     const duration = Date.now() - startTime;
-    await logSchedulerRun('processing', 'success', `${stats.accepted} accepted, ${stats.rejected} rejected, ${stats.duplicates} dups`, stats);
-    await logAgentAction({ agentName: 'Scraper', action: 'completed processing cycle', details: `${stats.accepted}/${stats.rejected}/${stats.duplicates} in ${duration}ms` });
+    const deferNote = stats.deferred > 0 ? `, ${stats.deferred} deferred (budget)` : '';
+    await logSchedulerRun('processing', 'success', `${stats.accepted} accepted, ${stats.rejected} rejected, ${stats.duplicates} dups${deferNote}`, stats);
+    await logAgentAction({ agentName: 'Scraper', action: 'completed processing cycle', details: `${stats.accepted}/${stats.rejected}/${stats.duplicates} in ${duration}ms${deferNote}` });
     console.log(`[ProcessingWorker] Complete in ${duration}ms:`, stats);
   } catch (error: any) {
     stats.errors.push(error.message);
