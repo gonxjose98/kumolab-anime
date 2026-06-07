@@ -21,6 +21,7 @@ import {
     DIVERSITY,
     Lane,
     Platform,
+    isPremiumStudio,
 } from './automation-config';
 
 export interface SchedulerInput {
@@ -150,8 +151,11 @@ function etHourKey(d: Date): string {
 // Find the next slot that:
 //   - is in the 7-22 ET posting window
 //   - is in an UN-CLAIMED hour (no existing scheduled post that hour)
-//   - prefers PREMIUM hours over non-premium when both are available
-async function findStandardSlot(nowUtc: Date): Promise<Date> {
+//   - when preferPremium: prefers PREMIUM hours over non-premium
+//   - when !preferPremium: takes the earliest OFF-PEAK hour first, so the
+//     premium windows stay open for priority-studio content (Run 3,
+//     2026-06-06). Falls back to premium only if no off-peak slot is open.
+async function findStandardSlot(nowUtc: Date, preferPremium: boolean = true): Promise<Date> {
     const existing = await recentScheduledSlots(nowUtc);
     const claimedHours = new Set(existing.map(etHourKey));
 
@@ -184,12 +188,20 @@ async function findStandardSlot(nowUtc: Date): Promise<Date> {
         walker = new Date(walker.getTime() + 60 * 60 * 1000);
     }
 
-    // 1. First premium open slot wins
-    const premium = candidates.find(c => c.isPremium);
-    if (premium) return premium.slot;
-
-    // 2. Otherwise the earliest non-premium open slot
-    if (candidates.length > 0) return candidates[0].slot;
+    if (preferPremium) {
+        // 1. First premium open slot wins
+        const premium = candidates.find(c => c.isPremium);
+        if (premium) return premium.slot;
+        // 2. Otherwise the earliest open slot (non-premium)
+        if (candidates.length > 0) return candidates[0].slot;
+    } else {
+        // 1. Reserve premium windows for priority studios: take the
+        //    earliest OFF-PEAK open slot first.
+        const offPeak = candidates.find(c => !c.isPremium);
+        if (offPeak) return offPeak.slot;
+        // 2. No off-peak open — fall back to the earliest open (premium).
+        if (candidates.length > 0) return candidates[0].slot;
+    }
 
     // 3. Last resort — no slots open in the next 16h. Fall through to
     // tomorrow's first premium hour. Avoids returning a slot inside
@@ -216,11 +228,17 @@ export async function assignScheduledSlot(input: SchedulerInput): Promise<Schedu
 
     // STANDARD: daily caps removed per Jose. Spacing is enforced by findStandardSlot
     // via DIVERSITY.MIN_GAP_MINUTES. Posts flow freely; spacing protects algo health.
-    const slot = await findStandardSlot(now);
+    //
+    // Publish priority (Run 3, 2026-06-06): priority-studio posts (TOHO) claim
+    // the premium peak-hour slots; everything else fills the off-peak pool
+    // first, reserving high-first-hour-engagement windows for breakout-class
+    // content. See PREMIUM_PUBLISH_STUDIOS in automation-config.ts.
+    const preferPremium = isPremiumStudio(input.source);
+    const slot = await findStandardSlot(now, preferPremium);
     return {
         lane,
         scheduled_at: slot.toISOString(),
         platforms,
-        reason: `STANDARD: queued at ET hour ${etHour(slot)}`,
+        reason: `STANDARD: queued at ET hour ${etHour(slot)}${preferPremium ? ' (priority studio → premium)' : ' (off-peak pool)'}`,
     };
 }

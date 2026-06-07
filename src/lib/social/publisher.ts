@@ -235,6 +235,34 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         }
     }
 
+    // ── 1c. Video-only social policy ───────────────────────────
+    // CHANGE FOLLOWING IG ANALYSIS RUN 3 (2026-06-06). See REVIEW-CHANGELOG.md.
+    //
+    // Three consecutive account reviews now agree image posts are dead
+    // weight on social: Run 3 measured 61 image posts at a 16-view median
+    // with ZERO ever clearing the mid (1k+) tier, while every breakout is a
+    // video Reel. So we no longer broadcast image-only posts to IG/FB/Threads.
+    // If nothing was staged above (no YouTube source, no operator
+    // image-to-Reel opt-in, no pre-staged MP4), the post still lives on the
+    // website — we just skip the social broadcast.
+    //
+    // Intentional, not a fault → action_logs (operational), not error_logs.
+    // Mirrors the existing "no screenshot fallback" directive.
+    if (!stagedVideoUrl) {
+        const { supabaseAdmin } = await import('../supabase/admin');
+        await supabaseAdmin.from('action_logs').insert({
+            action: 'social_publish_skipped',
+            actor: 'system',
+            entity_type: 'post',
+            entity_id: (post as any).id,
+            entity_title: post.title,
+            reason: 'Image-only post — video-only social policy (IG analysis Run 3, 2026-06-06)',
+            details: { slug: post.slug, claim_type: claim, type: (post as any).type },
+        }).then(() => {}, () => {});
+        (result as any).skipped_reason = 'image_only_video_only_policy';
+        return result;
+    }
+
     // ── 2. Instagram ───────────────────────────────────────────
     // For TRAILER_DROP with a staged video, use the Reels API. Otherwise
     // (visual reveal, season confirm, etc.) keep the existing image flow.

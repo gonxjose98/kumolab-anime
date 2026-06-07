@@ -128,3 +128,31 @@ export function isTrailerTrustedSource(sourceName: string | undefined | null): b
     if (sourceName.startsWith('YouTube_')) return true;
     return TRAILER_TRUSTED_SOURCES.has(sourceName);
 }
+
+// ── Premium-slot studios (publish priority) ────────────────────
+// CHANGE FOLLOWING IG ANALYSIS RUN 3 (2026-06-06). See REVIEW-CHANGELOG.md.
+//
+// Every breakout Reel KumoLab has ever produced is a TOHO Animation
+// trailer (Snowball Earth 194k, Dorohedoro S2 88.7k, MHA No.170+1 60k).
+// Other tier-1 studio channels (Crunchyroll, Viz, Kadokawa, Aniplex)
+// topped out in the low thousands over the same window — `source_tier`
+// (all == 1) can't separate them, so we wire publish priority by studio
+// name instead. Posts from a priority studio claim the premium peak-hour
+// slots; everything else fills the off-peak pool first, reserving the
+// high-first-hour-engagement windows for our highest-ceiling content.
+//
+// This is a hypothesis under test (Run 3 H13), not a permanent truth.
+// Re-evaluate the list every account-review cycle: promote a studio when
+// the data shows it producing breakouts, demote one that stops. Match is
+// a case-insensitive substring test against the post's source name (which
+// carries a "YouTube_" prefix for channel sources, e.g. "YouTube_TOHO
+// Animation").
+export const PREMIUM_PUBLISH_STUDIOS: string[] = [
+    'TOHO Animation',
+];
+
+export function isPremiumStudio(sourceName: string | undefined | null): boolean {
+    if (!sourceName) return false;
+    const s = sourceName.toLowerCase();
+    return PREMIUM_PUBLISH_STUDIOS.some(name => s.includes(name.toLowerCase()));
+}
