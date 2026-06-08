@@ -85,10 +85,15 @@ export interface BlogPost {
 export interface Product {
     id: string;
     name: string;
-    price: number;
+    price: number;            // live Printful retail_price (the charged price)
     image: string;
     isVisible: boolean;
     description?: string;
     variants?: any[];
     link?: string; // Printful link (optional)
+    // KumoLab-side display overrides (merch_settings). The anchor is cosmetic
+    // only — never charged. See src/lib/merch.ts + merch_settings migration.
+    isFeatured?: boolean;
+    anchorPrice?: number | null;  // cosmetic struck-through compare-at price
+    label?: string | null;        // e.g. 'Launch price'
 }

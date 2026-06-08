@@ -7,13 +7,19 @@ import styles from './ProductClient.module.css';
 
 interface ProductClientProps {
     productData: any;
+    anchorPrice?: number | null;  // cosmetic compare-at; never charged
+    label?: string | null;        // e.g. 'Launch price'
 }
 
-export default function ProductClient({ productData }: ProductClientProps) {
+export default function ProductClient({ productData, anchorPrice = null, label = null }: ProductClientProps) {
     const { sync_product, sync_variants } = productData;
     const [selectedVariant, setSelectedVariant] = useState(sync_variants[0]);
     const [quantity, setQuantity] = useState(1);
     const addItem = useCartStore((state) => state.addItem);
+
+    const realPrice = parseFloat(selectedVariant.retail_price);
+    const hasAnchor = anchorPrice != null && anchorPrice > realPrice;
+    const pct = hasAnchor ? Math.round((1 - realPrice / anchorPrice) * 100) : 0;
 
     const handleAddToCart = () => {
         addItem({
@@ -42,7 +48,24 @@ export default function ProductClient({ productData }: ProductClientProps) {
 
             <div className={styles.detailsSection}>
                 <h1 className={styles.title}>{sync_product.name}</h1>
-                <p className={styles.price}>${selectedVariant.retail_price}</p>
+                <div className={styles.price} style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                    {hasAnchor && (
+                        <span style={{ textDecoration: 'line-through', opacity: 0.5, fontWeight: 400 }}>
+                            ${anchorPrice!.toFixed(2)}
+                        </span>
+                    )}
+                    <span>${realPrice.toFixed(2)}</span>
+                    {hasAnchor && (
+                        <span
+                            style={{
+                                background: '#e3002b', color: '#fff', fontSize: 13, fontWeight: 800,
+                                letterSpacing: '0.04em', padding: '3px 10px', borderRadius: 6,
+                            }}
+                        >
+                            {label ? `${label} · ` : ''}-{pct}%
+                        </span>
+                    )}
+                </div>
 
                 <div className={styles.variants}>
                     <h3>Select Style</h3>

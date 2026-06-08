@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { CartItem } from '@/store/useCartStore';
+import { getSyncVariantPrice } from '@/lib/merch';
 
 export async function POST(req: Request) {
     try {
@@ -11,23 +12,38 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'No items in cart' }, { status: 400 });
         }
 
-        const lineItems = items.map((item: CartItem) => ({
-            price_data: {
-                currency: 'usd',
-                product_data: {
-                    name: item.name,
-                    images: [item.image],
-                    metadata: {
-                        productId: item.productId,
-                        variantId: item.variantId,
-                        size: item.size || '',
-                        color: item.color || '',
+        // SECURITY / PRICE INTEGRITY: never trust the client-sent price. The
+        // cart lives in the browser, so item.price is attacker-controllable.
+        // Re-fetch each variant's live Printful retail_price server-side and
+        // charge THAT. If any variant can't be resolved we abort the whole
+        // checkout rather than fall back to a client price — a price we can't
+        // verify against Printful must never reach Stripe.
+        const lineItems = await Promise.all(
+            items.map(async (item: CartItem) => {
+                const livePrice = await getSyncVariantPrice(item.variantId);
+                if (livePrice == null || livePrice <= 0) {
+                    throw new Error(`Could not verify price for "${item.name}". Please refresh and try again.`);
+                }
+                return {
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: item.name,
+                            images: [item.image],
+                            metadata: {
+                                productId: item.productId,
+                                variantId: item.variantId,
+                                size: item.size || '',
+                                color: item.color || '',
+                            },
+                        },
+                        // Authoritative price from Printful, not item.price.
+                        unit_amount: Math.round(livePrice * 100),
                     },
-                },
-                unit_amount: Math.round(item.price * 100),
-            },
-            quantity: item.quantity,
-        }));
+                    quantity: item.quantity,
+                };
+            })
+        );
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
