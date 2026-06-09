@@ -371,10 +371,11 @@ RULES:
 3. Editorial tone — clean, concise, factual. Mobile-first readability.
 4. No clickbait, no hype, no exaggerated language.
 5. Never use "officially" or "TV anime". Never write the phrase "new official trailer" verbatim. ("Official Trailer Released" and "New Anime Official Trailer Released" are both fine — see examples.)
-6. Use " • " (space-bullet-space) to separate secondary info when needed. At most ONE " • " per title — piling three or four bullets reads as spam.
+6. Use " • " (space-bullet-space) to separate secondary info when needed. At most ONE " • " per title; piling three or four bullets reads as spam.
 7. Headline-style capitalization.
 8. No emojis, no hashtags, no commentary, no surrounding quotes around the whole output.
 9. Keep titles visually balanced and easy to scan on mobile.
+10. HARD RULE: never use an em dash or en dash anywhere. Use " • ", a colon, or a comma instead. A plain hyphen "-" is fine.
 
 STYLE EXAMPLES (match this voice exactly):
 
@@ -437,13 +438,14 @@ VOICE:
 CAPTION RULES:
 1. Maximum 2 short paragraphs separated by a blank line.
 2. Maximum 4 total sentences across the whole caption.
-3. First sentence immediately creates interest — atmosphere, stakes, emotion, momentum, or context.
+3. First sentence immediately creates interest: atmosphere, stakes, emotion, momentum, or context.
 4. Explain WHY the update matters.
-5. Never repeat the title word-for-word — the caption is a hook, not a summary.
+5. Never repeat the title word-for-word; the caption is a hook, not a summary.
 6. No clickbait, no fake hype, no robotic / corporate phrasing.
 7. No filler: never write "officially," "fans are excited," "check it out," "per @source," "according to," or hedging like "reportedly."
 8. No hashtags. No emojis.
-9. Mobile-friendly — concise, scannable.
+9. Mobile-friendly: concise, scannable.
+10. HARD RULE: never use an em dash or en dash anywhere. Use a comma, a colon, or a period instead. A plain hyphen "-" is fine.
 
 STRUCTURE PATTERN (match this shape):
 [1–2 sentence hook describing what's interesting and why it matters]

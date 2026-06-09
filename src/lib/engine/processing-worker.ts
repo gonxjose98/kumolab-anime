@@ -25,6 +25,7 @@ import { evaluateCircuitBreaker } from './circuit-breaker';
 import { extractYouTubeVideo } from './video-extractor';
 import { isTrailerTrustedSource } from './automation-config';
 import { selectBestImage } from './image-selector';
+import { stripFancyDashes } from './utils';
 
 // Branded fallback URL returned by selectBestImage when nothing usable is
 // found — we treat that as "no image" since it's not actual anime artwork.
@@ -161,8 +162,9 @@ function preCleanTitle(raw: string): string {
   // Strip leading "RE-", "PV-", "FULL-", "WATCH-" style prefixes joined by hyphens
   t = t.replace(/^\s*(re|pv|cm|full|watch|new|exclusive)[\s-]+(?=[A-Z0-9])/i, '');
 
-  // Hyphen glued to ALL-CAPS chunk: "X -SEASON 3" → "X — Season 3"
-  t = t.replace(/\s+-([A-Z][A-Z0-9 ]{2,})/g, ' — $1');
+  // Hyphen glued to ALL-CAPS chunk: "X -SEASON 3" -> "X • Season 3".
+  // House separator is the bullet, never an em dash (no em/en dashes anywhere).
+  t = t.replace(/\s+-([A-Z][A-Z0-9 ]{2,})/g, ' • $1');
 
   // Strip wrapping straight/smart quotes around the whole thing
   t = t.replace(/^["'""'']\s*|\s*["'""'']$/g, '').trim();
@@ -207,7 +209,12 @@ function sanitizeString(str: string | null | undefined, maxLength = 200): string
   for (let i = 0; i < 2; i++) {
     cleaned = cleaned.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'").replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)));
   }
-  return cleaned.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().replace(/\x00/g, '').substring(0, maxLength);
+  // stripFancyDashes enforces the no-em/en-dash brand rule on every title,
+  // excerpt and content string before it is persisted (this is the chokepoint
+  // all three pass through in createPendingPost).
+  return stripFancyDashes(
+    cleaned.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().replace(/\x00/g, '')
+  ).substring(0, maxLength);
 }
 
 // ─── Staggered Scheduling ───────────────────────────────────

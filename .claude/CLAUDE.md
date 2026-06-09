@@ -303,6 +303,7 @@ No daily caps. Spacing (25-min min gap) does the pacing. Platforms fall out of t
 - Never hardcode source URLs or RSS feeds — they belong in `sources-config.ts`
 - Never add a direct Facebook or Threads API call — Meta Suite handles those via IG cross-post
 - Do not re-introduce `declined_posts` or a `NEXT_PUBLIC_USE_SUPABASE` JSON-fallback — both were removed in the v2 rebuild for storage + simplicity reasons
+- HARD RULE (Jose, 2026-06-08): NO em dashes or en dashes in ANY KumoLab content — titles, captions, copy, anywhere. Use a comma, colon, the " • " bullet, or a plain hyphen. Enforced deterministically by `stripFancyDashes()` (`src/lib/engine/utils.ts`), applied in `processing-worker.ts` (`sanitizeString`) and `ai-import-draft.ts`, and reinforced in the AI prompts. Applies to anything Claude writes for the brand too.
 
 ---
 

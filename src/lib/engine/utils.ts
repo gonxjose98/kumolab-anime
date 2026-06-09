@@ -1,6 +1,30 @@
 import { createHash } from 'crypto';
 
 /**
+ * HARD BRAND RULE (Jose, 2026-06-08): no em or en dashes in ANY KumoLab content.
+ *
+ * Strips em (—), en (–), figure (‒), horizontal bar (―) and minus (−) dashes from
+ * any title/caption/copy. A dash used as a clause separator (spaced) becomes a
+ * comma; a tight dash (compound/range, e.g. "A—B") becomes a plain hyphen. The
+ * ordinary hyphen-minus ("-") is allowed and left untouched.
+ *
+ * This is the deterministic enforcement point — call it on every piece of
+ * generated text before it is persisted. A prompt instruction alone is not
+ * enough; the model ignores it often enough that the rule must be mechanical.
+ */
+export function stripFancyDashes(input: string): string {
+    if (!input) return input;
+    return input
+        // em/en/figure/bar/minus dashes; spaced -> comma, tight -> hyphen
+        .replace(/\s*[‒-―−]\s*/g, (m) => (/\s/.test(m) ? ', ' : '-'))
+        .replace(/\s+,/g, ',')      // " ," -> ","
+        .replace(/,\s*,/g, ', ')    // collapse accidental double commas
+        .replace(/\s{2,}/g, ' ')    // collapse runs of spaces
+        .replace(/,\s*$/g, '')      // no trailing comma left by an end-of-string dash
+        .trim();
+}
+
+/**
  * Generates a stable canonical identity for an event.
  * event_fingerprint = hash(anime_id + event_type + canonical_announcement_key + primary_signal_date_or_asset_id)
  */

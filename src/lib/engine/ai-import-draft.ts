@@ -21,6 +21,7 @@
  */
 
 import { AntigravityAI } from './ai';
+import { stripFancyDashes } from './utils';
 
 export interface ImportDraftInput {
     platform: 'x' | 'instagram';
@@ -68,8 +69,9 @@ export async function draftImportedPost(input: ImportDraftInput): Promise<Import
         ai.generateHighlightCaption(rawContext),
     ]);
 
+    // No em/en dashes in any KumoLab content (hard rule).
     return {
-        title: (title || rawTitle).trim(),
-        caption: (caption || '').trim(),
+        title: stripFancyDashes((title || rawTitle).trim()),
+        caption: stripFancyDashes((caption || '').trim()),
     };
 }
