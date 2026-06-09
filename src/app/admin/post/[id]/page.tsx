@@ -327,7 +327,10 @@ export default function PostEditor() {
                 await callJson('/api/admin/approve', { postIds: [id] });
             }
 
-            router.push('/admin/dashboard');
+            // Return to the tab the operator came from (same as Cancel), not
+            // the dashboard. refresh() invalidates the list cache so the
+            // restored tab shows the updated/moved post.
+            goBackToList();
             router.refresh();
         } catch (e: any) {
             setError(e?.message || 'Save failed');
@@ -335,20 +338,24 @@ export default function PostEditor() {
         }
     }
 
-    function handleCancel() {
-        // Discard everything: no DB writes, no render persistence. The post
-        // remains exactly as it was when the editor opened.
-        //
-        // Return the operator to wherever they came from (e.g. the Drafts tab),
-        // not always the dashboard. router.back() pops the history entry for
-        // the editor, restoring the previous list + its active tab/query. If
-        // the editor was opened via a direct link or a refresh (no in-app
-        // history), fall back to the posts list rather than the dashboard.
+    // Return the operator to wherever they came from (e.g. the Drafts tab),
+    // not always the dashboard. router.back() pops the editor's history entry,
+    // restoring the previous list and its active tab. PostsList persists the
+    // tab in sessionStorage so it survives the round trip. Falls back to the
+    // posts list when the editor was opened via a direct link / refresh (no
+    // in-app history). Used by Cancel, Save, and Save draft alike.
+    function goBackToList() {
         if (typeof window !== 'undefined' && window.history.length > 1) {
             router.back();
         } else {
             router.push('/admin/posts');
         }
+    }
+
+    function handleCancel() {
+        // Discard everything: no DB writes, no render persistence. The post
+        // remains exactly as it was when the editor opened.
+        goBackToList();
     }
 
     async function handleRegenerate(opts: { silent?: boolean } = {}) {
