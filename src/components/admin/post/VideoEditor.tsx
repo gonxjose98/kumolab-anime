@@ -427,7 +427,7 @@ export default function VideoEditor({
 
     async function handleApply() {
         if (duration === null) {
-            setError('Video metadata still loading — give it a second and try again.');
+            setError('Video metadata still loading. Give it a second and try again.');
             return;
         }
         if (trimEnd <= trimStart) { setError('End must be greater than start.'); return; }
@@ -477,7 +477,7 @@ export default function VideoEditor({
     }
 
     function fmtTime(s: number): string {
-        if (!isFinite(s)) return '—';
+        if (!isFinite(s)) return '-';
         const m = Math.floor(s / 60);
         const sec = s - m * 60;
         return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
@@ -640,10 +640,10 @@ export default function VideoEditor({
                         !stagedUrl
                             ? 'Hit Apply changes first to render an output'
                             : outputDirty
-                                ? 'Enlarge — shows the rendered output (your latest edits aren’t baked in yet)'
-                                : 'Enlarge — shows the rendered output (what publishes)'
+                                ? 'Enlarge: shows the rendered output (your latest edits aren’t baked in yet)'
+                                : 'Enlarge: shows the rendered output (what publishes)'
                     }
-                    aria-label="Enlarge — preview rendered output"
+                    aria-label="Enlarge: preview rendered output"
                     className="absolute top-2 right-2 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.1] disabled:opacity-40"
                     style={{ zIndex: 6, width: 34, height: 34, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', fontSize: 15 }}
                 >
@@ -673,10 +673,10 @@ export default function VideoEditor({
                 current with the live edits. */}
             <p className="text-[10px] px-1" style={{ color: outputDirty ? '#ffcc66' : 'var(--text-muted)' }}>
                 {!stagedUrl
-                    ? 'No render yet — hit Apply changes, then tap ⛶ to preview the real output.'
+                    ? 'No render yet. Hit Apply changes, then tap ⛶ to preview the real output.'
                     : outputDirty
-                        ? '⚠ Edits not rendered yet — hit Apply changes, then tap ⛶ to preview exactly what publishes.'
-                        : '✓ Output is up to date — tap ⛶ on the preview to see exactly what publishes.'}
+                        ? '⚠ Edits not rendered yet. Hit Apply changes, then tap ⛶ to preview exactly what publishes.'
+                        : '✓ Output is up to date. Tap ⛶ on the preview to see exactly what publishes.'}
             </p>
 
             {/* ── Controls ──────────────────────────────────────── */}
@@ -791,7 +791,7 @@ export default function VideoEditor({
                         <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
                             <input type="checkbox" checked={backgroundFill} disabled={busy} onChange={(e) => setBackgroundFill(e.target.checked)} />
                             <span className="text-xs">
-                                Background Fill — fit the full clip to <span style={{ color: HANDLE_COLOR }}>9:16</span>, fill the gaps (no crop)
+                                Background Fill: fit the full clip to <span style={{ color: HANDLE_COLOR }}>9:16</span>, fill the gaps (no crop)
                             </span>
                         </label>
                         {backgroundFill && (
@@ -848,7 +848,7 @@ export default function VideoEditor({
 
                         {overlays.length === 0 ? (
                             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                Add text and drag it anywhere on the canvas — usually above or below the clip. Emojis work too 🔥 (type them from your keyboard).
+                                Add text and drag it anywhere on the canvas, usually above or below the clip. Emojis work too 🔥 (type them from your keyboard).
                             </p>
                         ) : (
                             <div className="space-y-2">
@@ -929,7 +929,7 @@ export default function VideoEditor({
                         {busy ? 'Processing…' : 'Apply changes'}
                     </button>
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        Renders text / watermark / fill into the video (FFmpeg, ~5–20s). Trim-only is instant. Use <strong style={{ color: 'var(--text-secondary)' }}>Save draft</strong> up top to save without rendering.
+                        Renders text / watermark / fill into the video (FFmpeg, ~5-20s). Trim-only is instant. Use <strong style={{ color: 'var(--text-secondary)' }}>Save draft</strong> up top to save without rendering.
                     </span>
                 </div>
 
@@ -955,7 +955,7 @@ export default function VideoEditor({
                     <div className="w-full max-w-md flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: '#fff', fontFamily: 'var(--font-display)' }}>
-                                Final output — what publishes
+                                Final output: what publishes
                             </span>
                             <button onClick={() => setOutputOpen(false)} className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                                 Close
@@ -963,7 +963,7 @@ export default function VideoEditor({
                         </div>
                         {outputDirty && (
                             <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: 'rgba(255,170,0,0.10)', border: '1px solid rgba(255,170,0,0.30)', color: '#ffcc66' }}>
-                                ⚠ This is the last render. Your latest edits aren’t baked in yet — close, hit “Apply changes”, then preview again.
+                                ⚠ This is the last render. Your latest edits aren’t baked in yet. Close, hit “Apply changes”, then preview again.
                             </div>
                         )}
                         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}

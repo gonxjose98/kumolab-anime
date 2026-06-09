@@ -216,7 +216,7 @@ export default function ImportFromUrlButton() {
                                         color: '#7af0a8',
                                     }}
                                 >
-                                    Imported — opening editor…
+                                    Imported, opening editor…
                                 </div>
                             )}
 
@@ -255,7 +255,7 @@ export default function ImportFromUrlButton() {
                             className="text-[10px] mt-4"
                             style={{ color: 'var(--text-muted)' }}
                         >
-                            Imports skip duplicate detection — you&apos;re curating. They land as
+                            Imports skip duplicate detection. You&apos;re curating. They land as
                             pending; nothing publishes until you approve in the editor.
                         </p>
                     </div>

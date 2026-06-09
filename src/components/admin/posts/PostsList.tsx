@@ -262,7 +262,7 @@ function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: bool
                         <img src={thumb} alt="" className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                            {isVideo ? '▶' : '—'}
+                            {isVideo ? '▶' : '-'}
                         </div>
                     )}
                     {isVideo && thumb && (
@@ -279,7 +279,7 @@ function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: bool
                         {post.title}
                     </p>
                     <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {post.source || '—'}{!isScheduled && ts ? ` · ${timeAgo(ts)}` : ''}
+                        {post.source || '-'}{!isScheduled && ts ? ` · ${timeAgo(ts)}` : ''}
                     </p>
                 </div>
             </button>
@@ -478,7 +478,7 @@ function AiAssistModal({ onClose }: { onClose: () => void }) {
                         </button>
                     </div>
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Describe the post in plain language — AI drafts it in KumoLab voice.
+                        Describe the post in plain language. AI drafts it in KumoLab voice.
                     </p>
                 </div>
 
@@ -730,7 +730,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                     </div>
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                         {isImage
-                            ? 'Image uploads open in the editor — set overlays, toggle Convert-to-Reel, then Approve'
+                            ? 'Image uploads open in the editor: set overlays, toggle Convert-to-Reel, then Approve'
                             : 'Video uploads publish straight to website + Instagram + Facebook + Threads'}
                     </p>
                 </div>
@@ -772,7 +772,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                             />
                             {result.social?.skipped_reason && (
                                 <div className="text-[11px] p-2 rounded" style={{ background: 'rgba(255,170,0,0.10)', border: '1px solid rgba(255,170,0,0.30)', color: '#ffcc66' }}>
-                                    Note: socials skipped — {result.social.skipped_reason}
+                                    Note: socials skipped, {result.social.skipped_reason}
                                 </div>
                             )}
                             <button
@@ -926,7 +926,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                         {phase === 'uploading'
                                             ? `Sending ${file?.name} (${((file?.size || 0) / 1024 / 1024).toFixed(1)} MB) to storage…`
                                             : phase === 'publishing'
-                                                ? 'Creating post + pushing to Instagram, Facebook, and Threads. Videos take 1–3 minutes for the platforms to process.'
+                                                ? 'Creating post + pushing to Instagram, Facebook, and Threads. Videos take 1-3 minutes for the platforms to process.'
                                                 : ''}
                                     </div>
                                     <div
@@ -943,7 +943,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                                         />
                                     </div>
                                     <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                                        Don&apos;t close this window — it&apos;s working.
+                                        Don&apos;t close this window, it&apos;s working.
                                     </div>
                                 </div>
                             )}

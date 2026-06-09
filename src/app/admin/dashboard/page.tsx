@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // ─── Helpers ──────────────────────────────────────────────────
 
 function timeAgo(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const ms = Date.now() - new Date(iso).getTime();
     if (ms < 60_000) return 'just now';
     if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
@@ -20,7 +20,7 @@ function timeAgo(iso: string | null | undefined): string {
 }
 
 function formatSlot(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const d = new Date(iso);
     return d.toLocaleString('en-US', {
         timeZone: 'America/New_York',
@@ -465,7 +465,7 @@ export default async function DashboardPage() {
                                                 className="font-mono uppercase text-[9px] px-1.5 py-0.5 rounded shrink-0"
                                                 style={{ background: `${color}12`, border: `1px solid ${color}30`, color, minWidth: '80px', textAlign: 'center' }}
                                             >
-                                                {row.decision?.replace('_', ' ') || '—'}
+                                                {row.decision?.replace('_', ' ') || '-'}
                                             </span>
                                             <span className="flex-1 truncate" style={{ color: 'var(--text-tertiary)' }}>
                                                 {row.candidate_title}
@@ -605,7 +605,7 @@ function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: stri
                 className="w-12 h-12 rounded shrink-0 flex items-center justify-center"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-                <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>—</span>
+                <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>-</span>
             </div>
         );
     }

@@ -3,7 +3,7 @@ import { fetchIGDashboardData, type IGDashboardData, type IGMediaInsight } from 
 export const dynamic = 'force-dynamic';
 
 function timeAgo(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const ms = Date.now() - new Date(iso).getTime();
     if (ms < 60_000) return 'just now';
     if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
@@ -85,7 +85,7 @@ function IGSection({ ig }: { ig: IGDashboardData }) {
         );
     }
 
-    const fmt = (n: number | null) => n === null || n === undefined ? '—' : n.toLocaleString('en-US');
+    const fmt = (n: number | null) => n === null || n === undefined ? '-' : n.toLocaleString('en-US');
 
     return (
         <>
@@ -111,7 +111,7 @@ function IGSection({ ig }: { ig: IGDashboardData }) {
                     </span>
                 </div>
                 {topRecent.length === 0 ? (
-                    <EmptyState text="No recent posts to score yet — Meta hasn't returned media for this account." />
+                    <EmptyState text="No recent posts to score yet. Meta hasn't returned media for this account." />
                 ) : (
                     <ul className="space-y-2">
                         {topRecent.map(m => (

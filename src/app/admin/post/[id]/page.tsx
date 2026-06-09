@@ -559,7 +559,7 @@ export default function PostEditor() {
                             <button
                                 onClick={() => handleSave({ thenApprove: true })}
                                 disabled={!!busy}
-                                title="Save and approve — auto-schedules the post for publishing"
+                                title="Save and approve: auto-schedules the post for publishing"
                                 className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
                                 style={{
                                     background: 'linear-gradient(135deg, rgba(0,255,136,0.20), rgba(0,212,170,0.12))',
@@ -675,7 +675,7 @@ export default function PostEditor() {
                                         src={imageUrl}
                                         alt={title}
                                         className="w-full h-full object-cover"
-                                        onError={() => setImageError('Image failed to load — the source may be expired or blocked.')}
+                                        onError={() => setImageError('Image failed to load. The source may be expired or blocked.')}
                                     />
                                     {busy === 'render' && (
                                         <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
@@ -930,7 +930,7 @@ export default function PostEditor() {
             {!isVideoPost && (
             <Collapsible
                 title="Image source"
-                hint="Replace the background image — upload, paste a URL, or reset to a fresh original"
+                hint="Replace the background image: upload, paste a URL, or reset to a fresh original"
             >
                 <div className="p-5">
                     <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">

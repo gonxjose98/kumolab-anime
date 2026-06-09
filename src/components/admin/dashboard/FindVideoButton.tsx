@@ -226,7 +226,7 @@ export default function FindVideoButton({
                         </h2>
                         <p className="text-[11px] mb-4" style={{ color: 'var(--text-muted)' }}>
                             Search YouTube for the video version of this post. The top match
-                            is pre-selected — override if it isn&apos;t right. We&apos;ll download
+                            is pre-selected. Override if it isn&apos;t right. We&apos;ll download
                             it and attach to this pending row for trimming.
                         </p>
 
@@ -352,7 +352,7 @@ export default function FindVideoButton({
                                     color: '#7af0a8',
                                 }}
                             >
-                                Attached — opening editor…
+                                Attached, opening editor…
                             </div>
                         )}
 

@@ -23,7 +23,7 @@ export default async function AdminMerchPage() {
                 <h1 className="text-2xl font-black tracking-tight">Merch</h1>
                 <p className="text-sm opacity-70">
                     Only <strong>featured</strong> products show on the storefront. The charged price is always
-                    Printful&apos;s live price — you set the cosmetic <strong>anchor</strong> (the struck-through
+                    Printful&apos;s live price. You set the cosmetic <strong>anchor</strong> (the struck-through
                     &quot;was&quot; price). Save is blocked unless the anchor is higher than Printful&apos;s price.
                 </p>
             </header>
