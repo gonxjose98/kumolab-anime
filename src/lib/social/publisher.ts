@@ -11,6 +11,12 @@ const IG_USER_ID = process.env.META_IG_ID;
 const FB_PAGE_ID = '833836379820504';
 const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
 const THREADS_USER_ID = process.env.THREADS_USER_ID;
+// Threads "topic" (the "+ Community or topic" field in the composer). The API
+// allows ONE topic_tag per post and drops the post into that topic's discovery
+// feed, so it works like a pinned hashtag for reach. Default "Anime" to land
+// every post in front of the anime community; override via env (no # symbol)
+// without a redeploy. Empty string disables it.
+const THREADS_TOPIC_TAG = (process.env.THREADS_TOPIC_TAG ?? 'Anime').trim();
 
 export interface SocialPublishResult {
     instagram_id?: string;
@@ -707,6 +713,8 @@ async function publishToThreads(post: BlogPost, stagedVideoUrl: string | null = 
             media_type: isVideo ? 'VIDEO' : hasImage ? 'IMAGE' : 'TEXT',
             ...(isVideo ? { video_url: stagedVideoUrl! } : {}),
             ...(!isVideo && hasImage ? { image_url: post.image! } : {}),
+            // Tag the post into a Threads topic for discovery (one allowed).
+            ...(THREADS_TOPIC_TAG ? { topic_tag: THREADS_TOPIC_TAG } : {}),
         });
 
         const containerRes = await fetchWithTimeout(`${containerUrl}?${containerParams}`, { method: 'POST' }, 20_000);
