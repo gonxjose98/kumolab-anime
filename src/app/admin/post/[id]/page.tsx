@@ -336,9 +336,19 @@ export default function PostEditor() {
     }
 
     function handleCancel() {
-        // Discard everything — no DB writes, no render persistence. The
-        // post remains exactly as it was when the editor opened.
-        router.push('/admin/dashboard');
+        // Discard everything: no DB writes, no render persistence. The post
+        // remains exactly as it was when the editor opened.
+        //
+        // Return the operator to wherever they came from (e.g. the Drafts tab),
+        // not always the dashboard. router.back() pops the history entry for
+        // the editor, restoring the previous list + its active tab/query. If
+        // the editor was opened via a direct link or a refresh (no in-app
+        // history), fall back to the posts list rather than the dashboard.
+        if (typeof window !== 'undefined' && window.history.length > 1) {
+            router.back();
+        } else {
+            router.push('/admin/posts');
+        }
     }
 
     async function handleRegenerate(opts: { silent?: boolean } = {}) {

@@ -78,6 +78,21 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const [uploadOpen, setUploadOpen] = useState(false);
     const [reschedulePost, setReschedulePost] = useState<Post | null>(null);
 
+    // Remember the active tab across navigation. When you open a post and hit
+    // Cancel, the editor does router.back() to this list; restoring the last
+    // tab here lands you back on (e.g.) Drafts instead of the default tab.
+    // Initialised in an effect (not the useState initialiser) to avoid an SSR
+    // hydration mismatch — the server has no sessionStorage.
+    useEffect(() => {
+        const saved = typeof window !== 'undefined' ? sessionStorage.getItem('admin-posts-tab') : null;
+        if (saved && ['pending', 'draft', 'approved', 'published'].includes(saved)) {
+            setFilter(saved as Filter);
+        }
+    }, []);
+    useEffect(() => {
+        if (typeof window !== 'undefined') sessionStorage.setItem('admin-posts-tab', filter);
+    }, [filter]);
+
     const counts = useMemo(() => {
         const c: Record<Filter, number> = { pending: 0, draft: 0, approved: 0, published: 0 };
         for (const p of initialPosts) {
