@@ -13,10 +13,11 @@ const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
 const THREADS_USER_ID = process.env.THREADS_USER_ID;
 // Threads "topic" (the "+ Community or topic" field in the composer). The API
 // allows ONE topic_tag per post and drops the post into that topic's discovery
-// feed, so it works like a pinned hashtag for reach. Default "Anime" to land
-// every post in front of the anime community; override via env (no # symbol)
-// without a redeploy. Empty string disables it.
-const THREADS_TOPIC_TAG = (process.env.THREADS_TOPIC_TAG ?? 'Anime').trim();
+// feed, so it works like a pinned hashtag for reach. Default "Anime Threads",
+// the 343K-member community (distinct from the smaller plain "anime" topic),
+// to land every post in front of the largest anime audience. Override via env
+// (no # symbol) without a redeploy. Empty string disables it.
+const THREADS_TOPIC_TAG = (process.env.THREADS_TOPIC_TAG ?? 'Anime Threads').trim();
 
 export interface SocialPublishResult {
     instagram_id?: string;
