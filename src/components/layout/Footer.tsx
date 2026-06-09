@@ -12,7 +12,7 @@ const Footer = () => {
                 <span className={styles.brandJp}>クモラボ</span>
             </Link>
             <p className={styles.tagline}>
-                Your Anime Intelligence Hub — Verified · Real-Time · Always On
+                Your Anime Intelligence Hub · Verified · Real-Time · Always On
             </p>
             <nav className={styles.legalLinks} aria-label="Legal">
                 <Link href="/privacy" className={styles.legalLink}>Privacy Policy</Link>

@@ -179,7 +179,7 @@ const StatsBar = () => {
                         <div className={styles.cardContent}>
                             <span className={styles.cardIcon}>{stat.icon}</span>
                             <div className={styles.cardValue}>
-                                {loading ? '—' : stat.value.toLocaleString()}
+                                {loading ? '-' : stat.value.toLocaleString()}
                             </div>
                             <div className={styles.cardLabel}>{stat.label}</div>
                         </div>

@@ -22,7 +22,7 @@ const Hero = () => {
                 {/* Live badge */}
                 <div className={styles.liveBadge}>
                     <span className={styles.liveDot} />
-                    <span className={styles.liveText}>ライブ — Live Intelligence Feed</span>
+                    <span className={styles.liveText}>ライブ · Live Intelligence Feed</span>
                 </div>
 
                 {/* Main headline */}

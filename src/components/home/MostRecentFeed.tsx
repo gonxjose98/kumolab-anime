@@ -240,7 +240,7 @@ const MostRecentFeed = ({ posts }: MostRecentFeedProps) => {
         <section className={styles.section}>
             {/* Section Header */}
             <div className={styles.header}>
-                <div className={styles.headerTag}>◉ 最新 — Most Recent</div>
+                <div className={styles.headerTag}>◉ 最新 · Most Recent</div>
                 <div className={styles.headerRow}>
                     <h2 className={styles.headerTitle}>Most Recent</h2>
                     <span className={styles.headerHint}>Swipe to discover</span>
