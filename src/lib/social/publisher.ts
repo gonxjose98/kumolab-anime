@@ -127,7 +127,20 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     // Same staged URL feeds TikTok + YT Shorts below.
     const claim = (post as any).claimType || (post as any).claim_type;
     const sourceUrl = (post as any).source_url || '';
-    const isYouTubeSource = /youtube\.com|youtu\.be/.test(sourceUrl);
+    // Resolve the underlying trailer. Posts detected from an aggregator
+    // (e.g. AnimeNewsNetwork) carry the article link in source_url but the
+    // real YouTube trailer in youtube_url / youtube_video_id. Without this
+    // fallback those posts look "image-only" and get skipped by the
+    // video-only policy below, throwing away a video we already have.
+    const youtubeFieldUrl =
+        (post as any).youtube_url ||
+        ((post as any).youtube_video_id
+            ? `https://youtube.com/watch?v=${(post as any).youtube_video_id}`
+            : '');
+    const trailerUrl = /youtube\.com|youtu\.be/.test(sourceUrl)
+        ? sourceUrl
+        : youtubeFieldUrl;
+    const isYouTubeSource = /youtube\.com|youtu\.be/.test(trailerUrl);
 
     // Manual uploads come pre-staged: the operator already pushed the
     // MP4 to our blog-videos bucket via the admin upload flow, and
@@ -213,7 +226,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             // catch just unwinds to the image flow.
         }
     } else if (isYouTubeSource) {
-        const staged = await fetchYouTubeToBucket(sourceUrl, post.slug);
+        const staged = await fetchYouTubeToBucket(trailerUrl, post.slug);
         if (staged) {
             stagedVideoUrl = staged.bucket_url;
             result.staged_video_url = staged.bucket_url;
@@ -235,7 +248,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                 entity_id: (post as any).id,
                 entity_title: post.title,
                 reason: 'YouTube video fetch failed — no screenshot fallback',
-                details: { slug: post.slug, source_url: sourceUrl },
+                details: { slug: post.slug, source_url: sourceUrl, trailer_url: trailerUrl },
             }).then(() => {}, () => {});
             (result as any).skipped_reason = 'video_fetch_failed';
             return result;
