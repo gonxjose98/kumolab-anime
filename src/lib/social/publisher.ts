@@ -380,6 +380,7 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
         title: post.title,
         claim_type: (post as any).claimType || (post as any).claim_type,
         anime_id: post.anime_id,
+        override: (post as any).hashtags,
     }).join(' ');
     const caption = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 2200);
 
@@ -536,6 +537,7 @@ async function publishToFacebookPage(post: BlogPost, stagedVideoUrl: string | nu
         title: post.title,
         claim_type: (post as any).claimType || (post as any).claim_type,
         anime_id: post.anime_id,
+        override: (post as any).hashtags,
     }).join(' ');
     // Per Jose's directive (2026-05-05): no URL in FB captions. FB
     // algorithmically downranks posts with external links, and the

@@ -3,6 +3,11 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import VideoEditor from '@/components/admin/post/VideoEditor';
+import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
+
+// Cap mirrors buildSocialHashtags' publish-time cap so what the operator
+// sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
+const MAX_HASHTAGS = 6;
 
 interface XY { x: number; y: number }
 
@@ -65,6 +70,11 @@ export default function PostEditor() {
     const [excerpt, setExcerpt] = useState('');
     const [content, setContent] = useState('');
     const [sourceUrl, setSourceUrl] = useState('');
+    // Social hashtags shown as editable chips. Hydrated on load from the saved
+    // list, or auto-derived when the post has none yet. What's here is what
+    // publishes (capped at 6).
+    const [hashtags, setHashtags] = useState<string[]>([]);
+    const [tagInput, setTagInput] = useState('');
     const [imageDims, setImageDims] = useState<{ w: number; h: number } | null>(null);
 
     // Probe the current source image's natural dimensions whenever it
@@ -124,6 +134,19 @@ export default function PostEditor() {
                 setTitle(data.title || '');
                 setExcerpt(data.excerpt || '');
                 setContent(data.content || '');
+                // Hashtags: use the saved list if the operator set one before;
+                // otherwise pre-fill with the auto-derived defaults so the tags
+                // are visible and editable BEFORE approving (they used to be
+                // invisible until publish). Either way, what's shown publishes.
+                setHashtags(
+                    Array.isArray(data.hashtags) && data.hashtags.length
+                        ? data.hashtags
+                        : defaultSocialHashtags({
+                            title: data.title || '',
+                            claim_type: data.claim_type,
+                            anime_id: data.anime_id,
+                        }),
+                );
                 // DO NOT pre-fill sourceUrl from data.source_url — that field
                 // is the article/YouTube watch URL, NOT a renderable image.
                 // Pre-filling it caused the renderer to fetch youtube.com/
@@ -304,7 +327,7 @@ export default function PostEditor() {
                 }
             }
 
-            const putBody: Record<string, any> = { id, title, excerpt, content };
+            const putBody: Record<string, any> = { id, title, excerpt, content, hashtags };
             if (imageBytesForSave) putBody.image = imageBytesForSave;
             // "Save draft" parks the post in the Draft tab (out of Pending) so
             // the operator can come back to it. Only applied to a post that's
@@ -597,6 +620,85 @@ export default function PostEditor() {
                     {error}
                 </div>
             )}
+
+            {/* ── Social hashtags ───────────────────────────────────
+                Editable chips, auto-filled from the anime name + claim type
+                (plus a fan abbreviation when one exists). Visible and editable
+                BEFORE approving — what's shown here is exactly what gets
+                appended to the IG / FB / Threads captions (capped at 6). */}
+            <Card className="p-5">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                        Social hashtags
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => setHashtags(defaultSocialHashtags({ title, claim_type: post.claim_type, anime_id: post.anime_id }))}
+                        className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded transition-all hover:bg-white/[0.06]"
+                        style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-tertiary)' }}
+                    >
+                        Reset to auto
+                    </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    {hashtags.map((tag, i) => (
+                        <span
+                            key={`${tag}-${i}`}
+                            className="inline-flex items-center gap-1 pl-3 pr-1 py-1.5 rounded-full text-xs font-semibold"
+                            style={{ background: `${KUMOLAB_PURPLE}22`, border: `1px solid ${KUMOLAB_PURPLE}55`, color: '#d8ccff' }}
+                        >
+                            {tag}
+                            <button
+                                type="button"
+                                aria-label={`Remove ${tag}`}
+                                onClick={() => setHashtags(hashtags.filter((_, idx) => idx !== i))}
+                                className="flex items-center justify-center w-6 h-6 rounded-full text-base leading-none transition-all hover:bg-white/[0.12]"
+                                style={{ color: '#d8ccff' }}
+                            >
+                                &times;
+                            </button>
+                        </span>
+                    ))}
+                    {hashtags.length < MAX_HASHTAGS && (
+                        <input
+                            type="text"
+                            value={tagInput}
+                            onChange={e => setTagInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    const t = sanitizeTag(tagInput);
+                                    if (t && !hashtags.some(h => h.toLowerCase() === t.toLowerCase())) {
+                                        setHashtags([...hashtags, t].slice(0, MAX_HASHTAGS));
+                                    }
+                                    setTagInput('');
+                                } else if (e.key === 'Backspace' && !tagInput && hashtags.length) {
+                                    setHashtags(hashtags.slice(0, -1));
+                                }
+                            }}
+                            onBlur={() => {
+                                // Commit a half-typed tag on blur so it isn't lost
+                                // when the operator taps Save (esp. on mobile where
+                                // the keyboard's "Go" may not fire Enter here).
+                                const t = sanitizeTag(tagInput);
+                                if (t && !hashtags.some(h => h.toLowerCase() === t.toLowerCase())) {
+                                    setHashtags([...hashtags, t].slice(0, MAX_HASHTAGS));
+                                }
+                                setTagInput('');
+                            }}
+                            placeholder="+ add"
+                            inputMode="text"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            className="bg-transparent text-xs focus:outline-none px-2 py-2 min-w-[88px] flex-1"
+                            style={{ color: 'var(--text-primary)' }}
+                        />
+                    )}
+                </div>
+                <p className="mt-3 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    {hashtags.length}/{MAX_HASHTAGS} tags · appended to Instagram, Facebook and Threads captions. Tap &times; to remove, type and press Enter to add.
+                </p>
+            </Card>
 
             {/* ── Title + Caption ──────────────────────────────────
                 For video posts these live in a SINGLE bubble at the very

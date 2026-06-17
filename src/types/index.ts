@@ -56,6 +56,10 @@ export interface BlogPost {
     expires_at?: string;
     source?: string;
     source_url?: string;
+    // Operator-curated social hashtags. NULL = auto-derive at publish
+    // (defaultSocialHashtags). When set, this exact list publishes (sanitized,
+    // deduped, capped at 6). Edited via the admin editor's hashtag chip row.
+    hashtags?: string[];
     // Platform-native post IDs — populated after publisher fires
     twitter_tweet_id?: string;
     twitter_url?: string;

@@ -97,7 +97,7 @@ export async function PUT(req: NextRequest) {
         const allowedFields = [
             'status', 'is_published', 'scheduled_post_time',
             'title', 'content', 'excerpt', 'image', 'type',
-            'source_url', 'timestamp', 'claim_type',
+            'source_url', 'timestamp', 'claim_type', 'hashtags',
         ];
         const safeUpdates: Record<string, any> = {};
         for (const key of allowedFields) {

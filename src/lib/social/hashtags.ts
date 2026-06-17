@@ -97,23 +97,85 @@ const CLAIM_CONTEXT_TAG: Record<string, string> = {
     OTHER:                '#animeintel',
 };
 
-export function buildSocialHashtags(params: {
+// Fan abbreviations the audience actually searches but AniList won't give
+// us (it returns full + romaji titles, never "JJK"). Keyed by the
+// alphanumeric-normalized series name OR anime_id slug. These ADD on top of
+// the full series tag — they don't replace it (Jose's directive 2026-06-17).
+// Keep this curated and small; only well-established abbreviations belong here.
+const SERIES_ABBREV: Record<string, string[]> = {
+    jujutsukaisen:                    ['#JJK'],
+    myheroacademia:                   ['#MHA'],
+    bokunoheroacademia:               ['#MHA'],
+    attackontitan:                    ['#AOT'],
+    shingekinokyojin:                 ['#AOT'],
+    demonslayer:                      ['#KnY'],
+    kimetsunoyaiba:                   ['#KnY'],
+    onepunchman:                      ['#OPM'],
+    jojosbizarreadventure:            ['#JJBA'],
+    chainsawman:                      ['#CSM'],
+    spyxfamily:                       ['#SxF'],
+    fullmetalalchemist:               ['#FMA'],
+    rezero:                           ['#ReZero'],
+    thattimeigotreincarnatedasaslime: ['#TenSura'],
+};
+
+function normKey(s?: string | null): string {
+    return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function seriesAbbreviations(series?: string | null, anime_id?: string | null): string[] {
+    for (const k of [normKey(series), normKey(anime_id)]) {
+        if (k && SERIES_ABBREV[k]) return SERIES_ABBREV[k];
+    }
+    return [];
+}
+
+// Normalize an arbitrary string (auto-derived or hand-typed by the operator)
+// into a clean hashtag: single leading '#', no whitespace, no fancy dashes
+// (KumoLab hard rule), only letters/numbers/underscore in the body. Case is
+// preserved so #JujutsuKaisen / #JJK / #anime all survive as written.
+// Returns null for anything that can't become a valid tag.
+export function sanitizeTag(raw: string): string | null {
+    if (!raw) return null;
+    const body = raw
+        .trim()
+        .replace(/^#+/, '')
+        .replace(/[‒-―−]/g, '')      // figure/en/em/horizontal-bar/minus dashes
+        .replace(/[^\p{L}\p{N}_]/gu, '');           // drop spaces + remaining punctuation
+    if (body.length < 2 || body.length > 40) return null;
+    return `#${body}`;
+}
+
+function dedupeCap(tags: string[], cap: number): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const t of tags) {
+        const k = t.toLowerCase();
+        if (!t || seen.has(k)) continue;
+        seen.add(k);
+        out.push(t);
+        if (out.length >= cap) break;
+    }
+    return out;
+}
+
+/**
+ * The auto-derived default tag set, shown pre-filled in the admin editor and
+ * used at publish time when the operator hasn't set an explicit list.
+ *   1. #anime          — mega anchor, signals topic to IG's clustering
+ *   2. #animenews      — KumoLab brand positioning + mid-reach pool
+ *   3. #[Series]       — fandom discovery (e.g. #DemonSlayer)
+ *   4. #[Abbrev]       — fan abbreviation if one exists (e.g. #JJK), ADDS
+ *   5. #[Context]      — claim-type fandom (e.g. #newanimetrailer)
+ * Lean 4-6: enough surface area for discovery without reading as spam.
+ */
+export function defaultSocialHashtags(params: {
     title: string;
     claim_type?: string | null;
     anime_id?: string | null;
 }): string[] {
-    // Tight 4-tag mix optimized for max reach per post:
-    //   1. #anime          — mega anchor, signals topic to IG's clustering
-    //   2. #animenews      — KumoLab's brand positioning + mid-reach pool
-    //   3. #[Series]       — fandom discovery (e.g. #DemonSlayer)
-    //   4. #[Context]      — claim-type fandom (e.g. #newanimetrailer)
-    //
-    // 4 is the right number: too few = no surface area for discovery,
-    // too many = IG's algorithm reads spam. Quality > quantity at this
-    // scale.
     const tags: string[] = ['#anime', '#animenews'];
 
-    // Series-specific (slot 3)
     const series = extractSeriesName(params.title, params.anime_id);
     if (series) {
         const pascal = toPascalCase(series);
@@ -122,22 +184,35 @@ export function buildSocialHashtags(params: {
         }
     }
 
-    // Claim-type context (slot 4) — prefer the targeted CONTEXT tag
-    // over the legacy generic CLAIM_HASHTAG since #newanimetrailer
-    // out-reaches plain #Trailer.
-    const claim = (params.claim_type || 'OTHER').toUpperCase();
-    const contextTag = CLAIM_CONTEXT_TAG[claim] || CLAIM_CONTEXT_TAG.OTHER;
-    tags.push(contextTag);
+    // Fan abbreviation(s) — add on top of the full series tag.
+    for (const ab of seriesAbbreviations(series, params.anime_id)) tags.push(ab);
 
-    // Dedupe + cap at 4
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const t of tags) {
-        const k = t.toLowerCase();
-        if (seen.has(k)) continue;
-        seen.add(k);
-        out.push(t);
-        if (out.length >= 4) break;
+    // Claim-type context — prefer the targeted CONTEXT tag over the legacy
+    // generic CLAIM_HASHTAG since #newanimetrailer out-reaches plain #Trailer.
+    const claim = (params.claim_type || 'OTHER').toUpperCase();
+    tags.push(CLAIM_CONTEXT_TAG[claim] || CLAIM_CONTEXT_TAG.OTHER);
+
+    return dedupeCap(tags, 6);
+}
+
+/**
+ * Resolve the hashtags to publish with. If the operator saved an explicit
+ * list on the post (`override`), that wins — sanitized, deduped, capped at 6.
+ * Otherwise fall back to the auto-derived default. Keeping both behind one
+ * function means auto-pipeline posts (no operator override) and hand-approved
+ * posts go through the same formatting + cap.
+ */
+export function buildSocialHashtags(params: {
+    title: string;
+    claim_type?: string | null;
+    anime_id?: string | null;
+    override?: string[] | null;
+}): string[] {
+    if (params.override && params.override.length) {
+        const cleaned = params.override
+            .map(sanitizeTag)
+            .filter((t): t is string => !!t);
+        if (cleaned.length) return dedupeCap(cleaned, 6);
     }
-    return out;
+    return defaultSocialHashtags(params);
 }

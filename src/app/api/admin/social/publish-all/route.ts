@@ -99,6 +99,7 @@ async function publishToFacebook(post: any, imageUrl: string) {
         title: post.title,
         claim_type: post.claim_type || post.claimType,
         anime_id: post.anime_id,
+        override: post.hashtags,
     }).join(' ');
     const message = `${post.title}\n\n${lead}\n\n${postUrl}\n\n${hashtags}`;
 
@@ -136,6 +137,7 @@ async function publishToInstagram(post: any, imageUrl: string) {
         title: post.title,
         claim_type: post.claim_type || post.claimType,
         anime_id: post.anime_id,
+        override: post.hashtags,
     }).join(' ');
     const caption = `${post.title}\n\n${lead}\n\nLink in bio: ${postUrl}\n\n${hashtags}`.substring(0, 2200);
 
