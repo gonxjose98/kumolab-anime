@@ -1,4 +1,5 @@
 import { fetchIGDashboardData, type IGDashboardData, type IGMediaInsight } from '@/lib/social/ig-insights';
+import { fetchWebsiteTraffic, type WebsiteTraffic } from '@/lib/analytics/page-views';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +28,13 @@ const FALLBACK: IGDashboardData = {
 };
 
 export default async function AnalyticsPage() {
-    const ig: IGDashboardData = await fetchIGDashboardData().catch((e) => ({
-        ...FALLBACK,
-        snapshot: { ...FALLBACK.snapshot, reason: e?.message ?? 'IG fetch failed' },
-    }));
+    const [ig, web]: [IGDashboardData, WebsiteTraffic] = await Promise.all([
+        fetchIGDashboardData().catch((e) => ({
+            ...FALLBACK,
+            snapshot: { ...FALLBACK.snapshot, reason: e?.message ?? 'IG fetch failed' },
+        })),
+        fetchWebsiteTraffic(),
+    ]);
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -64,8 +68,100 @@ export default async function AnalyticsPage() {
                 </div>
             </div>
 
+            <WebsiteSection web={web} />
             <IGSection ig={ig} />
         </div>
+    );
+}
+
+// ─── Website traffic ──────────────────────────────────────────
+
+function WebsiteSection({ web }: { web: WebsiteTraffic }) {
+    const fmt = (n: number) => n.toLocaleString('en-US');
+
+    if (!web.ok) {
+        return (
+            <Card className="p-5">
+                <SectionHeader label="Website" accent="#00ff88" />
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {web.reason || 'Traffic unavailable.'}
+                </div>
+            </Card>
+        );
+    }
+
+    if (web.views30d === 0) {
+        return (
+            <Card className="p-5">
+                <SectionHeader label="Website" accent="#00ff88" />
+                <EmptyState text="No website views recorded yet. Tracking was just fixed — real visits will start appearing here within minutes of going live." />
+                {web.botViews30d > 0 && (
+                    <div className="text-center text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                        ({fmt(web.botViews30d)} bot hits filtered out)
+                    </div>
+                )}
+            </Card>
+        );
+    }
+
+    return (
+        <>
+            <Card className="p-5">
+                <SectionHeader label="Website" accent="#00ff88" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <Metric label="Views" value={fmt(web.views30d)} accent="#00ff88" sub="30d" />
+                    <Metric label="Views" value={fmt(web.views7d)} accent="#00d4ff" sub="7d" />
+                    <Metric label="Bots Filtered" value={fmt(web.botViews30d)} accent="#7b61ff" sub="30d" />
+                </div>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-5">
+                    <SectionHeader label="Top Pages" count={web.topPaths.length} accent="#00d4ff" />
+                    {web.topPaths.length === 0 ? (
+                        <EmptyState text="No pages yet." />
+                    ) : (
+                        <ul className="space-y-2">
+                            {web.topPaths.map((r) => (
+                                <TrafficBar key={r.label} row={r} max={web.topPaths[0].views} accent="#00d4ff" />
+                            ))}
+                        </ul>
+                    )}
+                </Card>
+
+                <Card className="p-5">
+                    <SectionHeader label="Top Sources" count={web.topReferrers.length} accent="#ffaa00" />
+                    {web.topReferrers.length === 0 ? (
+                        <EmptyState text="No referrers yet — traffic is mostly direct / in-app." />
+                    ) : (
+                        <ul className="space-y-2">
+                            {web.topReferrers.map((r) => (
+                                <TrafficBar key={r.label} row={r} max={web.topReferrers[0].views} accent="#ffaa00" />
+                            ))}
+                        </ul>
+                    )}
+                </Card>
+            </div>
+        </>
+    );
+}
+
+function TrafficBar({ row, max, accent }: { row: { label: string; views: number }; max: number; accent: string }) {
+    const pct = max > 0 ? Math.max(4, Math.round((row.views / max) * 100)) : 0;
+    return (
+        <li className="space-y-1">
+            <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {row.label}
+                </span>
+                <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: accent }}>
+                    {row.views.toLocaleString('en-US')}
+                </span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent, opacity: 0.7 }} />
+            </div>
+        </li>
     );
 }
 

@@ -1,64 +1,42 @@
 'use client';
 
-import { createClient } from '@supabase/supabase-js';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
-function getSupabase() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return null;
-    }
-    
-    return createClient(supabaseUrl, supabaseAnonKey);
-}
-
+/**
+ * Records one page view per client-side navigation by POSTing to /api/track,
+ * which writes via the service-role client. (The old version inserted into
+ * page_views directly with the anon key — silently denied by RLS, so nothing
+ * was ever recorded.) Bot detection + user-agent capture now happen server-side
+ * from the real request headers.
+ */
 export function AnalyticsTracker() {
-    const supabase = useMemo(() => getSupabase(), []);
     const pathname = usePathname();
-    const isFirstRun = useRef(true);
     const lastTrackedPath = useRef<string | null>(null);
 
     useEffect(() => {
-        // Skip if Supabase is not configured
-        if (!supabase) return;
-        
-        // 1. SILENT: Detect Bots
-        const userAgent = navigator.userAgent;
-        const botRegex = /bot|google|baidu|bing|msn|teoma|slurp|yandex/i;
-        const isBot = botRegex.test(userAgent);
+        if (!pathname) return;
+        // Never count admin routes.
+        if (pathname.startsWith('/admin')) return;
+        // Guard against React strict-mode double-fire and same-path re-renders.
+        if (lastTrackedPath.current === pathname) return;
+        lastTrackedPath.current = pathname;
 
-        // 2. EXCLUSION: Ignore Admin Routes completely
-        if (pathname?.startsWith('/admin')) {
-            return;
+        // Fire-and-forget. keepalive lets the request survive a fast navigation
+        // away from the page before it completes.
+        try {
+            fetch('/api/track', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ path: pathname, referrer: document.referrer || null }),
+                keepalive: true,
+            }).catch(() => {
+                // Never block or surface anything to the user.
+            });
+        } catch {
+            // ignore — analytics must never break the page
         }
+    }, [pathname]);
 
-        // 3. EXCLUSION: Prevent Double-Counting (React Strict Mode safety)
-        if (lastTrackedPath.current === pathname) {
-            return;
-        }
-
-        // FIRE AND FORGET
-        async function track() {
-            if (!supabase) return;
-            try {
-                await supabase.from('page_views').insert({
-                    path: pathname,
-                    referrer: document.referrer || null,
-                    user_agent: userAgent,
-                    is_bot: isBot
-                });
-                lastTrackedPath.current = pathname;
-            } catch (err) {
-                // Fail silently - never block the user
-            }
-        }
-
-        track();
-
-    }, [pathname, supabase]);
-
-    return null; // Render nothing
+    return null; // renders nothing
 }
