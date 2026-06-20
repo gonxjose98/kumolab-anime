@@ -1,7 +1,7 @@
 > Read [APEX.md](http://APEX.md) before this file. This file is project-scoped context for KumoLab.
 >
 
-> Status: 🔴 Active — Jose activated KumoLab on 2026-04-20. Storage + automation rebuild in Phase 1. See [ROADMAP.md](http://ROADMAP.md).
+> 🟢 **#1 PRIORITY (2026-06-19).** KumoLab is the company's primary focus. It is live, publishing, and has grown meaningfully since launch. The pipeline works — the job now is **monetization**: display ads + sponsorships + merch. See [APEX.md](http://APEX.md) + [GLOBAL-ROADMAP.md](http://GLOBAL-ROADMAP.md).
 > 
 
 ## 01 — Project Identity
@@ -12,7 +12,7 @@
 
 **Owner:** Jose Gonzalez
 
-**Status:** 🔴 Active — Phase 1 (Pipeline Rebuild) in progress as of 2026-04-20
+**Status:** 🟢 Live — pipeline operational and publishing; audience growing. **Company #1 focus as of 2026-06-19.** Current emphasis: monetization (ads + sponsorships + merch).
 
 **Primary Goals Served:** G1 (MRR), G2 (AI Execution), G5 (Scale)
 
@@ -59,7 +59,7 @@ KumoLab is an anime intelligence platform that automates detection, curation, an
 | **Hosting** | Vercel (auto-deploy on push to `main`) |
 | **Image processing** | `@napi-rs/canvas`  • `sharp` |
 | **AI (scoring + translate + tone/safety)** | Provider chain in `src/lib/engine/ai.ts` — Gemini → Groq → DeepSeek → Kimi → OpenAI → Antigravity. First success wins. Heuristic + deterministic fallbacks per touchpoint so KumoLab keeps publishing English-source posts even with zero AI access. |
-| **Social publishing** | Instagram Graph API via `src/lib/social/publisher.ts` — Meta Suite cross-posts IG → FB + Threads automatically. X / TikTok / YT Shorts publishers pending (Milestone 1.3). |
+| **Social publishing** | `src/lib/social/publisher.ts` — **direct Graph API call per platform**: Instagram (Reels/image), Facebook Page (direct, `/video_reels` or `/photos`), Threads (direct Threads API, with `topic_tag`). The old Meta Suite IG→FB→Threads cross-post path was unreliable and has been REPLACED by direct calls. TikTok + YT Shorts fire only for YouTube-sourced/TRAILER_DROP posts; X deferred. |
 | **Data sourcing** | AniList GraphQL API, RSS feeds, YouTube channels |
 
 ---
@@ -90,7 +90,13 @@ Deploy: push to `main` → Vercel auto-deploys. Redeploy after any change to `ve
 
 **Read `ROADMAP.md` before starting any feature work.**
 
-**Current Phase:** Phase 1 — Pipeline Rebuild. All code complete on `claude/storage-rebuild`. Old Supabase deleted 2026-04-21. Production cutover (Vercel env vars + branch merge) is the last remaining step.
+**Current Phase:** Live operation + **Monetization**. The Phase 1 pipeline rebuild (storage + automation, new Supabase `xzoqsldtcoeaegxcdsia`) is complete and in production — KumoLab is publishing and growing. Focus has shifted from building the pipeline to making money from the audience it produces:
+
+1. **Display ads** — wire an ad network to the site (AdSense to start; Mediavine/Raptive need ~50k sessions/mo — measure the gap). Website MAU must be instrumented first.
+2. **Sponsorships** — media kit (audience + engagement + reach), rate card, outreach list of anime/streaming/game brands.
+3. **Merch** — Printful + Stripe already wired (`PRINTFUL_ACCESS_TOKEN`, `STRIPE_SECRET_KEY`); confirm end-to-end and launch an initial drop.
+
+> Verify before reporting revenue work "done": confirm the ad network is actually serving, a sponsorship is actually signed, or merch actually sells — not just that code/config exists.
 
 ---
 
@@ -165,6 +171,8 @@ All routed through `src/app/api/cron/route.ts`.
 | `dailydrops` | 11:00 UTC | `/api/cron?worker=dailydrops` |
 | `daily-report` | 04:00 UTC | `/api/cron?worker=daily-report` |
 | `cleanup` | 03:00 UTC | `/api/cron?worker=cleanup` |
+| `refresh-meta-token` | Mondays 05:00 UTC | refreshes `META_ACCESS_TOKEN` (90-day window) |
+| `refresh-threads-token` | Weekly | refreshes `THREADS_ACCESS_TOKEN` (60-day token) |
 
 ---
 
@@ -223,12 +231,20 @@ Required in Vercel for production (after Phase 1 cutover):
 - `KUMOLAB_CIRCUIT_BREAKER_THRESHOLD=3`
 - `KUMOLAB_PROCESSING_BUDGET_MS=150000` — wall-clock budget for the processing worker's candidate loop. Stops starting new candidates near the ceiling and defers the rest to the next hourly run (FIFO preserved, nothing dropped). Guards against detection-burst backlogs running the function past Vercel's 300s `maxDuration`. Lower it if `publishScheduledPosts()` (runs first in the same invocation) grows slow.
 
-**Meta (IG + Meta Suite cross-post):**
-- `META_ACCESS_TOKEN` — page access token. **Auto-refreshed weekly** via the `refresh-meta-token` cron (Mondays 05:00 UTC); each successful exchange resets the 90-day data-access window forward.
+**Meta (Instagram + Facebook Page — direct Graph API, NOT Meta Suite):**
+- `META_ACCESS_TOKEN` — page access token (drives both IG and FB Page direct posts). **Auto-refreshed weekly** via the `refresh-meta-token` cron (Mondays 05:00 UTC); each successful exchange resets the 90-day data-access window forward.
 - `META_IG_ID`
 - `META_APP_ID` + `META_APP_SECRET` — required for the auto-refresh path to call `oauth/access_token?grant_type=fb_exchange_token`.
 - `AUTO_PUBLISH_SOCIALS=true`
-- `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` + `VERCEL_TEAM_ID` — used by the refresh cron to update the `META_ACCESS_TOKEN` env entry in place via Vercel's REST API.
+- `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` + `VERCEL_TEAM_ID` — used by the refresh cron to update the token env entries in place via Vercel's REST API.
+- FB Page ID is hardcoded in `publisher.ts` (`833836379820504`), not an env var.
+
+**Threads (direct Threads Graph API — separate app + token from Meta):**
+- `THREADS_ACCESS_TOKEN` — long-lived 60-day token, **refreshed weekly** by the `refresh-threads-token` cron worker.
+- `THREADS_USER_ID`
+- `THREADS_TOPIC_TAG` — optional, default `Anime Threads` (the ~343K-member community topic). One topic_tag per post; drops it into that discovery feed. Empty string disables.
+
+> ⚠️ Local note (verified 2026-06-19): the live Meta/Threads tokens are kept in `.env.poll.tmp`, NOT `.env.local` (which only carries Supabase + AI keys). Production tokens live in Vercel and self-refresh via the weekly crons.
 
 **TikTok (awaits developer app approval):**
 - `TIKTOK_ACCESS_TOKEN` — user-scoped OAuth token from Content Posting API
@@ -270,12 +286,13 @@ Local dev: keys live in `.env.local` (gitignored). Human-readable reference at `
 - **Canvas-based image processing** — `@napi-rs/canvas` server-side. Do not replace.
 - **Dedup via `seen_fingerprints`** — unified memory (origin ∈ processed|declined|published). Primary fingerprint is a hash of normalized title + source host. Old "anime_id + claim_type + season_label" composite is retired. Don't re-introduce `declined_posts`.
 - **Fork-2 retention** — posts carry `expires_at`; daily cleanup worker deletes + writes redirect. NULL expires_at = evergreen. Controlled by `KUMOLAB_DEFAULT_RETENTION_DAYS`.
-- **Meta Suite does the Meta fan-out** — publisher hits Instagram API only. Do NOT add direct Facebook or Threads API calls; Meta Suite cross-posts IG → FB + Threads automatically on Jose's side. Duplicating here would double-publish.
+- **Direct Graph API fan-out, one call per platform** — `publisher.ts` posts independently to Instagram, the Facebook Page (`FB_PAGE_ID` 833836379820504, via `/video_reels` or `/photos`/`/feed`), and Threads (`graph.threads.net`, with `topic_tag` for discovery). The old Meta Suite cross-post path (IG → FB + Threads) was unreliable and is RETIRED — the IG→FB and IG→Threads cross-post toggles are left OFF so we don't double-post. A per-post idempotency lock (`worker_locks`, key `publish:{id}`) prevents duplicate publishes since the Meta APIs are not idempotent. *(Corrected 2026-06-19 — this section previously said the opposite; verified against code.)*
 - **No per-platform daily caps** — spacing (`MIN_GAP_MINUTES`) does the pacing, not count limits. Trailers meant to be uncapped.
 - **No attribution-in-copy** — posts assert claims in KumoLab's voice. Accuracy enforced upstream (multi-source + AniList + tone check), not by "per @source" wording.
 - **Circuit breaker is the sole brake** — no dead-man switch. 3 declines in 24h → 6h pause. Manual reset via `manualResetCircuitBreaker()`.
 - **Cron routing** — All crons route through `src/app/api/cron/route.ts`. No parallel entry points.
 - **Auth surface** — `src/middleware.ts` is the single chokepoint for API auth. `/api/cron/*` requires Vercel cron header or `CRON_SECRET` bearer. `/api/admin/*` requires a valid Supabase session (validated server-side via `getUser()`, not just cookie presence). Page routes under `/admin/*` are gated independently in their layout.tsx server components. Don't reintroduce unauthenticated `test-env` / `test-x-token` style debug endpoints.
+- **Analytics writes go through `/api/track` (service role), never the anon client.** This DB is RLS-on with NO table policies (service-role-only), so browser anon-key inserts are silently denied. `page_views` recorded ZERO rows for ~2 months because `AnalyticsTracker` inserted with the anon key (fixed 2026-06-19). The public `/api/track` route writes via `supabaseAdmin` (bypasses RLS) and derives `is_bot` + `user_agent` from request headers. `AnalyticsTracker.tsx` POSTs to it. The admin Analytics page reads via `src/lib/analytics/page-views.ts` (service role). Do NOT revert to a direct anon insert, and do NOT "fix" this by adding an anon INSERT policy (that opens a spammable unauthenticated write into traffic data we base ad/sponsor decisions on).
 
 ---
 
@@ -301,7 +318,7 @@ No daily caps. Spacing (25-min min gap) does the pacing. Platforms fall out of t
 - Always test cron endpoints with curl before reporting complete
 - Redeploy to Vercel after any change to `vercel.json` cron schedules
 - Never hardcode source URLs or RSS feeds — they belong in `sources-config.ts`
-- Never add a direct Facebook or Threads API call — Meta Suite handles those via IG cross-post
+- Facebook + Threads publish via **direct Graph API calls** in `publisher.ts` (Meta Suite cross-post is retired — do not re-enable the IG→FB / IG→Threads toggles, that would double-post). Keep the per-post `worker_locks` idempotency lock intact.
 - Do not re-introduce `declined_posts` or a `NEXT_PUBLIC_USE_SUPABASE` JSON-fallback — both were removed in the v2 rebuild for storage + simplicity reasons
 - HARD RULE (Jose, 2026-06-08): NO em dashes or en dashes in ANY KumoLab content — titles, captions, copy, anywhere. Use a comma, colon, the " • " bullet, or a plain hyphen. Enforced deterministically by `stripFancyDashes()` (`src/lib/engine/utils.ts`), applied in `processing-worker.ts` (`sanitizeString`) and `ai-import-draft.ts`, and reinforced in the AI prompts. Applies to anything Claude writes for the brand too.
 
@@ -311,7 +328,7 @@ No daily caps. Spacing (25-min min gap) does the pacing. Platforms fall out of t
 
 | Date | Summary |
 | --- | --- |
-| — | — |
+| 2026-06-19 | Strategic realignment — KumoLab set as company #1 focus. Status updated from "pipeline rebuild" to "live + monetizing." Documented monetization track (display ads + sponsorships + merch). Global brain files (APEX / GLOBAL-ROADMAP / SCOREBOARD) updated to match. Audience metrics flagged stale (last pull 2026-05-07) — refresh next session. |
 
 ---
 
