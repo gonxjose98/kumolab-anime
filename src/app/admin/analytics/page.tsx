@@ -19,10 +19,12 @@ const FALLBACK: IGDashboardData = {
         followers: null,
         follows: null,
         mediaCount: null,
+        views28d: null,
         reach28d: null,
         profileViews28d: null,
         websiteClicks28d: null,
         accountsEngaged28d: null,
+        totalInteractions28d: null,
     },
     topRecent: [],
 };
@@ -188,12 +190,14 @@ function IGSection({ ig }: { ig: IGDashboardData }) {
             {/* Account snapshot */}
             <Card className="p-5">
                 <SectionHeader label="Account Snapshot" accent="#ff3cac" />
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <Metric label="Views" value={fmt(snapshot.views28d)} accent="#00d4ff" sub="28d" />
+                    <Metric label="Reach" value={fmt(snapshot.reach28d)} accent="#7b61ff" sub="28d" />
                     <Metric label="Followers" value={fmt(snapshot.followers)} accent="#ff3cac" />
-                    <Metric label="Posts" value={fmt(snapshot.mediaCount)} accent="#7b61ff" />
-                    <Metric label="Reach" value={fmt(snapshot.reach28d)} accent="#00d4ff" sub="28d" />
-                    <Metric label="Profile Views" value={fmt(snapshot.profileViews28d)} accent="#00ff88" sub="28d" />
+                    <Metric label="Posts" value={fmt(snapshot.mediaCount)} accent="#a092ff" />
                     <Metric label="Engaged" value={fmt(snapshot.accountsEngaged28d)} accent="#ffaa00" sub="28d" />
+                    <Metric label="Interactions" value={fmt(snapshot.totalInteractions28d)} accent="#00ff88" sub="28d" />
+                    <Metric label="Profile Views" value={fmt(snapshot.profileViews28d)} accent="#ff7ec5" sub="28d" />
                     <Metric label="Site Clicks" value={fmt(snapshot.websiteClicks28d)} accent="#ff6b35" sub="28d" />
                 </div>
             </Card>

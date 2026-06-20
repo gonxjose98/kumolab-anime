@@ -18,10 +18,12 @@ export interface IGAccountSnapshot {
     followers: number | null;
     follows: number | null;
     mediaCount: number | null;
+    views28d: number | null;
     reach28d: number | null;
     profileViews28d: number | null;
     websiteClicks28d: number | null;
     accountsEngaged28d: number | null;
+    totalInteractions28d: number | null;
 }
 
 export interface IGMediaInsight {
@@ -47,10 +49,12 @@ const DEAD: IGAccountSnapshot = {
     followers: null,
     follows: null,
     mediaCount: null,
+    views28d: null,
     reach28d: null,
     profileViews28d: null,
     websiteClicks28d: null,
     accountsEngaged28d: null,
+    totalInteractions28d: null,
 };
 
 export async function fetchIGDashboardData(): Promise<IGDashboardData> {
@@ -80,15 +84,18 @@ async function fetchAccountSnapshot(): Promise<IGAccountSnapshot> {
 
         // 2) Rolling 28-day account insights.
         // On v22, account-level metrics that work without a specific
-        // breakdown: `reach`, `profile_views`, `website_clicks`,
-        // `accounts_engaged`. All require `metric_type=total_value`.
+        // breakdown: `views`, `reach`, `profile_views`, `website_clicks`,
+        // `accounts_engaged`, `total_interactions`. All require
+        // `metric_type=total_value`. `views` is the headline metric (total
+        // plays/impressions across content) and is much larger than `reach`
+        // (unique accounts) — do NOT conflate the two.
         const since = Math.floor((Date.now() - 28 * 86400 * 1000) / 1000);
         const until = Math.floor(Date.now() / 1000);
         const byName: Record<string, number> = {};
         // Each metric must be requested separately on v22 — the API
         // rejects mixed-cardinality metrics in a single call. Fetch in
         // parallel and merge.
-        const metricNames = ['reach', 'profile_views', 'website_clicks', 'accounts_engaged'];
+        const metricNames = ['views', 'reach', 'profile_views', 'website_clicks', 'accounts_engaged', 'total_interactions'];
         await Promise.all(
             metricNames.map(async (name) => {
                 try {
@@ -115,10 +122,12 @@ async function fetchAccountSnapshot(): Promise<IGAccountSnapshot> {
             followers: fData.followers_count ?? null,
             follows: fData.follows_count ?? null,
             mediaCount: fData.media_count ?? null,
+            views28d: byName.views ?? null,
             reach28d: byName.reach ?? null,
             profileViews28d: byName.profile_views ?? null,
             websiteClicks28d: byName.website_clicks ?? null,
             accountsEngaged28d: byName.accounts_engaged ?? null,
+            totalInteractions28d: byName.total_interactions ?? null,
         };
     } catch (e: any) {
         return { ...DEAD, reason: `threw: ${e?.message || e}` };
