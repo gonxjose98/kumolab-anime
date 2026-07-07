@@ -114,25 +114,25 @@
 .scA {
     top: -8%;
     left: -9%;
-    width: 38vw;
-    min-width: 320px;
+    width: 23vw;
+    min-width: 210px;
     animation-duration: 84s;
 }
 
 .scB {
     top: -15%;
     right: -8%;
-    width: 33vw;
-    min-width: 280px;
+    width: 20vw;
+    min-width: 185px;
     animation-duration: 100s;
     animation-delay: -44s;
 }
 
 .scC {
     top: 3%;
-    left: 33%;
-    width: 24vw;
-    min-width: 200px;
+    left: 38%;
+    width: 14vw;
+    min-width: 135px;
     opacity: calc(var(--sc-op) * 0.55);
     animation-duration: 92s;
     animation-delay: -66s;
@@ -271,8 +271,8 @@
 
 /* ── Phones: fewer/bigger clouds, tiny caption (counts capped in JS) ── */
 @media (max-width: 639px) {
-    .scA { width: 76vw; min-width: 0; }
-    .scB { width: 64vw; min-width: 0; }
+    .scA { width: 50vw; min-width: 0; }
+    .scB { width: 42vw; min-width: 0; }
     .scC { display: none; }
 
     .caption {

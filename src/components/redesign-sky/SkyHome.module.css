@@ -456,20 +456,19 @@
        prefixing at the build layer, not here. */
     backdrop-filter: blur(26px) saturate(1.7);
     transform-origin: calc(100% - 26px) top;
-    /* Closed: rolled up and tucked under the menu button, edge-on. */
-    transform: perspective(800px) translateY(-6px) rotateX(-88deg) scaleY(0.7);
-    transition:
-        opacity 0.2s ease,
-        transform 0.4s cubic-bezier(0.3, 0, 0.4, 1);
+    /* Closed rests invisible (opacity 0 from the stock nav). The OPEN keyframe
+       owns ALL the transform motion — nothing else transitions transform, so
+       there's no competing motion (that competition caused the double-drop
+       glitch). Only opacity transitions, for a clean fade on close. */
+    transition: opacity 0.28s ease;
 }
 
-/* Open → an anime scroll-style roll: the panel unrolls downward from the
-   top edge, curling open past level then settling with a soft wobble.
-   (If the keyframes name doesn't bind, the base→open transition still does
-   a strong rotateX(-88deg → 0) flip-roll.) */
+/* Open → an anime scroll-style roll: the panel unrolls downward from the top
+   edge, curling open past level then settling with a soft wobble. The
+   keyframes own the transform outright; `both` holds the resting frame so
+   nothing hands back to a transition. */
 :global(nav[data-sky-nav] button[aria-expanded='true'] + div) {
-    transform: perspective(800px) translateY(0) rotateX(0) skewY(0) scaleY(1);
-    animation: skyMenuRoll 0.6s cubic-bezier(0.3, 0.75, 0.35, 1);
+    animation: skyMenuRoll 0.6s cubic-bezier(0.3, 0.75, 0.35, 1) both;
 }
 
 @keyframes skyMenuRoll {

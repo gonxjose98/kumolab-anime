@@ -206,25 +206,23 @@ export default function SeaToSky() {
         };
     }, []);
 
-    /* ── SCROLL ASSIST — auto-play the dolly, hand off on hold ────────────
-       Lazy-scroll helper for the hero. Once the visitor has manually
-       scrolled ~35% into the journey, we take over and GLIDE them through
-       the rest of the sea→sky dolly automatically, dropping them where the
-       content begins. At any point they can PRESS & HOLD (mouse or finger)
-       to grab the reel and SCRUB the animation by dragging; releasing
-       resumes the auto-glide toward the end. Scrubbing back up past the
-       trigger hands control back (normal scrolling). Native wheel/touch is
-       suppressed only while WE are driving (auto or scrub). If a pointer is
-       already held when the 35% line is crossed (e.g. a mobile swipe), we go
-       straight to scrub so the finger stays in control. No-ops under
-       reduced motion. */
+    /* ── SCROLL ASSIST — take over on the FIRST scroll ───────────────────
+       Lazy-scroll helper for the hero. The instant the visitor scrolls (or
+       swipes) down AT ALL from the top, we take over and GLIDE them through
+       the whole sea→sky dolly automatically, dropping them where the content
+       begins — same for desktop wheel and mobile swipe. From the landing, a
+       small scroll UP glides them back to the top. At any point during a
+       glide they can PRESS & HOLD (mouse or finger) to grab the reel and
+       SCRUB the animation by dragging; releasing resumes the auto-glide.
+       Native wheel/touch is suppressed only while WE are driving (auto or
+       scrub). No-ops under reduced motion. */
     useEffect(() => {
         const journey = journeyRef.current;
         if (!journey) return;
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
-        const TRIGGER = 0.35; // start auto once past this much of the journey
-        const REARM = 0.05; // re-arm the trigger once back near the top
+        const TRIGGER = 0.02; // hand off on the first bit of scroll from the top
+        const REARM = 0.01; // re-arm the trigger once back at the very top
         const SCRUB_GAIN = 1.6; // scroll px per drag px while scrubbing
         const NAV_KEYS = new Set([
             ' ', 'Spacebar', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End',
@@ -341,18 +339,15 @@ export default function SeaToSky() {
 
         const onScroll = () => {
             if (mode === 'idle') {
-                // scrolled DOWN past 35% of the journey → ride to the landing
-                if (progress() >= TRIGGER) {
-                    if (pointerActive) beginScrub(lastPointerY);
-                    else glideDown();
-                }
+                // scrolled/swiped DOWN at all from the top → ride to the
+                // landing automatically (desktop wheel and mobile swipe alike)
+                if (progress() >= TRIGGER) glideDown();
             } else if (mode === 'done') {
-                // scrolled back UP the same ~35% (of the journey) from the
-                // landing, still inside the hero span → ride back to the top.
+                // scrolled back UP a touch from the landing, still inside the
+                // hero span → ride back to the top.
                 const upThreshold = endTargetY() - TRIGGER * metrics().track;
                 if (window.scrollY <= upThreshold) {
-                    if (pointerActive) beginScrub(lastPointerY);
-                    else glideUp();
+                    glideUp();
                 } else if (progress() < REARM) {
                     mode = 'idle';
                 }
