@@ -1,0 +1,139 @@
+/* ═══ REDESIGN LEGAL — PRIVACY & TERMS ON THE CONTENT SKY ════════════
+   Shared by /redesign-legal/privacy and /redesign-legal/terms.
+   Mobile-first: single column, fluid clamp() type, no fixed widths, no
+   horizontal overflow. The legal document lives in ONE deep, fairly
+   opaque glass panel so long-form legal text stays highly legible over
+   both the bright day sky and the navy night sky — readability beats
+   decoration here. Colors read from the --sky-* tokens set by
+   SkyContentRoot. */
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.hero {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: calc(var(--header-height, 64px) + clamp(44px, 10vw, 96px)) 20px clamp(26px, 5vw, 48px);
+    text-align: center;
+}
+
+.kicker {
+    margin: 0;
+    font-family: var(--font-jp);
+    font-size: clamp(0.66rem, 2vw, 0.78rem);
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(255, 236, 194, 0.9);
+    text-shadow: 0 1px 10px rgba(12, 50, 110, 0.35);
+}
+
+.title {
+    margin: 12px 0 0;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(2.5rem, 10vw, 4.4rem);
+    font-weight: 400;
+    line-height: 0.98;
+    letter-spacing: 0.05em;
+    background: linear-gradient(180deg, #ffffff 0%, #f4faff 60%, #ffe1a0 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 5px 24px rgba(12, 50, 110, 0.32));
+}
+
+.updated {
+    margin: 14px auto 0;
+    font-family: var(--font-display);
+    font-size: clamp(0.7rem, 2vw, 0.78rem);
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(240, 249, 255, 0.75);
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.3);
+}
+
+/* ── Document column ──────────────────────────────────────────────── */
+.main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 16px clamp(64px, 10vw, 110px);
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .main { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ── The glass document panel ─────────────────────────────────────── */
+.doc {
+    min-width: 0;
+    border-radius: 24px;
+    padding: clamp(24px, 6.5vw, 48px);
+    background: linear-gradient(172deg, rgba(12, 40, 88, 0.66) 0%, rgba(9, 30, 70, 0.74) 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.26);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 16px 44px rgba(8, 30, 70, 0.3);
+}
+
+/* Body copy: highest-priority legibility. ≥16px, high opacity, roomy
+   leading, wraps long strings (emails, URLs) without overflow. */
+.doc p {
+    margin: 0 0 1.1em;
+    font-family: var(--font-main);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.8;
+    color: rgba(245, 250, 255, 0.94);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.doc p:last-child {
+    margin-bottom: 0;
+}
+
+.doc strong {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+/* Section headings: clear hierarchy, warm gold accent rule. */
+.doc h2 {
+    margin: clamp(28px, 6vw, 40px) 0 12px;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(1.35rem, 5vw, 1.7rem);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: 0.05em;
+    color: #ffedbd;
+    text-shadow: 0 2px 12px rgba(8, 30, 70, 0.4);
+    padding-top: clamp(20px, 4.5vw, 28px);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Links: gold, underlined, generous tap target via padding-block. */
+.doc a {
+    color: #ffe08a;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1.5px;
+    padding-block: 4px;
+    overflow-wrap: anywhere;
+    transition: color 0.3s ease;
+}
+
+.doc a:hover {
+    color: #fff3d2;
+}
+
+.doc a:focus-visible {
+    outline: 2px solid rgba(255, 224, 138, 0.9);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .doc a {
+        transition: none;
+    }
+}

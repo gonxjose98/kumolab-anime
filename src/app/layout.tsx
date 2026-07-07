@@ -3,7 +3,6 @@ import { Inter, Plus_Jakarta_Sans, Outfit } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/layout/Navigation';
 import Footer from '@/components/layout/Footer';
-import GalaxyBackground from '@/components/shared/GalaxyBackground';
 import ConditionalLayout from '@/components/shared/ConditionalLayout';
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
 import { OrganizationJsonLd, WebSiteJsonLd } from '@/components/seo/JsonLd';
@@ -87,7 +86,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AnalyticsTracker />
-          <ConditionalLayout nav={<><GalaxyBackground /><Navigation /></>} footer={<Footer />}>
+          <ConditionalLayout nav={<Navigation />} footer={<Footer />}>
             <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>
           </ConditionalLayout>
         </ThemeProvider>

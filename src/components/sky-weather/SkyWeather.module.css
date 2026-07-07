@@ -1,0 +1,295 @@
+/* ═══ AMBIENT WEATHER LAYER ══════════════════════════════════════════
+   Fixed full-viewport overlay, pointer-transparent, keyed off
+   `data-condition` and the INHERITED day/night variable --t
+   (0 = day → 1 = night, tweened by SkyThemeRoot / SkyContentRoot).
+
+   DAY/NIGHT RULE: the day overcast veil composes its strength with
+   calc(1 - var(--t)) — gloomy weather makes DAY darker-than-normal,
+   greyer and moodier, but still clearly daytime; as --t rises the day
+   veil hands off to a subtler night veil (thicker cover, dimmed stars).
+
+   Performance: transform + opacity animation only; the storm clouds are
+   the only elements with will-change. */
+
+.weather {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+
+    /* Per-condition mood strengths (0 = none) */
+    --ovc-day: 0;   /* day overcast veil */
+    --ovc-night: 0; /* night overcast veil */
+    --sc-op: 0;     /* storm-cloud opacity */
+}
+
+.weather[data-condition='cloudy'] {
+    --ovc-day: 0.24;
+    --ovc-night: 0.2;
+    --sc-op: 0.2;
+}
+
+.weather[data-condition='rain'] {
+    --ovc-day: 0.44;
+    --ovc-night: 0.32;
+    --sc-op: 0.3;
+}
+
+.weather[data-condition='thunder'] {
+    --ovc-day: 0.56;
+    --ovc-night: 0.42;
+    --sc-op: 0.4;
+}
+
+.weather[data-condition='snow'] {
+    --ovc-day: 0.4;
+    --ovc-night: 0.26;
+    --sc-op: 0.24;
+}
+
+/* ── Overcast veils — cross-faded by --t ────────────────────────────── */
+.tintDay,
+.tintNight {
+    position: absolute;
+    inset: 0;
+}
+
+/* DAY: greyer, desaturated, heaviest overhead — never night-dark. */
+.tintDay {
+    opacity: calc((1 - var(--t, 0)) * var(--ovc-day));
+    background:
+        radial-gradient(ellipse 120% 55% at 50% -18%, rgba(44, 56, 72, 0.55), transparent 74%),
+        linear-gradient(
+            180deg,
+            rgba(64, 78, 96, 0.82) 0%,
+            rgba(76, 90, 108, 0.58) 42%,
+            rgba(90, 104, 122, 0.34) 74%,
+            rgba(98, 112, 130, 0.18) 100%
+        );
+}
+
+/* Snow day reads bright winter-grey, not stormy slate */
+.weather[data-condition='snow'] .tintDay {
+    background: linear-gradient(
+        180deg,
+        rgba(196, 206, 218, 0.7) 0%,
+        rgba(178, 190, 204, 0.42) 48%,
+        rgba(168, 182, 198, 0.22) 100%
+    );
+}
+
+/* NIGHT: subtle — thicker cloud cover, gently dimmed stars */
+.tintNight {
+    opacity: calc(var(--t, 0) * var(--ovc-night));
+    background:
+        radial-gradient(ellipse 120% 55% at 50% -18%, rgba(16, 22, 36, 0.7), transparent 74%),
+        linear-gradient(
+            180deg,
+            rgba(26, 33, 50, 0.85) 0%,
+            rgba(16, 22, 38, 0.55) 50%,
+            rgba(12, 17, 30, 0.32) 100%
+        );
+}
+
+/* ── Storm clouds along the upper sky — slow cel drift ──────────────── */
+.cloudBand {
+    position: absolute;
+    inset: 0;
+}
+
+.stormCloud {
+    position: absolute;
+    opacity: var(--sc-op);
+    /* darker, cooler silhouettes as night takes over */
+    filter: brightness(calc(1 - var(--t, 0) * 0.55)) saturate(calc(1 - var(--t, 0) * 0.2));
+    animation: skywDrift ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+/* Staggered TOPS + a centre gap so the bank never reads as one flat-
+   bottomed bar (which looked like a fake nav bar). Pulled higher and
+   lighter (see --sc-op) so it hazes the top of the sky rather than
+   capping it. */
+.scA {
+    top: -8%;
+    left: -9%;
+    width: 38vw;
+    min-width: 320px;
+    animation-duration: 84s;
+}
+
+.scB {
+    top: -15%;
+    right: -8%;
+    width: 33vw;
+    min-width: 280px;
+    animation-duration: 100s;
+    animation-delay: -44s;
+}
+
+.scC {
+    top: 3%;
+    left: 33%;
+    width: 24vw;
+    min-width: 200px;
+    opacity: calc(var(--sc-op) * 0.55);
+    animation-duration: 92s;
+    animation-delay: -66s;
+}
+
+@keyframes skywDrift {
+    from { transform: translate3d(-2.5%, 0, 0); }
+    to { transform: translate3d(4%, 0, 0); }
+}
+
+/* ── Precipitation canvas (rain / snow particles) ───────────────────── */
+.canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* streaks read a touch softer against the night sky */
+    opacity: calc(1 - var(--t, 0) * 0.22);
+}
+
+/* ── Lightning: full-scene bloom, soft double-blink (~720ms total) ──── */
+.flash {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    background: radial-gradient(
+        ellipse 85% 62% at var(--flash-x, 60%) -12%,
+        rgba(245, 250, 255, 0.95) 0%,
+        rgba(206, 225, 255, 0.55) 34%,
+        rgba(168, 197, 255, 0.18) 62%,
+        transparent 82%
+    );
+}
+
+.flashRun {
+    animation: skywFlash 0.72s ease-out;
+}
+
+@keyframes skywFlash {
+    0% { opacity: 0; }
+    8% { opacity: 0.52; }
+    19% { opacity: 0.06; }
+    31% { opacity: 0.38; }
+    52% { opacity: 0.04; }
+    100% { opacity: 0; }
+}
+
+/* Faint bolt — shows on roughly half the flashes, repositioned each time */
+.bolt {
+    position: absolute;
+    top: -2vh;
+    left: 58%;
+    width: clamp(30px, 4.5vw, 62px);
+    height: 40vh;
+    opacity: 0;
+    filter: drop-shadow(0 0 7px rgba(190, 214, 255, 0.85));
+}
+
+.bolt svg {
+    width: 100%;
+    height: 100%;
+}
+
+.boltRun {
+    animation: skywBolt 0.72s ease-out;
+}
+
+@keyframes skywBolt {
+    0% { opacity: 0; }
+    7% { opacity: 0.5; }
+    16% { opacity: 0.04; }
+    27% { opacity: 0.3; }
+    42% { opacity: 0; }
+    100% { opacity: 0; }
+}
+
+/* ── Shooting star — upper sky, night only (gated in JS by --t) ─────── */
+.shootingStar {
+    position: absolute;
+    top: 12%;
+    left: 18%;
+    width: clamp(70px, 9vw, 120px);
+    height: 2px;
+    border-radius: 2px;
+    opacity: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(214, 231, 255, 0.75) 55%,
+        #ffffff 100%
+    );
+    transform: rotate(26deg);
+}
+
+.shootingStar::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    top: -1.5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 9px 2px rgba(222, 236, 255, 0.85);
+}
+
+.starRun {
+    animation: skywShoot 1.15s cubic-bezier(0.25, 0.55, 0.4, 1) forwards;
+}
+
+@keyframes skywShoot {
+    0% {
+        transform: translate3d(0, 0, 0) rotate(26deg);
+        opacity: 0;
+    }
+    10% { opacity: 0.95; }
+    68% { opacity: 0.8; }
+    100% {
+        transform: translate3d(38vmin, 18.5vmin, 0) rotate(26deg);
+        opacity: 0;
+    }
+}
+
+/* ── Whisper-quiet corner caption ───────────────────────────────────── */
+.caption {
+    position: absolute;
+    left: 16px;
+    bottom: 13px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: rgba(240, 247, 255, 0.9);
+    text-shadow: 0 1px 8px rgba(8, 18, 40, 0.5);
+    opacity: 0.42;
+}
+
+/* ── Phones: fewer/bigger clouds, tiny caption (counts capped in JS) ── */
+@media (max-width: 639px) {
+    .scA { width: 76vw; min-width: 0; }
+    .scB { width: 64vw; min-width: 0; }
+    .scC { display: none; }
+
+    .caption {
+        left: 12px;
+        bottom: 10px;
+        font-size: 10px;
+    }
+}
+
+/* ── Reduced motion: static tint only (JS also skips these layers) ──── */
+@media (prefers-reduced-motion: reduce) {
+    .stormCloud { animation: none; }
+
+    .canvas,
+    .flash,
+    .bolt,
+    .shootingStar {
+        display: none;
+    }
+}

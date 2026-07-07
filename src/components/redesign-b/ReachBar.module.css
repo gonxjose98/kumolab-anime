@@ -1,0 +1,183 @@
+/* ─── REACH BAR — social proof under the hero ───────────────────────── */
+
+.section {
+    position: relative;
+    padding: 40px 20px 80px;
+    display: flex;
+    justify-content: center;
+}
+
+.panel {
+    width: 100%;
+    max-width: 980px;
+    padding: 44px 32px 38px;
+    border-radius: 26px;
+    border: 1px solid rgba(150, 170, 255, 0.14);
+    background: linear-gradient(
+        160deg,
+        rgba(20, 17, 58, 0.6) 0%,
+        rgba(12, 10, 36, 0.55) 100%
+    );
+    backdrop-filter: blur(16px);
+    box-shadow:
+        0 30px 80px rgba(3, 3, 14, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    text-align: center;
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.visible .panel {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.statement {
+    font-family: var(--font-display);
+    font-size: clamp(1.3rem, 3.4vw, 2.1rem);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #dfe5ff;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.35em;
+}
+
+.bigNumber {
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+    line-height: 1;
+    letter-spacing: 0.03em;
+    background: linear-gradient(135deg, #8fe8ff 0%, #9a86ff 55%, #ff7ac8 120%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 30px rgba(123, 97, 255, 0.4));
+}
+
+.plus {
+    color: inherit;
+}
+
+.statRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 22px;
+    margin-top: 34px;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 150px;
+    opacity: 0;
+    transform: translateY(18px);
+    transition: all 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s;
+}
+
+.visible .stat {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.visible .stat:nth-child(3) { transition-delay: 0.4s; }
+.visible .stat:nth-child(5) { transition-delay: 0.55s; }
+
+.statValue {
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(1.7rem, 4vw, 2.4rem);
+    line-height: 1;
+    color: #eef1ff;
+    text-shadow: 0 0 24px rgba(140, 200, 255, 0.3);
+}
+
+.statLabel {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #97a2d4;
+    letter-spacing: 0.04em;
+}
+
+.statJp {
+    font-family: var(--font-jp);
+    font-size: 0.66rem;
+    letter-spacing: 0.3em;
+    color: #5d68a0;
+}
+
+.divider {
+    width: 1px;
+    align-self: stretch;
+    background: linear-gradient(
+        180deg,
+        transparent,
+        rgba(150, 170, 255, 0.25),
+        transparent
+    );
+}
+
+.platforms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px 22px;
+    margin-top: 32px;
+    padding-top: 26px;
+    border-top: 1px solid rgba(150, 170, 255, 0.1);
+}
+
+.platform {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #6f7ab2;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.7s cubic-bezier(0.22, 1, 0.36, 1) calc(0.5s + var(--d, 0s));
+}
+
+.visible .platform {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.handle {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #8fe8ff;
+    text-shadow: 0 0 16px rgba(0, 212, 255, 0.4);
+    opacity: 0;
+    transition: opacity 0.8s ease 0.95s;
+}
+
+.visible .handle {
+    opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .divider { display: none; }
+    .statRow { gap: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel,
+    .stat,
+    .platform,
+    .handle {
+        transition: none;
+        opacity: 1;
+        transform: none;
+    }
+}

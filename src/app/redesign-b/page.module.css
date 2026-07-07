@@ -1,0 +1,15 @@
+/* ─── REDESIGN B — NIGHT SKY / NEBULA — page shell ─────────────────── */
+
+.page {
+    position: relative;
+    /* Opaque base so the global GalaxyBackground never bleeds through —
+       the NightSky component paints the real sky on top of this. */
+    background: #050514;
+    isolation: isolate;
+    overflow-x: clip;
+}
+
+.content {
+    position: relative;
+    z-index: 1;
+}

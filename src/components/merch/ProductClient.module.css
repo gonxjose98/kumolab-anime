@@ -1,91 +1,198 @@
+/* ── Sky-theme product detail ────────────────────────────────────────────
+   Frosted glass on the calm sky. Day is the default; night overrides key
+   off the [data-sky='night'] flag SkyContentRoot stamps on its root. */
+
 .productLayout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4rem;
+    gap: 3.5rem;
     align-items: start;
+}
+
+.imageSection {
+    border-radius: 20px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #ffffff, #e9f2ff);
+    border: 1px solid rgba(120, 160, 210, 0.35);
+    box-shadow: 0 24px 60px -28px rgba(20, 60, 120, 0.5);
 }
 
 .mainImage {
     width: 100%;
-    border-radius: 12px;
-    background: var(--surface-color);
+    display: block;
+    background: transparent;
 }
 
 .title {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
+    font-size: 2.4rem;
+    line-height: 1.08;
+    margin: 0 0 1rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #0b2547;
 }
 
 .price {
-    font-size: 1.5rem;
-    color: var(--accent-primary);
+    font-size: 1.6rem;
+    color: #0b2547;
     margin-bottom: 2rem;
-    font-weight: 600;
+    font-weight: 800;
+}
+
+.variants h3,
+.quantitySection h3 {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 800;
+    color: rgba(11, 37, 71, 0.7);
+    margin: 0 0 0.7rem;
 }
 
 .variantGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 0.55rem;
     margin-bottom: 2rem;
 }
 
 .variantBtn {
-    padding: 0.75rem;
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-secondary);
+    padding: 0.7rem 0.6rem;
+    border: 1px solid rgba(120, 160, 210, 0.5);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(6px);
+    color: #123a63;
     cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.875rem;
+    transition: all 0.18s ease;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.variantBtn:hover {
+    border-color: rgba(28, 127, 214, 0.6);
+    background: rgba(255, 255, 255, 0.82);
 }
 
 .variantBtn.active {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
+    background: linear-gradient(180deg, #f4c25e, #d99b26);
+    color: #3a2a05;
+    border-color: #d99b26;
+    box-shadow: 0 6px 16px -6px rgba(196, 146, 44, 0.6);
 }
 
 .quantityControls {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    margin-top: 0.5rem;
+    gap: 1.4rem;
+    margin-top: 0.4rem;
     margin-bottom: 2rem;
 }
 
+.quantityControls span {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0b2547;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
 .quantityControls button {
-    width: 32px;
-    height: 32px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    border: 1px solid var(--border-subtle);
-    background: transparent;
-    color: var(--text-primary);
+    border: 1px solid rgba(120, 160, 210, 0.5);
+    background: rgba(255, 255, 255, 0.6);
+    color: #0b2547;
+    font-size: 1.1rem;
+    font-weight: 700;
     cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.quantityControls button:hover {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(28, 127, 214, 0.6);
 }
 
 .addToCartBtn {
     width: 100%;
-    padding: 1rem;
-    background: var(--accent-primary);
-    color: white;
+    padding: 1.05rem;
+    background: linear-gradient(180deg, #f4c25e, #d99b26);
+    color: #3a2a05;
     border: none;
     border-radius: 99px;
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 14px 30px -12px rgba(196, 146, 44, 0.7);
 }
 
 .addToCartBtn:hover {
-    transform: scale(1.02);
+    transform: translateY(-1px);
+    box-shadow: 0 18px 38px -12px rgba(196, 146, 44, 0.85);
+}
+
+/* ── Night ──────────────────────────────────────────────────────────── */
+:global([data-sky='night']) .imageSection {
+    background: linear-gradient(180deg, #12203f, #0a1730);
+    border-color: rgba(140, 170, 230, 0.22);
+    box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.6);
+}
+
+:global([data-sky='night']) .title,
+:global([data-sky='night']) .price,
+:global([data-sky='night']) .quantityControls span {
+    color: #eaf2ff;
+}
+
+:global([data-sky='night']) .variants h3,
+:global([data-sky='night']) .quantitySection h3 {
+    color: rgba(220, 232, 255, 0.66);
+}
+
+:global([data-sky='night']) .variantBtn {
+    background: rgba(180, 205, 255, 0.08);
+    border-color: rgba(160, 190, 255, 0.28);
+    color: #d6e4ff;
+}
+
+:global([data-sky='night']) .variantBtn:hover {
+    background: rgba(180, 205, 255, 0.16);
+    border-color: rgba(157, 184, 255, 0.5);
+}
+
+:global([data-sky='night']) .variantBtn.active {
+    background: linear-gradient(180deg, #ffd88a, #e6b45a);
+    color: #2a1e04;
+    border-color: #e6b45a;
+}
+
+:global([data-sky='night']) .quantityControls button {
+    background: rgba(180, 205, 255, 0.1);
+    border-color: rgba(160, 190, 255, 0.28);
+    color: #eaf2ff;
+}
+
+:global([data-sky='night']) .quantityControls button:hover {
+    background: rgba(180, 205, 255, 0.18);
+}
+
+:global([data-sky='night']) .addToCartBtn {
+    background: linear-gradient(180deg, #ffd88a, #e6b45a);
+    color: #2a1e04;
+    box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.5);
 }
 
 @media (max-width: 768px) {
     .productLayout {
         grid-template-columns: 1fr;
         gap: 2rem;
+    }
+
+    .title {
+        font-size: 2rem;
     }
 }

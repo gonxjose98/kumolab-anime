@@ -129,13 +129,14 @@ export async function getVisibleProducts(): Promise<Product[]> {
     return await getProducts();
 }
 
-// Storefront view — single-hero model: only featured products are shown.
-// Falls back to ALL products if nothing is featured yet, so a misconfigured
-// settings table never yields an empty shop.
+// Storefront view — shows the FULL published catalog (all visible products).
+// The featured / single-hero filter was retired 2026-07-06 at the owner's
+// request so every published product appears. merch_settings still drives
+// per-product anchor price + label (the sale badges); only the is_featured
+// filter is dropped. Kept under this name so existing storefront callers
+// (home, /merch) need no changes.
 export async function getFeaturedProducts(): Promise<Product[]> {
-    const all = await getProducts();
-    const featured = all.filter(p => p.isFeatured);
-    return featured.length > 0 ? featured : all;
+    return await getProducts();
 }
 
 // Live Printful retail_price for a single sync variant. This is the SOURCE OF

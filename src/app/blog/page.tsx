@@ -1,29 +1,16 @@
-import { getPosts } from '@/lib/blog';
-import BlogList from '@/components/blog/BlogList';
+import type { Metadata } from 'next';
+
+// Live feed now renders the sky-themed blog. Implementation lives in the
+// (non-indexed) preview route; rendered here under the canonical /blog URL
+// with production, indexable metadata.
+export { default } from '../redesign-blog/page';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function BlogPage() {
-    let posts: any[] = [];
-    
-    try {
-        posts = await getPosts();
-    } catch (error) {
-        console.error('[BlogPage] Failed to fetch posts:', error);
-        // Return empty array - component will handle empty state
-        posts = [];
-    }
-
-    return (
-        <div className="container" style={{ paddingTop: 'calc(var(--header-height) + 2rem)', paddingBottom: '4rem' }}>
-            <header style={{ marginBottom: '3rem' }}>
-                <h1 style={{ fontSize: '3rem', fontWeight: 800, marginBottom: '1rem' }}>The Feed</h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px' }}>
-                    Real-time anime intelligence. No fluff. No clickbait.
-                </p>
-            </header>
-            <BlogList initialPosts={posts} />
-        </div>
-    );
-}
+export const metadata: Metadata = {
+    title: 'The Feed',
+    description:
+        'Daily anime news, drops, release dates, and trailers — verified and without the noise.',
+    alternates: { canonical: '/blog' },
+};

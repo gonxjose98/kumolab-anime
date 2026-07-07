@@ -1,0 +1,373 @@
+/* ═══ REDESIGN MERCH — THE COLLECTION ON THE CONTENT SKY ═════════════
+   Boutique storefront preview. Mobile-first: single centered column,
+   fluid clamp() type, ≥44px tap targets, min-width:0 everywhere, no
+   fixed widths → zero horizontal overflow at 390px. Grid becomes two
+   centered boutique columns from 700px. All colors sit on the --sky-*
+   tokens set by SkyContentRoot and stay legible in day AND night via
+   the same ink text-shadows as the blog exemplar. */
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.hero {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: calc(var(--header-height, 64px) + clamp(44px, 10vw, 96px)) 20px clamp(26px, 5vw, 48px);
+    text-align: center;
+}
+
+.kicker {
+    margin: 0;
+    font-family: var(--font-jp);
+    font-size: clamp(0.66rem, 2vw, 0.78rem);
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(255, 236, 194, 0.9);
+    text-shadow: 0 1px 10px rgba(12, 50, 110, 0.35);
+}
+
+.title {
+    margin: 12px 0 0;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(2.9rem, 12vw, 5rem);
+    font-weight: 400;
+    line-height: 0.98;
+    letter-spacing: 0.05em;
+    background: linear-gradient(180deg, #ffffff 0%, #f4faff 60%, #ffe1a0 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 5px 24px rgba(12, 50, 110, 0.32));
+}
+
+.sub {
+    margin: 14px auto 0;
+    max-width: 460px;
+    font-family: var(--font-main);
+    font-size: clamp(0.94rem, 2.6vw, 1.05rem);
+    font-weight: 500;
+    line-height: 1.7;
+    color: rgba(240, 249, 255, 0.9);
+    text-shadow: 0 1px 10px rgba(12, 50, 110, 0.3);
+    overflow-wrap: break-word;
+}
+
+/* ── Shop shell ───────────────────────────────────────────────────── */
+.shop {
+    padding: clamp(8px, 2vw, 18px) 16px clamp(64px, 10vw, 110px);
+}
+
+@media (min-width: 640px) {
+    .shop { padding-left: 24px; padding-right: 24px; }
+}
+
+.inner {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+/* ── Boutique grid: 1 large centered card → 2 from 700px ──────────
+   Fixed max track size + justify-content keeps a 1–2 item drop feeling
+   deliberate and centered instead of lost in a wide grid. */
+.grid {
+    display: grid;
+    grid-template-columns: minmax(0, 480px);
+    justify-content: center;
+    gap: clamp(20px, 4.5vw, 32px);
+}
+
+@media (min-width: 700px) {
+    .grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 448px));
+    }
+}
+
+/* ── Product card — large glassy sky card ─────────────────────────── */
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-radius: 24px;
+    overflow: hidden;
+    background: linear-gradient(170deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.07) 70%);
+    border: 1.5px solid rgba(255, 255, 255, 0.36);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 14px 40px rgba(10, 40, 90, 0.18);
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(255, 255, 255, 0.68);
+    box-shadow: 0 26px 64px rgba(10, 40, 90, 0.32), 0 0 48px rgba(255, 240, 200, 0.14);
+}
+
+/* Gentle sheen that sweeps across on hover (killed for reduced motion). */
+.card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.16) 46%, rgba(255, 244, 214, 0.1) 52%, transparent 66%);
+    transform: translateX(-130%);
+    transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+.card:hover::after {
+    transform: translateX(130%);
+}
+
+/* ── Media: portrait product shot ─────────────────────────────────── */
+.media {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    max-height: 420px;
+    width: 100%;
+    overflow: hidden;
+    /* Soft sky-lit backdrop behind the mockup keeps letterboxing pretty. */
+    background:
+        radial-gradient(ellipse 80% 65% at 50% 36%, rgba(255, 255, 255, 0.3), transparent 78%),
+        linear-gradient(180deg, rgba(220, 238, 255, 0.35), rgba(160, 200, 245, 0.22));
+}
+
+.image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    image-rendering: auto;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover .image {
+    transform: scale(1.045);
+}
+
+.fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--font-jp);
+    font-size: 4rem;
+    color: rgba(255, 255, 255, 0.55);
+    background:
+        radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.24), transparent 75%),
+        linear-gradient(180deg, #4fa3ee, #2b7bd4);
+}
+
+/* Subtle veil + inner shadow so the flat mockup sits "into" the glass
+   and stays readable against the bright day sky. */
+.mediaVeil {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(16, 58, 118, 0.04) 0%, rgba(16, 58, 118, 0) 30%, rgba(16, 58, 118, 0.32) 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 -18px 40px rgba(12, 50, 110, 0.14);
+}
+
+/* ── Badges ───────────────────────────────────────────────────────── */
+.ribbon {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: linear-gradient(120deg, #ffe08a 0%, #ffedbd 100%);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 4px 14px rgba(12, 50, 110, 0.28);
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #4a3308;
+    white-space: nowrap;
+}
+
+.saleBadge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    max-width: calc(100% - 28px);
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(12, 44, 92, 0.62);
+    border: 1px solid rgba(255, 224, 138, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-family: var(--font-display);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #ffe08a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Two badges can collide on very narrow media — stack the sale badge
+   below the ribbon on small phones. */
+@media (max-width: 419px) {
+    .saleBadge {
+        right: auto;
+        left: 14px;
+        top: 54px;
+    }
+}
+
+/* ── Card body ────────────────────────────────────────────────────── */
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: clamp(18px, 4vw, 24px) clamp(18px, 4vw, 24px) clamp(20px, 4.5vw, 26px);
+    flex: 1;
+    min-width: 0;
+}
+
+.name {
+    margin: 0;
+    font-family: var(--font-main);
+    font-size: clamp(1.06rem, 3.2vw, 1.22rem);
+    font-weight: 600;
+    line-height: 1.45;
+    color: #ffffff;
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.3);
+    overflow-wrap: break-word;
+}
+
+.priceRow {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    min-width: 0;
+}
+
+.anchor {
+    font-family: var(--font-display);
+    font-size: clamp(0.9rem, 2.6vw, 1rem);
+    font-weight: 600;
+    text-decoration: line-through;
+    color: rgba(240, 249, 255, 0.55);
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.3);
+}
+
+.price {
+    font-family: var(--font-display);
+    font-size: clamp(1.35rem, 4.4vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #ffedbd;
+    text-shadow: 0 1px 12px rgba(12, 50, 110, 0.4);
+}
+
+/* ── CTA pill — inverts to solid white on hover like the blog's
+   active filter, giving an unmistakable "shop" affordance. ─────────── */
+.cta {
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    align-self: stretch;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.12);
+    font-family: var(--font-display);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.35);
+    transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+}
+
+.ctaArrow {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover .cta {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(255, 255, 255, 0.95);
+    color: var(--sky-ink, #123a6b);
+    text-shadow: none;
+}
+
+.card:hover .ctaArrow {
+    transform: translateX(4px);
+}
+
+/* ── Small-batch note ─────────────────────────────────────────────── */
+.note {
+    margin: clamp(28px, 6vw, 44px) auto 0;
+    max-width: 440px;
+    text-align: center;
+    font-family: var(--font-main);
+    font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+    font-weight: 500;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+    color: rgba(240, 249, 255, 0.72);
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.3);
+    overflow-wrap: break-word;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.empty {
+    padding: clamp(40px, 9vw, 72px) 20px;
+    text-align: center;
+    font-family: var(--font-main);
+    font-size: 1rem;
+    font-weight: 500;
+    color: rgba(240, 249, 255, 0.85);
+    text-shadow: 0 1px 8px rgba(12, 50, 110, 0.3);
+}
+
+.emptyGlyph {
+    display: block;
+    margin-bottom: 10px;
+    font-family: var(--font-jp);
+    font-size: 2.6rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .card,
+    .card::after,
+    .image,
+    .cta,
+    .ctaArrow {
+        transition: none;
+    }
+
+    .card:hover {
+        transform: none;
+    }
+
+    .card:hover .image {
+        transform: none;
+    }
+
+    .card::after,
+    .card:hover::after {
+        transform: none;
+        opacity: 0;
+    }
+
+    .card:hover .ctaArrow {
+        transform: none;
+    }
+}

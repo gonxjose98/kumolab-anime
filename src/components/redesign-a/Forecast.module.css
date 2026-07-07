@@ -1,0 +1,187 @@
+/* ═══ THE FORECAST — EMAIL CAPTURE ═══════════════════════════════════ */
+
+.section {
+    position: relative;
+    padding: 60px 24px 120px;
+}
+
+.glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 56% 60% at 50% 55%, rgba(245, 168, 108, 0.11) 0%, transparent 70%);
+}
+
+.cardWrap {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.card {
+    position: relative;
+    text-align: center;
+    padding: 64px 40px 52px;
+    border-radius: 28px;
+    background: linear-gradient(170deg, rgba(255, 230, 200, 0.07) 0%, rgba(168, 84, 101, 0.05) 100%);
+    border: 1px solid rgba(255, 214, 170, 0.18);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    overflow: hidden;
+}
+
+/* Soft cloud drifting along the top edge of the card */
+.cloudTop {
+    position: absolute;
+    top: -46px;
+    left: -10%;
+    width: 120%;
+    height: 90px;
+    background:
+        radial-gradient(ellipse 24% 70% at 18% 60%, rgba(255, 226, 190, 0.28) 0%, transparent 70%),
+        radial-gradient(ellipse 28% 82% at 44% 48%, rgba(255, 218, 176, 0.22) 0%, transparent 70%),
+        radial-gradient(ellipse 26% 68% at 70% 58%, rgba(255, 226, 190, 0.26) 0%, transparent 70%),
+        radial-gradient(ellipse 20% 56% at 90% 64%, rgba(255, 212, 168, 0.2) 0%, transparent 70%);
+    filter: blur(12px);
+    animation: forecastDrift 26s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes forecastDrift {
+    from { transform: translateX(-3%); }
+    to { transform: translateX(3%); }
+}
+
+.kicker {
+    font-family: var(--font-jp);
+    font-size: 0.76rem;
+    letter-spacing: 0.42em;
+    color: rgba(255, 214, 170, 0.55);
+    text-transform: uppercase;
+}
+
+.title {
+    margin: 16px 0 0;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(2rem, 5.4vw, 3.2rem);
+    font-weight: 400;
+    line-height: 1.06;
+    letter-spacing: 0.05em;
+    background: linear-gradient(180deg, #fff4e0 0%, #ffdca6 60%, #f0a06a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.sub {
+    margin: 18px auto 0;
+    max-width: 440px;
+    font-family: var(--font-main);
+    font-size: 0.98rem;
+    line-height: 1.72;
+    color: rgba(230, 216, 204, 0.66);
+}
+
+.form {
+    display: flex;
+    gap: 12px;
+    max-width: 480px;
+    margin: 32px auto 0;
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    padding: 16px 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 214, 170, 0.25);
+    background: rgba(12, 8, 22, 0.45);
+    color: #f4ead9;
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input::placeholder { color: rgba(230, 216, 204, 0.35); }
+
+.input:focus {
+    border-color: rgba(255, 214, 170, 0.55);
+    box-shadow: 0 0 0 4px rgba(245, 168, 108, 0.12);
+}
+
+.button {
+    padding: 16px 30px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffdfa8 0%, #f5a96e 55%, #e2825e 100%);
+    color: #2a1830;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 10px 34px rgba(245, 165, 105, 0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
+}
+
+.button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 44px rgba(245, 165, 105, 0.45);
+}
+
+.button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 34px auto 0;
+    max-width: 420px;
+    font-family: var(--font-main);
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #ffe6c2;
+}
+
+.successKanji {
+    font-family: var(--font-jp);
+    font-size: 2.6rem;
+    color: rgba(255, 220, 170, 0.85);
+    text-shadow: 0 0 30px rgba(255, 190, 120, 0.5);
+}
+
+.error {
+    margin: 14px 0 0;
+    font-family: var(--font-main);
+    font-size: 0.85rem;
+    color: #f0a0a0;
+}
+
+.fine {
+    margin: 22px 0 0;
+    font-family: var(--font-main);
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    color: rgba(230, 216, 204, 0.38);
+}
+
+@media (max-width: 560px) {
+    .card { padding: 52px 24px 44px; }
+
+    .form {
+        flex-direction: column;
+    }
+
+    .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cloudTop { animation: none; }
+    .button, .input { transition: none; }
+}

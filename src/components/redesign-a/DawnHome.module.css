@@ -1,0 +1,92 @@
+/* ═══ DAWN HOME — PAGE SHELL ═════════════════════════════════════════
+   Opaque wrapper: fully covers the global galaxy background so this
+   preview reads as its own world without touching global styles. */
+
+.page {
+    position: relative;
+    background: #0c0a1b;
+    overflow-x: clip;
+
+    /* Dawn palette tokens — inherited by every section via the DOM */
+    --dawn-ink: #17122a;
+    --dawn-gold: #ffd9a4;
+    --dawn-peach: #f5a96e;
+    --dawn-coral: #e2825e;
+    --dawn-rose: #a85465;
+    --dawn-cream: #fff4e0;
+    --dawn-text: #f4ead9;
+}
+
+/* Below the cloud bank: back into deep dusk, warmed by the light above */
+.below {
+    position: relative;
+    background: linear-gradient(
+        180deg,
+        #17122a 0%,
+        #1a1430 26%,
+        #1b142e 55%,
+        #150f24 82%,
+        #100b1d 100%
+    );
+    isolation: isolate;
+}
+
+.ambience {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 70% 30% at 50% 0%, rgba(245, 168, 108, 0.09) 0%, transparent 70%),
+        radial-gradient(ellipse 46% 24% at 12% 34%, rgba(168, 84, 101, 0.1) 0%, transparent 70%),
+        radial-gradient(ellipse 44% 22% at 88% 56%, rgba(203, 178, 232, 0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 26% at 50% 92%, rgba(245, 168, 108, 0.06) 0%, transparent 72%);
+}
+
+/* Slow wisps of cloud drifting through the dusk sections */
+.wispA,
+.wispB {
+    position: absolute;
+    height: 160px;
+    width: 120%;
+    left: -10%;
+    filter: blur(28px);
+    background:
+        radial-gradient(ellipse 22% 60% at 20% 55%, rgba(255, 226, 190, 0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 26% 74% at 48% 45%, rgba(214, 196, 232, 0.05) 0%, transparent 70%),
+        radial-gradient(ellipse 24% 62% at 76% 55%, rgba(255, 226, 190, 0.06) 0%, transparent 70%);
+    animation: wispDrift 60s ease-in-out infinite alternate;
+}
+
+.wispA { top: 22%; }
+
+.wispB {
+    top: 64%;
+    animation-duration: 74s;
+    animation-delay: -30s;
+}
+
+@keyframes wispDrift {
+    from { transform: translateX(-4%); }
+    to { transform: translateX(4%); }
+}
+
+/* Fine film grain over the whole preview */
+.page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wispA,
+    .wispB {
+        animation: none;
+    }
+}

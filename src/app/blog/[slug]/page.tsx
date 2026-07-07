@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getPostBySlug, getExpiredRedirect } from '@/lib/blog';
 import PostBody from './PostBody';
+import SkyContentRoot from '@/components/sky-content';
+import SkyFooter from '@/components/redesign-sky/SkyFooter';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,5 +17,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         if (redirectUrl) redirect(redirectUrl);
     }
 
-    return <PostBody slug={slug} />;
+    return (
+        <SkyContentRoot>
+            <PostBody slug={slug} />
+            <SkyFooter />
+        </SkyContentRoot>
+    );
 }

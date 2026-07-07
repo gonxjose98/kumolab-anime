@@ -1,0 +1,360 @@
+/* ─── HERO B — cinematic night-sky brand moment ─────────────────────── */
+
+.hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 24px 90px;
+    overflow: hidden;
+}
+
+/* Giant kanji watermark */
+.kanji {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -54%);
+    font-family: var(--font-jp);
+    font-weight: 700;
+    font-size: min(58vmin, 620px);
+    line-height: 1;
+    color: rgba(123, 97, 255, 0.055);
+    text-shadow: 0 0 120px rgba(123, 97, 255, 0.12);
+    user-select: none;
+    pointer-events: none;
+    animation: kanjiFloat 16s ease-in-out infinite;
+}
+
+@keyframes kanjiFloat {
+    0%, 100% { transform: translate(-50%, -54%) rotate(0deg); }
+    50% { transform: translate(-50%, -57%) rotate(1.2deg); }
+}
+
+.inner {
+    position: relative;
+    z-index: 2;
+    max-width: 920px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 22px;
+}
+
+/* Badge */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    border-radius: 100px;
+    border: 1px solid rgba(150, 170, 255, 0.18);
+    background: rgba(16, 14, 46, 0.5);
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    transform: translateY(18px);
+    transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+}
+
+.badgeDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #8fe8ff;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.9);
+    animation: badgePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(0, 212, 255, 0.9); }
+    50% { opacity: 0.4; box-shadow: 0 0 3px rgba(0, 212, 255, 0.3); }
+}
+
+.badgeText {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    color: #aebcf0;
+}
+
+/* Wordmark — letters rise out of the clouds */
+.wordmark {
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(4.2rem, 15vw, 11.5rem);
+    line-height: 0.94;
+    letter-spacing: 0.045em;
+    margin: 0;
+    display: flex;
+    filter: drop-shadow(0 8px 60px rgba(123, 97, 255, 0.35));
+}
+
+.letter {
+    display: inline-block;
+    background: linear-gradient(
+        180deg,
+        #ffffff 8%,
+        #d7e2ff 42%,
+        #a7a0ff 78%,
+        #7b61ff 105%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0;
+    transform: translateY(70px) rotate(3deg);
+    filter: blur(14px);
+    transition:
+        opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(0.3s + var(--i) * 0.07s);
+}
+
+.loaded .letter {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+    filter: blur(0);
+}
+
+/* Tagline */
+.tagline {
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 2.6vw, 1.6rem);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #e9edff;
+    text-shadow: 0 0 40px rgba(140, 160, 255, 0.35);
+    opacity: 0;
+    transform: translateY(22px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 0.85s;
+}
+
+.sub {
+    max-width: 560px;
+    font-size: clamp(0.92rem, 1.6vw, 1.05rem);
+    line-height: 1.7;
+    color: #9aa4d4;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 1s;
+}
+
+.loaded .tagline,
+.loaded .sub {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* CTAs */
+.ctas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 10px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 1.15s;
+}
+
+.loaded .ctas {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.primaryCta {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 54px;
+    padding: 0 38px;
+    border-radius: 100px;
+    background: linear-gradient(135deg, #6f5bff 0%, #8d63ff 50%, #4fb8ff 120%);
+    box-shadow:
+        0 10px 40px rgba(123, 97, 255, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+}
+
+.primaryCta:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow:
+        0 16px 55px rgba(123, 97, 255, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.ctaShine {
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(
+        105deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.35) 50%,
+        transparent 100%
+    );
+    transform: skewX(-20deg);
+    animation: ctaShineSweep 3.6s ease-in-out infinite;
+}
+
+@keyframes ctaShineSweep {
+    0%, 60% { left: -45%; }
+    100% { left: 130%; }
+}
+
+.primaryCta .ctaText {
+    position: relative;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.secondaryCta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 54px;
+    padding: 0 32px;
+    border-radius: 100px;
+    border: 1px solid rgba(150, 170, 255, 0.28);
+    background: rgba(14, 12, 40, 0.45);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.secondaryCta:hover {
+    border-color: rgba(0, 212, 255, 0.55);
+    background: rgba(0, 212, 255, 0.07);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.secondaryCta .ctaText {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #c4d0ff;
+}
+
+/* Scroll cue */
+.scrollCue {
+    position: absolute;
+    bottom: 34px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 1.4s ease 2s;
+}
+
+.scrollCue.loaded {
+    opacity: 0.55;
+}
+
+.scrollLabel {
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 0.4em;
+    color: #8b96c8;
+}
+
+.scrollLine {
+    position: relative;
+    width: 1px;
+    height: 46px;
+    background: linear-gradient(180deg, rgba(150, 170, 255, 0.5), transparent);
+    overflow: hidden;
+}
+
+.scrollDot {
+    position: absolute;
+    top: 0;
+    left: -1.5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #9fe8ff;
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.9);
+    animation: scrollFall 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes scrollFall {
+    0% { transform: translateY(-6px); opacity: 0; }
+    25% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(48px); opacity: 0; }
+}
+
+/* Hero cinematically dissolves upward as you scroll into the page */
+@supports (animation-timeline: scroll()) {
+    .inner {
+        animation: heroDissolve linear both;
+        animation-timeline: scroll(root);
+        animation-range: 0 90vh;
+    }
+    /* Full shorthand reset — replaces the time-based float so the scroll
+       timeline owns the kanji's transform without conflict. */
+    .kanji {
+        animation: kanjiDissolve linear both;
+        animation-timeline: scroll(root);
+        animation-range: 0 90vh;
+    }
+}
+
+@keyframes heroDissolve {
+    to {
+        opacity: 0;
+        transform: translateY(-70px) scale(0.96);
+        filter: blur(8px);
+    }
+}
+
+@keyframes kanjiDissolve {
+    to {
+        opacity: 0;
+        transform: translate(-50%, -80%) scale(1.15);
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .kanji,
+    .badgeDot,
+    .ctaShine,
+    .scrollDot,
+    .inner {
+        animation: none !important;
+    }
+    .badge,
+    .letter,
+    .tagline,
+    .sub,
+    .ctas,
+    .scrollCue {
+        transition: none;
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+    .letter {
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}

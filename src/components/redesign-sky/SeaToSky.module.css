@@ -1,0 +1,1140 @@
+/* ═══ SEA → SKY — THE SCROLL JOURNEY (DOLLY-IN) ══════════════════════
+   A long (420vh) journey with a sticky 100vh stage. A damped rAF loop
+   writes --p (smoothed 0→1), --e (easeInOut), --se (easeIn), --z (the
+   ZOOM: 0 until p ≈ 0.08, easing to 1 by p ≈ 0.9) and --mid (hump) on
+   .stage. The camera pushes FORWARD into the sky: every cloud layer
+   scales up around a shared transform-origin at the dive point
+   (50%, 38vh), so peripheral clouds grow and sweep radially past the
+   frame edges — you fly THROUGH them. The sea recedes by scaling down,
+   tilting away and fading beneath the camera. Only slight translateY
+   remnants remain for pan flavor; SCALE carries the journey. The
+   sun/moon stay ANCHORED (see .orrery). Time-of-day cross-fade is
+   driven by --t (0 day → 1 night) from SkyThemeRoot.
+   Transform / opacity / filter / scale only. */
+
+.journey {
+    position: relative;
+    /* Scroll length of the whole dolly. Shorter = the animation advances
+       faster per pixel scrolled (feels more 1:1) and the 35% auto-trigger is
+       reached in ~1 gesture instead of ~3. */
+    height: 260vh;
+    background: #4fa4f0; /* matches the p=1 sky for a seamless handoff */
+    transition: background 2.1s ease;
+}
+
+.journey[data-sky='night'],
+:global([data-sky='night']) .journey {
+    background: #101a3f;
+}
+
+.stage {
+    --p: 0;
+    --e: 0;
+    --se: 0;
+    --z: 0;
+    --mid: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
+    isolation: isolate;
+    /* perspective sells the dolly-in (sea tilts away, clouds sweep past) */
+    perspective: 1600px;
+    perspective-origin: 50% 42%;
+    /* Intro "camera pull-back": on load/refresh the whole scene starts a
+       touch zoomed-in and eases out to the resting view in ~1s. NO
+       animation-fill, so once it finishes the stage carries no transform
+       and the sticky scroll behaves exactly as before. The hero text keeps
+       its own fade-in (see .content .loaded). */
+    animation: stageIntro 1.05s cubic-bezier(0.2, 0.9, 0.25, 1);
+    transform-origin: 50% 46%;
+}
+
+@keyframes stageIntro {
+    from { transform: scale(1.12); }
+    to { transform: scale(1); }
+}
+
+/* ── SKY PANORAMA — enlarges to fill the frame as the camera pushes in.
+      The gradient also drifts toward its zenith blues (altitude), but
+      the scale is what reads: the sky swallowing the viewport. ──────── */
+.skyWorld {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -150vh;
+    height: 250vh;
+    z-index: 1;
+    transform-origin: 50% 0;
+    transform: translate3d(0, calc(var(--e) * 90vh), 0) scale(calc(1 + var(--z) * 0.5));
+    will-change: transform;
+    background: linear-gradient(
+        180deg,
+        #2472dc 0%,
+        #2e84e7 16%,
+        #429aee 32%,
+        #58acf2 46%,
+        #79c2f6 60%,
+        #9bd4f9 72%,
+        #bce6fc 82%,
+        #dcf3fe 91%,
+        #f2fbff 100%
+    );
+}
+
+/* Warm dusk gradient — peaks mid-transition (sunset / dawn) */
+.skyDusk {
+    position: absolute;
+    inset: 0;
+    opacity: calc(var(--t, 0) * (1 - var(--t, 0)) * 4);
+    background: linear-gradient(
+        180deg,
+        #241a4e 0%,
+        #40275f 20%,
+        #6d3a68 38%,
+        #a04d67 52%,
+        #d16f57 66%,
+        #ef9d5a 78%,
+        #ffc784 89%,
+        #ffe7bd 100%
+    );
+}
+
+/* Deep night gradient — ramps in toward the end of the transition */
+.skyNight {
+    position: absolute;
+    inset: 0;
+    opacity: calc(var(--t, 0) * var(--t, 0));
+    background: linear-gradient(
+        180deg,
+        #070b22 0%,
+        #0b1230 18%,
+        #111a44 34%,
+        #182459 48%,
+        #22306e 62%,
+        #33417f 74%,
+        #4a5892 84%,
+        #6a76a8 93%,
+        #8f98bd 100%
+    );
+}
+
+/* Star field — fades in with --t */
+.starField {
+    position: absolute;
+    inset: 0 0 40% 0;
+    opacity: calc(var(--t, 0) * 0.85);
+    background-image:
+        radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.9) 50%, transparent),
+        radial-gradient(1px 1px at 28% 32%, rgba(255, 255, 255, 0.7) 50%, transparent),
+        radial-gradient(1px 1px at 44% 12%, rgba(255, 255, 255, 0.8) 50%, transparent),
+        radial-gradient(1px 1px at 62% 26%, rgba(255, 255, 255, 0.6) 50%, transparent),
+        radial-gradient(1px 1px at 78% 16%, rgba(255, 255, 255, 0.85) 50%, transparent),
+        radial-gradient(1px 1px at 88% 30%, rgba(255, 255, 255, 0.7) 50%, transparent),
+        radial-gradient(1px 1px at 20% 8%, rgba(255, 255, 255, 0.6) 50%, transparent),
+        radial-gradient(1px 1px at 54% 36%, rgba(255, 255, 255, 0.75) 50%, transparent),
+        radial-gradient(1px 1px at 70% 6%, rgba(255, 255, 255, 0.65) 50%, transparent),
+        radial-gradient(1px 1px at 36% 40%, rgba(255, 255, 255, 0.7) 50%, transparent);
+}
+
+.stars {
+    position: absolute;
+    inset: 0;
+    opacity: var(--t, 0);
+}
+
+.star {
+    position: absolute;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 6px 1px rgba(210, 226, 255, 0.9);
+    opacity: 0;
+    animation: starTwinkle var(--du, 3.4s) ease-in-out var(--de, 0s) infinite;
+}
+
+@keyframes starTwinkle {
+    0%, 100% { opacity: 0; transform: scale(0.6); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+/* ── BIRDS — a small flock gliding slowly across the upper sky.
+      All flights share one seamless crossing loop (both endpoints are
+      off-screen) at staggered phases/heights; the whole layer fades as
+      the zoom dive begins and dims to a faint hint at night. ────────── */
+.birdLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    opacity: calc((1 - var(--z) * 1.7) * (1 - var(--t, 0) * 0.72));
+}
+
+.flightA,
+.flightB,
+.flightC {
+    position: absolute;
+    left: 30%;
+    animation: flockCross 52s linear infinite;
+    will-change: transform;
+}
+
+.flightA {
+    top: 15vh;
+    width: 8vw;
+    min-width: 84px;
+}
+
+.flightB {
+    top: 22vh;
+    width: 5.5vw;
+    min-width: 60px;
+    opacity: 0.72;
+    animation-duration: 67s;
+    animation-delay: -24s;
+}
+
+.flightC {
+    top: 8vh;
+    width: 4.5vw;
+    min-width: 48px;
+    opacity: 0.55;
+    animation-duration: 80s;
+    animation-delay: -49s;
+}
+
+.birdSvg {
+    display: block;
+    width: 100%;
+}
+
+/* glide left→right with a gentle soaring undulation; -56vw and +80vw
+   are both past the frame edges → the loop wrap is invisible */
+@keyframes flockCross {
+    0% { transform: translate3d(-56vw, 1.6vh, 0); }
+    25% { transform: translate3d(-22vw, -1.4vh, 0); }
+    50% { transform: translate3d(12vw, 0.9vh, 0); }
+    75% { transform: translate3d(46vw, -1.7vh, 0); }
+    100% { transform: translate3d(80vw, 1.6vh, 0); }
+}
+
+/* ── FAR PUFFS — barely swell, drift softly outward (deep distance) ── */
+.layerFar {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    transform-origin: 50% 38%;
+    transform: translate3d(0, calc(var(--z) * 4vh), 0) scale(calc(1 + var(--z) * 0.7));
+    will-change: transform;
+    opacity: calc(1 - var(--z) * 0.45);
+}
+
+.cloudFar {
+    position: absolute;
+    max-width: 200px;
+    opacity: 0.92;
+    /* brightness/saturate tween with --t → moonlit at night */
+    filter: brightness(calc(1 - var(--t, 0) * 0.42)) saturate(calc(1 - var(--t, 0) * 0.4))
+        drop-shadow(0 4px 14px rgba(30, 90, 160, 0.12));
+    /* gentle wind: a visible horizontal breath so the horizon puffs aren't
+       dead-static (desynced per cloud below) */
+    animation: cloudSway 20s ease-in-out infinite alternate;
+}
+
+.cloudFar:nth-child(2) { animation-duration: 24s; animation-delay: -9s; }
+.cloudFar:nth-child(3) { animation-duration: 22s; animation-delay: -14s; }
+.cloudFar:nth-child(4) { animation-duration: 26s; animation-delay: -19s; }
+
+/* ── ANCHORED LIGHT SOURCE — celestial orrery ──────────────────────── */
+.lightStage {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* pivot below the horizon; the wheel spins the sun/moon on an arc */
+.orrery {
+    --R: 118vh;
+    position: absolute;
+    left: 50%;
+    top: 118vh;
+    width: 0;
+    height: 0;
+}
+
+.wheel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    /* day = +20°  (sun up-right, moon below-left)
+       night = +160° (sun set down-right, moon risen up-left) */
+    transform: rotate(calc(20deg + var(--t, 0) * 140deg));
+}
+
+.sunHolder,
+.moonHolder {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 15vmin;
+    height: 15vmin;
+}
+
+.sunHolder {
+    transform: translate(-50%, -50%) translateY(calc(-1 * var(--R)));
+    opacity: calc(1 - var(--t, 0));
+}
+
+.moonHolder {
+    transform: translate(-50%, -50%) translateY(var(--R));
+    opacity: var(--t, 0);
+}
+
+/* Sun */
+.sunCore {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fffdf4 0%, #fff4cb 54%, #ffe199 100%);
+    box-shadow:
+        0 0 34px 10px rgba(255, 244, 200, 0.85),
+        0 0 120px 60px rgba(255, 232, 170, 0.4);
+}
+
+.sunGlow {
+    position: absolute;
+    inset: -120%;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(255, 242, 194, 0.6) 0%,
+        rgba(255, 222, 150, 0.28) 34%,
+        transparent 66%
+    );
+    opacity: calc(0.5 + var(--mid) * 0.5);
+    transform: scale(calc(1 + var(--mid) * 0.35));
+}
+
+/* God-rays — bloom hard when enveloped in cloud (mid-climb) */
+.godrays {
+    position: absolute;
+    inset: -260%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(255, 244, 200, 0) 0deg,
+        rgba(255, 244, 200, 0.5) 3deg,
+        rgba(255, 244, 200, 0) 8deg
+    );
+    -webkit-mask: radial-gradient(circle, #000 6%, transparent 60%);
+    mask: radial-gradient(circle, #000 6%, transparent 60%);
+    opacity: calc(0.06 + var(--mid) * 0.6);
+    animation: raySpin 64s linear infinite;
+}
+
+@keyframes raySpin {
+    to { transform: rotate(360deg); }
+}
+
+.sunRing {
+    position: absolute;
+    inset: -24%;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 252, 235, 0.5);
+    animation: sunRing 5s ease-in-out infinite;
+}
+
+@keyframes sunRing {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.18; }
+}
+
+/* Moon */
+.moonDisc {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 26px rgba(190, 214, 255, 0.7));
+}
+
+.moonGlow {
+    position: absolute;
+    inset: -120%;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(198, 218, 255, 0.5) 0%,
+        rgba(150, 182, 240, 0.22) 36%,
+        transparent 66%
+    );
+    opacity: calc(0.45 + var(--mid) * 0.5);
+    transform: scale(calc(1 + var(--mid) * 0.32));
+}
+
+.moonRays {
+    position: absolute;
+    inset: -240%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(206, 224, 255, 0) 0deg,
+        rgba(206, 224, 255, 0.42) 3deg,
+        rgba(206, 224, 255, 0) 8deg
+    );
+    -webkit-mask: radial-gradient(circle, #000 6%, transparent 58%);
+    mask: radial-gradient(circle, #000 6%, transparent 58%);
+    opacity: calc(0.04 + var(--mid) * 0.42);
+    animation: raySpin 80s linear infinite;
+}
+
+/* ── THE SEA (foreground) — recedes BENEATH the camera: it scales
+      down, tilts away under perspective and fades out, with only a
+      small residual downward drift. Wider than the viewport (±18vw
+      bleed) so the shrink doesn't expose side seams early. ──────────── */
+.sea {
+    position: absolute;
+    left: -18vw;
+    right: -18vw;
+    top: 55vh;
+    height: 130vh;
+    z-index: 3;
+    transform-origin: 50% 88%;
+    transform: translate3d(0, calc(var(--se) * 22vh), 0) rotateX(calc(var(--se) * 42deg))
+        scale(calc(1 - var(--se) * 0.42));
+    opacity: calc(1 - var(--se) * 1.15);
+    will-change: transform, opacity;
+    background: transparent;
+    /* moonlit ocean — brightness/saturate tween with --t */
+    filter: brightness(calc(1 - var(--t, 0) * 0.5)) saturate(calc(1 - var(--t, 0) * 0.14));
+}
+
+.seaBody {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 11vh;
+    bottom: 0;
+    z-index: 0;
+    background: linear-gradient(180deg, #2f9fe2 0%, #0f7ac6 22%, #0a5aa2 55%, #08467f 100%);
+}
+
+/* undulating horizon crest — sky shows through the scallops above it */
+.horizonCrest {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 15vh;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.crestSvg {
+    display: block;
+    width: 100%;
+    /* same anti-squish min-width as the wave bands (see .waveSvg) */
+    min-width: 1600px;
+    height: 100%;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    /* lateral roll + rise/fall come from the SMIL path morph in art.tsx */
+}
+
+.horizonHaze {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4vh;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(235, 250, 255, 0.4) 0%, rgba(235, 250, 255, 0) 100%);
+    pointer-events: none;
+}
+
+.waveLayer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    overflow: hidden;
+    /* gentle vertical undulation — the swell breathing under the bands */
+    animation: waveSurge ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+.waveSvg {
+    display: block;
+    width: 100%;
+    /* Keep crests GENTLE on narrow screens. The band's viewBox is 3000 wide
+       with preserveAspectRatio:none, so at width:100% a phone squishes the
+       whole wave pattern into ~390px and the crests turn sharp/aggressive.
+       Holding a min-width means a phone simply shows ~one calm wave at the
+       same slope as desktop (centered, the overflow is clipped). */
+    min-width: 1600px;
+    height: 100%;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+@keyframes waveSurge {
+    from { transform: translate3d(0, -0.5vh, 0); }
+    to { transform: translate3d(0, 0.6vh, 0); }
+}
+
+.wave2 { top: 6vh; height: 28vh; z-index: 3; animation-duration: 7.5s; }
+.wave3 { top: 14vh; height: 38vh; z-index: 4; animation-duration: 6.2s; animation-delay: -2.4s; }
+.wave4 { top: 26vh; height: 104vh; z-index: 5; animation-duration: 5.1s; animation-delay: -4.1s; }
+
+/* moonlight glitter path — a broken shimmer column under the risen
+   moon, night only (opacity rides --t) */
+.moonGlitter {
+    position: absolute;
+    top: 2vh;
+    height: 42vh;
+    left: 30%;
+    width: 11vw;
+    z-index: 6;
+    pointer-events: none;
+    transform: skewX(-4deg);
+    opacity: calc(var(--t, 0) * 0.5);
+    background: linear-gradient(
+        180deg,
+        rgba(220, 236, 255, 0.55) 0%,
+        rgba(190, 214, 255, 0.22) 46%,
+        rgba(170, 200, 255, 0.06) 78%,
+        transparent 100%
+    );
+    -webkit-mask: repeating-linear-gradient(180deg, #000 0 5px, transparent 5px 13px);
+    mask: repeating-linear-gradient(180deg, #000 0 5px, transparent 5px 13px);
+    animation: glitterSway 7s ease-in-out infinite alternate;
+}
+
+@keyframes glitterSway {
+    from { transform: skewX(-4deg) translate3d(-0.5vw, 0, 0); }
+    to { transform: skewX(-4deg) translate3d(0.5vw, 0, 0); }
+}
+
+.glints {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+}
+
+/* cel specular sheen — slim rounded bars that swell and fade */
+.shimmer {
+    position: absolute;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.85) 22%,
+        rgba(232, 248, 255, 0.95) 50%,
+        rgba(255, 255, 255, 0.85) 78%,
+        transparent 100%
+    );
+    opacity: 0;
+    transform: scaleX(0.2);
+    animation: shimmerSwell var(--du, 5s) ease-in-out var(--de, 0s) infinite;
+}
+
+@keyframes shimmerSwell {
+    0%, 100% { opacity: 0; transform: scaleX(0.2); }
+    40% { opacity: 0.5; transform: scaleX(1); }
+    62% { opacity: 0.3; transform: scaleX(0.75); }
+}
+
+.glint {
+    position: absolute;
+    background: #ffffff;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    opacity: 0;
+    animation: glintPop var(--du, 2.6s) ease-in-out var(--de, 0s) infinite;
+}
+
+@keyframes glintPop {
+    0%, 100% { opacity: 0; transform: scale(0.25); }
+    45% { opacity: 0.95; transform: scale(1.15); }
+    60% { opacity: 0.7; transform: scale(0.9); }
+}
+
+.island {
+    position: absolute;
+    top: 10.4vh;
+    left: 20%;
+    width: 15vw;
+    min-width: 130px;
+    z-index: 4;
+    opacity: 0.9;
+}
+
+/* the drift carriage — sails the boat across the whole seascape;
+   both keyframe endpoints are past the frame edges so the loop wrap
+   is invisible (seamless). Base position = the reduced-motion pose. */
+.boatDrift {
+    position: absolute;
+    top: 14vh;
+    left: 62%;
+    width: 4.2vw;
+    min-width: 46px;
+    z-index: 5;
+    animation: boatDrift 96s linear infinite;
+    will-change: transform;
+}
+
+.boatBob {
+    animation: boatBob 5.5s ease-in-out infinite;
+    transform-origin: 50% 100%;
+}
+
+.boat {
+    display: block;
+    width: 100%;
+}
+
+@keyframes boatDrift {
+    from { transform: translate3d(-80vw, 0, 0); }
+    to { transform: translate3d(42vw, 0, 0); }
+}
+
+@keyframes boatBob {
+    0%, 100% { transform: translateY(0) rotate(-1.6deg); }
+    50% { transform: translateY(0.5vh) rotate(1.6deg); }
+}
+
+/* ── MID CUMULUS — swells around the dive point, slides outward ────── */
+.layerMid {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    transform-origin: 50% 38%;
+    transform: translate3d(0, calc(var(--z) * 6vh), 0) scale(calc(1 + var(--z) * 2.1));
+    will-change: transform;
+}
+
+/* ── BIG FOREGROUND CUMULUS — the "through the clouds" beat: scales
+      ×4.4 around the dive point so each corner cloud balloons and
+      sweeps past its nearest frame edge, tilting slightly toward
+      the lens under perspective ─────────────────────────────────────── */
+.layerNear {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    transform-origin: 50% 38%;
+    transform: translate3d(0, calc(var(--z) * 9vh), 0) rotateX(calc(var(--z) * -6deg))
+        scale(calc(1 + var(--z) * 3.4));
+    will-change: transform;
+}
+
+.cloudDriftM,
+.cloudDriftN {
+    position: absolute;
+    animation: cloudSway ease-in-out infinite alternate;
+}
+
+.cloudDriftN {
+    filter: brightness(calc(1 - var(--t, 0) * 0.42)) saturate(calc(1 - var(--t, 0) * 0.4))
+        drop-shadow(0 18px 30px rgba(20, 70, 140, 0.18));
+}
+
+.cloudSvg {
+    display: block;
+    width: 100%;
+    filter: brightness(calc(1 - var(--t, 0) * 0.42)) saturate(calc(1 - var(--t, 0) * 0.4));
+}
+
+@keyframes cloudSway {
+    from { transform: translate3d(-7%, 1.3%, 0); }
+    to { transform: translate3d(7%, -1.3%, 0); }
+}
+
+/* ── WISP STREAKS — fastest layer, they whip past the lens ─────────── */
+.layerWisp {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    transform-origin: 50% 38%;
+    transform: translate3d(0, calc(var(--z) * 10vh), 0) scale(calc(1 + var(--z) * 4.6));
+    will-change: transform;
+    pointer-events: none;
+}
+
+.wisp {
+    position: absolute;
+    /* quiet accents at rest, streaking brighter as they rush the camera;
+       --wop (per-wisp, set inline) scales the whole curve — the low
+       sea-mist wisp uses it to read as faint evaporation off the water */
+    opacity: calc(var(--wop, 1) * (0.5 + var(--z) * 0.4));
+    filter: brightness(calc(1 - var(--t, 0) * 0.42)) saturate(calc(1 - var(--t, 0) * 0.4));
+}
+
+/* ── LIGHT MOTES ───────────────────────────────────────────────────── */
+.motes {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    pointer-events: none;
+}
+
+.mote {
+    position: absolute;
+    bottom: 8%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.7);
+    opacity: 0;
+    animation: moteRise linear infinite;
+}
+
+@keyframes moteRise {
+    0% { transform: translateY(0); opacity: 0; }
+    12% { opacity: 0.8; }
+    70% { opacity: 0.35; }
+    100% { transform: translateY(-58vh); opacity: 0; }
+}
+
+/* ── HERO CONTENT — the camera pushes PAST it: it swells slightly and
+      dissolves as the dolly begins (plus a whisper of upward pan) ───── */
+.content {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    padding: 120px 24px 130px;
+    text-align: center;
+    transform: translate3d(0, calc(var(--e) * -8vh), 0) scale(calc(1 + var(--e) * 0.6));
+    opacity: calc(1 - var(--p) * 3.2);
+    will-change: transform, opacity;
+}
+
+/* soft legibility scrim behind the hero copy — a faint deepening of the
+   sky (never a box) so white text reads over bright clouds in day and
+   stays anchored at night (--t deepens it) */
+.content::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(940px, 98vw);
+    height: 76vh;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+        closest-side,
+        rgba(14, 54, 118, calc(0.26 + var(--t, 0) * 0.2)) 0%,
+        rgba(14, 54, 118, calc(0.12 + var(--t, 0) * 0.1)) 58%,
+        transparent 100%
+    );
+}
+
+.stage[data-past='1'] .content {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transform: translateY(16px);
+    transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+}
+
+.badgeDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffe08a;
+    box-shadow: 0 0 10px rgba(255, 220, 130, 0.95);
+    animation: badgePulse 3s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.badgeText {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #ffffff;
+    text-shadow: 0 1px 10px rgba(12, 60, 120, 0.4);
+}
+
+.wordmark {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(3.4rem, 14vw, 11.5rem);
+    font-weight: 400;
+    line-height: 0.92;
+    letter-spacing: 0.06em;
+}
+
+.letter {
+    display: inline-block;
+    background: linear-gradient(180deg, #ffffff 0%, #f2faff 52%, #cbe7ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 8px 30px rgba(8, 52, 108, 0.5));
+    opacity: 0;
+    transform: translateY(46px);
+    transition:
+        opacity 1s cubic-bezier(0.22, 1, 0.36, 1) calc(0.3s + var(--i) * 0.07s),
+        transform 1.1s cubic-bezier(0.22, 1, 0.36, 1) calc(0.3s + var(--i) * 0.07s);
+}
+
+.loaded .letter {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tagline {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.3rem, 3.2vw, 1.9rem);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #ffffff;
+    text-shadow: 0 2px 18px rgba(10, 60, 120, 0.55);
+    opacity: 0;
+    transform: translateY(22px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 0.85s;
+}
+
+.sub {
+    margin: 0;
+    max-width: 560px;
+    font-family: var(--font-main);
+    font-size: clamp(0.98rem, 2vw, 1.12rem);
+    font-weight: 500;
+    line-height: 1.75;
+    color: #f4fbff;
+    text-shadow: 0 1px 12px rgba(10, 60, 120, 0.5);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 1s;
+}
+
+.ctas {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 14px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 1.15s;
+}
+
+.loaded .badge,
+.loaded .tagline,
+.loaded .sub,
+.loaded .ctas {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.primaryCta {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 17px 44px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffe397 0%, #ffbe55 55%, #ff9f3e 100%);
+    color: #3a2708;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    overflow: hidden;
+    box-shadow:
+        0 10px 36px rgba(20, 80, 150, 0.35),
+        0 4px 18px rgba(255, 170, 60, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.primaryCta:hover {
+    transform: translateY(-3px);
+    box-shadow:
+        0 16px 48px rgba(20, 80, 150, 0.45),
+        0 6px 26px rgba(255, 170, 60, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.ctaShine {
+    position: absolute;
+    top: 0;
+    left: -70%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    transform: skewX(-18deg);
+    transition: left 0.6s ease;
+    pointer-events: none;
+}
+
+.primaryCta:hover .ctaShine { left: 130%; }
+
+.secondaryCta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 36px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1.5px solid rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #ffffff;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 8px rgba(12, 60, 120, 0.35);
+    transition: all 0.35s ease;
+}
+
+.secondaryCta:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.85);
+    transform: translateY(-3px);
+}
+
+.ctaText { position: relative; z-index: 1; }
+
+.scrollCue {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 44px;
+    opacity: 0;
+    transition: opacity 1.6s ease 1.9s;
+}
+
+.loaded .scrollCue { opacity: 0.9; }
+
+.scrollLabel {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: #ffffff;
+    text-shadow: 0 1px 8px rgba(12, 60, 120, 0.4);
+}
+
+.scrollLine {
+    width: 2px;
+    height: 44px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), transparent);
+    overflow: hidden;
+    position: relative;
+    border-radius: 2px;
+}
+
+.scrollLine::after {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: 0;
+    width: 100%;
+    height: 40%;
+    background: #ffe9ad;
+    animation: scrollDrip 2.4s ease-in-out infinite;
+}
+
+@keyframes scrollDrip {
+    0% { top: -40%; }
+    100% { top: 110%; }
+}
+
+/* ── PAYOFF — the clear brilliant blue ──────────────────────────────
+   No longer a resting full-screen frame: it BLOOMS in at the end of the
+   dive (--in, p .74→.88), holds a beat, then RISES + SHRINKS + fades
+   (--out, p .90→1) as its docked twin — the [data-sky-landing] header in
+   SkyHome — glides up from below to take its place at the top of the
+   viewport. The scroll assist carries the user straight through this
+   handoff, so there is never a dead centered-text screen at rest. */
+.payoff {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    pointer-events: none;
+    --in: clamp(0, (var(--p) - 0.74) * 7.2, 1);
+    --out: clamp(0, (var(--p) - 0.9) * 10, 1);
+    opacity: calc(var(--in) * (1 - var(--out)));
+    /* arrives by ZOOM (scales up into place as the dive completes), then
+       departs upward, condensing toward the docked landing header */
+    transform: translate3d(0, calc((1 - var(--e)) * 8vh - var(--out) * 30vh), 0)
+        scale(calc(0.86 + var(--e) * 0.14 - var(--out) * 0.34));
+    will-change: transform, opacity;
+}
+
+.payoffKanji {
+    font-family: var(--font-jp);
+    font-weight: 700;
+    font-size: clamp(2.6rem, 7vw, 4.6rem);
+    letter-spacing: 0.22em;
+    color: #ffffff;
+    text-shadow: 0 4px 40px rgba(255, 255, 255, 0.55), 0 2px 16px rgba(20, 80, 160, 0.35);
+}
+
+.payoffLine {
+    font-family: var(--font-display);
+    font-size: clamp(0.85rem, 1.8vw, 1.05rem);
+    font-weight: 700;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 12px rgba(20, 80, 160, 0.4);
+}
+
+/* ══ NIGHT — discrete bits not covered by the --t tween ══════════════ */
+:global([data-sky='night']) .badgeDot {
+    background: #cfe0ff;
+    box-shadow: 0 0 10px rgba(200, 220, 255, 0.95);
+}
+
+:global([data-sky='night']) .glint {
+    background: #dbe8ff;
+}
+
+:global([data-sky='night']) .shimmer {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(214, 232, 255, 0.8) 22%,
+        rgba(196, 220, 255, 0.9) 50%,
+        rgba(214, 232, 255, 0.8) 78%,
+        transparent 100%
+    );
+}
+
+/* ── MOBILE ────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .content { padding: 100px 20px 110px; }
+
+    .primaryCta,
+    .secondaryCta {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .orrery { --R: 128vh; }
+    .sunHolder,
+    .moonHolder { width: 22vmin; height: 22vmin; }
+    .island { left: 14%; }
+    .boatDrift { left: 66%; }
+}
+
+/* ── REDUCED MOTION — a gorgeous static sea-and-sky key visual ─────── */
+@media (prefers-reduced-motion: reduce) {
+    .journey { height: 100vh; height: 100svh; }
+
+    .stage {
+        position: relative;
+        --p: 0 !important;
+        --e: 0 !important;
+        --se: 0 !important;
+        --z: 0 !important;
+        --mid: 0 !important;
+        perspective: none;
+        animation: none; /* no intro pull-back under reduced motion */
+    }
+
+    .skyWorld,
+    .layerFar,
+    .lightStage,
+    .sea,
+    .layerMid,
+    .layerNear,
+    .layerWisp,
+    .content,
+    .payoff {
+        transform: none;
+    }
+
+    .layerMid,
+    .layerNear,
+    .layerWisp,
+    .payoff,
+    .motes {
+        display: none;
+    }
+
+    .waveSvg,
+    .crestSvg,
+    .waveLayer,
+    .boatDrift,
+    .boatBob,
+    .glint,
+    .shimmer,
+    .moonGlitter,
+    .mote,
+    .badgeDot,
+    .sunRing,
+    .godrays,
+    .moonRays,
+    .star,
+    .flightA,
+    .flightB,
+    .flightC,
+    .cloudDriftM,
+    .cloudDriftN,
+    .scrollLine::after {
+        animation: none !important;
+    }
+
+    .glint { opacity: 0.75; transform: scale(0.9); }
+    .shimmer { opacity: 0.35; transform: scaleX(0.8); }
+    .star { opacity: 0.9; transform: scale(1); }
+
+    .badge,
+    .letter,
+    .tagline,
+    .sub,
+    .ctas,
+    .scrollCue,
+    .content {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+        visibility: visible !important;
+    }
+}

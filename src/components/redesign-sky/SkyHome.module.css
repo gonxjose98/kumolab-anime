@@ -1,0 +1,600 @@
+/* ═══ SKY HOME — PAGE SHELL ══════════════════════════════════════════
+   Opaque wrapper: fully covers the global galaxy background so this
+   preview reads as its own bright world without touching global styles. */
+
+.page {
+    position: relative;
+    background: #4fa4f0;
+    overflow-x: clip;
+    transition: background 2.1s ease-in-out;
+
+    /* Bright sky palette tokens — inherited by every section via the DOM */
+    --sky-zenith: #2472dc;
+    --sky-bright: #4ba1ef;
+    --sky-deep: #123a80;
+    --sky-gold: #ffd76e;
+    --sky-gold-deep: #ff9f3e;
+    --sky-cream: #fff3d2;
+    --sky-text: #f2f9ff;
+    --sky-ink: #123a6b;
+}
+
+.page[data-sky='night'] {
+    background: #101a3f;
+}
+
+/* High above the clouds: serene, richer blue for content contrast.
+   The top color continues the journey's final frame seamlessly.
+   SPLIT for the ambient weather layer: the sky gradient lives on
+   .aloftBg (z-0) and the sections on .aloftContent (z-2) so the fixed
+   weather overlay (z-1) slides between them — precipitation and the
+   overcast veil land on the sky, never on the content. */
+.aloft {
+    position: relative;
+    /* Rise over the journey's final frame: as the payoff finishes its
+       bloom (p ≈ .89) the landing is already cresting the bottom edge, so
+       the auto-glide flows straight from "payoff lifts away" into "docked
+       header + stats arrive" with no dead full-screen beat between them.
+       (Reset under reduced motion, where the journey is a static 100vh.) */
+    margin-top: -18vh;
+}
+
+.aloftBg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    /* Feather the slab's top edge so it has no seam while it glides up
+       over the stage's final sky (and, at rest, over the journey's
+       matching background) — the overlap reads as one continuous sky. */
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16vh);
+    mask-image: linear-gradient(180deg, transparent 0, #000 16vh);
+    background: linear-gradient(
+        180deg,
+        #4fa4f0 0%,
+        #3a8ce4 14%,
+        #2e78d2 32%,
+        #2765bd 52%,
+        #1f53a6 72%,
+        #18448f 88%,
+        #123a80 100%
+    );
+    transition: background 2.1s ease-in-out;
+}
+
+/* Night: cool, deep moonlit navy for the high-altitude content sections.
+   (Gradients can't tween; the sections sit below the fold during a toggle,
+   and the page background-color under them cross-fades over 2.1s.) */
+.page[data-sky='night'] .aloftBg {
+    background: linear-gradient(
+        180deg,
+        #101a3f 0%,
+        #0e1636 16%,
+        #0c1330 36%,
+        #0a1029 56%,
+        #090e23 76%,
+        #070b1c 100%
+    );
+}
+
+/* Own stacking context (z-2): keeps the ambience clouds' z:-1 inside the
+   content world (same role isolation:isolate played before the split). */
+.aloftContent {
+    position: relative;
+    z-index: 2;
+}
+
+/* ── THE LANDING — docked payoff header + reach stats ────────────────
+   Carries [data-sky-landing]: the scroll assist ends the ride with this
+   section's top at the top of the viewport. Top padding clears the fixed
+   nav so the docked title is never hidden beneath it. */
+.landing {
+    position: relative;
+    padding-top: calc(var(--header-height, 64px) + 18px);
+}
+
+.landingHead {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 0 24px;
+    text-align: center;
+}
+
+.landingKanji {
+    margin: 0;
+    font-family: var(--font-jp);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 3.6vw, 1.95rem);
+    letter-spacing: 0.24em;
+    color: #ffffff;
+    text-shadow: 0 2px 24px rgba(255, 255, 255, 0.45), 0 1px 10px rgba(20, 80, 160, 0.3);
+}
+
+.landingTitle {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(0.7rem, 1.6vw, 0.84rem);
+    font-weight: 700;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.88);
+    text-shadow: 0 1px 12px rgba(20, 80, 160, 0.4);
+}
+
+/* Progressive enhancement: as the landing glides up to dock, the header
+   condenses from payoff-scale toward its compact resting size — the
+   felt "shrink to the top" the departing payoff hands off to. Ends at
+   scale(1) right as the section docks; stays put on further scroll. */
+@supports (animation-timeline: view()) {
+    .landingHead {
+        transform-origin: 50% 0;
+        animation: landingDock cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation-timeline: view();
+        animation-range: entry 0% cover 88%;
+    }
+}
+
+@keyframes landingDock {
+    from { transform: scale(1.55); }
+    to { transform: scale(1); }
+}
+
+/* Cel clouds drifting between sections read cooler / dimmer at night —
+   tied to --t so they cross-fade in step with the sky. */
+.driftCloud {
+    filter: brightness(calc(1 - var(--t, 0) * 0.4)) saturate(calc(1 - var(--t, 0) * 0.42));
+}
+
+/* Soft cel clouds drifting between the sections */
+.ambience {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.driftCloud {
+    position: absolute;
+    opacity: 0.5;
+    animation: aloftDrift ease-in-out infinite alternate;
+}
+
+.driftA {
+    top: 4%;
+    left: -6%;
+    width: 34vw;
+    min-width: 300px;
+    animation-duration: 26s;
+}
+
+.driftB {
+    top: 21%;
+    right: -5%;
+    width: 22vw;
+    min-width: 210px;
+    opacity: 0.42;
+    animation-duration: 32s;
+    animation-delay: -11s;
+}
+
+.driftC {
+    top: 43%;
+    left: -8%;
+    width: 30vw;
+    min-width: 270px;
+    opacity: 0.34;
+    animation-duration: 29s;
+    animation-delay: -18s;
+}
+
+.driftD {
+    top: 62%;
+    right: -4%;
+    width: 18vw;
+    min-width: 180px;
+    opacity: 0.3;
+    animation-duration: 34s;
+    animation-delay: -7s;
+}
+
+.driftE {
+    top: 84%;
+    left: 4%;
+    width: 16vw;
+    min-width: 160px;
+    opacity: 0.22;
+    animation-duration: 30s;
+    animation-delay: -22s;
+}
+
+@keyframes aloftDrift {
+    from { transform: translate3d(-8%, 1.4%, 0); }
+    to { transform: translate3d(9%, -1.4%, 0); }
+}
+
+/* Fine film grain over the whole preview — keeps it premium, not flat */
+.page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .driftCloud {
+        animation: none;
+    }
+
+    /* the journey is a static 100vh key visual — no payoff handoff to
+       overlap, so the aloft sits flush beneath it and the docked header
+       renders at its resting size immediately */
+    .aloft {
+        margin-top: 0;
+    }
+
+    .landingHead {
+        animation: none;
+        transform: none;
+    }
+}
+
+/* ═══ ROUTE-SCOPED NAV SKIN ══════════════════════════════════════════
+   The global fixed nav ships galaxy-dark styling that clashes with this
+   sky. While /redesign-sky is mounted, SkyThemeRoot stamps
+   `data-sky-nav="day|night"` plus a `data-sky-scrolled` mirror of the
+   nav's own show-on-scroll condition onto the <nav> at runtime (both
+   removed on unmount), and these :global() rules key EXCLUSIVELY off
+   those attributes — no other route is ever affected, and no shared
+   file is edited. Inner pieces are matched via stable structural/ARIA
+   hooks (aria-label, aria-expanded, element structure), NEVER hashed
+   CSS-module class names, so the skin survives both Turbopack dev and
+   webpack prod naming. Hide-at-top / show-on-scroll behavior is kept;
+   only the palette changes. */
+
+/* Recolor everything the nav derives from theme tokens (icon + menu
+   line colors, dropdown labels, cart CTA gradient) by re-scoping vars. */
+:global(nav[data-sky-nav='day']) {
+    --text-primary: #10315e;
+    --text-secondary: #1c4a85;
+    --accent-cyan: #1c7fd6;
+    --accent-purple: #4f6fd0;
+}
+
+:global(nav[data-sky-nav='night']) {
+    --text-primary: #eaf2ff;
+    --text-secondary: #c9d8f7;
+    --accent-cyan: #9db8ff;
+    --accent-purple: #8296e2;
+}
+
+/* Scrolled chrome (also while the menu is open) — day: light, airy,
+   translucent over the bright sky. The extra [class] bumps specificity
+   past the galaxy `.light .nav.scrolled` rule. */
+:global(nav[data-sky-nav='day'][data-sky-scrolled='1'][class]),
+:global(nav[data-sky-nav='day'][class]:has(button[aria-expanded='true'])) {
+    background: rgba(238, 248, 255, 0.8);
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    border-bottom-color: rgba(20, 80, 160, 0.14);
+    box-shadow: 0 8px 30px rgba(20, 70, 140, 0.1);
+}
+
+/* Scrolled chrome — night: deep moonlit translucent navy */
+:global(nav[data-sky-nav='night'][data-sky-scrolled='1'][class]),
+:global(nav[data-sky-nav='night'][class]:has(button[aria-expanded='true'])) {
+    background: rgba(8, 13, 36, 0.8);
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    border-bottom-color: rgba(150, 180, 255, 0.12);
+    box-shadow: 0 8px 30px rgba(2, 8, 26, 0.35);
+}
+
+/* Not scrolled → stays fully transparent (hide-at-top preserved) */
+
+/* ── GOLD CHROME (exploration) — logo mark + day/night toggle + hamburger.
+   RELAXED GOLD: a muted antique gold (#c49a52 day / #e6c489 night) so the
+   brand marks read as "present" for recognition without shouting over the
+   calm sky. Fully revertible — delete this block to restore stock chrome.
+
+   Logo: the stock raster (with wordmark) is swapped for the text-free
+   cloud mark, pre-baked in relaxed gold (#C6A15C) so it needs no filter. */
+/* Full-width nav: the stock container is max-width 1200px centered, which
+   parked the logo ~360px in on wide screens (read as a big left margin).
+   Let it span the full width so the logo sits at the edge gutter and the
+   actions sit at the far right. */
+:global(nav[data-sky-nav] > div) {
+    max-width: none;
+}
+
+:global(nav[data-sky-nav='day'] a img),
+:global(nav[data-sky-nav='night'] a img) {
+    content: url("/kumolab-cloud-mark-gold.png");
+    width: 66px;
+    height: 44px;
+    object-fit: contain;
+    /* override the base sky re-skin's invert() so the baked gold shows true */
+    filter: none;
+}
+
+/* Night: lift the baked gold a touch so it carries on deep navy */
+:global(nav[data-sky-nav='night'] a img) {
+    filter: brightness(1.16) saturate(1.04);
+}
+
+/* Day/night toggle icon (sun / moon) → relaxed gold */
+:global(nav[data-sky-nav='day'] button[aria-label*='Switch']),
+:global(nav[data-sky-nav='day'] button[aria-label*='Switch'] svg) {
+    color: #c49a52;
+    stroke: #c49a52;
+}
+
+:global(nav[data-sky-nav='night'] button[aria-label*='Switch']),
+:global(nav[data-sky-nav='night'] button[aria-label*='Switch'] svg) {
+    color: #e6c489;
+    stroke: #e6c489;
+}
+
+/* Hamburger lines → relaxed gold, softly rounded caps (cloud-soft) */
+:global(nav[data-sky-nav='day'] button[aria-expanded] span) {
+    background-color: #c49a52;
+    border-radius: 2px;
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] span) {
+    background-color: #e6c489;
+    border-radius: 2px;
+}
+
+/* ── THEMED NAV GLYPHS (exploration) — swap the lucide sun/moon for a
+   cloud-tucked celestial glyph, and the hamburger lines for a wind-streak
+   menu that flips to a close X when open. Pure overlay: the stock
+   <svg>/<span> are hidden and a ::before carries the glyph, so this whole
+   block is delete-to-revert. NOTE: theming the hamburger this way trades
+   away the stock line→X open/close animation. ────────────────────────── */
+
+/* Day/night toggle → cloud-tucked sun (day) / moon-with-wisp (night) */
+:global(nav[data-sky-nav] button[aria-label*='Switch'] svg) {
+    display: none;
+}
+:global(nav[data-sky-nav] button[aria-label*='Switch'])::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 21px 21px;
+}
+:global(nav[data-sky-nav='day'] button[aria-label*='Switch'])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23c49a52'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Ccircle%20cx%3D'12'%20cy%3D'12'%20r%3D'4'%2F%3E%3Cpath%20d%3D'M12%203.5V5.7M12%2018.3V20.5M3.5%2012H5.7M18.3%2012H20.5M6.2%206.2L7.9%207.9M16.1%207.9L17.8%206.2M6.2%2017.8L7.9%2016.1M16.1%2016.1L17.8%2017.8'%2F%3E%3C%2Fsvg%3E");
+}
+:global(nav[data-sky-nav='night'] button[aria-label*='Switch'])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23e6c489'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpath%20d%3D'M10.8%206.4A4.9%204.9%200%200%200%2017.6%2013.2A6.8%206.8%200%201%201%2010.8%206.4Z'%2F%3E%3Cpath%20d%3D'M18.4%204.4V7.6M16.8%206H20'%2F%3E%3C%2Fsvg%3E");
+}
+
+/* Hamburger → wind-streak menu (day/night), close X when open */
+:global(nav[data-sky-nav] button[aria-expanded] span) {
+    display: none;
+}
+:global(nav[data-sky-nav] button[aria-expanded])::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 22px 22px;
+}
+:global(nav[data-sky-nav='day'] button[aria-expanded])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23c49a52'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpath%20d%3D'M3%207h10.4a2.3%202.3%200%201%200-2.3-2.4'%2F%3E%3Cpath%20d%3D'M3%2012h13.4a2.3%202.3%200%201%201-2.3%202.4'%2F%3E%3Cpath%20d%3D'M3%2017h7.6'%2F%3E%3C%2Fsvg%3E");
+}
+:global(nav[data-sky-nav='night'] button[aria-expanded])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23e6c489'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpath%20d%3D'M3%207h10.4a2.3%202.3%200%201%200-2.3-2.4'%2F%3E%3Cpath%20d%3D'M3%2012h13.4a2.3%202.3%200%201%201-2.3%202.4'%2F%3E%3Cpath%20d%3D'M3%2017h7.6'%2F%3E%3C%2Fsvg%3E");
+}
+:global(nav[data-sky-nav='day'] button[aria-expanded='true'])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23c49a52'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpath%20d%3D'M6%206L18%2018M18%206L6%2018'%2F%3E%3C%2Fsvg%3E");
+}
+:global(nav[data-sky-nav='night'] button[aria-expanded='true'])::before {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23e6c489'%20stroke-width%3D'1.9'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpath%20d%3D'M6%206L18%2018M18%206L6%2018'%2F%3E%3C%2Fsvg%3E");
+}
+
+/* Icon buttons: theme toggle (aria-label "Switch to …"), cart link
+   (aria-label "Cart"), hamburger (aria-expanded). Day: frosted white
+   with ink borders. */
+:global(nav[data-sky-nav='day'] button[aria-label*='Switch']),
+:global(nav[data-sky-nav='day'] a[aria-label='Cart']),
+:global(nav[data-sky-nav='day'] button[aria-expanded]) {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(16, 58, 110, 0.25);
+}
+
+:global(nav[data-sky-nav='day'] button[aria-label*='Switch']:hover),
+:global(nav[data-sky-nav='day'] a[aria-label='Cart']:hover),
+:global(nav[data-sky-nav='day'] button[aria-expanded]:hover) {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(28, 127, 214, 0.45);
+}
+
+:global(nav[data-sky-nav='day'] button[aria-expanded='true']) {
+    background: rgba(28, 127, 214, 0.14);
+    border-color: rgba(28, 127, 214, 0.4);
+}
+
+/* Icon buttons — night: subtle glass on deep navy */
+:global(nav[data-sky-nav='night'] button[aria-label*='Switch']),
+:global(nav[data-sky-nav='night'] a[aria-label='Cart']),
+:global(nav[data-sky-nav='night'] button[aria-expanded]) {
+    background: rgba(180, 205, 255, 0.08);
+    border-color: rgba(170, 195, 255, 0.18);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-label*='Switch']:hover),
+:global(nav[data-sky-nav='night'] a[aria-label='Cart']:hover),
+:global(nav[data-sky-nav='night'] button[aria-expanded]:hover) {
+    background: rgba(180, 205, 255, 0.16);
+    border-color: rgba(157, 184, 255, 0.45);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded='true']) {
+    background: rgba(157, 184, 255, 0.14);
+    border-color: rgba(157, 184, 255, 0.4);
+}
+
+/* Dropdown panel = the hamburger's adjacent sibling div.
+   Day: bright paper sky with a warm gold edge; night: deep navy glass. */
+/* Dropdown panel — frosted glass: translucent so the sky and drifting
+   clouds show through (blurred for legibility), with a springy drop/lift
+   that unfolds from the hamburger corner. */
+:global(nav[data-sky-nav] button[aria-expanded] + div) {
+    /* NOTE: standard property only — pairing it with -webkit-backdrop-filter
+       makes the build's CSS minifier emit the -webkit- one alone, which this
+       engine ignores (blur silently drops to none). Go-live: add Safari
+       prefixing at the build layer, not here. */
+    backdrop-filter: blur(26px) saturate(1.7);
+    transform-origin: calc(100% - 26px) top;
+    /* Closed: rolled up and tucked under the menu button, edge-on. */
+    transform: perspective(800px) translateY(-6px) rotateX(-88deg) scaleY(0.7);
+    transition:
+        opacity 0.2s ease,
+        transform 0.4s cubic-bezier(0.3, 0, 0.4, 1);
+}
+
+/* Open → an anime scroll-style roll: the panel unrolls downward from the
+   top edge, curling open past level then settling with a soft wobble.
+   (If the keyframes name doesn't bind, the base→open transition still does
+   a strong rotateX(-88deg → 0) flip-roll.) */
+:global(nav[data-sky-nav] button[aria-expanded='true'] + div) {
+    transform: perspective(800px) translateY(0) rotateX(0) skewY(0) scaleY(1);
+    animation: skyMenuRoll 0.6s cubic-bezier(0.3, 0.75, 0.35, 1);
+}
+
+@keyframes skyMenuRoll {
+    0% {
+        opacity: 0;
+        transform: perspective(800px) translateY(-6px) rotateX(-92deg)
+            skewY(5deg) scaleY(0.62);
+    }
+    38% {
+        opacity: 1;
+    }
+    62% {
+        transform: perspective(800px) translateY(4px) rotateX(11deg)
+            skewY(-2.5deg) scaleY(1.05);
+    }
+    82% {
+        transform: perspective(800px) translateY(-1px) rotateX(-3.5deg)
+            skewY(1deg) scaleY(0.99);
+    }
+    100% {
+        opacity: 1;
+        transform: perspective(800px) translateY(0) rotateX(0) skewY(0)
+            scaleY(1);
+    }
+}
+
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div) {
+    background: rgba(240, 248, 255, 0.4);
+    border-color: rgba(196, 146, 44, 0.42);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div) {
+    background: rgba(12, 18, 44, 0.38);
+    border-color: rgba(226, 176, 90, 0.3);
+    box-shadow: inset 0 1px 0 rgba(160, 190, 255, 0.14);
+}
+
+/* Reduced motion: keep the frosted glass, drop the wind roll → plain fade */
+@media (prefers-reduced-motion: reduce) {
+    :global(nav[data-sky-nav] button[aria-expanded] + div),
+    :global(nav[data-sky-nav] button[aria-expanded='true'] + div) {
+        transform: none;
+        animation: none;
+        transition: opacity 0.2s ease;
+    }
+}
+
+/* Dropdown link rows — GOLD hover accent to echo the CTA + LIMITED
+   ribbons. background-color only, so the cart CTA's gradient
+   (background-image) is never clobbered. */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a:hover) {
+    background-color: rgba(255, 193, 74, 0.16);
+    border-left-color: #f0a028;
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div a:hover) {
+    background-color: rgba(255, 197, 92, 0.12);
+    border-left-color: #ffca66;
+}
+
+/* Main label warms to gold on hover */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a:hover > span:first-child) {
+    color: #b47e10;
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div a:hover > span:first-child) {
+    color: #ffd88a;
+}
+
+/* The JP sub-label (second span in each link row; the cart CTA's lone
+   span is preceded by an svg, so it's not matched) reads as a warm gold
+   accent on every row — the CTA's gold carried into the menu. */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a > span + span) {
+    color: rgba(150, 100, 12, 0.95);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div a > span + span) {
+    color: rgba(255, 216, 140, 0.78);
+}
+
+/* Legibility on the translucent panel: a crisp anime-style label — heavier
+   main word plus a tight double glow that separates the text from any sky
+   or cloud behind it, no opaque background needed. */
+:global(nav[data-sky-nav] button[aria-expanded] + div a > span:first-child) {
+    font-weight: 900;
+    font-size: 1.02rem;
+    letter-spacing: 0.1em;
+}
+
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a > span:first-child) {
+    color: #071b36;
+}
+
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a > span) {
+    text-shadow:
+        0 0 1px rgba(255, 255, 255, 1),
+        0 0 5px rgba(255, 255, 255, 0.95),
+        0 1px 6px rgba(255, 255, 255, 0.9);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div a > span) {
+    text-shadow:
+        0 0 1px rgba(2, 6, 20, 0.95),
+        0 0 5px rgba(2, 6, 20, 0.9),
+        0 1px 7px rgba(2, 6, 20, 0.98);
+}
+
+/* Day JP sub-label: a deeper gold with only a light halo — the strong
+   white glow used for the main word would wash this small text out. */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div a > span + span) {
+    color: #7d5406;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75);
+}
+
+/* Hairline accents → gold */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div > span) {
+    background: linear-gradient(90deg, rgba(240, 160, 40, 0.6), transparent);
+}
+
+:global(nav[data-sky-nav='night'] button[aria-expanded] + div > span) {
+    background: linear-gradient(90deg, rgba(255, 199, 102, 0.5), transparent);
+}
+
+/* Cart CTA text stays readable on the recolored gradient */
+:global(nav[data-sky-nav='day'] button[aria-expanded] + div > a) {
+    color: #f2f9ff;
+}

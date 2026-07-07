@@ -1,0 +1,109 @@
+/* ── Sky-theme checkout success ──────────────────────────────────────────
+   Centered confirmation on the calm sky. Day default; night overrides key
+   off the [data-sky='night'] flag SkyContentRoot stamps on its root. */
+
+.wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    margin: 0 auto;
+    min-height: 78vh;
+    padding: calc(var(--header-height, 72px) + 3rem) 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1.1rem;
+}
+
+.icon {
+    color: #1faa6e;
+    filter: drop-shadow(0 6px 18px rgba(31, 170, 110, 0.35));
+}
+
+.title {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #0b2547;
+    margin: 0;
+}
+
+.message {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: rgba(11, 37, 71, 0.72);
+    max-width: 30rem;
+    margin: 0;
+}
+
+.actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.primary {
+    display: inline-flex;
+    padding: 0.85rem 2rem;
+    background: linear-gradient(180deg, #f4c25e, #d99b26);
+    color: #3a2a05;
+    border-radius: 99px;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 14px 30px -12px rgba(196, 146, 44, 0.7);
+    transition: transform 0.18s ease;
+}
+
+.primary:hover {
+    transform: translateY(-1px);
+}
+
+.secondary {
+    display: inline-flex;
+    padding: 0.85rem 2rem;
+    border-radius: 99px;
+    font-weight: 800;
+    text-decoration: none;
+    border: 1px solid rgba(120, 160, 210, 0.5);
+    background: rgba(255, 255, 255, 0.5);
+    color: #123a63;
+    transition: all 0.18s ease;
+}
+
+.secondary:hover {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(28, 127, 214, 0.6);
+}
+
+/* ── Night ──────────────────────────────────────────────────────────── */
+:global([data-sky='night']) .title {
+    color: #eaf2ff;
+}
+
+:global([data-sky='night']) .message {
+    color: rgba(220, 232, 255, 0.72);
+}
+
+:global([data-sky='night']) .icon {
+    color: #34d399;
+    filter: drop-shadow(0 6px 18px rgba(52, 211, 153, 0.4));
+}
+
+:global([data-sky='night']) .primary {
+    background: linear-gradient(180deg, #ffd88a, #e6b45a);
+    color: #2a1e04;
+}
+
+:global([data-sky='night']) .secondary {
+    background: rgba(180, 205, 255, 0.1);
+    border-color: rgba(160, 190, 255, 0.3);
+    color: #d6e4ff;
+}
+
+:global([data-sky='night']) .secondary:hover {
+    background: rgba(180, 205, 255, 0.18);
+}

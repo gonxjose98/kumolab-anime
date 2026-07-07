@@ -1,0 +1,147 @@
+/* ─── FOOTER B — the ground beneath the sky ─────────────────────────── */
+
+.footer {
+    position: relative;
+    padding: 90px 20px 50px;
+    overflow: hidden;
+}
+
+/* Soft violet horizon line rising behind the footer */
+.horizon {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1100px, 120vw);
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(123, 97, 255, 0.5) 30%,
+        rgba(0, 212, 255, 0.5) 55%,
+        rgba(123, 97, 255, 0.5) 75%,
+        transparent 100%
+    );
+    box-shadow: 0 0 40px 4px rgba(123, 97, 255, 0.25);
+}
+
+.inner {
+    max-width: 1140px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 34px;
+    text-align: center;
+}
+
+.brandBlock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.wordmark {
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: 2.6rem;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    background: linear-gradient(180deg, #ffffff 10%, #cfd9ff 55%, #9d8bff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 26px rgba(123, 97, 255, 0.3));
+}
+
+.jp {
+    font-family: var(--font-jp);
+    font-size: 0.74rem;
+    letter-spacing: 0.34em;
+    color: #6f7ab2;
+}
+
+.tagline {
+    font-size: 0.86rem;
+    color: #8b96c8;
+}
+
+/* Socials */
+.socials {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+}
+
+.socialLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 100px;
+    border: 1px solid rgba(150, 170, 255, 0.16);
+    background: rgba(14, 12, 40, 0.55);
+    backdrop-filter: blur(10px);
+    color: #a5b0e0;
+    transition: all 0.3s ease;
+}
+
+.socialLink:hover {
+    color: #8fe8ff;
+    border-color: rgba(0, 212, 255, 0.45);
+    background: rgba(0, 212, 255, 0.06);
+    box-shadow: 0 0 26px rgba(0, 212, 255, 0.14);
+    transform: translateY(-2px);
+}
+
+.socialName {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* Nav */
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 28px;
+}
+
+.navLink {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #6f7ab2;
+    transition: color 0.3s ease;
+}
+
+.navLink:hover {
+    color: #dfe5ff;
+}
+
+/* Bottom */
+.bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding-top: 26px;
+    border-top: 1px solid rgba(150, 170, 255, 0.08);
+    width: 100%;
+    font-size: 0.74rem;
+    color: #4f5a92;
+}
+
+.bottomJp {
+    font-family: var(--font-jp);
+    font-size: 0.68rem;
+    letter-spacing: 0.3em;
+    color: #434e85;
+}

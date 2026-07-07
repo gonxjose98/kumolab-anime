@@ -1,0 +1,281 @@
+/* ═══ REDESIGN ABOUT — ABOUT KUMOLAB ON THE CONTENT SKY ══════════════
+   Mobile-first: single column, fluid clamp() type, ≥44px tap targets,
+   no fixed widths, no horizontal overflow. Prose sits in a deep glass
+   panel so long-form reading stays legible over the bright day sky AND
+   the navy night sky. All colors read from the --sky-* tokens set by
+   SkyContentRoot. */
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.hero {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: calc(var(--header-height, 64px) + clamp(44px, 10vw, 96px)) 20px clamp(26px, 5vw, 48px);
+    text-align: center;
+}
+
+.kicker {
+    margin: 0;
+    font-family: var(--font-jp);
+    font-size: clamp(0.66rem, 2vw, 0.78rem);
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(255, 236, 194, 0.9);
+    text-shadow: 0 1px 10px rgba(12, 50, 110, 0.35);
+}
+
+.title {
+    margin: 12px 0 0;
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(2.7rem, 11vw, 5rem);
+    font-weight: 400;
+    line-height: 0.98;
+    letter-spacing: 0.05em;
+    background: linear-gradient(180deg, #ffffff 0%, #f4faff 60%, #ffe1a0 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 5px 24px rgba(12, 50, 110, 0.32));
+}
+
+.sub {
+    margin: 14px auto 0;
+    max-width: 480px;
+    font-family: var(--font-main);
+    font-size: clamp(0.94rem, 2.6vw, 1.05rem);
+    font-weight: 500;
+    line-height: 1.7;
+    color: rgba(240, 249, 255, 0.9);
+    text-shadow: 0 1px 10px rgba(12, 50, 110, 0.3);
+}
+
+/* ── Page column ──────────────────────────────────────────────────── */
+.main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px clamp(64px, 10vw, 110px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(20px, 4.5vw, 32px);
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .main { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ── Deep glass panel: legible long-form surface, day & night ─────── */
+.panel {
+    min-width: 0;
+    border-radius: 24px;
+    padding: clamp(24px, 6vw, 40px);
+    background: linear-gradient(172deg, rgba(13, 42, 92, 0.6) 0%, rgba(10, 32, 74, 0.68) 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.26);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 16px 44px rgba(8, 30, 70, 0.28);
+}
+
+.sectionKicker {
+    margin: 0 0 6px;
+    font-family: var(--font-jp);
+    font-size: clamp(0.6rem, 1.8vw, 0.7rem);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255, 236, 194, 0.78);
+}
+
+.sectionTitle {
+    margin: 0 0 clamp(14px, 3.5vw, 20px);
+    font-family: 'Bebas Neue', var(--font-display), sans-serif;
+    font-size: clamp(1.7rem, 6.5vw, 2.2rem);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: 0.05em;
+    color: #ffffff;
+    text-shadow: 0 2px 14px rgba(8, 30, 70, 0.4);
+}
+
+.sectionTitle::after {
+    content: '';
+    display: block;
+    width: 44px;
+    height: 3px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ffe08a, rgba(255, 224, 138, 0));
+}
+
+/* ── Prose ────────────────────────────────────────────────────────── */
+.prose p {
+    margin: 0 0 1em;
+    font-family: var(--font-main);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.8;
+    color: rgba(240, 249, 255, 0.92);
+    overflow-wrap: break-word;
+}
+
+.prose p:last-child {
+    margin-bottom: 0;
+}
+
+/* ── What We Offer: glass chip rows ───────────────────────────────── */
+.offerList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.offerItem {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 52px;
+    min-width: 0;
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--font-main);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: rgba(244, 250, 255, 0.94);
+    overflow-wrap: break-word;
+    transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.offerItem:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.offerGlyph {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 30%, #fff3d2, #ffd76e 70%);
+    box-shadow: 0 0 14px rgba(255, 215, 110, 0.4);
+    font-size: 0.8rem;
+    color: #6b4a0c;
+}
+
+/* ── Contact form: glassy sky inputs ──────────────────────────────── */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.label {
+    font-family: var(--font-display);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 236, 194, 0.9);
+}
+
+.input,
+.textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-family: var(--font-main);
+    font-size: 1rem;
+    font-weight: 500;
+    color: #ffffff;
+    outline: none;
+    transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.textarea {
+    resize: vertical;
+    min-height: 132px;
+    line-height: 1.6;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+    color: rgba(240, 249, 255, 0.55);
+}
+
+.input:focus,
+.textarea:focus {
+    border-color: rgba(255, 224, 138, 0.85);
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 0 3px rgba(255, 224, 138, 0.22);
+}
+
+.submitBtn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    width: 100%;
+    padding: 0 38px;
+    border: 1.5px solid rgba(255, 243, 210, 0.75);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffedbd 0%, #ffd76e 100%);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #5b3d09;
+    cursor: pointer;
+    box-shadow: 0 10px 26px rgba(8, 30, 70, 0.28), 0 0 22px rgba(255, 215, 110, 0.22);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
+}
+
+@media (min-width: 640px) {
+    .submitBtn { width: auto; }
+}
+
+.submitBtn:hover {
+    transform: translateY(-3px);
+    filter: brightness(1.04);
+    box-shadow: 0 16px 36px rgba(8, 30, 70, 0.34), 0 0 30px rgba(255, 215, 110, 0.35);
+}
+
+.submitBtn:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 3px;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .offerItem,
+    .input,
+    .textarea,
+    .submitBtn {
+        transition: none;
+    }
+
+    .offerItem:hover,
+    .submitBtn:hover {
+        transform: none;
+    }
+}

@@ -1,28 +1,7 @@
-import { getPosts } from '@/lib/blog';
-import Hero from '@/components/home/Hero';
-import StatsBar from '@/components/home/StatsBar';
-import ConfirmationAlert from '@/components/home/ConfirmationAlert';
-import MostRecentFeed from '@/components/home/MostRecentFeed';
+// Live home now renders the sea-to-sky experience. Implementation lives in
+// the (non-indexed) preview route; rendered here under the canonical "/"
+// URL, inheriting the site's production home metadata from the layout.
+export { default } from './redesign-sky/page';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-export default async function Home() {
-  let posts: any[] = [];
-  
-  try {
-    posts = await getPosts();
-  } catch (error) {
-    console.error('[Home] Failed to fetch posts:', error);
-    posts = [];
-  }
-
-  return (
-    <>
-      <Hero />
-      <StatsBar />
-      <ConfirmationAlert posts={posts} />
-      <MostRecentFeed posts={posts} />
-    </>
-  );
-}

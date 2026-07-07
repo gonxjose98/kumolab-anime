@@ -224,3 +224,111 @@
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
 }
+
+/* ══ SKY THEME OVERRIDES ══════════════════════════════════════════════════
+   This page now renders inside SkyContentRoot, which stamps [data-sky='day'
+   | 'night'] on its root. The galaxy tokens (light text) would be invisible
+   on the bright day sky, so override them with the sky palette. */
+
+:global([data-sky='day']) .title {
+    background: linear-gradient(to right, #0b2547, #1c4a85);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+:global([data-sky='night']) .title {
+    background: linear-gradient(to right, #eaf2ff, #b9cdf3);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+:global([data-sky='day']) .content,
+:global([data-sky='day']) .paragraph {
+    color: rgba(11, 37, 71, 0.86);
+}
+
+:global([data-sky='night']) .content,
+:global([data-sky='night']) .paragraph {
+    color: rgba(224, 234, 255, 0.86);
+}
+
+:global([data-sky='day']) .header {
+    border-bottom-color: rgba(120, 160, 210, 0.4);
+}
+
+:global([data-sky='night']) .header {
+    border-bottom-color: rgba(160, 190, 255, 0.22);
+}
+
+:global([data-sky='day']) .date {
+    color: rgba(11, 37, 71, 0.62);
+}
+
+:global([data-sky='night']) .date {
+    color: rgba(220, 232, 255, 0.62);
+}
+
+.badge {
+    background: linear-gradient(180deg, #f4c25e, #d99b26);
+    color: #3a2a05;
+}
+
+:global([data-sky='night']) .badge {
+    background: linear-gradient(180deg, #ffd88a, #e6b45a);
+    color: #2a1e04;
+}
+
+:global([data-sky='day']) .dropTitle {
+    color: #0b2547;
+}
+
+:global([data-sky='night']) .dropTitle {
+    color: #eaf2ff;
+}
+
+.dropSubline {
+    color: #b47e10;
+}
+
+:global([data-sky='night']) .dropSubline {
+    color: #ffd88a;
+}
+
+:global([data-sky='day']) .dropContent .paragraph {
+    color: rgba(11, 37, 71, 0.7);
+}
+
+:global([data-sky='night']) .dropContent .paragraph {
+    color: rgba(224, 234, 255, 0.72);
+}
+
+:global([data-sky='day']) .sourceAttribution {
+    color: rgba(11, 37, 71, 0.55);
+    border-top-color: rgba(120, 160, 210, 0.4);
+}
+
+:global([data-sky='night']) .sourceAttribution {
+    color: rgba(220, 232, 255, 0.5);
+    border-top-color: rgba(160, 190, 255, 0.22);
+}
+
+.highlightBlock {
+    background: rgba(196, 146, 44, 0.12);
+    border-left-color: #d99b26;
+}
+
+:global([data-sky='day']) .highlightBlock {
+    color: #0b2547;
+}
+
+:global([data-sky='night']) .highlightBlock {
+    background: rgba(226, 176, 90, 0.12);
+    border-left-color: #e6b45a;
+    color: #eaf2ff;
+}
+
+:global([data-sky='day']) .heroImage img {
+    box-shadow: 0 30px 60px -20px rgba(20, 60, 120, 0.4);
+}
