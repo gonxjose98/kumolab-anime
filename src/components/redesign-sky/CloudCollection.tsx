@@ -14,6 +14,22 @@ function cleanName(name: string): string {
     return name.replace(/\s*[|·]\s*KumoLab.*$/i, '').trim();
 }
 
+/**
+ * Printful's thumbnail_url is a small thumb that blurs when shown large. The
+ * same CDN asset is usually served at higher res as `_preview.<ext>`, so we
+ * do a pure string swap (no extra API call). If the pattern doesn't match the
+ * URL is returned untouched; the <img> onError falls back to the thumb.
+ */
+function upgradePrintfulImage(url: string): string {
+    if (!url) return url;
+    try {
+        if (!new URL(url).hostname.endsWith('printful.com')) return url;
+        return url.replace(/_thumb(\.(?:png|jpe?g|webp|gif))(\?.*)?$/i, '_preview$1$2');
+    } catch {
+        return url;
+    }
+}
+
 function ProductCard({
     product,
     index,
@@ -25,17 +41,22 @@ function ProductCard({
 }) {
     return (
         <Reveal delay={0.1 + index * 0.12} className={featured ? styles.cellFeatured : styles.cell}>
-            <Link href="/merch" className={`${styles.card} ${featured ? styles.cardFeatured : ''}`}>
+            <Link href={`/merch/${product.id}`} className={`${styles.card} ${featured ? styles.cardFeatured : ''}`}>
                 {featured && <span className={styles.flagChip}>The Flagship</span>}
                 <div className={styles.cardHalo} aria-hidden="true" />
                 <div className={styles.imageWrap}>
                     {product.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                            src={product.image}
+                            src={upgradePrintfulImage(product.image)}
                             alt={cleanName(product.name)}
                             loading="lazy"
                             className={styles.image}
+                            onError={(e) => {
+                                // upgraded _preview 404'd → fall back to the thumb once
+                                const img = e.currentTarget;
+                                if (product.image && img.src !== product.image) img.src = product.image;
+                            }}
                         />
                     ) : (
                         <div className={styles.imageFallback}>雲</div>
@@ -51,7 +72,7 @@ function ProductCard({
                         )}
                         {product.label && <span className={styles.labelChip}>{product.label}</span>}
                     </div>
-                    <span className={styles.cardCta}>View in the shop →</span>
+                    <span className={styles.cardCta}>View this drop →</span>
                 </div>
             </Link>
         </Reveal>

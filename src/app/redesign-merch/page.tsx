@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getFeaturedProducts } from '@/lib/merch';
+import { getVisibleProducts } from '@/lib/merch';
 import { Product } from '@/types';
 import SkyContentRoot from '@/components/sky-content';
 import SkyFooter from '@/components/redesign-sky/SkyFooter';
@@ -48,7 +48,8 @@ export default async function RedesignMerchPage() {
     let products: Product[] = [];
 
     try {
-        products = await getFeaturedProducts();
+        // The merch tab carries the whole catalogue (home features a subset).
+        products = await getVisibleProducts();
     } catch (error) {
         console.error('[redesign-merch] Failed to fetch products:', error);
     }

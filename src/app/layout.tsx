@@ -84,7 +84,13 @@ export default function RootLayout({
         <WebSiteJsonLd />
       </head>
       <body className={`${inter.variable} ${jakarta.variable} ${outfit.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        {/* storageKey bumped to 'kumolab-theme-sky': the sky redesign inverted
+            the day/night meaning of next-themes 'dark'/'light', so any stale
+            preference from the old galaxy theme (or an early review toggle)
+            would open the site in night. A fresh key ignores those and
+            re-defaults everyone to day ('dark' = bright sky); toggling still
+            persists normally under the new key. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="kumolab-theme-sky">
           <AnalyticsTracker />
           <ConditionalLayout nav={<Navigation />} footer={<Footer />}>
             <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>

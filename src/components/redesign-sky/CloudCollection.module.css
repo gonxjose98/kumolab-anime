@@ -210,6 +210,10 @@
     max-width: 300px;
     aspect-ratio: 1;
     object-fit: contain;
+    /* The global `img { opacity: 0; animation: imgIn }` fade-in is overridden
+       by productFloat below, so opacity would stay stuck at 0 — set it visible
+       explicitly (the Reveal wrapper already provides the entrance fade). */
+    opacity: 1;
     filter: drop-shadow(0 24px 30px rgba(8, 36, 80, 0.35));
     transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     animation: productFloat 7s ease-in-out infinite;
