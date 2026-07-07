@@ -129,15 +129,15 @@ export async function getVisibleProducts(): Promise<Product[]> {
     return await getProducts();
 }
 
-// HOME promo surface — featured products only (curated in the admin via
-// merch_settings.is_featured to boost promotion), falling back to the full
-// catalogue when nothing is flagged so the home band is never empty. The
-// /merch tab shows EVERYTHING (getVisibleProducts) — home features a subset,
-// merch carries the whole catalogue (incl. future affiliate products).
+// HOME promo surface — returns the full catalogue with FEATURED products
+// sorted to the front (curated in the admin via merch_settings.is_featured to
+// boost promotion). The home band caps how many it renders, so featured pieces
+// lead / take the flagship slot while a small catalogue still shows everything
+// (no product hidden just because it isn't flagged yet). The /merch tab shows
+// EVERYTHING unsorted (getVisibleProducts), incl. future affiliate products.
 export async function getFeaturedProducts(): Promise<Product[]> {
     const all = await getProducts();
-    const featured = all.filter(p => p.isFeatured);
-    return featured.length > 0 ? featured : all;
+    return [...all].sort((a, b) => Number(!!b.isFeatured) - Number(!!a.isFeatured));
 }
 
 // Live Printful retail_price for a single sync variant. This is the SOURCE OF

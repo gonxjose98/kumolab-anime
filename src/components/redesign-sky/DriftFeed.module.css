@@ -100,6 +100,11 @@
     height: 116%;
     object-fit: cover;
     display: block;
+    /* The global `img { opacity: 0; animation: imgIn }` fade-in is overridden
+       by imgDrift below (scroll parallax) on browsers with animation-timeline,
+       which would leave the post image stuck at opacity 0 (invisible → only
+       the blurred veil shows). Make it visible explicitly. */
+    opacity: 1;
 }
 
 /* Scroll-driven parallax inside the media frame (progressive enhancement) */
