@@ -12,6 +12,7 @@ import {
     Menu,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
+import ThemeToggle from './ThemeToggle';
 
 const GROUPS: { label: string; items: { href: string; label: string; icon: typeof LayoutDashboard }[] }[] = [
     { label: 'Overview', items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -88,6 +89,7 @@ export default function AdminShell({
                 </nav>
 
                 <div className="ak-rail__foot">
+                    <ThemeToggle />
                     {email && <div className="ak-rail__user">{email}</div>}
                     <LogoutButton />
                 </div>

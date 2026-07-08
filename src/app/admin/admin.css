@@ -1127,3 +1127,126 @@ body:has(.admin-root) {
 .admin-root .ak-cal__cell:hover {
     background: var(--surface-2);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME OVERRIDES
+   The token flip (tokens.css) re-themes everything that reads a var. These
+   rules fix the handful of surfaces that hardcode light colors + give badges
+   and status boxes proper dark variants. All scoped to the dark attribute so
+   the light theme is untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* App canvas — beat the light !important reset. */
+html[data-admin-theme='dark']:has(.admin-root),
+html[data-admin-theme='dark'] body:has(.admin-root) {
+    background: #070c16 !important;
+}
+
+/* Frosted top bar */
+html[data-admin-theme='dark'] .admin-root .ak-topbar {
+    background: rgba(10, 18, 32, 0.82);
+    border-bottom-color: var(--line);
+}
+
+/* Cards get a hair of lift on dark */
+html[data-admin-theme='dark'] .admin-root .ak-card,
+html[data-admin-theme='dark'] .admin-root .ak-stat {
+    box-shadow: var(--shadow-0), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Badges — dark translucent variants */
+html[data-admin-theme='dark'] .admin-root .ak-badge--pending {
+    color: #f0c674; background: rgba(240, 198, 116, 0.13); border-color: rgba(240, 198, 116, 0.3);
+}
+html[data-admin-theme='dark'] .admin-root .ak-badge--draft {
+    color: #a6b6d0; background: rgba(150, 180, 226, 0.1); border-color: rgba(150, 180, 226, 0.22);
+}
+html[data-admin-theme='dark'] .admin-root .ak-badge--scheduled {
+    color: #7fbcff; background: rgba(74, 158, 255, 0.14); border-color: rgba(74, 158, 255, 0.32);
+}
+html[data-admin-theme='dark'] .admin-root .ak-badge--published,
+html[data-admin-theme='dark'] .admin-root .ak-badge--success {
+    color: #5fd6a0; background: rgba(62, 207, 142, 0.13); border-color: rgba(62, 207, 142, 0.3);
+}
+html[data-admin-theme='dark'] .admin-root .ak-badge--error {
+    color: #ff9184; background: rgba(255, 111, 97, 0.14); border-color: rgba(255, 111, 97, 0.34);
+}
+html[data-admin-theme='dark'] .admin-root .ak-pill__count {
+    background: rgba(227, 178, 90, 0.18); color: #f0c674;
+}
+
+/* Status / error boxes (login error, import status, etc.) */
+html[data-admin-theme='dark'] .admin-root .ak-auth__err {
+    color: #ff9184; background: rgba(255, 111, 97, 0.12); border-color: rgba(255, 111, 97, 0.3);
+}
+
+/* Merch manager light-hardcoded bits */
+html[data-admin-theme='dark'] .admin-root .ak-merch__bar {
+    background: rgba(8, 15, 28, 0.9);
+}
+html[data-admin-theme='dark'] .admin-root .ak-merch__unsaved {
+    color: #f0c674; background: rgba(240, 198, 116, 0.13); border-color: rgba(240, 198, 116, 0.3);
+}
+html[data-admin-theme='dark'] .admin-root .ak-merch__warn {
+    color: #ff9184; background: rgba(255, 111, 97, 0.12); border-color: rgba(255, 111, 97, 0.3);
+}
+html[data-admin-theme='dark'] .admin-root .ak-merch__ok { color: #5fd6a0; }
+html[data-admin-theme='dark'] .admin-root .ak-merch__chip--on {
+    background: rgba(74, 158, 255, 0.16); color: #7fbcff; border-color: rgba(74, 158, 255, 0.35);
+}
+html[data-admin-theme='dark'] .admin-root .ak-merch__chip--star.ak-merch__chip--on {
+    background: rgba(240, 198, 116, 0.14); color: #f0c674; border-color: rgba(240, 198, 116, 0.35);
+}
+html[data-admin-theme='dark'] .admin-root .ak-merch__saves { color: #5fd6a0; }
+
+/* Post-row video badge already dark-friendly; nothing needed. */
+
+/* ── Login: night sky in dark mode ─────────────────────────────────────── */
+html[data-admin-theme='dark'] .admin-root.ak-auth {
+    background:
+        radial-gradient(ellipse 90% 60% at 50% -10%, #16233f 0%, transparent 65%),
+        linear-gradient(180deg, #0c1730 0%, #060b16 100%);
+}
+html[data-admin-theme='dark'] .admin-root .ak-auth__clouds {
+    background:
+        radial-gradient(1.5px 1.5px at 18% 24%, rgba(255, 255, 255, 0.7), transparent),
+        radial-gradient(1.5px 1.5px at 72% 18%, rgba(255, 255, 255, 0.6), transparent),
+        radial-gradient(1.5px 1.5px at 44% 62%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(2px 2px at 86% 48%, rgba(255, 255, 255, 0.65), transparent),
+        radial-gradient(1.5px 1.5px at 30% 82%, rgba(255, 255, 255, 0.5), transparent);
+}
+html[data-admin-theme='dark'] .admin-root .ak-auth__card {
+    background: rgba(19, 31, 56, 0.86);
+    border-color: rgba(150, 180, 226, 0.18);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Theme toggle control (sidebar) ────────────────────────────────────── */
+.admin-root .ak-themetoggle {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.admin-root .ak-themetoggle button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--rail-text);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.admin-root .ak-themetoggle button.is-active {
+    background: rgba(230, 196, 137, 0.16);
+    color: var(--rail-text-active);
+}

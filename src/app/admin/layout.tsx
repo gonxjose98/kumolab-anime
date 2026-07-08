@@ -5,6 +5,16 @@
 import './tokens.css';
 import './admin.css';
 
+// Set the light/dark attribute BEFORE paint so there's no flash of the wrong
+// theme. Reads the operator's saved choice; defaults to light (Clear Skies).
+const themeScript =
+    "(function(){try{var t=localStorage.getItem('kumolab-admin-theme');document.documentElement.dataset.adminTheme=(t==='dark'?'dark':'light');}catch(e){}})();";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
+    return (
+        <>
+            <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+            {children}
+        </>
+    );
 }

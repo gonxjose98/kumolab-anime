@@ -63,3 +63,42 @@
     font-family: var(--ak-sans);
     -webkit-font-smoothing: antialiased;
 }
+
+/* ══ Dark "night sky" theme ════════════════════════════════════════════════
+   Re-declares the tokens when the operator flips to dark. Because every admin
+   surface reads these vars, the whole console re-themes from this one block
+   (plus the component overrides in admin.css for the few hardcoded-light spots).
+   Toggled via <html data-admin-theme="dark"> (set pre-paint by the layout
+   script + the sidebar toggle). */
+html[data-admin-theme='dark'] .admin-root {
+    --bg: #080f1c;
+    --surface: #131f38;
+    --surface-2: #0e1830;
+    --rail: #0a1424;
+    --rail-2: #14223f;
+
+    --ink: #eaf1fb;
+    --ink-2: #a6b6d0;
+    --ink-3: #6f819e;
+    --rail-text: #c9d6ea;
+    --rail-text-active: #f4d89a;
+
+    --line: rgba(150, 180, 226, 0.13);
+    --line-2: rgba(150, 180, 226, 0.24);
+
+    --blue: #4a9eff;
+    --blue-soft: rgba(74, 158, 255, 0.16);
+    --gold: #e3b25a;
+    --gold-grad: linear-gradient(180deg, #f4c869, #d99b26);
+    --gold-ink: #241803;
+    --sun: #ff6f61;
+
+    --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-1: 0 6px 22px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.6);
+
+    background:
+        radial-gradient(120% 90% at 50% -10%, #16233f 0%, transparent 55%),
+        linear-gradient(180deg, #0a1120 0%, #070c16 100%);
+}
+
