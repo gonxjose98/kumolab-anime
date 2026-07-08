@@ -9,6 +9,7 @@ import {
     CalendarDays,
     BarChart3,
     ShoppingBag,
+    Clapperboard,
     Menu,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
@@ -25,6 +26,7 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     {
         label: 'Publishing', jp: '発信', items: [
             { href: '/admin/posts', label: 'Posts', jp: '記事', icon: FileText },
+            { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard },
             { href: '/admin/calendar', label: 'Calendar', jp: '暦', icon: CalendarDays },
         ],
     },
@@ -47,7 +49,9 @@ export default function AdminShell({
 
     const isActive = (href: string) => {
         if (href === '/admin/dashboard') return pathname === href;
-        if (href === '/admin/posts') return pathname.startsWith('/admin/posts') || pathname.startsWith('/admin/post/');
+        // The video editor (/admin/post/[id]/studio) lights up Studio, not Posts.
+        if (href === '/admin/studio') return pathname.startsWith('/admin/studio') || pathname.endsWith('/studio');
+        if (href === '/admin/posts') return (pathname.startsWith('/admin/posts') || pathname.startsWith('/admin/post/')) && !pathname.endsWith('/studio');
         return pathname.startsWith(href);
     };
     const title = ALL.find((i) => isActive(i.href))?.label ?? 'Admin';
