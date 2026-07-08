@@ -9,6 +9,17 @@ const nextConfig = {
             './public/fonts/**',
         ],
     },
+    // The Studio's FFmpeg.wasm cores (@ffmpeg/core + core-mt, ~60MB of wasm) are
+    // BROWSER-only — loaded at runtime from /public/ffmpeg via blob URL, never
+    // imported server-side. Keep them out of every serverless function bundle,
+    // otherwise the trace pulls them into api/cron/run-blog-engine and blows past
+    // Vercel's 250MB function limit (it already carries the 80MB ffmpeg-static).
+    outputFileTracingExcludes: {
+        '*': [
+            './node_modules/@ffmpeg/core/**',
+            './node_modules/@ffmpeg/core-mt/**',
+        ],
+    },
 
     typescript: {
         ignoreBuildErrors: true,
