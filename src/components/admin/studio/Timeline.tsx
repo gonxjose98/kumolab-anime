@@ -46,7 +46,8 @@ export default function Timeline() {
                         <div style={{ height: 22 }} />
                         {project.tracks.map((t) => (
                             <div key={t.id} className="st-thead__row">
-                                <span style={{ textTransform: 'capitalize' }}>{t.kind}</span>
+                                <span className="st-thead__dot" style={{ background: TRACK_DOT[t.kind] }} />
+                                <span>{t.kind}</span>
                             </div>
                         ))}
                     </div>
@@ -88,6 +89,13 @@ export default function Timeline() {
 }
 
 const TRACK_HEADER_W = 128;
+
+const TRACK_DOT: Record<string, string> = {
+    video: '#4a9eff',
+    audio: '#3ecf8e',
+    text: '#f4c869',
+    image: '#a78bfa',
+};
 
 function ClipView({ clip, track, pxPerSec, selected }: { clip: Clip; track: Track; pxPerSec: number; selected: boolean }) {
     const left = clip.timelineStart * pxPerSec;

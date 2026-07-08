@@ -1,17 +1,39 @@
-/* ══ KumoLab Studio — full-screen editor ══════════════════════════════════
-   Scoped under .admin-root so it inherits the Clear Skies tokens. The editor
-   overlays the whole viewport (fixed) on top of AdminShell. The preview stage
-   is intentionally dark (media focus); the chrome stays light Clear Skies. */
+/* ══ KumoLab Studio — professional "night sky" editor ══════════════════════
+   The editor is the night side of the sea-to-sky world: deep navy surfaces,
+   one warm gold accent, cool blue for selection. We re-declare the Clear Skies
+   design tokens ON .st-root, so every inherited .ak-* button/field/card and
+   every .st-* part picks up the dark theme automatically. Scoped under
+   .admin-root so nothing leaks to the light admin. */
 
 .admin-root .st-root {
+    /* Dark palette (token overrides — cascade to .ak-* + .st-*) */
+    --bg: #0a1220;
+    --surface: #141f38;
+    --surface-2: #0e1830;
+    --ink: #eaf1fb;
+    --ink-2: #a6b6d0;
+    --ink-3: #6f819e;
+    --line: rgba(150, 180, 226, 0.12);
+    --line-2: rgba(150, 180, 226, 0.22);
+    --blue: #4a9eff;
+    --blue-soft: rgba(74, 158, 255, 0.16);
+    --gold: #e3b25a;
+    --gold-grad: linear-gradient(180deg, #f4c869, #d99b26);
+    --gold-ink: #241803;
+    --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.55);
+
     position: fixed;
     inset: 0;
     z-index: 120;
-    background: var(--bg);
     color: var(--ink);
+    background:
+        radial-gradient(120% 80% at 50% -20%, #16233f 0%, transparent 60%),
+        linear-gradient(180deg, #0b1428 0%, #070d18 100%);
     display: grid;
-    grid-template-columns: 248px 1fr 312px;
-    grid-template-rows: 52px 1fr minmax(200px, 34vh);
+    grid-template-columns: 256px 1fr 320px;
+    grid-template-rows: 56px 1fr minmax(210px, 34vh);
     grid-template-areas:
         "topbar topbar topbar"
         "library preview inspector"
@@ -26,48 +48,67 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 16px;
-    background: var(--surface);
+    padding: 0 18px;
+    background: linear-gradient(180deg, rgba(20, 31, 56, 0.9), rgba(12, 21, 40, 0.9));
     border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 .admin-root .st-topbar__title {
     font-family: var(--ak-serif);
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 600;
-    color: var(--ink);
+    letter-spacing: 0.01em;
+    background: linear-gradient(180deg, #fbe4a8, #e3b25a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 .admin-root .st-topbar__sub {
     font-size: 12px;
     color: var(--ink-3);
+    max-width: 42ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.admin-root .st-topbar__logo {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
 }
 .admin-root .st-spacer { flex: 1; }
 
 /* ── Panels (library / inspector) ────────────────────────────────────────*/
 .admin-root .st-panel {
-    background: var(--surface);
+    background: linear-gradient(180deg, rgba(20, 31, 56, 0.72), rgba(14, 24, 48, 0.72));
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.03) inset;
 }
 .admin-root .st-library { grid-area: library; }
 .admin-root .st-inspector {
     grid-area: inspector;
     border-right: 0;
     border-left: 1px solid var(--line);
+    box-shadow: -1px 0 0 rgba(255, 255, 255, 0.03) inset;
 }
 .admin-root .st-panel__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 12px 14px;
+    padding: 13px 16px;
     border-bottom: 1px solid var(--line);
     flex: none;
 }
+.admin-root .st-panel__head .ak-overline { color: var(--ink-2); letter-spacing: 0.14em; }
 .admin-root .st-panel__body {
-    padding: 12px 14px;
+    padding: 14px 16px;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
@@ -77,21 +118,27 @@
 .admin-root .st-media-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 10px;
 }
 .admin-root .st-asset {
     position: relative;
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     overflow: hidden;
-    background: var(--surface-2);
+    background: #0a1526;
     cursor: grab;
     aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: var(--shadow-0);
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
-.admin-root .st-asset:hover { border-color: var(--blue); }
+.admin-root .st-asset:hover {
+    border-color: rgba(227, 178, 90, 0.6);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(227, 178, 90, 0.25);
+    transform: translateY(-1px);
+}
 .admin-root .st-asset img,
 .admin-root .st-asset video {
     width: 100%;
@@ -100,24 +147,25 @@
 }
 .admin-root .st-asset__badge {
     position: absolute;
-    left: 4px;
-    top: 4px;
+    left: 5px;
+    top: 5px;
     font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: rgba(10, 23, 48, 0.72);
-    color: #fff;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(7, 13, 24, 0.82);
+    color: #e3b25a;
+    border: 1px solid rgba(227, 178, 90, 0.3);
 }
 .admin-root .st-asset__name {
     position: absolute;
     inset: auto 0 0 0;
-    padding: 2px 5px;
+    padding: 10px 6px 4px;
     font-size: 10px;
-    color: #fff;
-    background: linear-gradient(180deg, transparent, rgba(10,23,48,0.72));
+    color: #dfe8f5;
+    background: linear-gradient(180deg, transparent, rgba(7, 13, 24, 0.9));
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -125,43 +173,49 @@
 .admin-root .st-drop {
     border: 1.5px dashed var(--line-2);
     border-radius: var(--r-md);
-    padding: 16px;
+    padding: 22px 16px;
     text-align: center;
     color: var(--ink-3);
     font-size: 12px;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 .admin-root .st-drop:hover,
-.admin-root .st-drop--over { border-color: var(--blue); background: var(--blue-soft); color: #1d5cb4; }
+.admin-root .st-drop--over {
+    border-color: rgba(227, 178, 90, 0.7);
+    background: rgba(227, 178, 90, 0.08);
+    color: #f0d59a;
+}
 
-/* ── Preview stage (dark media surface) ─────────────────────────────────*/
+/* ── Preview stage (near-black media surface) ───────────────────────────*/
 .admin-root .st-preview {
     grid-area: preview;
-    background: #0b1220;
+    background: radial-gradient(80% 60% at 50% 40%, #0a1220 0%, #05080f 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 0;
     min-width: 0;
-    padding: 16px;
-    gap: 12px;
+    padding: 20px;
+    gap: 14px;
     position: relative;
 }
 .admin-root .st-stage {
     position: relative;
     background: #000;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(150, 180, 226, 0.1);
     max-height: 100%;
     max-width: 100%;
+    overflow: hidden;
 }
 .admin-root .st-stage canvas { display: block; max-height: 100%; max-width: 100%; }
 .admin-root .st-transport {
     display: flex;
     align-items: center;
-    gap: 12px;
-    color: #c9d6ea;
+    gap: 14px;
+    color: var(--ink-2);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
 }
@@ -169,20 +223,22 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.16);
-    background: rgba(255,255,255,0.06);
-    color: #fff;
+    border: 1px solid rgba(227, 178, 90, 0.35);
+    background: linear-gradient(180deg, rgba(227, 178, 90, 0.16), rgba(227, 178, 90, 0.06));
+    color: #f4d89a;
     cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
 }
-.admin-root .st-transport button:hover { background: rgba(255,255,255,0.12); }
+.admin-root .st-transport button:hover { background: rgba(227, 178, 90, 0.24); }
+.admin-root .st-transport button:active { transform: scale(0.94); }
 
 /* ── Timeline ────────────────────────────────────────────────────────────*/
 .admin-root .st-timeline {
     grid-area: timeline;
-    background: var(--surface);
+    background: linear-gradient(180deg, rgba(16, 26, 48, 0.9), rgba(11, 19, 38, 0.95));
     border-top: 1px solid var(--line);
     display: flex;
     flex-direction: column;
@@ -193,7 +249,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 7px 12px;
     border-bottom: 1px solid var(--line);
     flex: none;
 }
@@ -210,8 +266,8 @@
 .admin-root .st-ruler {
     position: sticky;
     top: 0;
-    height: 22px;
-    background: var(--surface-2);
+    height: 24px;
+    background: #0a1526;
     border-bottom: 1px solid var(--line);
     z-index: 3;
 }
@@ -219,98 +275,93 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    border-left: 1px solid var(--line-2);
-    padding-left: 4px;
+    border-left: 1px solid rgba(150, 180, 226, 0.16);
+    padding-left: 5px;
     font-size: 9px;
     color: var(--ink-3);
     font-variant-numeric: tabular-nums;
+    line-height: 24px;
 }
 .admin-root .st-track {
     position: relative;
-    height: 56px;
-    border-bottom: 1px solid var(--line);
-    background: var(--surface);
+    height: 58px;
+    border-bottom: 1px solid rgba(150, 180, 226, 0.08);
+    background: rgba(255, 255, 255, 0.008);
 }
-.admin-root .st-track--audio { background: #f7faf8; }
-.admin-root .st-track--text { background: #faf8f4; }
+.admin-root .st-track--audio { background: rgba(46, 158, 99, 0.05); }
+.admin-root .st-track--text { background: rgba(227, 178, 90, 0.05); }
+.admin-root .st-track--image { background: rgba(123, 97, 255, 0.05); }
 .admin-root .st-playhead {
     position: absolute;
     top: 0;
     bottom: 0;
     width: 2px;
-    background: var(--sun);
+    background: #f4c869;
     z-index: 5;
     pointer-events: none;
+    box-shadow: 0 0 8px rgba(244, 200, 105, 0.7);
 }
 .admin-root .st-playhead::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -4px;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid var(--sun);
+    left: -5px;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 7px solid #f4c869;
 }
 
-/* ── Clip ────────────────────────────────────────────────────────────────*/
+/* ── Clip (glassy gradient chips) ────────────────────────────────────────*/
 .admin-root .st-clip {
     position: absolute;
-    top: 4px;
-    bottom: 4px;
-    border-radius: 6px;
-    background: var(--blue-soft);
-    border: 1px solid #bcd4f2;
+    top: 5px;
+    bottom: 5px;
+    border-radius: 7px;
     overflow: hidden;
     cursor: grab;
     user-select: none;
     display: flex;
     align-items: center;
-    padding: 0 8px;
+    padding: 0 9px;
     font-size: 11px;
-    color: #1d5cb4;
+    font-weight: 600;
     white-space: nowrap;
+    box-shadow: var(--shadow-0), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
-.admin-root .st-clip--video { background: #e7eefb; border-color: #bcd4f2; color: #1d5cb4; }
-.admin-root .st-clip--audio { background: #e2f4ea; border-color: #b9e0c9; color: #1d7a4f; }
-.admin-root .st-clip--text { background: #fdf3e0; border-color: #ecd9ae; color: #8a6420; }
-.admin-root .st-clip--image { background: #efe9fb; border-color: #d6c9f2; color: #5b3fc4; }
-.admin-root .st-clip--selected { outline: 2px solid var(--blue); outline-offset: 0; z-index: 4; }
+.admin-root .st-clip--video { background: linear-gradient(180deg, #2f568c, #1b3358); color: #cfe2ff; }
+.admin-root .st-clip--audio { background: linear-gradient(180deg, #237a52, #164a32); color: #c9f4dc; }
+.admin-root .st-clip--text { background: linear-gradient(180deg, #7a5f22, #4d3c14); color: #ffe9b8; }
+.admin-root .st-clip--image { background: linear-gradient(180deg, #5a48a0, #372a6a); color: #e0d6ff; }
+.admin-root .st-clip--selected { outline: 2px solid #f4c869; outline-offset: 0; z-index: 4; box-shadow: 0 0 0 1px #f4c869, 0 6px 18px rgba(0, 0, 0, 0.5); }
 .admin-root .st-clip__handle {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 8px;
+    width: 9px;
     cursor: ew-resize;
-    background: rgba(36, 114, 220, 0.25);
+    background: rgba(255, 255, 255, 0.18);
 }
+.admin-root .st-clip__handle:hover { background: rgba(244, 200, 105, 0.5); }
 .admin-root .st-clip__handle--l { left: 0; }
 .admin-root .st-clip__handle--r { right: 0; }
-.admin-root .st-clip__thumb {
-    position: absolute;
-    inset: 0;
-    opacity: 0.35;
-    object-fit: cover;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-}
-.admin-root .st-clip__label { position: relative; z-index: 1; }
+.admin-root .st-clip__label { position: relative; z-index: 1; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
 
 /* ── Inspector rows ──────────────────────────────────────────────────────*/
-.admin-root .st-field { margin-bottom: 14px; }
+.admin-root .st-field { margin-bottom: 15px; }
 .admin-root .st-field__label {
     display: block;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--ink-2);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
 }
 .admin-root .st-row { display: flex; align-items: center; gap: 8px; }
-.admin-root .st-range { width: 100%; accent-color: var(--blue); }
+.admin-root .st-range { width: 100%; accent-color: #e3b25a; }
 .admin-root .st-num {
-    width: 56px;
+    width: 58px;
     text-align: right;
     font-variant-numeric: tabular-nums;
     font-size: 12px;
@@ -322,26 +373,38 @@
     position: sticky;
     left: 0;
     z-index: 4;
-    width: 128px;
+    width: 132px;
     flex: none;
-    background: var(--surface-2);
+    background: #0a1526;
     border-right: 1px solid var(--line);
 }
 .admin-root .st-thead__row {
-    height: 56px;
+    height: 58px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 10px;
-    border-bottom: 1px solid var(--line);
+    gap: 8px;
+    padding: 0 12px;
+    border-bottom: 1px solid rgba(150, 180, 226, 0.08);
     font-size: 12px;
     font-weight: 600;
     color: var(--ink-2);
+    text-transform: capitalize;
+}
+.admin-root .st-thead__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex: none;
 }
 
 .admin-root .st-empty-hint {
     color: var(--ink-3);
     font-size: 12px;
     text-align: center;
-    padding: 20px 8px;
+    padding: 22px 10px;
+    line-height: 1.5;
 }
+
+/* Selects inside the dark studio inherit tokens but need explicit option color
+   on some platforms. */
+.admin-root .st-root select.ak-field__input option { background: #0e1830; color: var(--ink); }

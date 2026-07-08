@@ -126,8 +126,10 @@ export default function StudioApp({ postId }: { postId: string }) {
                 <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => router.push(`/admin/post/${postId}`)}>
                     <ArrowLeft size={15} /> Back
                 </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/kumolab-cloud-mark-gold.png" alt="" className="st-topbar__logo" />
                 <div>
-                    <div className="st-topbar__title">Studio</div>
+                    <div className="st-topbar__title">KumoLab Studio</div>
                     <div className="st-topbar__sub">{loading ? 'Loading…' : postTitle}</div>
                 </div>
                 <div className="st-spacer" />

@@ -2,7 +2,6 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import VideoEditor from '@/components/admin/post/VideoEditor';
 import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
@@ -549,11 +548,6 @@ export default function PostEditor() {
                     For non-pending posts there's nothing to approve, so a
                     single plain Save. */}
                 <div className="flex gap-2">
-                    {isVideoPost && (
-                        <button onClick={() => router.push(`/admin/post/${id}/studio`)} className="ak-btn ak-btn--secondary" title="Open the full multi-track video editor">
-                            🎬 Open in Studio
-                        </button>
-                    )}
                     <button onClick={handleCancel} disabled={!!busy} className="ak-btn ak-btn--ghost">
                         Cancel
                     </button>
@@ -704,28 +698,31 @@ export default function PostEditor() {
                         </div>
                     </Card>
 
-                    <VideoEditor
-                        postId={id}
-                        // Always load the immutable original. staged_video_url is
-                        // the publisher's current trimmed file; the editor needs
-                        // the full source to let the operator re-trim freely.
-                        // Legacy posts (imported before original_video_url existed)
-                        // fall back to staged_video_url, which on a never-trimmed
-                        // post is identical to the original.
-                        initialVideoUrl={post.social_ids.original_video_url || post.social_ids.staged_video_url}
-                        initialStagedUrl={post.social_ids.staged_video_url}
-                        initialSettings={post.image_settings?.video}
-                        onSettingsChange={(s) => { videoSettingsRef.current = s; }}
-                        onProcessed={(newUrl) => {
-                            // Mirror the new URL onto local post state so other
-                            // parts of the page (Save, etc.) reflect the change
-                            // without a full reload.
-                            setPost((prev: any) => prev ? {
-                                ...prev,
-                                social_ids: { ...prev.social_ids, staged_video_url: newUrl },
-                            } : prev);
-                        }}
-                    />
+                    {/* Video editing lives entirely in the Studio — one clear,
+                        professional entry point (no inline half-editor). */}
+                    <Card className="p-5">
+                        <div className="flex items-center gap-4">
+                            <div className="relative shrink-0 rounded-lg overflow-hidden" style={{ width: 76, height: 100, background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                                {post.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={post.image} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                                    <video src={post.social_ids.staged_video_url} muted preload="metadata" className="w-full h-full object-cover" />
+                                )}
+                                <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(10,23,48,0.25)', color: '#fff', fontSize: 22 }}>▶</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="ak-heading">KumoLab Studio</div>
+                                <p className="ak-body-sm" style={{ marginTop: 2 }}>
+                                    Trim, add clips, text, music, transitions and export a finished vertical reel in the full editor.
+                                </p>
+                            </div>
+                            <button className="ak-btn ak-btn--primary" onClick={() => router.push(`/admin/post/${id}/studio`)}>
+                                Open Studio →
+                            </button>
+                        </div>
+                    </Card>
                 </>
             ) : (
                 <>
