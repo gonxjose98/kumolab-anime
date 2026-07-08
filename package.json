@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "prebuild": "node scripts/copy-ffmpeg-core.mjs",
+    "build": "node scripts/copy-ffmpeg-core.mjs && next build",
+    "postinstall": "node scripts/copy-ffmpeg-core.mjs",
     "start": "next start",
     "lint": "eslint",
     "engine:08:00": "tsx scripts/run-engine.ts 08:00",
@@ -14,6 +16,7 @@
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/core-mt": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@napi-rs/canvas": "^0.1.88",

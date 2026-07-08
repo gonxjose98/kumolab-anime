@@ -87,6 +87,17 @@ const nextConfig = {
                         value: 'public, max-age=31536000, immutable'
                     }
                 ]
+            },
+            {
+                // Cross-origin isolation for the Studio route only — enables the
+                // multithreaded FFmpeg.wasm core (SharedArrayBuffer). Scoped to
+                // this path so it never affects the rest of the admin/storefront
+                // (global COEP would break cross-origin images + OAuth popups).
+                source: '/admin/post/:id/studio',
+                headers: [
+                    { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+                    { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' }
+                ]
             }
         ];
     },

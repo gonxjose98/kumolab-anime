@@ -91,6 +91,8 @@ export interface Clip {
     text?: TextStyle;      // text clips
     transitionIn?: Transition;
     effects?: ClipEffect[];
+    fadeIn?: number;       // seconds; 0/undefined = none
+    fadeOut?: number;      // seconds
     z: number;             // stacking within a frame (higher = front)
 }
 
@@ -110,6 +112,7 @@ export interface ProjectMeta {
     canvasHeight: number;  // 1920
     fps: number;           // 30
     backgroundColor: string;
+    watermark: boolean;    // burn @kumolabanime bottom-right on export
 }
 
 export interface VideoProject {
@@ -129,6 +132,7 @@ export const DEFAULT_META: ProjectMeta = {
     canvasHeight: 1920,
     fps: 30,
     backgroundColor: '#000000',
+    watermark: true,
 };
 
 export const DEFAULT_TRANSFORM: Transform = {

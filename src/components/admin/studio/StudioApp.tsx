@@ -86,9 +86,11 @@ export default function StudioApp({ postId }: { postId: string }) {
         return () => clearTimeout(t);
     }, [project, postId]);
 
-    // Expose stores for debugging / automated verification (harmless).
+    // Expose stores for debugging / automated verification (dev only).
     useEffect(() => {
-        (window as any).__studio = { project: useProjectStore, playback: usePlaybackStore, media: useMediaStore };
+        if (process.env.NODE_ENV !== 'production') {
+            (window as any).__studio = { project: useProjectStore, playback: usePlaybackStore, media: useMediaStore };
+        }
     }, []);
 
     // Keyboard: space = play/pause, delete = remove selection.

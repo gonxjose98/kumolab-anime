@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { renderProject } from './export/renderProject';
-import { isIsolated } from './export/ffmpegClient';
 import { CAPS } from './types';
 
 type Phase = 'idle' | 'rendering' | 'uploading' | 'done' | 'error';
@@ -25,6 +24,7 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
     const abortRef = useRef<AbortController | null>(null);
 
     const project = useProjectStore.getState().project;
+    const watermark = useProjectStore((s) => s.project?.meta.watermark ?? true);
     const dur = project?.durationSec ?? 0;
     const overCap = dur > CAPS.maxDurationSec;
     const busy = phase === 'rendering' || phase === 'uploading';
@@ -100,9 +100,14 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
                                 </select>
                             </div>
 
+                            <label className="ak-body-sm" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={watermark} disabled={busy}
+                                    onChange={(e) => useProjectStore.getState().setMeta({ watermark: e.target.checked })} />
+                                Burn in the <strong>@kumolabanime</strong> watermark
+                            </label>
+
                             <div className="ak-body-sm">
-                                Duration <strong>{dur.toFixed(1)}s</strong> · renders in your browser
-                                {isIsolated() ? ' (fast mode)' : ' (standard mode)'}.
+                                Duration <strong>{dur.toFixed(1)}s</strong> · renders in your browser.
                                 {dur > CAPS.warnDurationSec && !overCap && <span style={{ color: '#8a6420' }}> Long export — this may take a couple minutes.</span>}
                             </div>
                             {overCap && (

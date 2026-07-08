@@ -3,7 +3,27 @@
 import { Scissors, Trash2 } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
-import type { Clip, Track } from './types';
+import type { Clip, Track, ClipEffect, ClipEffectType } from './types';
+
+/** Read a clip's effect amount (or the neutral default when unset). */
+function effectVal(clip: Clip, type: ClipEffectType, neutral: number): number {
+    const e = clip.effects?.find((x) => x.type === type);
+    return e ? e.amount : neutral;
+}
+/** Return a new effects array with `type` set to `amount` (removed at neutral). */
+function withEffect(clip: Clip, type: ClipEffectType, amount: number, neutral: number): ClipEffect[] {
+    const rest = (clip.effects || []).filter((x) => x.type !== type);
+    return amount === neutral ? rest : [...rest, { type, amount }];
+}
+
+function Check({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }) {
+    return (
+        <label className="st-row" style={{ gap: 6, cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)' }}>
+            <input type="checkbox" checked={on} onChange={(e) => onToggle(e.target.checked)} />
+            {label}
+        </label>
+    );
+}
 
 /** Right rail: properties of the selected clip. */
 export default function Inspector() {
@@ -104,6 +124,24 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                         fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ xPct: v })} />
                     <RangeRow label="Position Y" min={0} max={1} step={0.01} value={clip.transform.yPct}
                         fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ yPct: v })} />
+
+                    {/* Colour effects */}
+                    <RangeRow label="Brightness" min={-0.5} max={0.5} step={0.02} value={effectVal(clip, 'brightness', 0)}
+                        fmt={(v) => v.toFixed(2)} onChange={(v) => set({ effects: withEffect(clip, 'brightness', v, 0) })} />
+                    <RangeRow label="Contrast" min={0.5} max={1.8} step={0.02} value={effectVal(clip, 'contrast', 1)}
+                        fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'contrast', v, 1) })} />
+                    <RangeRow label="Saturation" min={0} max={2.5} step={0.05} value={effectVal(clip, 'saturation', 1)}
+                        fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'saturation', v, 1) })} />
+                    <RangeRow label="Blur" min={0} max={20} step={1} value={effectVal(clip, 'blur', 0)}
+                        fmt={(v) => (v ? `${Math.round(v)}px` : 'off')} onChange={(v) => set({ effects: withEffect(clip, 'blur', v, 0) })} />
+                    <div className="st-field">
+                        <span className="st-field__label">Filters</span>
+                        <div className="st-row" style={{ gap: 12, flexWrap: 'wrap' }}>
+                            <Check label="Grayscale" on={effectVal(clip, 'grayscale', 0) > 0} onToggle={(on) => set({ effects: withEffect(clip, 'grayscale', on ? 1 : 0, 0) })} />
+                            <Check label="Fade in" on={!!clip.fadeIn} onToggle={(on) => set({ fadeIn: on ? 0.4 : 0 })} />
+                            <Check label="Fade out" on={!!clip.fadeOut} onToggle={(on) => set({ fadeOut: on ? 0.4 : 0 })} />
+                        </div>
+                    </div>
                 </>
             )}
 

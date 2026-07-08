@@ -44,6 +44,54 @@ function fitFilter(tr: Transform | undefined, W: number, H: number): string {
     return `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=${color}`;
 }
 
+/** Per-clip colour effects → an appendable filter fragment (leading comma). */
+function effectsFilter(clip: Clip): string {
+    const parts: string[] = [];
+    const eq: string[] = [];
+    for (const fx of clip.effects || []) {
+        if (fx.type === 'brightness' && fx.amount) eq.push(`brightness=${fx.amount}`);        // -1..1
+        else if (fx.type === 'contrast' && fx.amount !== 1) eq.push(`contrast=${fx.amount}`); // 0..2 (1 neutral)
+        else if (fx.type === 'saturation' && fx.amount !== 1) eq.push(`saturation=${fx.amount}`);
+        else if (fx.type === 'grayscale' && fx.amount > 0) parts.push('hue=s=0');
+        else if (fx.type === 'blur' && fx.amount > 0) parts.push(`boxblur=${Math.round(fx.amount)}`);
+    }
+    if (eq.length) parts.unshift(`eq=${eq.join(':')}`);
+    return parts.length ? ',' + parts.join(',') : '';
+}
+
+/** Per-clip fade in/out → an appendable filter fragment (leading comma). */
+function fadeFilter(clip: Clip, dur: number): string {
+    const parts: string[] = [];
+    if (clip.fadeIn && clip.fadeIn > 0) parts.push(`fade=t=in:st=0:d=${Math.min(clip.fadeIn, dur).toFixed(2)}`);
+    if (clip.fadeOut && clip.fadeOut > 0) parts.push(`fade=t=out:st=${Math.max(0, dur - clip.fadeOut).toFixed(2)}:d=${Math.min(clip.fadeOut, dur).toFixed(2)}`);
+    return parts.length ? ',' + parts.join(',') : '';
+}
+
+/** Full-frame transparent PNG with the @kumolabanime mark bottom-right. */
+function watermarkPng(W: number, H: number): Promise<Uint8Array> {
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d')!;
+    const fontPx = Math.round(H * 0.022);
+    ctx.font = `800 ${fontPx}px Outfit, Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    const x = W - Math.round(W * 0.035);
+    const y = H - Math.round(H * 0.03);
+    ctx.lineWidth = Math.max(2, fontPx * 0.12);
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineJoin = 'round';
+    ctx.strokeText('@kumolabanime', x, y);
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
+    ctx.fillText('@kumolabanime', x, y);
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((b) => {
+            if (!b) return reject(new Error('watermark render failed'));
+            b.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
+        }, 'image/png');
+    });
+}
+
 /** Render a text clip to a full-frame transparent PNG (overlaid at 0,0). */
 function textPng(clip: Clip, W: number, H: number): Promise<Uint8Array> {
     const ts = clip.text as TextStyle;
@@ -140,7 +188,7 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
         const vBase = asset.kind === 'image'
             ? `${fitFilter(clip.transform, W, H)}`
             : `trim=start=${clip.srcStart}:end=${clip.srcEnd},setpts=(PTS-STARTPTS)/${clip.speed},${fitFilter(clip.transform, W, H)}`;
-        const vChain = `[0:v]${vBase},fps=${fps},format=yuv420p,setsar=1[v]`;
+        const vChain = `[0:v]${vBase}${effectsFilter(clip)}${fadeFilter(clip, clipDur)},fps=${fps},format=yuv420p,setsar=1[v]`;
 
         const args: string[] = [];
         if (asset.kind === 'image') { args.push('-loop', '1', '-t', clipDur.toFixed(3), '-i', inName); }
@@ -225,6 +273,20 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
             await ffmpeg.exec([...inputs, '-filter_complex', filter, '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', ...ACODEC, '-movflags', '+faststart', outName]);
             baseName = outName;
         }
+    }
+
+    // ── Stage 5: @kumolabanime watermark ───────────────────────────────────
+    if (project.meta.watermark) {
+        throwIfAborted(signal);
+        report(0.92, 'Watermark');
+        await ffmpeg.writeFile('wm.png', await watermarkPng(W, H));
+        const outName = 'base_wm.mp4';
+        await ffmpeg.exec([
+            '-i', baseName, '-i', 'wm.png',
+            '-filter_complex', '[0:v][1:v]overlay=0:0[v]',
+            '-map', '[v]', '-map', '0:a?', ...VCODEC, '-c:a', 'copy', outName,
+        ]);
+        baseName = outName;
     }
 
     // Ensure faststart on the final container.

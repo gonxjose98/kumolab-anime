@@ -7,6 +7,7 @@ import {
     type Clip,
     type MediaAsset,
     type TrackKind,
+    type ProjectMeta,
     emptyProject,
     uid,
 } from '../types';
@@ -26,6 +27,7 @@ interface ProjectStore {
     load: (project: VideoProject) => void;
     initEmpty: (postId: string) => void;
 
+    setMeta: (patch: Partial<ProjectMeta>) => void;
     addMedia: (asset: MediaAsset) => void;
     removeMedia: (mediaId: string) => void;
 
@@ -107,6 +109,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         load: (project) => set({ project: clone(project), past: [], future: [], selectedClipIds: [] }),
         initEmpty: (postId) => set({ project: emptyProject(postId), past: [], future: [], selectedClipIds: [] }),
 
+        setMeta: (patch) => commit((p) => { p.meta = { ...p.meta, ...patch }; }),
         addMedia: (asset) => commit((p) => {
             if (!p.media.some((m) => m.id === asset.id)) p.media.push(asset);
         }),
