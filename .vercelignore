@@ -4,5 +4,4 @@
 .git
 .vercel
 node_modules
-/scripts
 /test
