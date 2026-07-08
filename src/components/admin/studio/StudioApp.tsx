@@ -13,6 +13,7 @@ import MediaLibrary from './MediaLibrary';
 import PreviewCanvas from './PreviewCanvas';
 import Timeline from './Timeline';
 import Inspector from './Inspector';
+import ExportDialog from './ExportDialog';
 import './studio.css';
 
 export default function StudioApp({ postId }: { postId: string }) {
@@ -23,6 +24,7 @@ export default function StudioApp({ postId }: { postId: string }) {
     const project = useProjectStore((s) => s.project);
     const isPlaying = usePlaybackStore((s) => s.isPlaying);
     const savedRef = useRef<string>('');
+    const [exportOpen, setExportOpen] = useState(false);
 
     // Load the post → build or restore the project.
     useEffect(() => {
@@ -84,6 +86,11 @@ export default function StudioApp({ postId }: { postId: string }) {
         return () => clearTimeout(t);
     }, [project, postId]);
 
+    // Expose stores for debugging / automated verification (harmless).
+    useEffect(() => {
+        (window as any).__studio = { project: useProjectStore, playback: usePlaybackStore, media: useMediaStore };
+    }, []);
+
     // Keyboard: space = play/pause, delete = remove selection.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -126,10 +133,12 @@ export default function StudioApp({ postId }: { postId: string }) {
                 <div className="st-spacer" />
                 <button className="ak-btn ak-btn--ghost ak-btn--sm" title="Undo" onClick={() => useProjectStore.getState().undo()}><Undo2 size={15} /></button>
                 <button className="ak-btn ak-btn--ghost ak-btn--sm" title="Redo" onClick={() => useProjectStore.getState().redo()}><Redo2 size={15} /></button>
-                <button className="ak-btn ak-btn--primary" disabled title="Export (coming in the next milestone)">
+                <button className="ak-btn ak-btn--primary" onClick={() => setExportOpen(true)} disabled={loading || !project?.durationSec}>
                     <Download size={15} /> Export
                 </button>
             </div>
+
+            {exportOpen && <ExportDialog postId={postId} onClose={() => setExportOpen(false)} onDone={() => { /* stays open to show success */ }} />}
 
             {loading ? (
                 <div style={{ gridArea: 'preview', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c9d6ea' }}>
