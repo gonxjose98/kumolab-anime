@@ -112,22 +112,9 @@ async function StreamedHealthCard() {
 
 function HealthCardSkeleton() {
     return (
-        <div className="ak-card">
-            <div className="ak-card__header">
-                <span className="ak-title">System health</span>
-                <span className="ak-caption">Checking…</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg animate-pulse" style={{ background: 'var(--surface-2)' }}>
-                        <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: 'var(--line-2)' }} />
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                            <div className="h-2.5 rounded w-1/3" style={{ background: 'var(--line-2)' }} />
-                            <div className="h-2 rounded w-2/3" style={{ background: 'var(--line)' }} />
-                        </div>
-                    </div>
-                ))}
-            </div>
+        <div className="ak-card flex items-center justify-between">
+            <span className="ak-title">System health</span>
+            <span className="ak-caption">Checking…</span>
         </div>
     );
 }
@@ -250,23 +237,30 @@ export default async function DashboardPage() {
                             <span className="ak-caption">Auto-publish handled everything that came through.</span>
                         </div>
                     ) : (
-                        <ul>
-                            {data.pendingPosts.map((p) => (
-                                <li key={p.id} className="flex items-center gap-4 px-5 py-3" style={{ borderTop: '1px solid var(--line)' }}>
-                                    <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
-                                    <div className="flex-1 min-w-0">
-                                        <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
-                                            {p.title}
-                                        </Link>
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <ClaimPill claim={p.claim_type} />
-                                            <span className="ak-caption">{p.source} · {timeAgo(p.timestamp)}</span>
+                        <>
+                            <ul>
+                                {data.pendingPosts.slice(0, 6).map((p) => (
+                                    <li key={p.id} className="flex items-center gap-4 px-5 py-3" style={{ borderTop: '1px solid var(--line)' }}>
+                                        <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
+                                        <div className="flex-1 min-w-0">
+                                            <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
+                                                {p.title}
+                                            </Link>
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                                <ClaimPill claim={p.claim_type} />
+                                                <span className="ak-caption">{p.source} · {timeAgo(p.timestamp)}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <PendingReviewActions postId={p.id} postTitle={p.title} />
-                                </li>
-                            ))}
-                        </ul>
+                                        <PendingReviewActions postId={p.id} postTitle={p.title} />
+                                    </li>
+                                ))}
+                            </ul>
+                            {stats.pending > 6 && (
+                                <Link href="/admin/posts" className="block text-center px-5 py-3 ak-caption" style={{ borderTop: '1px solid var(--line)', color: 'var(--gold-text)', textDecoration: 'none' }}>
+                                    View all {stats.pending} pending in Posts →
+                                </Link>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -423,18 +417,30 @@ function HealthCard({ snapshot }: { snapshot: HealthSnapshot }) {
     const cls = snapshot.overall === 'crit' ? 'ak-badge--error' : snapshot.overall === 'warn' ? 'ak-badge--pending' : 'ak-badge--published';
     const label = snapshot.overall === 'crit' ? 'Action needed' : snapshot.overall === 'warn' ? 'Degraded' : 'All systems go';
 
+    const issues = snapshot.checks.filter((c) => c.level !== 'ok').length;
+    // Collapsed when everything's healthy (declutter); auto-opens when there's
+    // something to look at, so problems are never hidden.
     return (
-        <div className="ak-card">
-            <div className="ak-card__header">
-                <span className="ak-title">System health</span>
-                <span className={`ak-badge ${cls}`}>{label}</span>
+        <details className="ak-card ak-card--flush group" open={snapshot.overall !== 'ok'}>
+            <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
+                <div className="flex items-center gap-3">
+                    <span className="ak-title">System health</span>
+                    <span className={`ak-badge ${cls}`}>{label}</span>
+                    {issues > 0 && <span className="ak-caption">{issues} to check</span>}
+                </div>
+                <span className="ak-caption">
+                    <span className="group-open:hidden">Show</span>
+                    <span className="hidden group-open:inline">Hide</span>
+                </span>
+            </summary>
+            <div className="px-5 pb-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {snapshot.checks.map((c) => (
+                        <HealthRow key={c.key} level={c.level} label={c.label} detail={c.detail} actionable={c.actionable} />
+                    ))}
+                </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {snapshot.checks.map((c) => (
-                    <HealthRow key={c.key} level={c.level} label={c.label} detail={c.detail} actionable={c.actionable} />
-                ))}
-            </div>
-        </div>
+        </details>
     );
 }
 
