@@ -7,6 +7,7 @@ import { runCleanupWorker } from '@/lib/engine/cleanup-worker';
 import { generateIntelImage } from '@/lib/engine/image-processor';
 import { refreshMetaToken } from '@/lib/engine/token-health';
 import { publishToSocials } from '@/lib/social/publisher';
+import { syncSocialMetrics } from '@/lib/social/metrics-sync';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const maxDuration = 300;
@@ -231,6 +232,19 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        // Per-post Instagram metrics → posts.social_metrics. Runs on a schedule
+        // (see vercel.json) so the analytics "Social" column stays fresh without
+        // anyone pressing the Sync button. Each run refreshes the most recent
+        // posts (whose numbers move most) and picks up any newly-published post
+        // still missing metrics. Rate-limit aware: stops cleanly if Meta throttles.
+        if (worker === 'metrics-sync') {
+            console.log('[Cron] Syncing per-post social metrics...');
+            const raw = Number(searchParams.get('limit'));
+            const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.trunc(raw), 1), 300) : 150;
+            const result = await syncSocialMetrics(limit);
+            return NextResponse.json({ success: result.ok, worker: 'metrics-sync', ...result });
+        }
+
         if (worker === 'cleanup') {
             console.log('[Cron] Running Cleanup Worker...');
             const result = await runCleanupWorker();
@@ -333,7 +347,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social', 'metrics-sync']
         }, { status: 400 });
 
     } catch (error: any) {
