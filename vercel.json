@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/cron?worker=metrics-sync",
-      "schedule": "40 */6 * * *"
+      "schedule": "40 */12 * * *"
     }
   ],
   "build": {
