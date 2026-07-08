@@ -91,15 +91,11 @@ export const TIER_2_RSS_SOURCES = [
     checkInterval: 30,
     healthScore: 100
   },
-  {
-    name: 'Anime Herald',
-    url: 'https://www.animeherald.com/feed/',
-    tier: 2,
-    weight: 6,
-    language: 'EN',
-    checkInterval: 30,
-    healthScore: 100
-  },
+  // Anime Herald retired 2026-07-08: its feed now sits behind Cloudflare bot
+  // protection that hard-blocks Vercel's datacenter IPs (the feed loads fine
+  // from a normal IP, so it's IP-based, not a header/UA fix). It failed 515
+  // times in a row over ~3 weeks. Re-add via a proxy/scraper if we ever want
+  // it back — a plain fetch from our infra can't reach it.
 
   // Platform News
   {

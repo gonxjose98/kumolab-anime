@@ -120,16 +120,27 @@ async function updateSourceHealthDB(
 // "Errors 24h" counter lights up. Keeps single-tick network blips from
 // pretending to be incidents.
 const PERSISTENT_RSS_FAILURE_THRESHOLD = 3;
+// Above this many consecutive failures a source isn't a fresh incident anymore —
+// it's chronically dead (site started blocking us, feed moved, domain gone).
+// Re-escalating to error_logs every run past this point just inflates the
+// "Errors 24h" counter forever with a problem the operator already knows about.
+// So we alert only in the window [THRESHOLD, CEILING] — long enough (~a day of
+// runs) to surface a genuinely new breakage — then fall back to operational
+// logging. The source stays disabled either way; we simply stop re-alerting.
+const CHRONIC_RSS_FAILURE_CEILING = 30;
 
 // One log call per RSS fetch failure. Routes to action_logs by default;
-// escalates to error_logs once a source has flaked N times in a row.
+// escalates to error_logs while a source is newly-but-persistently failing.
 async function logRssFailure(
   sourceName: string,
   sourceUrl: string,
   reason: string,
   consecutiveFailures: number,
 ) {
-  if (consecutiveFailures >= PERSISTENT_RSS_FAILURE_THRESHOLD) {
+  if (
+    consecutiveFailures >= PERSISTENT_RSS_FAILURE_THRESHOLD &&
+    consecutiveFailures <= CHRONIC_RSS_FAILURE_CEILING
+  ) {
     await logError({
       source: 'detection-worker',
       errorMessage: `RSS fetch failing persistently for ${sourceName} (${consecutiveFailures} consecutive)`,
