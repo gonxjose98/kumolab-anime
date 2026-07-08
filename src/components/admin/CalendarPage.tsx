@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import AdminPageHeader from './AdminSubLayout';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface CalendarEvent {
     id: string;
@@ -74,46 +74,34 @@ export default function CalendarPageClient() {
     const selectedEvents = selectedDay ? getEventsForDay(selectedDay) : [];
 
     return (
-        <div className="max-w-7xl mx-auto">
-            <AdminPageHeader
-                title="Calendar"
-                subtitle="Scheduled posts, cron jobs, and task deadlines"
-                accentColor="#ff3cac"
-                icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
+        <div className="max-w-6xl mx-auto">
+            <p className="ak-caption" style={{ marginBottom: '16px' }}>Scheduled posts, cron jobs, and task deadlines</p>
 
             <div className="flex gap-4 flex-col lg:flex-row">
                 {/* Calendar Grid */}
-                <div
-                    className="flex-1 rounded-xl overflow-hidden"
-                    style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
-                >
+                <div className="flex-1 ak-card ak-card--flush">
                     {/* Month Nav */}
-                    <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <button onClick={prevMonth} className="p-1.5 rounded-lg transition-all hover:bg-white/5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2"><path d="M15 19l-7-7 7-7" /></svg>
+                    <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
+                        <button onClick={prevMonth} className="ak-cal__nav" aria-label="Previous month">
+                            <ChevronLeft size={16} />
                         </button>
-                        <span className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
-                            {MONTHS[month]} {year}
-                        </span>
-                        <button onClick={nextMonth} className="p-1.5 rounded-lg transition-all hover:bg-white/5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>
+                        <span className="ak-heading">{MONTHS[month]} {year}</span>
+                        <button onClick={nextMonth} className="ak-cal__nav" aria-label="Next month">
+                            <ChevronRight size={16} />
                         </button>
                     </div>
 
                     {/* Day Headers */}
                     <div className="grid grid-cols-7 px-3 pt-3">
                         {DAYS.map(d => (
-                            <div key={d} className="text-center text-[9px] font-bold uppercase tracking-wider pb-2" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
-                                {d}
-                            </div>
+                            <div key={d} className="text-center ak-overline pb-2">{d}</div>
                         ))}
                     </div>
 
                     {/* Calendar Cells */}
                     {loading ? (
                         <div className="flex items-center justify-center py-20">
-                            <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#ff3cac', borderTopColor: 'transparent' }} />
+                            <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--line-2)', borderTopColor: 'var(--blue)' }} />
                         </div>
                     ) : (
                         <div className="grid grid-cols-7 px-3 pb-3 gap-px">
@@ -128,18 +116,18 @@ export default function CalendarPageClient() {
                                     <button
                                         key={day}
                                         onClick={() => setSelectedDay(isSelected ? null : day)}
-                                        className="p-1.5 min-h-[72px] rounded-lg text-left transition-all relative group"
+                                        className="ak-cal__cell"
                                         style={{
-                                            background: isSelected ? 'rgba(255,60,172,0.08)' : isTodayCell ? 'rgba(0,212,255,0.05)' : 'transparent',
-                                            border: isSelected ? '1px solid rgba(255,60,172,0.2)' : isTodayCell ? '1px solid rgba(0,212,255,0.15)' : '1px solid transparent',
+                                            background: isSelected ? 'rgba(196,154,82,0.12)' : isTodayCell ? 'var(--blue-soft)' : 'transparent',
+                                            borderColor: isSelected ? 'var(--gold)' : isTodayCell ? '#bcd4f2' : 'transparent',
                                         }}
                                     >
                                         <span
-                                            className="text-[11px] font-medium"
+                                            className="text-[12px]"
                                             style={{
-                                                color: isTodayCell ? '#00d4ff' : 'var(--text-secondary)',
-                                                fontFamily: 'var(--font-display)',
+                                                color: isTodayCell ? 'var(--blue)' : 'var(--ink-2)',
                                                 fontWeight: isTodayCell ? 700 : 500,
+                                                fontVariantNumeric: 'tabular-nums',
                                             }}
                                         >
                                             {day}
@@ -148,15 +136,10 @@ export default function CalendarPageClient() {
                                         {dayEvents.length > 0 && (
                                             <div className="flex gap-0.5 mt-1 flex-wrap">
                                                 {dayEvents.slice(0, 4).map((evt, j) => (
-                                                    <div
-                                                        key={j}
-                                                        className="w-1.5 h-1.5 rounded-full"
-                                                        style={{ background: evt.color }}
-                                                        title={evt.title}
-                                                    />
+                                                    <div key={j} className="w-1.5 h-1.5 rounded-full" style={{ background: evt.color }} title={evt.title} />
                                                 ))}
                                                 {dayEvents.length > 4 && (
-                                                    <span className="text-[7px]" style={{ color: 'var(--text-muted)' }}>+{dayEvents.length - 4}</span>
+                                                    <span className="text-[8px]" style={{ color: 'var(--ink-3)' }}>+{dayEvents.length - 4}</span>
                                                 )}
                                             </div>
                                         )}
@@ -168,22 +151,18 @@ export default function CalendarPageClient() {
                 </div>
 
                 {/* Sidebar: Day Detail + Cron Slots */}
-                <div className="w-full lg:w-80 space-y-4">
+                <div className="w-full lg:w-80 flex flex-col gap-4">
                     {/* Cron Schedule */}
-                    <div
-                        className="rounded-xl overflow-hidden"
-                        style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
-                    >
-                        <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#ffaa00' }}>
-                                Daily Cron Schedule (EST)
-                            </span>
+                    <div className="ak-card ak-card--flush">
+                        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
+                            <span className="ak-overline">Daily Cron Schedule (EST)</span>
                         </div>
-                        <div className="p-3 space-y-1.5">
+                        <div className="p-3 flex flex-col gap-1">
                             {CRON_SLOTS.map((slot) => (
-                                <div key={slot.time} className="flex items-center gap-3 px-2 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                    <span className="text-[10px] font-mono w-12" style={{ color: slot.color }}>{slot.time}</span>
-                                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{slot.label}</span>
+                                <div key={slot.time} className="flex items-center gap-3 px-2 py-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                                    <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: slot.color }} />
+                                    <span className="ak-body-sm" style={{ fontVariantNumeric: 'tabular-nums', width: '44px' }}>{slot.time}</span>
+                                    <span className="ak-body-sm">{slot.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -191,26 +170,21 @@ export default function CalendarPageClient() {
 
                     {/* Selected Day Detail */}
                     {selectedDay && (
-                        <div
-                            className="rounded-xl overflow-hidden"
-                            style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
-                        >
-                            <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)', color: '#ff3cac' }}>
-                                    {MONTHS[month]} {selectedDay}, {year}
-                                </span>
+                        <div className="ak-card ak-card--flush">
+                            <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
+                                <span className="ak-overline">{MONTHS[month]} {selectedDay}, {year}</span>
                             </div>
-                            <div className="p-3 space-y-1.5">
+                            <div className="p-3 flex flex-col gap-1.5">
                                 {selectedEvents.length === 0 ? (
-                                    <p className="text-[10px] text-center py-4" style={{ color: 'var(--text-muted)' }}>Nothing scheduled</p>
+                                    <p className="ak-caption text-center" style={{ padding: '12px 0' }}>Nothing scheduled</p>
                                 ) : selectedEvents.map((evt) => (
-                                    <div key={evt.id} className="flex items-start gap-2 p-2 rounded-lg" style={{ background: `${evt.color}08` }}>
-                                        <div className="w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0" style={{ background: evt.color }} />
+                                    <div key={evt.id} className="flex items-start gap-2 p-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                                        <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: evt.color }} />
                                         <div className="min-w-0">
-                                            <p className="text-[10px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{evt.title}</p>
+                                            <p className="ak-body-sm truncate" style={{ fontWeight: 600, color: 'var(--ink)' }}>{evt.title}</p>
                                             <div className="flex items-center gap-2 mt-0.5">
-                                                {evt.time && <span className="text-[8px] font-mono" style={{ color: evt.color }}>{evt.time}</span>}
-                                                <span className="text-[8px] uppercase" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+                                                {evt.time && <span className="ak-caption" style={{ fontVariantNumeric: 'tabular-nums' }}>{evt.time}</span>}
+                                                <span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                                     {evt.type.replace(/_/g, ' ')}
                                                 </span>
                                             </div>
@@ -222,12 +196,9 @@ export default function CalendarPageClient() {
                     )}
 
                     {/* Legend */}
-                    <div
-                        className="rounded-xl p-3"
-                        style={{ background: 'rgba(12,12,24,0.5)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}
-                    >
-                        <span className="text-[9px] font-bold uppercase tracking-wider block mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-muted)' }}>Legend</span>
-                        <div className="space-y-1.5">
+                    <div className="ak-card">
+                        <span className="ak-overline block" style={{ marginBottom: '10px' }}>Legend</span>
+                        <div className="flex flex-col gap-1.5">
                             {[
                                 { color: '#00d4ff', label: 'Scheduled Post' },
                                 { color: '#ffaa00', label: 'Daily Drop / Cron' },
@@ -236,7 +207,7 @@ export default function CalendarPageClient() {
                             ].map(item => (
                                 <div key={item.label} className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
-                                    <span className="text-[9px]" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+                                    <span className="ak-body-sm">{item.label}</span>
                                 </div>
                             ))}
                         </div>

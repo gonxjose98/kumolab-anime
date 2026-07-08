@@ -97,7 +97,12 @@ export interface Product {
     link?: string; // Printful link (optional)
     // KumoLab-side display overrides (merch_settings). The anchor is cosmetic
     // only — never charged. See src/lib/merch.ts + merch_settings migration.
-    isFeatured?: boolean;
+    isFeatured?: boolean;         // flagship — takes the big hero slot on the home band
     anchorPrice?: number | null;  // cosmetic struck-through compare-at price
     label?: string | null;        // e.g. 'Launch price'
+    // Placement controls (merch_settings). sortOrder is the manual display order
+    // shared by /merch and the home band (asc, nulls last). showOnHome picks
+    // which products land in the home Cloud Collection band.
+    sortOrder?: number | null;
+    showOnHome?: boolean;
 }

@@ -1,10 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import AdminHeader from '@/components/admin/AdminHeader';
-import GalaxyBackground from '@/components/shared/GalaxyBackground';
+import AdminShell from '@/components/admin/AdminShell';
 
-export default async function AdminCalendarLayout({ children }: { children: React.ReactNode }) {
+export default async function CalendarLayout({ children }: { children: React.ReactNode }) {
     const cookieStore = await cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,11 +14,5 @@ export default async function AdminCalendarLayout({ children }: { children: Reac
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) redirect('/admin/login');
 
-    return (
-        <div className="admin-galaxy-wrapper min-h-screen text-white" style={{ background: 'var(--bg-color)' }}>
-            <GalaxyBackground />
-            <AdminHeader userEmail={session.user.email} />
-            <main className="p-4 md:p-6 relative z-10">{children}</main>
-        </div>
-    );
+    return <AdminShell email={session.user.email}>{children}</AdminShell>;
 }

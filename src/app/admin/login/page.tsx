@@ -1,9 +1,10 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
-import GalaxyBackground from '@/components/shared/GalaxyBackground';
+import '../tokens.css';
+import '../admin.css';
 
 export default function AdminLogin() {
     const [email, setEmail] = useState('');
@@ -30,10 +31,7 @@ export default function AdminLogin() {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
             console.error('Login error:', error);
@@ -46,64 +44,44 @@ export default function AdminLogin() {
     };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#06060e' }} className="flex items-center justify-center p-4">
-            <GalaxyBackground />
-            <div className="w-full max-w-sm relative z-10 p-8 rounded-2xl" style={{ background: 'rgba(12,12,24,0.7)', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(30px)', boxShadow: '0 30px 60px rgba(0,0,0,0.5)' }}>
-                {/* Ambient glow */}
-                <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(123,97,255,0.15) 0%, transparent 70%)' }} />
-
-                <div className="mb-8 text-center relative">
-                    <h1 className="text-2xl font-black tracking-tight" style={{ fontFamily: 'var(--font-display)', background: 'linear-gradient(135deg, #00d4ff 0%, #7b61ff 50%, #ff3cac 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                        KUMOLAB
-                    </h1>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] mt-1" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
-                        Restricted Access
-                    </p>
+        <div className="admin-root ak-auth">
+            <div className="ak-auth__clouds" aria-hidden="true" />
+            <div className="ak-auth__card">
+                <div className="ak-auth__brand">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="ak-auth__mark" src="/kumolab-cloud-mark-gold.png" alt="KumoLab" />
+                    <span className="ak-auth__title">KumoLab</span>
+                    <span className="ak-auth__sub">Admin Console</span>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-4 relative">
-                    <div>
+                <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                    <label className="ak-field">
+                        <span className="ak-field__label">Email</span>
                         <input
                             type="email"
-                            placeholder="Email"
+                            className="ak-field__input"
+                            placeholder="you@kumolab.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-neutral-500 outline-none transition-all focus:ring-1"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontFamily: 'var(--font-main)' }}
                             required
                         />
-                    </div>
-                    <div>
+                    </label>
+                    <label className="ak-field">
+                        <span className="ak-field__label">Password</span>
                         <input
                             type="password"
-                            placeholder="Password"
+                            className="ak-field__input"
+                            placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-neutral-500 outline-none transition-all focus:ring-1"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontFamily: 'var(--font-main)' }}
                             required
                         />
-                    </div>
+                    </label>
 
-                    {error && (
-                        <div className="text-xs text-center py-2 px-3 rounded-lg" style={{ color: '#ff4444', background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.1)' }}>
-                            {error}
-                        </div>
-                    )}
+                    {error && <div className="ak-auth__err">{error}</div>}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3 font-bold rounded-xl text-sm uppercase tracking-wider transition-all disabled:opacity-50 hover:-translate-y-0.5"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.2))',
-                            border: '1px solid rgba(123,97,255,0.3)',
-                            color: '#fff',
-                            fontFamily: 'var(--font-display)',
-                            boxShadow: '0 4px 20px rgba(123,97,255,0.15)',
-                        }}
-                    >
-                        {loading ? 'Authenticating...' : 'Enter'}
+                    <button type="submit" disabled={loading} className="ak-btn ak-btn--primary ak-btn--block">
+                        {loading ? 'Signing in…' : 'Sign in'}
                     </button>
                 </form>
             </div>

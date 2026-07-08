@@ -39,35 +39,13 @@ export default async function AnalyticsPage() {
     ]);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto flex flex-col gap-6">
             {/* ── Title block ──────────────────────────────────────── */}
-            <div className="flex items-end justify-between flex-wrap gap-3 px-1">
-                <div>
-                    <h1
-                        className="text-2xl md:text-3xl font-black tracking-tight"
-                        style={{
-                            fontFamily: 'var(--font-display)',
-                            background: 'linear-gradient(135deg, #ff3cac 0%, #7b61ff 50%, #00d4ff 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                        }}
-                    >
-                        Analytics
-                    </h1>
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        what the cloud has been seeing
-                    </p>
-                </div>
-                <div
-                    className="text-[10px] font-mono px-3 py-1.5 rounded-lg"
-                    style={{
-                        background: 'rgba(255,60,172,0.08)',
-                        border: '1px solid rgba(255,60,172,0.20)',
-                        color: '#ff7ec5',
-                    }}
-                >
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <p className="ak-caption">What the cloud has been seeing</p>
+                <span className="ak-badge ak-badge--bare" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink-2)' }}>
                     Instagram · rolling 28 days
-                </div>
+                </span>
             </div>
 
             <WebsiteSection web={web} />
@@ -151,17 +129,15 @@ function WebsiteSection({ web }: { web: WebsiteTraffic }) {
 function TrafficBar({ row, max, accent }: { row: { label: string; views: number }; max: number; accent: string }) {
     const pct = max > 0 ? Math.max(4, Math.round((row.views / max) * 100)) : 0;
     return (
-        <li className="space-y-1">
+        <li className="space-y-1.5">
             <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                    {row.label}
-                </span>
-                <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: accent }}>
+                <span className="ak-body-sm truncate">{row.label}</span>
+                <span className="ak-body-sm shrink-0" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>
                     {row.views.toLocaleString('en-US')}
                 </span>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent, opacity: 0.7 }} />
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--blue)', opacity: 0.85 }} />
             </div>
         </li>
     );
@@ -227,74 +203,26 @@ function IGSection({ ig }: { ig: IGDashboardData }) {
 // ─── UI primitives ────────────────────────────────────────────
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+    return <div className={`ak-card ${className}`}>{children}</div>;
+}
+
+function SectionHeader({ label, count }: { label: string; count?: number | string; accent?: string }) {
     return (
-        <div
-            className={`rounded-2xl ${className}`}
-            style={{
-                background: 'rgba(12, 12, 24, 0.55)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-            }}
-        >
-            {children}
+        <div className="flex items-baseline gap-3 mb-4">
+            <span className="ak-overline">{label}</span>
+            {count !== undefined && <span className="ak-pill__count">{count}</span>}
         </div>
     );
 }
 
-function SectionHeader({ label, count, accent = '#7b61ff' }: { label: string; count?: number | string; accent?: string }) {
+function Metric({ label, value, sub }: { label: string; value: string; accent?: string; sub?: string }) {
     return (
-        <div className="flex items-baseline gap-3 mb-3">
-            <span
-                className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-            >
-                {label}
-            </span>
-            {count !== undefined && (
-                <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-                    style={{
-                        background: `${accent}15`,
-                        border: `1px solid ${accent}30`,
-                        color: accent,
-                    }}
-                >
-                    {count}
-                </span>
-            )}
-        </div>
-    );
-}
-
-function Metric({ label, value, accent, sub }: { label: string; value: string; accent: string; sub?: string }) {
-    return (
-        <div
-            className="rounded-xl px-4 py-3"
-            style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.05)',
-            }}
-        >
-            <div className="flex items-baseline gap-1.5 mb-1.5">
-                <span
-                    className="text-[9px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
-                >
-                    {label}
-                </span>
-                {sub && (
-                    <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                        · {sub}
-                    </span>
-                )}
+        <div className="ak-metric">
+            <div className="flex items-baseline gap-1.5">
+                <span className="ak-overline">{label}</span>
+                {sub && <span className="ak-caption">· {sub}</span>}
             </div>
-            <div
-                className="text-2xl font-black tabular-nums"
-                style={{ color: accent, fontFamily: 'var(--font-display)', textShadow: `0 0 20px ${accent}30` }}
-            >
-                {value}
-            </div>
+            <div className="ak-metric__num">{value}</div>
         </div>
     );
 }
@@ -302,80 +230,45 @@ function Metric({ label, value, accent, sub }: { label: string; value: string; a
 function PostRow({ m }: { m: IGMediaInsight }) {
     const isReel = m.mediaType === 'REEL' || m.mediaType === 'VIDEO';
     return (
-        <li
-            className="flex items-center gap-3 p-3 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-        >
+        <li className="ak-uprow" style={{ padding: '10px 12px' }}>
             {m.thumbnail ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                    src={m.thumbnail}
-                    alt=""
-                    className="w-12 h-12 rounded object-cover shrink-0"
-                    style={{ border: '1px solid rgba(255,255,255,0.06)' }}
-                />
+                <img src={m.thumbnail} alt="" className="w-12 h-12 rounded object-cover shrink-0" style={{ border: '1px solid var(--line)' }} />
             ) : (
-                <div
-                    className="w-12 h-12 rounded shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                />
+                <div className="w-12 h-12 rounded shrink-0" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }} />
             )}
             <div className="flex-1 min-w-0">
-                <a
-                    href={m.permalink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs truncate hover:underline"
-                    style={{ color: 'var(--text-secondary)' }}
-                >
+                <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="block ak-body-sm truncate hover:underline" style={{ color: 'var(--ink)' }}>
                     {m.caption || '(no caption)'}
                 </a>
                 <div className="flex items-center gap-2 mt-1.5">
-                    <span
-                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                        style={{
-                            background: isReel ? 'rgba(255,60,172,0.10)' : 'rgba(123,97,255,0.10)',
-                            border: `1px solid ${isReel ? 'rgba(255,60,172,0.30)' : 'rgba(123,97,255,0.30)'}`,
-                            color: isReel ? '#ff7ec5' : '#a092ff',
-                        }}
-                    >
+                    <span className={`ak-badge ${isReel ? 'ak-badge--error' : 'ak-badge--scheduled'}`}>
                         {isReel ? 'Reel' : 'Image'}
                     </span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {timeAgo(m.timestamp)}
-                    </span>
+                    <span className="ak-caption">{timeAgo(m.timestamp)}</span>
                 </div>
             </div>
             <div className="flex items-center gap-4 shrink-0">
-                <Stat label="views" value={m.views} accent="#00d4ff" />
-                <Stat label="reach" value={m.reach} accent="#7b61ff" />
-                <Stat label="likes" value={m.likes} accent="#ff3cac" />
-                <Stat label="comments" value={m.comments} accent="#00ff88" />
+                <Stat label="views" value={m.views} />
+                <Stat label="reach" value={m.reach} />
+                <Stat label="likes" value={m.likes} />
+                <Stat label="comments" value={m.comments} />
             </div>
         </li>
     );
 }
 
-function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
+function Stat({ label, value }: { label: string; value: number; accent?: string }) {
     return (
         <div className="flex flex-col items-end leading-tight">
-            <span className="text-sm font-bold tabular-nums" style={{ color: accent }}>
+            <span className="ak-body-sm" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>
                 {value.toLocaleString('en-US')}
             </span>
-            <span
-                className="text-[8px] uppercase tracking-wider"
-                style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
-            >
-                {label}
-            </span>
+            <span className="ak-caption" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
         </div>
     );
 }
 
 function EmptyState({ text }: { text: string }) {
-    return (
-        <div className="text-center py-6 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            {text}
-        </div>
-    );
+    return <div className="text-center ak-caption" style={{ padding: '20px 0' }}>{text}</div>;
 }

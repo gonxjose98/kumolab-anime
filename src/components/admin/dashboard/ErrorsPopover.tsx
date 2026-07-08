@@ -48,15 +48,8 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
 
     if (count === 0) {
         return (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: '#00ff88', boxShadow: '0 0 8px #00ff88' }}
-                />
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                    All systems operational
-                </span>
+            <div className="ak-badge ak-badge--success">
+                All systems operational
             </div>
         );
     }
@@ -66,24 +59,13 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-white/[0.06]"
-                style={{
-                    background: open ? 'rgba(255,68,68,0.14)' : 'rgba(255,68,68,0.08)',
-                    border: '1px solid rgba(255,68,68,0.30)',
-                }}
+                className="ak-badge ak-badge--error"
+                style={{ cursor: 'pointer', height: '26px' }}
                 aria-haspopup="dialog"
                 aria-expanded={open}
             >
-                <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: '#ff4444', boxShadow: '0 0 8px #ff4444' }}
-                />
-                <span className="text-[10px] font-mono" style={{ color: '#ff9999' }}>
-                    {count} error{count === 1 ? '' : 's'} in last 24h
-                </span>
-                <span className="text-[10px]" style={{ color: '#ff9999' }} aria-hidden>
-                    {open ? '▲' : '▼'}
-                </span>
+                {count} error{count === 1 ? '' : 's'} in last 24h
+                <span aria-hidden style={{ fontSize: '9px' }}>{open ? '▲' : '▼'}</span>
             </button>
 
             {open && (
@@ -92,27 +74,20 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
                     style={{
                         width: 'min(440px, calc(100vw - 32px))',
                         maxHeight: 'min(70vh, 600px)',
-                        background: 'rgba(12, 12, 24, 0.96)',
-                        border: '1px solid rgba(255,68,68,0.25)',
-                        backdropFilter: 'blur(20px)',
-                        boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                        background: 'var(--surface)',
+                        border: '1px solid #f0c4be',
+                        boxShadow: 'var(--shadow-2)',
                     }}
                     role="dialog"
                     aria-label="Recent errors"
                 >
                     <div className="px-4 py-3 flex items-center justify-between"
-                         style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                        <span
-                            className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                            style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                        >
-                            Recent Errors (24h)
-                        </span>
+                         style={{ borderBottom: '1px solid var(--line)' }}>
+                        <span className="ak-overline">Recent Errors (24h)</span>
                         <button
                             type="button"
                             onClick={() => setOpen(false)}
-                            className="text-[12px] hover:text-white"
-                            style={{ color: 'var(--text-tertiary)' }}
+                            className="ak-btn ak-btn--ghost ak-btn--sm"
                             aria-label="Close"
                         >
                             ✕
@@ -120,13 +95,13 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
                     </div>
                     <div className="overflow-y-auto" style={{ maxHeight: 'calc(min(70vh, 600px) - 50px)' }}>
                         {errors.length === 0 ? (
-                            <p className="px-4 py-6 text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+                            <p className="px-4 py-6 ak-caption text-center">
                                 No error rows available.
                             </p>
                         ) : (
                             <ul>
                                 {errors.map(err => (
-                                    <li key={err.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                                    <li key={err.id} style={{ borderTop: '1px solid var(--line)' }}>
                                         <ErrorRow err={err} />
                                     </li>
                                 ))}
@@ -161,28 +136,26 @@ function ErrorRow({ err }: { err: DashboardError }) {
             <button
                 type="button"
                 onClick={() => setExpanded(e => !e)}
-                className="w-full flex items-center gap-2 py-2.5 px-4 hover:bg-white/[0.03] text-left"
+                className="w-full flex items-center gap-2 py-2.5 px-4 text-left"
+                style={{ background: 'transparent' }}
             >
                 <span
                     className="text-[10px] shrink-0 transition-transform"
                     style={{
-                        color: 'var(--text-muted)',
+                        color: 'var(--ink-3)',
                         transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
                     }}
                     aria-hidden
                 >
                     ▶
                 </span>
-                <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded shrink-0"
-                    style={{ background: 'rgba(255,68,68,0.12)', border: '1px solid rgba(255,68,68,0.28)', color: '#ff9999' }}
-                >
+                <span className="ak-badge ak-badge--error shrink-0" style={{ height: '20px', fontSize: '11px' }}>
                     {err.source || 'unknown'}
                 </span>
-                <span className="text-[10px] font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <span className="ak-caption shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {timeAgo(err.created_at)}
                 </span>
-                <span className="text-xs truncate flex-1 min-w-0" style={{ color: 'var(--text-primary)' }}>
+                <span className="ak-body-sm truncate flex-1 min-w-0" style={{ color: 'var(--ink)' }}>
                     {preview}
                 </span>
             </button>
@@ -190,35 +163,22 @@ function ErrorRow({ err }: { err: DashboardError }) {
             {expanded && (
                 <div className="pl-10 pr-4 pb-3 pt-1 space-y-2">
                     <div>
-                        <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--text-muted)' }}>
-                            Message
-                        </div>
-                        <p className="text-sm break-words" style={{ color: 'var(--text-primary)' }}>
+                        <div className="ak-overline mb-1">Message</div>
+                        <p className="ak-body-sm break-words" style={{ color: 'var(--ink)' }}>
                             {message}
                         </p>
                     </div>
-                    <div className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                        {absTime} ET
-                    </div>
+                    <div className="ak-caption">{absTime} ET</div>
                     {contextEntries.length > 0 && (
                         <div>
-                            <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                                Context
-                            </div>
+                            <div className="ak-overline mb-1.5">Context</div>
                             <dl className="space-y-1">
                                 {contextEntries.map(([k, v]) => (
                                     <div key={k} className="flex gap-3 text-[11px]">
-                                        <dt
-                                            className="font-mono shrink-0"
-                                            style={{ color: 'var(--text-tertiary)', minWidth: '110px' }}
-                                        >
+                                        <dt className="font-mono shrink-0" style={{ color: 'var(--ink-3)', minWidth: '110px' }}>
                                             {k}
                                         </dt>
-                                        <dd
-                                            className="font-mono break-all"
-                                            style={{ color: 'var(--text-primary)' }}
-                                            title={v.length > 200 ? v : undefined}
-                                        >
+                                        <dd className="font-mono break-all" style={{ color: 'var(--ink)' }} title={v.length > 200 ? v : undefined}>
                                             {v.length > 200 ? v.slice(0, 200) + '…' : v}
                                         </dd>
                                     </div>

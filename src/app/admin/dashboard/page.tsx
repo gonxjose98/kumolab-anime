@@ -42,15 +42,11 @@ const CLAIM_LABEL: Record<string, string> = {
     OTHER: 'News',
 };
 
-const CLAIM_COLOR: Record<string, string> = {
-    TRAILER_DROP: '#ff3cac',
-    NEW_KEY_VISUAL: '#7b61ff',
-    NEW_SEASON_CONFIRMED: '#00d4ff',
-    DATE_ANNOUNCED: '#ffaa00',
-    DELAY: '#ff6b35',
-    CAST_ADDITION: '#00ff88',
-    STAFF_UPDATE: '#00ff88',
-    OTHER: '#9ca3af',
+// Health level → semantic dot color (sky palette)
+const LEVEL_DOT: Record<HealthLevel, string> = {
+    crit: '#c03d33',
+    warn: '#8a6420',
+    ok: '#2e9e63',
 };
 
 // ─── Data fetch ───────────────────────────────────────────────
@@ -60,10 +56,8 @@ async function fetchDashboardData() {
     const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Note: getHealthSnapshot() is intentionally NOT in this Promise.all.
-    // It can take up to 60s when the yt-dlp worker is cold-starting on
-    // Render free tier, and Meta's debug_token has no timeout. Streaming
-    // it via <Suspense> below keeps the rest of the dashboard instant.
+    // getHealthSnapshot() is intentionally NOT in this Promise.all — it can
+    // take up to 60s on a cold yt-dlp worker; it streams via <Suspense> below.
     const [
         { count: publishedTotal },
         { count: published24h },
@@ -118,99 +112,35 @@ async function StreamedHealthCard() {
 
 function HealthCardSkeleton() {
     return (
-        <Card className="p-5">
-            <div className="flex items-baseline justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <span
-                        className="w-2.5 h-2.5 rounded-full animate-pulse"
-                        style={{ background: '#9ca3af', boxShadow: '0 0 10px #9ca3af80' }}
-                    />
-                    <span
-                        className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                    >
-                        System Health
-                    </span>
-                </div>
-                <span
-                    className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
-                >
-                    Checking…
-                </span>
+        <div className="ak-card">
+            <div className="ak-card__header">
+                <span className="ak-title">System health</span>
+                <span className="ak-caption">Checking…</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                        key={i}
-                        className="flex items-start gap-3 p-2.5 rounded-lg animate-pulse"
-                        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-                    >
-                        <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#3a3a4a' }} />
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg animate-pulse" style={{ background: 'var(--surface-2)' }}>
+                        <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: 'var(--line-2)' }} />
                         <div className="flex-1 min-w-0 space-y-1.5">
-                            <div className="h-2.5 rounded w-1/3" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                            <div className="h-2 rounded w-2/3" style={{ background: 'rgba(255,255,255,0.04)' }} />
+                            <div className="h-2.5 rounded w-1/3" style={{ background: 'var(--line-2)' }} />
+                            <div className="h-2 rounded w-2/3" style={{ background: 'var(--line)' }} />
                         </div>
                     </div>
                 ))}
             </div>
-        </Card>
-    );
-}
-
-// ─── UI primitives ────────────────────────────────────────────
-
-function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
-    return (
-        <div
-            id={id}
-            className={`rounded-2xl ${className}`}
-            style={{
-                background: 'rgba(12, 12, 24, 0.55)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-                scrollMarginTop: '80px',
-            }}
-        >
-            {children}
         </div>
     );
 }
 
-function SectionHeader({ label, count, accent = '#7b61ff' }: { label: string; count?: number | string; accent?: string }) {
-    return (
-        <div className="flex items-baseline gap-3 mb-3">
-            <span
-                className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-            >
-                {label}
-            </span>
-            {count !== undefined && (
-                <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-                    style={{
-                        background: `${accent}15`,
-                        border: `1px solid ${accent}30`,
-                        color: accent,
-                    }}
-                >
-                    {count}
-                </span>
-            )}
-        </div>
-    );
-}
+// ─── UI primitives (Clear Skies) ──────────────────────────────
 
 function ClaimPill({ claim }: { claim: string | null }) {
     const key = (claim || 'OTHER').toUpperCase();
-    const color = CLAIM_COLOR[key] || CLAIM_COLOR.OTHER;
     const label = CLAIM_LABEL[key] || CLAIM_LABEL.OTHER;
     return (
         <span
-            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
-            style={{ background: `${color}18`, border: `1px solid ${color}35`, color }}
+            className="ak-badge ak-badge--bare"
+            style={{ background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--ink-2)', fontWeight: 600 }}
         >
             {label}
         </span>
@@ -220,17 +150,39 @@ function ClaimPill({ claim }: { claim: string | null }) {
 function PlatformBadge({ icon, on }: { icon: string; on: boolean }) {
     return (
         <span
-            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-            style={{
-                background: on ? 'rgba(0,255,136,0.10)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${on ? 'rgba(0,255,136,0.30)' : 'rgba(255,255,255,0.06)'}`,
-                color: on ? '#7af0a8' : 'var(--text-muted)',
-            }}
+            className={`ak-badge ak-badge--bare`}
+            style={
+                on
+                    ? { color: '#1d7a4f', background: '#e2f4ea', borderColor: '#b9e0c9', fontWeight: 600 }
+                    : { color: 'var(--ink-3)', background: 'var(--surface-2)', borderColor: 'var(--line)', fontWeight: 600 }
+            }
             title={on ? `Published to ${icon}` : `Not on ${icon}`}
         >
             {icon}
         </span>
     );
+}
+
+function EmptyState({ text, compact = false }: { text: string; compact?: boolean }) {
+    return (
+        <div className="text-center ak-caption" style={{ padding: compact ? '12px 0' : '28px 0' }}>
+            {text}
+        </div>
+    );
+}
+
+function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: string | null }) {
+    const url = (src && !src.includes('placeholder')) ? src
+        : (youtube_id ? `https://img.youtube.com/vi/${youtube_id}/mqdefault.jpg` : null);
+    if (!url || url.includes('placeholder')) {
+        return (
+            <div className="w-12 h-12 rounded-lg shrink-0 flex items-center justify-center" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                <span className="ak-caption">—</span>
+            </div>
+        );
+    }
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" style={{ border: '1px solid var(--line)' }} />;
 }
 
 // ─── Page ─────────────────────────────────────────────────────
@@ -240,193 +192,143 @@ export default async function DashboardPage() {
     const { stats } = data;
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
-            {/* ── Title block ──────────────────────────────────────── */}
-            <div className="flex items-end justify-between flex-wrap gap-3 px-1">
-                <div>
-                    <h1
-                        className="text-2xl md:text-3xl font-black tracking-tight"
-                        style={{
-                            fontFamily: 'var(--font-display)',
-                            background: 'linear-gradient(135deg, #00d4ff 0%, #7b61ff 50%, #ff3cac 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                        }}
-                    >
-                        Dashboard
-                    </h1>
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                        the cloud sees everything first
-                    </p>
-                </div>
-                <ErrorsPopover count={stats.errors24h} errors={data.recentErrors} />
-            </div>
-
+        <div className="flex flex-col gap-6">
             {/* ── Stat grid ────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard label="Published 24h" value={stats.published24h} accent="#00ff88" />
-                <StatCard label="Pending Review" value={stats.pending} accent="#ffaa00" highlight={stats.pending > 0} />
-                <StatCard label="Scheduled 24h" value={stats.scheduled24h} accent="#00d4ff" />
-                <StatCard
-                    label="Errors 24h"
-                    value={stats.errors24h}
-                    accent={stats.errors24h > 0 ? '#ff4444' : '#9ca3af'}
-                    highlight={stats.errors24h > 0}
-                />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard label="Published · 24h" value={stats.published24h} />
+                <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} />
+                <StatCard label="Scheduled · 24h" value={stats.scheduled24h} />
+                <div className="ak-stat" style={stats.errors24h > 0 ? { borderTop: '3px solid var(--sun)' } : undefined}>
+                    <div className="flex items-start justify-between gap-2">
+                        <span className="ak-overline">Errors · 24h</span>
+                        <ErrorsPopover count={stats.errors24h} errors={data.recentErrors} />
+                    </div>
+                    <div className="ak-stat__num" style={stats.errors24h > 0 ? { color: 'var(--sun)' } : undefined}>{stats.errors24h}</div>
+                    <span className="ak-caption">{stats.errors24h > 0 ? 'needs a look' : 'all clear'}</span>
+                </div>
             </div>
 
-            {/* ── System Health (streamed via Suspense) ───────────── */}
-            <Suspense fallback={<HealthCardSkeleton />}>
-                <StreamedHealthCard />
-            </Suspense>
-
-            {/* ── Pending review ───────────────────────────────────── */}
-            <Card className="p-5">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-baseline gap-3">
-                        <span
-                            className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                            style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                        >
-                            Pending Review
-                        </span>
-                        <span
-                            className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-                            style={{
-                                background: '#ffaa0015',
-                                border: '1px solid #ffaa0030',
-                                color: '#ffaa00',
-                            }}
-                        >
-                            {data.pendingPosts.length}
-                        </span>
+            {/* ── Pending review (hero) + right rail ──────────────── */}
+            <div className="grid lg:grid-cols-3 gap-6 items-start">
+                <div className="ak-card ak-card--flush lg:col-span-2">
+                    <div className="flex items-center justify-between gap-3 p-5 pb-3">
+                        <div className="flex items-center gap-3">
+                            <span className="ak-title">Needs your review</span>
+                            {data.pendingPosts.length > 0 && (
+                                <span className="ak-pill__count">{data.pendingPosts.length}</span>
+                            )}
+                        </div>
+                        <ImportFromUrlButton />
                     </div>
-                    <ImportFromUrlButton />
-                </div>
-                {data.pendingPosts.length === 0 ? (
-                    <EmptyState text="Nothing waiting on you. Auto-publish handled everything that came through." />
-                ) : (
-                    <ul className="space-y-2">
-                        {data.pendingPosts.map(p => (
-                            <li
-                                key={p.id}
-                                className="flex items-center gap-4 p-3 rounded-lg"
-                                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-                            >
-                                <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
-                                <div className="flex-1 min-w-0">
-                                    <Link
-                                        href={`/admin/post/${p.id}`}
-                                        className="block text-sm font-semibold truncate hover:underline"
-                                        style={{ color: 'var(--text-primary)' }}
-                                    >
-                                        {p.title}
-                                    </Link>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        <ClaimPill claim={p.claim_type} />
-                                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                            {p.source} • {timeAgo(p.timestamp)}
-                                        </span>
-                                    </div>
-                                </div>
-                                <PendingReviewActions postId={p.id} postTitle={p.title} />
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </Card>
-
-            {/* ── Scheduled next 24h + Recently published ─────────── */}
-            <div className="grid md:grid-cols-2 gap-3">
-                <Card className="p-5">
-                    <SectionHeader label="Next 24 hours" count={data.scheduledPosts.length} accent="#00d4ff" />
-                    {data.scheduledPosts.length === 0 ? (
-                        <EmptyState text="No scheduled posts in the next day." compact />
+                    {data.pendingPosts.length === 0 ? (
+                        <div className="ak-empty">
+                            <span className="ak-empty__glyph" aria-hidden="true">☁</span>
+                            <span className="ak-heading">Nothing waiting on you</span>
+                            <span className="ak-caption">Auto-publish handled everything that came through.</span>
+                        </div>
                     ) : (
-                        <ul className="space-y-2">
-                            {data.scheduledPosts.map(p => (
-                                <li key={p.id} className="flex items-center gap-3 py-1.5">
-                                    <span
-                                        className="text-[10px] font-mono px-2 py-1 rounded shrink-0"
-                                        style={{
-                                            background: 'rgba(0,212,255,0.08)',
-                                            border: '1px solid rgba(0,212,255,0.20)',
-                                            color: '#7adfff',
-                                            minWidth: '110px',
-                                        }}
-                                    >
-                                        {formatSlot(p.scheduled_post_time)}
-                                    </span>
-                                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                                        {p.title}
-                                    </span>
+                        <ul>
+                            {data.pendingPosts.map((p) => (
+                                <li key={p.id} className="flex items-center gap-4 px-5 py-3" style={{ borderTop: '1px solid var(--line)' }}>
+                                    <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
+                                    <div className="flex-1 min-w-0">
+                                        <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
+                                            {p.title}
+                                        </Link>
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <ClaimPill claim={p.claim_type} />
+                                            <span className="ak-caption">{p.source} · {timeAgo(p.timestamp)}</span>
+                                        </div>
+                                    </div>
+                                    <PendingReviewActions postId={p.id} postTitle={p.title} />
                                 </li>
                             ))}
                         </ul>
                     )}
-                </Card>
+                </div>
 
-                <Card className="p-5">
-                    <SectionHeader label="Recently Published" count={data.recentlyPublished.length} accent="#00ff88" />
-                    {data.recentlyPublished.length === 0 ? (
-                        <EmptyState text="Nothing published yet." compact />
-                    ) : (
-                        <ul className="space-y-2.5">
-                            {data.recentlyPublished.map(p => {
-                                const onIG = !!p.social_ids?.instagram_id;
-                                return (
-                                    <li key={p.id} className="flex items-start gap-2 py-1">
-                                        <span style={{ color: '#7af0a8' }} className="text-xs mt-0.5 shrink-0">✓</span>
-                                        <div className="flex-1 min-w-0">
-                                            <Link
-                                                href={`/blog/${p.slug}`}
-                                                target="_blank"
-                                                className="block text-xs truncate hover:underline"
-                                                style={{ color: 'var(--text-secondary)' }}
-                                            >
-                                                {p.title}
-                                            </Link>
-                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                                                    {timeAgo(p.published_at)}
-                                                </span>
-                                                <PlatformBadge icon="WEB" on={true} />
-                                                <PlatformBadge icon="IG" on={onIG} />
-                                            </div>
-                                        </div>
+                <div className="flex flex-col gap-6">
+                    {/* Up next */}
+                    <div className="ak-card">
+                        <div className="ak-card__header">
+                            <span className="ak-title">Up next</span>
+                            <span className="ak-caption">next 24h</span>
+                        </div>
+                        {data.scheduledPosts.length === 0 ? (
+                            <EmptyState text="Nothing scheduled in the next day." compact />
+                        ) : (
+                            <ul className="flex flex-col gap-2.5">
+                                {data.scheduledPosts.map((p) => (
+                                    <li key={p.id} className="flex items-center gap-3">
+                                        <span className="ak-caption shrink-0" style={{ color: 'var(--blue)', fontWeight: 600, minWidth: '112px', fontVariantNumeric: 'tabular-nums' }}>
+                                            {formatSlot(p.scheduled_post_time)}
+                                        </span>
+                                        <span className="ak-body-sm truncate">{p.title}</span>
                                     </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </Card>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    {/* Recently published */}
+                    <div className="ak-card">
+                        <div className="ak-card__header">
+                            <span className="ak-title">Recently published</span>
+                        </div>
+                        {data.recentlyPublished.length === 0 ? (
+                            <EmptyState text="Nothing published yet." compact />
+                        ) : (
+                            <ul className="flex flex-col gap-3">
+                                {data.recentlyPublished.map((p) => {
+                                    const onIG = !!p.social_ids?.instagram_id;
+                                    return (
+                                        <li key={p.id} className="flex items-start gap-2">
+                                            <span style={{ color: '#2e9e63' }} className="ak-body-sm mt-0.5 shrink-0">✓</span>
+                                            <div className="flex-1 min-w-0">
+                                                <Link href={`/blog/${p.slug}`} target="_blank" className="block ak-body-sm truncate" style={{ textDecoration: 'none' }}>
+                                                    {p.title}
+                                                </Link>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <span className="ak-caption">{timeAgo(p.published_at)}</span>
+                                                    <PlatformBadge icon="WEB" on={true} />
+                                                    <PlatformBadge icon="IG" on={onIG} />
+                                                </div>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                </div>
             </div>
 
+            {/* ── System health (streamed) ─────────────────────────── */}
+            <Suspense fallback={<HealthCardSkeleton />}>
+                <StreamedHealthCard />
+            </Suspense>
+
             {/* ── Source health (collapsible) ──────────────────────── */}
-            <details className="group">
-                <Card className="p-0 overflow-hidden">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none hover:bg-white/[0.02] transition-colors">
-                        <SectionHeader label="Source Health" count={`${data.sourceHealth.filter(s => s.is_enabled && s.consecutive_failures === 0).length}/${data.sourceHealth.length}`} accent="#7b61ff" />
-                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <details className="ak-card ak-card--flush group">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none" style={{ transition: 'background 0.15s' }}>
+                        <div className="flex items-center gap-3">
+                            <span className="ak-title">Source health</span>
+                            <span className="ak-pill__count">{`${data.sourceHealth.filter((s) => s.is_enabled && s.consecutive_failures === 0).length}/${data.sourceHealth.length}`}</span>
+                        </div>
+                        <span className="ak-caption">
                             <span className="group-open:hidden">Show</span>
                             <span className="hidden group-open:inline">Hide</span>
                         </span>
                     </summary>
                     <div className="px-5 pb-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                            {data.sourceHealth.map(s => {
-                                const healthy = s.is_enabled && s.consecutive_failures === 0 && s.health_score >= 50;
-                                const dot = !s.is_enabled ? '#ff4444' : (s.consecutive_failures > 0 ? '#ffaa00' : '#00ff88');
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                            {data.sourceHealth.map((s) => {
+                                const dot = !s.is_enabled ? '#c03d33' : (s.consecutive_failures > 0 ? '#8a6420' : '#2e9e63');
                                 return (
-                                    <div key={s.source_name} className="flex items-center gap-2.5 text-[11px]">
-                                        <span
-                                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                                            style={{ background: dot, boxShadow: `0 0 6px ${dot}` }}
-                                        />
-                                        <span className="flex-1 truncate" style={{ color: healthy ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
-                                            {s.source_name}
-                                        </span>
-                                        <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                    <div key={s.source_name} className="flex items-center gap-2.5">
+                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
+                                        <span className="flex-1 truncate ak-body-sm">{s.source_name}</span>
+                                        <span className="ak-caption shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
                                             {s.last_success ? timeAgo(s.last_success) : 'never'}
                                         </span>
                                     </div>
@@ -434,15 +336,16 @@ export default async function DashboardPage() {
                             })}
                         </div>
                     </div>
-                </Card>
             </details>
 
             {/* ── Recent activity (collapsible) ────────────────────── */}
-            <details className="group">
-                <Card className="p-0 overflow-hidden">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none hover:bg-white/[0.02] transition-colors">
-                        <SectionHeader label="Recent Activity" count={data.recentActivity.length} accent="#9ca3af" />
-                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <details className="ak-card ak-card--flush group">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
+                        <div className="flex items-center gap-3">
+                            <span className="ak-title">Recent activity</span>
+                            <span className="ak-pill__count">{data.recentActivity.length}</span>
+                        </div>
+                        <span className="ak-caption">
                             <span className="group-open:hidden">Show</span>
                             <span className="hidden group-open:inline">Hide</span>
                         </span>
@@ -451,41 +354,30 @@ export default async function DashboardPage() {
                         {data.recentActivity.length === 0 ? (
                             <EmptyState text="No recent pipeline activity." compact />
                         ) : (
-                            <ul className="space-y-1">
+                            <ul className="flex flex-col gap-1.5">
                                 {data.recentActivity.map((row, i) => {
                                     const accepted = row.decision?.startsWith('accepted');
-                                    const rejected = row.decision?.startsWith('rejected');
-                                    const color = accepted ? '#7af0a8' : rejected ? '#9ca3af' : '#ffaa00';
+                                    const cls = accepted ? 'ak-badge--published' : row.decision?.startsWith('rejected') ? 'ak-badge--draft' : 'ak-badge--pending';
                                     return (
-                                        <li key={i} className="flex items-center gap-3 py-1 text-[11px]">
-                                            <span className="font-mono w-12 shrink-0" style={{ color: 'var(--text-muted)' }}>
-                                                {timeAgo(row.created_at)}
-                                            </span>
-                                            <span
-                                                className="font-mono uppercase text-[9px] px-1.5 py-0.5 rounded shrink-0"
-                                                style={{ background: `${color}12`, border: `1px solid ${color}30`, color, minWidth: '80px', textAlign: 'center' }}
-                                            >
+                                        <li key={i} className="flex items-center gap-3">
+                                            <span className="ak-caption shrink-0" style={{ width: '48px', fontVariantNumeric: 'tabular-nums' }}>{timeAgo(row.created_at)}</span>
+                                            <span className={`ak-badge ${cls}`} style={{ minWidth: '84px', justifyContent: 'center' }}>
                                                 {row.decision?.replace('_', ' ') || '-'}
                                             </span>
-                                            <span className="flex-1 truncate" style={{ color: 'var(--text-tertiary)' }}>
-                                                {row.candidate_title}
-                                            </span>
-                                            <span className="text-[10px] truncate max-w-xs hidden md:inline" style={{ color: 'var(--text-muted)' }}>
-                                                {row.reason}
-                                            </span>
+                                            <span className="flex-1 truncate ak-body-sm">{row.candidate_title}</span>
+                                            <span className="ak-caption truncate max-w-xs hidden md:inline">{row.reason}</span>
                                         </li>
                                     );
                                 })}
                             </ul>
                         )}
                     </div>
-                </Card>
             </details>
 
             {/* ── Footer ───────────────────────────────────────────── */}
-            <div className="text-center pt-2 pb-4">
-                <span className="text-[9px] font-mono uppercase tracking-[0.3em]" style={{ color: 'var(--text-muted)' }}>
-                    KumoLab Dashboard · {stats.publishedTotal} published all-time
+            <div className="text-center pt-1 pb-4">
+                <span className="ak-caption" style={{ letterSpacing: '0.1em' }}>
+                    {stats.publishedTotal} published all-time
                 </span>
             </div>
         </div>
@@ -494,121 +386,47 @@ export default async function DashboardPage() {
 
 // ─── Sub-components ───────────────────────────────────────────
 
+function StatCard({ label, value, tone }: { label: string; value: number; tone?: 'attention' }) {
+    return (
+        <div className="ak-stat">
+            <span className="ak-overline">{label}</span>
+            <div className="ak-stat__num" style={tone === 'attention' ? { color: '#8a6420' } : undefined}>{value}</div>
+            <span className="ak-caption">&nbsp;</span>
+        </div>
+    );
+}
+
 function HealthCard({ snapshot }: { snapshot: HealthSnapshot }) {
-    const overallColor = snapshot.overall === 'crit' ? '#ff4444' : snapshot.overall === 'warn' ? '#ffaa00' : '#00ff88';
-    const overallLabel = snapshot.overall === 'crit' ? 'Action needed' : snapshot.overall === 'warn' ? 'Degraded' : 'All systems go';
+    const cls = snapshot.overall === 'crit' ? 'ak-badge--error' : snapshot.overall === 'warn' ? 'ak-badge--pending' : 'ak-badge--published';
+    const label = snapshot.overall === 'crit' ? 'Action needed' : snapshot.overall === 'warn' ? 'Degraded' : 'All systems go';
 
     return (
-        <Card className="p-5">
-            <div className="flex items-baseline justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ background: overallColor, boxShadow: `0 0 10px ${overallColor}` }}
-                    />
-                    <SectionHeader label="System Health" accent={overallColor} />
-                </div>
-                <span
-                    className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: overallColor, fontFamily: 'var(--font-display)' }}
-                >
-                    {overallLabel}
-                </span>
+        <div className="ak-card">
+            <div className="ak-card__header">
+                <span className="ak-title">System health</span>
+                <span className={`ak-badge ${cls}`}>{label}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {snapshot.checks.map(c => (
+                {snapshot.checks.map((c) => (
                     <HealthRow key={c.key} level={c.level} label={c.label} detail={c.detail} actionable={c.actionable} />
                 ))}
             </div>
-        </Card>
+        </div>
     );
 }
 
 function HealthRow({ level, label, detail, actionable }: { level: HealthLevel; label: string; detail: string; actionable?: string }) {
-    const color = level === 'crit' ? '#ff4444' : level === 'warn' ? '#ffaa00' : '#00ff88';
+    const color = LEVEL_DOT[level];
     return (
-        <div
-            className="flex items-start gap-3 p-2.5 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
-        >
-            <span
-                className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                style={{ background: color, boxShadow: `0 0 6px ${color}` }}
-            />
+        <div className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+            <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: color }} />
             <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {label}
-                </div>
-                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {detail}
-                </div>
+                <div className="ak-body-sm" style={{ color: 'var(--ink)', fontWeight: 600 }}>{label}</div>
+                <div className="ak-caption mt-0.5">{detail}</div>
                 {actionable && level !== 'ok' && (
-                    <div
-                        className="text-[9px] mt-1 font-mono"
-                        style={{ color: color, opacity: 0.85 }}
-                    >
-                        → {actionable}
-                    </div>
+                    <div className="ak-caption mt-1" style={{ color }}>→ {actionable}</div>
                 )}
             </div>
         </div>
     );
-}
-
-function StatCard({ label, value, accent, highlight = false }: { label: string; value: number; accent: string; highlight?: boolean }) {
-    return (
-        <Card className="p-4">
-            <div className="flex flex-col gap-1">
-                <span
-                    className="text-[9px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
-                >
-                    {label}
-                </span>
-                <span
-                    className="text-2xl md:text-3xl font-black"
-                    style={{
-                        color: highlight ? accent : 'var(--text-primary)',
-                        fontFamily: 'var(--font-display)',
-                        textShadow: highlight ? `0 0 20px ${accent}40` : 'none',
-                    }}
-                >
-                    {value}
-                </span>
-            </div>
-        </Card>
-    );
-}
-
-function EmptyState({ text, compact = false }: { text: string; compact?: boolean }) {
-    return (
-        <div
-            className={`text-center ${compact ? 'py-3' : 'py-6'} text-[11px]`}
-            style={{ color: 'var(--text-muted)' }}
-        >
-            {text}
-        </div>
-    );
-}
-
-function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: string | null }) {
-    // Match the publisher: post.image is the source of truth (it's what
-    // gets posted to IG/FB/Threads). Fall back to YouTube thumbnail only
-    // when post.image is missing — avoids the admin-vs-social desync
-    // where the dashboard showed YT thumb but IG actually posted the
-    // AniList cover.
-    const url = (src && !src.includes('placeholder')) ? src
-        : (youtube_id ? `https://img.youtube.com/vi/${youtube_id}/mqdefault.jpg` : null);
-    if (!url || url.includes('placeholder')) {
-        return (
-            <div
-                className="w-12 h-12 rounded shrink-0 flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
-                <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>-</span>
-            </div>
-        );
-    }
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="w-12 h-12 rounded object-cover shrink-0" style={{ border: '1px solid rgba(255,255,255,0.06)' }} />;
 }

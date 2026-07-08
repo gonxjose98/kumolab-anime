@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 
 type Step = 'idle' | 'searching' | 'results' | 'downloading' | 'done';
 
@@ -183,64 +184,34 @@ export default function FindVideoButton({
         <>
             <button
                 onClick={() => setOpen(true)}
-                className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
-                style={{
-                    background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.10))',
-                    border: '1px solid rgba(0,212,255,0.35)',
-                    color: '#7be0ff',
-                    fontFamily: 'var(--font-display)',
-                }}
+                className="ak-btn ak-btn--secondary ak-btn--sm"
                 title="Find a YouTube video to attach to this pending post"
             >
-                🔍 Find Video
+                <Search size={13} /> Find Video
             </button>
 
             {open && mounted && createPortal(
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                    style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-                    onClick={closeModal}
-                >
+                <div className="admin-root"><div className="ak-modal__scrim" onClick={closeModal}>
                     <div
-                        className="rounded-2xl p-5 md:p-6 w-full max-w-2xl flex flex-col"
+                        className="ak-modal p-5 md:p-6 flex flex-col"
                         style={{
-                            background: 'rgba(18, 18, 30, 0.95)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            boxShadow: '0 12px 48px rgba(0,0,0,0.5)',
+                            maxWidth: '672px',
                             // dvh handles iPhone's collapsing-URL-bar correctly;
                             // svh fallback for browsers that don't support dvh.
                             maxHeight: 'min(90svh, 90dvh)',
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h2
-                            className="text-lg font-black tracking-tight mb-1"
-                            style={{
-                                fontFamily: 'var(--font-display)',
-                                background: 'linear-gradient(135deg, #00d4ff, #7b61ff)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                            }}
-                        >
-                            Find Video
-                        </h2>
-                        <p className="text-[11px] mb-4" style={{ color: 'var(--text-muted)' }}>
+                        <h2 className="ak-title mb-1">Find Video</h2>
+                        <p className="ak-body-sm mb-4">
                             Search YouTube for the video version of this post. The top match
                             is pre-selected. Override if it isn&apos;t right. We&apos;ll download
                             it and attach to this pending row for trimming.
                         </p>
 
-                        <form onSubmit={runSearch} className="space-y-3">
-                            <div>
-                                <label
-                                    className="block text-[10px] font-bold uppercase tracking-wider mb-1"
-                                    style={{
-                                        color: 'var(--text-secondary)',
-                                        fontFamily: 'var(--font-display)',
-                                    }}
-                                >
-                                    Search query
-                                </label>
+                        <form onSubmit={runSearch}>
+                            <div className="ak-field">
+                                <label className="ak-field__label">Search query</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -248,24 +219,13 @@ export default function FindVideoButton({
                                         onChange={(e) => setQuery(e.target.value)}
                                         disabled={busy}
                                         placeholder="e.g. Apothecary Diaries Season 2 opening"
-                                        className="flex-1 px-3 py-2 rounded-md text-sm outline-none"
-                                        style={{
-                                            background: 'rgba(0,0,0,0.4)',
-                                            border: '1px solid rgba(255,255,255,0.10)',
-                                            color: 'var(--text-primary)',
-                                        }}
+                                        className="ak-field__input flex-1"
                                         autoFocus
                                     />
                                     <button
                                         type="submit"
                                         disabled={busy || !query.trim()}
-                                        className="px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                                        style={{
-                                            background: 'linear-gradient(135deg, rgba(0,212,255,0.30), rgba(123,97,255,0.20))',
-                                            border: '1px solid rgba(0,212,255,0.50)',
-                                            color: '#a3eaff',
-                                            fontFamily: 'var(--font-display)',
-                                        }}
+                                        className="ak-btn ak-btn--primary"
                                     >
                                         {step === 'searching' ? '…' : 'Search'}
                                     </button>
@@ -273,42 +233,17 @@ export default function FindVideoButton({
                             </div>
                         </form>
 
-                        {error && (
-                            <div
-                                className="text-[11px] px-3 py-2 rounded-md mt-3"
-                                style={{
-                                    background: 'rgba(255,68,68,0.10)',
-                                    border: '1px solid rgba(255,68,68,0.30)',
-                                    color: '#ff8888',
-                                }}
-                            >
-                                {error}
-                            </div>
-                        )}
+                        {error && <div className="ak-auth__err mt-3" style={{ textAlign: 'left' }}>{error}</div>}
 
                         {step === 'searching' && (
-                            <div
-                                className="text-[11px] px-3 py-2 rounded-md flex items-center gap-2 mt-3"
-                                style={{
-                                    background: 'rgba(0,212,255,0.08)',
-                                    border: '1px solid rgba(0,212,255,0.25)',
-                                    color: '#7be0ff',
-                                }}
-                            >
+                            <div className="text-[11px] px-3 py-2 rounded-md flex items-center gap-2 mt-3" style={{ background: 'var(--blue-soft)', border: '1px solid #bcd4f2', color: '#1d5cb4' }}>
                                 <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
                                 Searching YouTube…
                             </div>
                         )}
 
                         {step === 'results' && candidates.length === 0 && (
-                            <div
-                                className="text-[11px] px-3 py-2 rounded-md mt-3"
-                                style={{
-                                    background: 'rgba(255,170,0,0.08)',
-                                    border: '1px solid rgba(255,170,0,0.25)',
-                                    color: '#ffd88a',
-                                }}
-                            >
+                            <div className="text-[11px] px-3 py-2 rounded-md mt-3" style={{ background: '#fdf3e0', border: '1px solid #ecd9ae', color: '#8a6420' }}>
                                 No matches. Try refining the query.
                             </div>
                         )}
@@ -330,48 +265,20 @@ export default function FindVideoButton({
                             )}
 
                         {step === 'downloading' && (
-                            <div
-                                className="text-[11px] px-3 py-2 rounded-md flex items-center gap-2 mt-3"
-                                style={{
-                                    background: 'rgba(0,212,255,0.08)',
-                                    border: '1px solid rgba(0,212,255,0.25)',
-                                    color: '#7be0ff',
-                                }}
-                            >
+                            <div className="text-[11px] px-3 py-2 rounded-md flex items-center gap-2 mt-3" style={{ background: 'var(--blue-soft)', border: '1px solid #bcd4f2', color: '#1d5cb4' }}>
                                 <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
                                 Downloading video via worker (up to 60s if worker is cold)…
                             </div>
                         )}
 
                         {step === 'done' && (
-                            <div
-                                className="text-[11px] px-3 py-2 rounded-md mt-3"
-                                style={{
-                                    background: 'rgba(0,255,136,0.10)',
-                                    border: '1px solid rgba(0,255,136,0.30)',
-                                    color: '#7af0a8',
-                                }}
-                            >
+                            <div className="text-[11px] px-3 py-2 rounded-md mt-3" style={{ background: '#e2f4ea', border: '1px solid #b9e0c9', color: '#1d7a4f' }}>
                                 Attached, opening editor…
                             </div>
                         )}
 
-                        <div
-                            className="flex gap-2 justify-end pt-3 mt-3 shrink-0"
-                            style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-                        >
-                            <button
-                                type="button"
-                                onClick={closeModal}
-                                disabled={busy}
-                                className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
-                                style={{
-                                    background: 'rgba(255,255,255,0.03)',
-                                    border: '1px solid rgba(255,255,255,0.10)',
-                                    color: 'var(--text-secondary)',
-                                    fontFamily: 'var(--font-display)',
-                                }}
-                            >
+                        <div className="flex gap-2 justify-end pt-3 mt-3 shrink-0" style={{ borderTop: '1px solid var(--line)' }}>
+                            <button type="button" onClick={closeModal} disabled={busy} className="ak-btn ak-btn--secondary ak-btn--sm">
                                 Cancel
                             </button>
                             {step === 'results' && candidates.length > 0 && (
@@ -379,21 +286,14 @@ export default function FindVideoButton({
                                     type="button"
                                     onClick={confirmAttach}
                                     disabled={busy || !selectedVideoId}
-                                    className="px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    style={{
-                                        background:
-                                            'linear-gradient(135deg, rgba(0,255,136,0.30), rgba(0,212,170,0.20))',
-                                        border: '1px solid rgba(0,255,136,0.50)',
-                                        color: '#a3ffce',
-                                        fontFamily: 'var(--font-display)',
-                                    }}
+                                    className="ak-btn ak-btn--primary ak-btn--sm"
                                 >
                                     Use this video
                                 </button>
                             )}
                         </div>
                     </div>
-                </div>,
+                </div></div>,
                 document.body,
             )}
         </>
@@ -411,11 +311,11 @@ function CandidateRow({
 }) {
     const hasBad = c.risks.some((r) => r.type === 'bad');
     const borderColor = selected
-        ? 'rgba(0,212,255,0.55)'
+        ? 'var(--blue)'
         : hasBad
-            ? 'rgba(255,68,68,0.18)'
-            : 'rgba(255,255,255,0.08)';
-    const bg = selected ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.02)';
+            ? '#f0c4be'
+            : 'var(--line-2)';
+    const bg = selected ? 'var(--blue-soft)' : 'var(--surface)';
 
     return (
         <li>
@@ -438,25 +338,16 @@ function CandidateRow({
                         src={c.thumbnailUrl}
                         alt=""
                         className="w-24 h-14 rounded object-cover shrink-0"
-                        style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+                        style={{ border: '1px solid var(--line)' }}
                     />
                 ) : (
-                    <div
-                        className="w-24 h-14 rounded shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.04)' }}
-                    />
+                    <div className="w-24 h-14 rounded shrink-0" style={{ background: 'var(--surface-2)' }} />
                 )}
                 <div className="flex-1 min-w-0">
-                    <div
-                        className="text-[12px] font-semibold leading-snug line-clamp-2"
-                        style={{ color: 'var(--text-primary)' }}
-                    >
+                    <div className="text-[12px] font-semibold leading-snug line-clamp-2" style={{ color: 'var(--ink)' }}>
                         {c.title}
                     </div>
-                    <div
-                        className="text-[10px] mt-1 flex items-center gap-1.5 flex-wrap"
-                        style={{ color: 'var(--text-muted)' }}
-                    >
+                    <div className="text-[10px] mt-1 flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--ink-3)' }}>
                         <span>{c.channelTitle || 'unknown channel'}</span>
                         <span>·</span>
                         <span>{c.durationText}</span>
@@ -475,28 +366,20 @@ function CandidateRow({
                                 <span
                                     key={`p-${i}`}
                                     className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-                                    style={{
-                                        background: 'rgba(0,255,136,0.10)',
-                                        border: '1px solid rgba(0,255,136,0.30)',
-                                        color: '#7af0a8',
-                                    }}
+                                    style={{ background: '#e2f4ea', border: '1px solid #b9e0c9', color: '#1d7a4f' }}
                                 >
                                     ✓ {p}
                                 </span>
                             ))}
                             {c.risks.map((r, i) => {
-                                const color = r.type === 'bad' ? '#ff8888' : '#ffd88a';
-                                const bgc = r.type === 'bad' ? 'rgba(255,68,68,0.10)' : 'rgba(255,170,0,0.10)';
-                                const bc = r.type === 'bad' ? 'rgba(255,68,68,0.30)' : 'rgba(255,170,0,0.30)';
+                                const color = r.type === 'bad' ? '#b03328' : '#8a6420';
+                                const bgc = r.type === 'bad' ? '#fbe9e7' : '#fdf3e0';
+                                const bc = r.type === 'bad' ? '#f0c4be' : '#ecd9ae';
                                 return (
                                     <span
                                         key={`r-${i}`}
                                         className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-                                        style={{
-                                            background: bgc,
-                                            border: `1px solid ${bc}`,
-                                            color,
-                                        }}
+                                        style={{ background: bgc, border: `1px solid ${bc}`, color }}
                                     >
                                         ✗ {r.label}
                                     </span>
@@ -511,14 +394,7 @@ function CandidateRow({
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="shrink-0 self-start px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
-                    style={{
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        color: '#7be0ff',
-                        fontFamily: 'var(--font-display)',
-                        textDecoration: 'none',
-                    }}
+                    className="ak-btn ak-btn--secondary ak-btn--sm shrink-0 self-start"
                     title="Open on YouTube"
                 >
                     Watch ↗

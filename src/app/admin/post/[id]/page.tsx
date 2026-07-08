@@ -536,12 +536,10 @@ export default function PostEditor() {
             {/* Header strip — Cancel / (Save+Approve if pending) / Save */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
-                        Edit Post
-                    </h1>
-                    <div className="flex items-center gap-2 mt-1">
+                    <h1 className="ak-display" style={{ fontSize: '20px' }}>Edit Post</h1>
+                    <div className="flex items-center gap-2 mt-1.5">
                         <StatusPill status={post.status} />
-                        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        <span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             {claimLabel} · {post.source}
                         </span>
                     </div>
@@ -551,17 +549,7 @@ export default function PostEditor() {
                     For non-pending posts there's nothing to approve, so a
                     single plain Save. */}
                 <div className="flex gap-2">
-                    <button
-                        onClick={handleCancel}
-                        disabled={!!busy}
-                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:bg-white/[0.05] disabled:opacity-40"
-                        style={{
-                            background: 'transparent',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: 'var(--text-tertiary)',
-                            fontFamily: 'var(--font-display)',
-                        }}
-                    >
+                    <button onClick={handleCancel} disabled={!!busy} className="ak-btn ak-btn--ghost">
                         Cancel
                     </button>
                     {isDraftable ? (
@@ -569,13 +557,7 @@ export default function PostEditor() {
                             <button
                                 onClick={() => handleSave({ asDraft: true })}
                                 disabled={!!busy}
-                                className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
-                                    border: '1px solid rgba(123,97,255,0.30)',
-                                    color: '#fff',
-                                    fontFamily: 'var(--font-display)',
-                                }}
+                                className="ak-btn ak-btn--secondary"
                             >
                                 {busy === 'save' ? 'Saving…' : 'Save draft'}
                             </button>
@@ -583,43 +565,20 @@ export default function PostEditor() {
                                 onClick={() => handleSave({ thenApprove: true })}
                                 disabled={!!busy}
                                 title="Save and approve: auto-schedules the post for publishing"
-                                className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(0,255,136,0.20), rgba(0,212,170,0.12))',
-                                    border: '1px solid rgba(0,255,136,0.35)',
-                                    color: '#7af0a8',
-                                    fontFamily: 'var(--font-display)',
-                                }}
+                                className="ak-btn ak-btn--primary"
                             >
-                                {busy === 'approve' ? 'Saving…' : 'Save'}
+                                {busy === 'approve' ? 'Saving…' : 'Save & approve'}
                             </button>
                         </>
                     ) : (
-                        <button
-                            onClick={() => handleSave()}
-                            disabled={!!busy}
-                            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                            style={{
-                                background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
-                                border: '1px solid rgba(123,97,255,0.30)',
-                                color: '#fff',
-                                fontFamily: 'var(--font-display)',
-                            }}
-                        >
+                        <button onClick={() => handleSave()} disabled={!!busy} className="ak-btn ak-btn--primary">
                             {busy === 'save' ? 'Saving…' : 'Save'}
                         </button>
                     )}
                 </div>
             </div>
 
-            {error && (
-                <div
-                    className="p-3 rounded-lg text-xs"
-                    style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.25)', color: '#ff9999' }}
-                >
-                    {error}
-                </div>
-            )}
+            {error && <div className="ak-auth__err" style={{ textAlign: 'left' }}>{error}</div>}
 
             {/* ── Social hashtags ───────────────────────────────────
                 Editable chips, auto-filled from the anime name + claim type
@@ -634,8 +593,7 @@ export default function PostEditor() {
                     <button
                         type="button"
                         onClick={() => setHashtags(defaultSocialHashtags({ title, claim_type: post.claim_type, anime_id: post.anime_id }))}
-                        className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded transition-all hover:bg-white/[0.06]"
-                        style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-tertiary)' }}
+                        className="ak-btn ak-btn--ghost ak-btn--sm shrink-0"
                     >
                         Reset to auto
                     </button>
@@ -645,15 +603,15 @@ export default function PostEditor() {
                         <span
                             key={`${tag}-${i}`}
                             className="inline-flex items-center gap-1 pl-3 pr-1 py-1.5 rounded-full text-xs font-semibold"
-                            style={{ background: `${KUMOLAB_PURPLE}22`, border: `1px solid ${KUMOLAB_PURPLE}55`, color: '#d8ccff' }}
+                            style={{ background: `${KUMOLAB_PURPLE}18`, border: `1px solid ${KUMOLAB_PURPLE}66`, color: '#5b3fc4' }}
                         >
                             {tag}
                             <button
                                 type="button"
                                 aria-label={`Remove ${tag}`}
                                 onClick={() => setHashtags(hashtags.filter((_, idx) => idx !== i))}
-                                className="flex items-center justify-center w-6 h-6 rounded-full text-base leading-none transition-all hover:bg-white/[0.12]"
-                                style={{ color: '#d8ccff' }}
+                                className="flex items-center justify-center w-6 h-6 rounded-full text-base leading-none transition-all hover:bg-black/[0.06]"
+                                style={{ color: '#5b3fc4' }}
                             >
                                 &times;
                             </button>
@@ -768,7 +726,7 @@ export default function PostEditor() {
                 <>
                     {/* ── Image preview ─────────────────────────────── */}
                     <Card>
-                        <div className="aspect-[4/5] w-full relative" style={{ background: '#0a0a14' }}>
+                        <div className="aspect-[4/5] w-full relative" style={{ background: 'var(--surface-2)' }}>
                             {imageUrl && !imageError ? (
                                 <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -859,8 +817,7 @@ export default function PostEditor() {
                             onChange={e => setExcerpt(e.target.value)}
                             onBlur={() => handleRegenerate({ silent: true })}
                             placeholder="Short line rendered under the title on the image"
-                            className="w-full bg-black/40 px-3 py-2 rounded-lg text-sm focus:outline-none"
-                            style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
+                            className="ak-field__input"
                         />
                         <p className="mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                             Small text under the title <em>on the image only</em>. Separate from the social-media caption above.
@@ -876,7 +833,7 @@ export default function PostEditor() {
                 </div>
 
                 {/* Sub-section: overlay toggles + gradient */}
-                <div className="p-5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                <div className="p-5 border-t" style={{ borderColor: 'var(--line)' }}>
                     <SectionLabel>Overlay toggles</SectionLabel>
                     <div className="space-y-2 mt-3">
                         <Toggle
@@ -904,7 +861,7 @@ export default function PostEditor() {
                             onChange={v => setSettings(s => ({ ...s, convertToReel: v }))}
                         />
 
-                        <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                        <div className="pt-2 border-t space-y-2.5" style={{ borderColor: 'var(--line)' }}>
                             <div>
                                 <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-muted)' }}>
                                     Gradient position
@@ -918,12 +875,9 @@ export default function PostEditor() {
                                                 onClick={() => setSettings(s => ({ ...s, gradientPosition: pos }))}
                                                 className="flex-1 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
                                                 style={{
-                                                    background: active
-                                                        ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))'
-                                                        : 'rgba(255,255,255,0.03)',
-                                                    border: `1px solid ${active ? 'rgba(123,97,255,0.30)' : 'rgba(255,255,255,0.06)'}`,
-                                                    color: active ? '#fff' : 'var(--text-tertiary)',
-                                                    fontFamily: 'var(--font-display)',
+                                                    background: active ? 'var(--blue-soft)' : 'var(--surface-2)',
+                                                    border: `1px solid ${active ? '#bcd4f2' : 'var(--line-2)'}`,
+                                                    color: active ? '#1d5cb4' : 'var(--ink-3)',
                                                 }}
                                             >
                                                 {pos}
@@ -963,20 +917,15 @@ export default function PostEditor() {
                     <button
                         onClick={() => handleRegenerate()}
                         disabled={!!busy}
-                        className="w-full mt-4 px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(255,60,172,0.18), rgba(123,97,255,0.18))',
-                            border: '1px solid rgba(255,60,172,0.30)',
-                            color: '#fff',
-                            fontFamily: 'var(--font-display)',
-                        }}
+                        className="ak-btn ak-btn--secondary ak-btn--block"
+                        style={{ marginTop: '16px' }}
                     >
                         {busy === 'render' ? 'Rendering…' : 'Force Regenerate'}
                     </button>
                 </div>
 
                 {/* Sub-section: layout (scale + position per element) */}
-                <div className="p-5 space-y-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                <div className="p-5 space-y-4 border-t" style={{ borderColor: 'var(--line)' }}>
                     <SectionLabel>Layout</SectionLabel>
 
                     <ElementControls
@@ -1073,32 +1022,20 @@ export default function PostEditor() {
                                 value={sourceUrl}
                                 onChange={e => setSourceUrl(e.target.value)}
                                 placeholder="https://… (direct .jpg / .png / .webp)"
-                                className="flex-1 bg-black/40 px-4 py-3 rounded-lg text-sm font-mono focus:outline-none"
-                                style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                                className="ak-field__input flex-1"
+                                style={{ fontFamily: 'monospace' }}
                             />
                             <button
                                 onClick={handleReset}
                                 disabled={!!busy}
-                                className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                                style={{
-                                    background: 'rgba(255,255,255,0.03)',
-                                    border: '1px solid rgba(255,255,255,0.10)',
-                                    color: 'var(--text-tertiary)',
-                                    fontFamily: 'var(--font-display)',
-                                }}
+                                className="ak-btn ak-btn--secondary"
                                 title="Re-fetch a clean original image and discard any baked overlay"
                             >
                                 Reset
                             </button>
                             <label
-                                className="px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer text-center transition-all hover:-translate-y-0.5"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,97,255,0.15))',
-                                    border: '1px solid rgba(123,97,255,0.30)',
-                                    color: '#fff',
-                                    fontFamily: 'var(--font-display)',
-                                    opacity: busy ? 0.4 : 1,
-                                }}
+                                className="ak-btn ak-btn--primary cursor-pointer text-center"
+                                style={{ opacity: busy ? 0.4 : 1 }}
                             >
                                 {busy === 'render' ? 'Working…' : 'Upload image'}
                                 <input
@@ -1126,13 +1063,8 @@ export default function PostEditor() {
                     <button
                         onClick={handleDecline}
                         disabled={!!busy}
-                        className="w-full mt-3 px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                        style={{
-                            background: 'rgba(255,255,255,0.02)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            color: 'var(--text-tertiary)',
-                            fontFamily: 'var(--font-display)',
-                        }}
+                        className="ak-btn ak-btn--secondary ak-btn--block"
+                        style={{ marginTop: '12px' }}
                     >
                         {busy === 'decline' ? 'Declining…' : 'Decline & Remove'}
                     </button>
@@ -1143,13 +1075,7 @@ export default function PostEditor() {
                 <button
                     onClick={handleDelete}
                     disabled={!!busy}
-                    className="w-full px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:bg-red-500/10 disabled:opacity-40"
-                    style={{
-                        background: 'transparent',
-                        border: '1px solid rgba(255,68,68,0.20)',
-                        color: '#ff7777',
-                        fontFamily: 'var(--font-display)',
-                    }}
+                    className="ak-btn ak-btn--danger ak-btn--block"
                 >
                     {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
                 </button>
@@ -1178,13 +1104,13 @@ function Collapsible({
             open={defaultOpen}
             className="rounded-xl overflow-hidden group"
             style={{
-                background: 'rgba(12, 12, 24, 0.55)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(20px)',
+                background: 'var(--surface)',
+                border: '1px solid var(--line)',
+                boxShadow: 'var(--shadow-0)',
             }}
         >
             <summary
-                className="px-5 py-4 cursor-pointer flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors list-none [&::-webkit-details-marker]:hidden"
+                className="px-5 py-4 cursor-pointer flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors list-none [&::-webkit-details-marker]:hidden"
             >
                 <div className="min-w-0">
                     <div
@@ -1207,7 +1133,7 @@ function Collapsible({
                     ▾
                 </span>
             </summary>
-            <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            <div className="border-t" style={{ borderColor: 'var(--line)' }}>
                 {children}
             </div>
         </details>
@@ -1221,9 +1147,9 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
         <div
             className={`rounded-xl overflow-hidden ${className}`}
             style={{
-                background: 'rgba(12, 12, 24, 0.55)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(20px)',
+                background: 'var(--surface)',
+                border: '1px solid var(--line)',
+                boxShadow: 'var(--shadow-0)',
             }}
         >
             {children}
@@ -1255,18 +1181,18 @@ function Toggle({ label, hint, value, onChange }: { label: string; hint?: string
     return (
         <button
             onClick={() => onChange(!value)}
-            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all hover:bg-white/[0.03]"
+            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all hover:bg-black/[0.02]"
             style={{ background: 'transparent' }}
         >
             <div className="flex flex-col items-start">
-                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
-                {hint && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
+                <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>{label}</span>
+                {hint && <span className="text-[9px]" style={{ color: 'var(--ink-3)' }}>{hint}</span>}
             </div>
             <span
                 className="relative w-9 h-5 rounded-full transition-colors shrink-0"
                 style={{
-                    background: value ? 'linear-gradient(135deg, #00d4ff, #7b61ff)' : 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: value ? 'var(--gold)' : 'var(--line-2)',
+                    border: '1px solid transparent',
                 }}
             >
                 <span
@@ -1345,12 +1271,11 @@ function ElementControls({
                 <button
                     onClick={onRecenter}
                     disabled={disabled}
-                    className="ml-auto px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-white/[0.05] disabled:cursor-not-allowed"
+                    className="ml-auto px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed"
                     style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        color: 'var(--text-tertiary)',
-                        fontFamily: 'var(--font-display)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--line-2)',
+                        color: 'var(--ink-2)',
                     }}
                 >
                     Recenter
@@ -1365,11 +1290,11 @@ function NudgeBtn({ children, onClick, disabled }: { children: React.ReactNode; 
         <button
             onClick={onClick}
             disabled={disabled}
-            className="w-7 h-7 rounded text-xs font-bold transition-all hover:bg-white/[0.05] disabled:cursor-not-allowed"
+            className="w-7 h-7 rounded text-xs font-bold transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed"
             style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'var(--text-primary)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--line-2)',
+                color: 'var(--ink)',
             }}
         >
             {children}
@@ -1418,9 +1343,9 @@ function PurpleWordPicker({
                 disabled={disabled}
                 className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed"
                 style={{
-                    background: active ? `${KUMOLAB_PURPLE}25` : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${active ? KUMOLAB_PURPLE : 'rgba(255,255,255,0.08)'}`,
-                    color: active ? KUMOLAB_PURPLE : 'var(--text-tertiary)',
+                    background: active ? `${KUMOLAB_PURPLE}22` : 'var(--surface-2)',
+                    border: `1px solid ${active ? KUMOLAB_PURPLE : 'var(--line-2)'}`,
+                    color: active ? '#6b4fd6' : 'var(--ink-2)',
                 }}
             >
                 {word}
@@ -1429,7 +1354,7 @@ function PurpleWordPicker({
     };
 
     return (
-        <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)', opacity: disabled ? 0.4 : 1 }}>
+        <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'var(--line)', opacity: disabled ? 0.4 : 1 }}>
             <div className="flex items-center justify-between">
                 <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
                     Color words KumoLab purple
@@ -1460,19 +1385,15 @@ function PurpleWordPicker({
 }
 
 function StatusPill({ status }: { status: string | null }) {
-    const cfg: Record<string, { color: string; label: string }> = {
-        pending: { color: '#ffaa00', label: 'Pending' },
-        approved: { color: '#00d4ff', label: 'Approved' },
-        published: { color: '#00ff88', label: 'Published' },
-        declined: { color: '#9ca3af', label: 'Declined' },
+    const cls: Record<string, string> = {
+        pending: 'ak-badge--pending',
+        approved: 'ak-badge--scheduled',
+        published: 'ak-badge--published',
+        declined: 'ak-badge--draft',
     };
-    const c = cfg[status || ''] || { color: '#9ca3af', label: status || 'Unknown' };
-    return (
-        <span
-            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
-            style={{ background: `${c.color}18`, border: `1px solid ${c.color}35`, color: c.color }}
-        >
-            {c.label}
-        </span>
-    );
+    const label: Record<string, string> = {
+        pending: 'Pending', approved: 'Approved', published: 'Published', declined: 'Declined',
+    };
+    const variant = cls[status || ''] || 'ak-badge--draft';
+    return <span className={`ak-badge ${variant}`}>{label[status || ''] || status || 'Unknown'}</span>;
 }

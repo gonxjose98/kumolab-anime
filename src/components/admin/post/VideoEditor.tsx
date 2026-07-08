@@ -492,9 +492,9 @@ export default function VideoEditor({
     const HANDLE_BORDER = 'rgba(157, 123, 255, 0.95)';
 
     const cardStyle = {
-        background: 'rgba(12, 12, 24, 0.55)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        backdropFilter: 'blur(20px)',
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        boxShadow: 'var(--shadow-0)',
     } as const;
 
     return (
@@ -671,7 +671,7 @@ export default function VideoEditor({
             {/* Output status — the ⛶ Enlarge button on the preview plays the
                 real rendered file; this line says whether that output is
                 current with the live edits. */}
-            <p className="text-[10px] px-1" style={{ color: outputDirty ? '#ffcc66' : 'var(--text-muted)' }}>
+            <p className="text-[10px] px-1" style={{ color: outputDirty ? '#8a6420' : 'var(--text-muted)' }}>
                 {!stagedUrl
                     ? 'No render yet. Hit Apply changes, then tap ⛶ to preview the real output.'
                     : outputDirty
@@ -777,7 +777,7 @@ export default function VideoEditor({
                     )}
                 </div>
 
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} className="pt-3 space-y-4">
+                <div style={{ borderTop: '1px solid var(--line)' }} className="pt-3 space-y-4">
                     {/* Watermark */}
                     <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
                         <input type="checkbox" checked={watermark} disabled={busy} onChange={(e) => setWatermark(e.target.checked)} />
@@ -807,10 +807,9 @@ export default function VideoEditor({
                                                 onClick={() => setFillStyle(s)}
                                                 className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                                 style={{
-                                                    background: active ? 'rgba(123,97,255,0.25)' : 'rgba(255,255,255,0.04)',
-                                                    border: `1px solid ${active ? 'rgba(123,97,255,0.60)' : 'rgba(255,255,255,0.08)'}`,
-                                                    color: active ? '#fff' : 'var(--text-secondary)',
-                                                    fontFamily: 'var(--font-display)',
+                                                    background: active ? 'var(--blue-soft)' : 'var(--surface-2)',
+                                                    border: `1px solid ${active ? '#bcd4f2' : 'var(--line-2)'}`,
+                                                    color: active ? '#1d5cb4' : 'var(--ink-2)',
                                                 }}
                                             >
                                                 {s}
@@ -839,8 +838,7 @@ export default function VideoEditor({
                                 type="button"
                                 onClick={addOverlay}
                                 disabled={busy}
-                                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40"
-                                style={{ background: 'rgba(123,97,255,0.18)', border: '1px solid rgba(123,97,255,0.45)', color: '#cdbcff', fontFamily: 'var(--font-display)' }}
+                                className="ak-btn ak-btn--secondary ak-btn--sm"
                             >
                                 ＋ Add text
                             </button>
@@ -860,8 +858,8 @@ export default function VideoEditor({
                                             onClick={() => setSelectedOverlayId(o.id)}
                                             className="flex items-center gap-2 p-2 rounded-lg"
                                             style={{
-                                                background: selected ? 'rgba(123,97,255,0.10)' : 'rgba(255,255,255,0.03)',
-                                                border: `1px solid ${selected ? 'rgba(123,97,255,0.45)' : 'rgba(255,255,255,0.07)'}`,
+                                                background: selected ? 'var(--blue-soft)' : 'var(--surface-2)',
+                                                border: `1px solid ${selected ? '#bcd4f2' : 'var(--line)'}`,
                                             }}
                                         >
                                             <input
@@ -871,8 +869,7 @@ export default function VideoEditor({
                                                 onChange={(e) => updateOverlay(o.id, { text: e.target.value })}
                                                 onFocus={() => setSelectedOverlayId(o.id)}
                                                 placeholder="Type text + emoji…"
-                                                className="flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm outline-none"
-                                                style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--text-primary)' }}
+                                                className="ak-field__input flex-1 min-w-0"
                                             />
                                             <input
                                                 type="color"
@@ -901,7 +898,7 @@ export default function VideoEditor({
                                                 disabled={busy}
                                                 title="Delete text"
                                                 className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs"
-                                                style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff8888' }}
+                                                style={{ background: '#fbe9e7', border: '1px solid #f0c4be', color: '#b03328' }}
                                             >
                                                 ✕
                                             </button>
@@ -918,13 +915,12 @@ export default function VideoEditor({
 
                 {/* Apply — renders the edits into the video. Saving (without
                     rendering) lives in the top bar's "Save draft". */}
-                <div className="flex items-center gap-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center gap-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
                     <button
                         type="button"
                         onClick={handleApply}
                         disabled={busy || duration === null}
-                        className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.20), rgba(123,97,255,0.15))', border: '1px solid rgba(123,97,255,0.40)', color: '#fff', fontFamily: 'var(--font-display)' }}
+                        className="ak-btn ak-btn--primary"
                     >
                         {busy ? 'Processing…' : 'Apply changes'}
                     </button>
@@ -934,12 +930,12 @@ export default function VideoEditor({
                 </div>
 
                 {error && (
-                    <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: 'rgba(255,68,68,0.10)', border: '1px solid rgba(255,68,68,0.30)', color: '#ff8888' }}>
+                    <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: '#fbe9e7', border: '1px solid #f0c4be', color: '#b03328' }}>
                         {error}
                     </div>
                 )}
                 {info && (
-                    <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: 'rgba(0,255,136,0.10)', border: '1px solid rgba(0,255,136,0.30)', color: '#7af0a8' }}>
+                    <div className="text-[11px] px-3 py-2 rounded-md" style={{ background: '#e2f4ea', border: '1px solid #b9e0c9', color: '#1d7a4f' }}>
                         {info}
                     </div>
                 )}

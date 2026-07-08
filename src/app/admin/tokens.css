@@ -1,0 +1,65 @@
+/* ══ KumoLab Admin — "Clear Skies Console" design tokens ═══════════════════
+   The admin is the daytime cockpit of the same sea-to-sky world as the
+   storefront: calm light surfaces, navy ink, one gold accent, one blue accent.
+   Every value lives on .admin-root so the whole admin inherits the sky palette
+   without touching globals.css or the storefront. A night skin later is just
+   a re-declaration of these vars. (Design direction: Fable 5.) */
+
+.admin-root {
+    /* Surfaces */
+    --bg: #f4f7fb; /* app canvas — sky-tinted off-white, never pure white */
+    --surface: #ffffff; /* cards, panels, table bodies, modals */
+    --surface-2: #eef3f9; /* table headers, wells, inputs, hover rows */
+    --rail: #0a1730; /* sidebar — storefront night navy (sea below) */
+    --rail-2: #12203f; /* sidebar active/hover */
+
+    /* Text */
+    --ink: #17233a; /* headings, primary body, table text */
+    --ink-2: #51617c; /* secondary text, descriptions, meta */
+    --ink-3: #7d8ca3; /* placeholders, timestamps, disabled */
+    --rail-text: #c9d6ea; /* sidebar labels */
+    --rail-text-active: #e6c489; /* sidebar active label + icon (night gold) */
+
+    /* Lines */
+    --line: #dbe4f0; /* hairlines, row dividers */
+    --line-2: #c3d0e2; /* input borders, emphasized dividers */
+
+    /* Accents */
+    --blue: #2472dc; /* links, selected, focus rings, sort arrows */
+    --blue-soft: #e3edfb; /* selected row tint, info chips */
+    --gold: #c49a52; /* primary accent, active pill, featured */
+    --gold-grad: linear-gradient(180deg, #f4c25e, #d99b26); /* primary buttons only */
+    --gold-ink: #3a2b10; /* text on gold */
+    --sun: #c03d33; /* danger / destructive / broken (red-sun mark) */
+
+    /* Radii */
+    --r-sm: 6px; /* inputs, selects */
+    --r-md: 10px; /* buttons, thumbnails */
+    --r-lg: 14px; /* cards, panels, table containers */
+    --r-xl: 20px; /* modals */
+
+    /* Elevation — borders do the work in light mode; shadows are whispers */
+    --shadow-0: 0 1px 2px rgba(23, 35, 58, 0.05);
+    --shadow-1: 0 4px 16px rgba(23, 35, 58, 0.1);
+    --shadow-2: 0 12px 40px rgba(23, 35, 58, 0.18);
+
+    /* Type families */
+    --ak-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+    --ak-serif: 'Georgia', 'Times New Roman', serif;
+
+    /* Compatibility shim — the galaxy theme's text/font vars remapped to the
+       Clear Skies ink scale, so any admin markup still referencing the old
+       --text-* / --font-display vars (e.g. the post editor before its full
+       migration) renders as dark ink on the light canvas instead of near-white.
+       Scoped to .admin-root; the storefront's own vars are untouched. */
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --text-tertiary: var(--ink-3);
+    --text-muted: var(--ink-3);
+    --font-display: var(--ak-sans);
+
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ak-sans);
+    -webkit-font-smoothing: antialiased;
+}

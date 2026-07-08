@@ -1,0 +1,1129 @@
+/* ══ KumoLab Admin — "Clear Skies Console" component layer ═════════════════
+   Plain-CSS `.ak-*` skin classes. Layout (flex/grid/gap) stays in the JSX via
+   Tailwind; these classes own the SKIN (color, border, radius, shadow, type).
+   Rule of thumb: if it has a hex value or a px font-size, it lives here, not in
+   the JSX. Scoped under .admin-root so it never leaks to the storefront.
+   (Design direction: Fable 5.) */
+
+/* ── Type scale (7 steps) ─────────────────────────────────────────────── */
+.admin-root .ak-display {
+    font-family: var(--ak-serif);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+}
+.admin-root .ak-title {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--ink);
+}
+.admin-root .ak-heading {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--ink);
+}
+.admin-root .ak-body {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--ink);
+}
+.admin-root .ak-body-sm {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+.admin-root .ak-caption {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--ink-3);
+}
+.admin-root .ak-overline {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-2);
+}
+
+/* ── Card / Panel ─────────────────────────────────────────────────────── */
+.admin-root .ak-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-0);
+    padding: 20px;
+}
+.admin-root .ak-card--flush {
+    padding: 0;
+    overflow: hidden;
+}
+.admin-root .ak-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.admin-root .ak-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, filter 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.admin-root .ak-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+.admin-root .ak-btn--primary {
+    background: var(--gold-grad);
+    color: var(--gold-ink);
+}
+.admin-root .ak-btn--primary:hover {
+    filter: brightness(1.05);
+}
+.admin-root .ak-btn--primary:active {
+    filter: brightness(0.95);
+}
+.admin-root .ak-btn--secondary {
+    background: var(--surface);
+    border-color: var(--line-2);
+    color: var(--ink);
+}
+.admin-root .ak-btn--secondary:hover {
+    background: var(--surface-2);
+}
+.admin-root .ak-btn--ghost {
+    background: transparent;
+    color: var(--ink-2);
+}
+.admin-root .ak-btn--ghost:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+.admin-root .ak-btn--danger {
+    background: transparent;
+    color: var(--sun);
+    border-color: #f0c4be;
+}
+.admin-root .ak-btn--danger:hover {
+    background: #fbe9e7;
+}
+.admin-root .ak-btn--sm {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 13px;
+}
+.admin-root .ak-btn--block {
+    width: 100%;
+}
+
+/* ── Form field ───────────────────────────────────────────────────────── */
+.admin-root .ak-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.admin-root .ak-field__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.admin-root .ak-field__input {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    font-family: var(--ak-sans);
+    width: 100%;
+}
+.admin-root .ak-field__input::placeholder {
+    color: var(--ink-3);
+}
+.admin-root .ak-field__input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(36, 114, 220, 0.18);
+}
+.admin-root .ak-field__help {
+    font-size: 12px;
+    color: var(--ink-3);
+}
+.admin-root .ak-field--error .ak-field__input {
+    border-color: var(--sun);
+}
+.admin-root .ak-field--error .ak-field__help {
+    color: var(--sun);
+}
+
+/* ── Badge / status tag ───────────────────────────────────────────────── */
+.admin-root .ak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+}
+.admin-root .ak-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    flex: none;
+}
+.admin-root .ak-badge--bare::before {
+    display: none;
+}
+.admin-root .ak-badge--pending {
+    color: #8a6420;
+    background: #fdf3e0;
+    border-color: #ecd9ae;
+}
+.admin-root .ak-badge--draft {
+    color: #51617c;
+    background: #edf1f7;
+    border-color: #d7dfec;
+}
+.admin-root .ak-badge--scheduled {
+    color: #1d5cb4;
+    background: #e3edfb;
+    border-color: #bcd4f2;
+}
+.admin-root .ak-badge--published,
+.admin-root .ak-badge--success {
+    color: #1d7a4f;
+    background: #e2f4ea;
+    border-color: #b9e0c9;
+}
+.admin-root .ak-badge--error {
+    color: #b03328;
+    background: #fbe9e7;
+    border-color: #f0c4be;
+}
+
+/* ── Toggle ───────────────────────────────────────────────────────────── */
+.admin-root .ak-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.admin-root .ak-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.admin-root .ak-toggle__track {
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--line-2);
+    position: relative;
+    transition: background 0.15s ease;
+    flex: none;
+}
+.admin-root .ak-toggle__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: var(--shadow-0);
+    transition: left 0.15s ease;
+}
+.admin-root .ak-toggle input:checked + .ak-toggle__track {
+    background: var(--gold);
+}
+.admin-root .ak-toggle input:checked + .ak-toggle__track .ak-toggle__thumb {
+    left: 18px;
+}
+.admin-root .ak-toggle input:focus-visible + .ak-toggle__track {
+    outline: 3px solid rgba(36, 114, 220, 0.35);
+    outline-offset: 1px;
+}
+.admin-root .ak-toggle__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* ── Pills / tabs ─────────────────────────────────────────────────────── */
+.admin-root .ak-pills {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--surface-2);
+    border-radius: 999px;
+}
+.admin-root .ak-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-root .ak-pill--active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-0);
+}
+.admin-root .ak-pill__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(196, 154, 82, 0.15);
+    color: #8a6420;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* ── Stat card ────────────────────────────────────────────────────────── */
+.admin-root .ak-stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-0);
+    padding: 20px;
+}
+.admin-root .ak-stat__num {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    margin: 6px 0 4px;
+}
+.admin-root .ak-stat--alarm {
+    border-top: 3px solid var(--sun);
+}
+
+/* ── Section header ───────────────────────────────────────────────────── */
+.admin-root .ak-section {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+.admin-root .ak-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    padding: 48px 24px;
+    color: var(--ink-2);
+}
+.admin-root .ak-empty__glyph {
+    font-size: 40px;
+    color: var(--line-2);
+    line-height: 1;
+}
+
+/* ── Table ────────────────────────────────────────────────────────────── */
+.admin-root .ak-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.admin-root .ak-table thead th {
+    background: var(--surface-2);
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+.admin-root .ak-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    vertical-align: middle;
+}
+.admin-root .ak-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+.admin-root .ak-table tbody tr:hover {
+    background: var(--surface-2);
+}
+.admin-root .ak-table tbody tr[data-selected='1'] {
+    background: var(--blue-soft);
+}
+.admin-root .ak-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────── */
+.admin-root .ak-modal__scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 23, 48, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1000;
+}
+.admin-root .ak-modal {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+}
+.admin-root .ak-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+}
+.admin-root .ak-modal__body {
+    padding: 24px;
+}
+.admin-root .ak-modal__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--line);
+}
+
+/* ── Focus ring (applied broadly) ─────────────────────────────────────── */
+.admin-root .ak-btn:focus-visible,
+.admin-root .ak-pill:focus-visible,
+.admin-root a:focus-visible {
+    outline: 3px solid rgba(36, 114, 220, 0.35);
+    outline-offset: 1px;
+}
+
+/* ══ Auth / login — full-screen calm sky ══════════════════════════════════ */
+.admin-root.ak-auth {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+        radial-gradient(ellipse 90% 60% at 50% -10%, #eaf4ff 0%, transparent 70%),
+        linear-gradient(180deg, #cfe4f7 0%, #9fc6ea 100%);
+    overflow: hidden;
+}
+.admin-root .ak-auth__clouds {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 26% 18% at 14% 22%, rgba(255, 255, 255, 0.9), transparent 70%),
+        radial-gradient(ellipse 30% 20% at 84% 30%, rgba(255, 255, 255, 0.85), transparent 72%),
+        radial-gradient(ellipse 22% 16% at 68% 78%, rgba(255, 255, 255, 0.75), transparent 70%);
+}
+.admin-root .ak-auth__card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: var(--r-xl);
+    box-shadow: 0 24px 60px -24px rgba(20, 60, 120, 0.5);
+    padding: 32px;
+}
+.admin-root .ak-auth__brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    text-align: center;
+}
+.admin-root .ak-auth__mark {
+    width: 52px;
+    height: 38px;
+    object-fit: contain;
+}
+.admin-root .ak-auth__title {
+    font-family: var(--ak-serif);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+}
+.admin-root .ak-auth__sub {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-3);
+}
+.admin-root .ak-auth__err {
+    font-size: 13px;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    color: var(--sun);
+    background: #fbe9e7;
+    border: 1px solid #f0c4be;
+}
+
+/* ══ Shell — sidebar rail + frosted top bar (used from the next pass) ═════ */
+.admin-root .ak-shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+}
+.admin-root .ak-rail {
+    background: var(--rail);
+    color: var(--rail-text);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+.admin-root .ak-rail__group {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(201, 214, 234, 0.6);
+    padding: 16px 12px 6px;
+}
+.admin-root .ak-rail__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: var(--rail-text);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-root .ak-rail__item:hover {
+    background: var(--rail-2);
+}
+.admin-root .ak-rail__item--active {
+    background: var(--rail-2);
+    color: var(--rail-text-active);
+    border-left-color: var(--gold);
+}
+.admin-root .ak-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.admin-root .ak-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 56px;
+    padding: 0 32px;
+    background: rgba(244, 247, 251, 0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+}
+.admin-root .ak-content {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 32px;
+}
+
+/* Sidebar sub-parts */
+.admin-root .ak-rail__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px 18px;
+    text-decoration: none;
+}
+.admin-root .ak-rail__brand img {
+    width: 40px;
+    height: 28px;
+    object-fit: contain;
+}
+.admin-root .ak-rail__brand-name {
+    font-family: var(--ak-serif);
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+}
+.admin-root .ak-rail__nav {
+    flex: 1;
+    overflow-y: auto;
+    margin: 0 -4px;
+    padding: 0 4px;
+}
+.admin-root .ak-rail__foot {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 12px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.admin-root .ak-rail__user {
+    font-size: 12px;
+    color: var(--rail-text);
+    opacity: 0.7;
+    padding: 0 12px;
+    word-break: break-all;
+    line-height: 1.4;
+}
+.admin-root .ak-rail__logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rail-text);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-root .ak-rail__logout:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+}
+.admin-root .ak-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+}
+.admin-root .ak-rail__scrim {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .admin-root .ak-shell {
+        grid-template-columns: 1fr;
+    }
+    .admin-root .ak-rail {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 264px;
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        z-index: 200;
+    }
+    .admin-root .ak-rail--open {
+        transform: translateX(0);
+    }
+    .admin-root .ak-rail__scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 23, 48, 0.45);
+        z-index: 150;
+    }
+    .admin-root .ak-menu-btn {
+        display: inline-flex;
+    }
+    .admin-root .ak-content {
+        padding: 16px;
+    }
+    .admin-root .ak-topbar {
+        padding: 0 16px;
+    }
+}
+
+/* ── Admin page reset ─────────────────────────────────────────────────────
+   The storefront locks html/body to 100vh with internal overflow for its
+   scroll journey; the admin needs normal document flow + a light canvas.
+   Scoped to admin pages only via :has(.admin-root). */
+html:has(.admin-root),
+body:has(.admin-root) {
+    height: auto !important;
+    min-height: 100%;
+    overflow: visible !important;
+    background: #f4f7fb !important;
+}
+
+/* ══ Merch placement manager ══════════════════════════════════════════════ */
+.admin-root .ak-merch__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 56px;
+    z-index: 40;
+    background: rgba(244, 247, 251, 0.9);
+    backdrop-filter: blur(8px);
+    padding: 12px 4px;
+    margin-bottom: 8px;
+}
+.admin-root .ak-merch__barinfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.admin-root .ak-merch__dot {
+    margin: 0 8px;
+    color: var(--ink-3);
+}
+.admin-root .ak-merch__unsaved {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a6420;
+    background: #fdf3e0;
+    border: 1px solid #ecd9ae;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+.admin-root .ak-merch__ok {
+    color: #1d7a4f;
+    font-weight: 600;
+}
+.admin-root .ak-merch__err {
+    color: var(--sun);
+    font-weight: 600;
+}
+.admin-root .ak-merch__warn {
+    font-size: 13px;
+    color: var(--sun);
+    background: #fbe9e7;
+    border: 1px solid #f0c4be;
+    border-radius: var(--r-md);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
+
+.admin-root .ak-merch__list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.admin-root .ak-merch__row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-0);
+    padding: 12px 16px;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.admin-root .ak-merch__row--drag {
+    opacity: 0.55;
+    border-color: var(--blue);
+    box-shadow: var(--shadow-1);
+}
+.admin-root .ak-merch__handle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: grab;
+    color: var(--ink-3);
+}
+.admin-root .ak-merch__handle:active {
+    cursor: grabbing;
+}
+.admin-root .ak-merch__grip {
+    flex: none;
+}
+.admin-root .ak-merch__nudge {
+    display: flex;
+    flex-direction: column;
+}
+.admin-root .ak-merch__nudge button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    border-radius: 4px;
+}
+.admin-root .ak-merch__nudge button:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+.admin-root .ak-merch__nudge button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.admin-root .ak-merch__pos {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    width: 18px;
+    text-align: center;
+    flex: none;
+}
+.admin-root .ak-merch__thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--r-sm);
+    object-fit: cover;
+    border: 1px solid var(--line);
+    flex: none;
+    background: var(--surface-2);
+}
+.admin-root .ak-merch__meta {
+    flex: 1;
+    min-width: 0;
+}
+.admin-root .ak-merch__name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.admin-root .ak-merch__price {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 2px;
+}
+.admin-root .ak-merch__saves {
+    margin-left: 8px;
+    color: #1d7a4f;
+}
+.admin-root .ak-merch__saves s {
+    opacity: 0.6;
+}
+
+/* Placement chips */
+.admin-root .ak-merch__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: none;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.admin-root .ak-merch__chip:hover {
+    background: var(--surface-2);
+}
+.admin-root .ak-merch__chip--on {
+    background: var(--blue-soft);
+    color: #1d5cb4;
+    border-color: #bcd4f2;
+}
+.admin-root .ak-merch__chip--star.ak-merch__chip--on {
+    background: #fdf3e0;
+    color: #8a6420;
+    border-color: #ecd9ae;
+}
+
+/* Pricing inputs */
+.admin-root .ak-merch__inputs {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex: none;
+}
+.admin-root .ak-merch__anchorwrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.admin-root .ak-merch__anchor {
+    width: 92px;
+    height: 34px;
+}
+.admin-root .ak-merch__anchor--bad {
+    border-color: var(--sun);
+}
+.admin-root .ak-merch__hint {
+    font-size: 10px;
+    color: var(--sun);
+    padding-left: 2px;
+}
+.admin-root .ak-merch__label {
+    width: 130px;
+    height: 34px;
+}
+
+@media (max-width: 820px) {
+    .admin-root .ak-merch__row {
+        flex-wrap: wrap;
+    }
+    .admin-root .ak-merch__meta {
+        flex-basis: 60%;
+    }
+    .admin-root .ak-merch__inputs {
+        flex-basis: 100%;
+    }
+    .admin-root .ak-merch__anchor,
+    .admin-root .ak-merch__label {
+        flex: 1;
+        width: auto;
+    }
+}
+
+/* ══ Posts list ═══════════════════════════════════════════════════════════ */
+.admin-root .ak-postrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    transition: background 0.12s ease;
+}
+.admin-root .ak-postrow:hover {
+    background: var(--surface-2);
+}
+.admin-root .ak-postrow__main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.admin-root .ak-postrow__thumb {
+    position: relative;
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+}
+.admin-root .ak-postrow__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.admin-root .ak-postrow__thumbfallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--ink-3);
+}
+.admin-root .ak-postrow__vidbadge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 3px;
+    background: rgba(10, 23, 48, 0.7);
+    color: #fff;
+}
+.admin-root .ak-postrow__meta {
+    flex: 1;
+    min-width: 0;
+}
+.admin-root .ak-postrow__title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.admin-root .ak-postrow__sub {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.admin-root .ak-postrow__claim {
+    flex: none;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+}
+@media (max-width: 640px) {
+    .admin-root .ak-postrow__claim {
+        display: none;
+    }
+}
+.admin-root .ak-postrow__slot {
+    flex: none;
+    cursor: pointer;
+    transition: filter 0.12s ease;
+}
+.admin-root .ak-postrow__slot:hover {
+    filter: brightness(0.97);
+}
+
+/* Upload modal platform-confirm rows */
+.admin-root .ak-uprow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    text-decoration: none;
+}
+.admin-root .ak-uprow--link:hover {
+    background: var(--surface-2);
+}
+.admin-root .ak-uprow--skipped {
+    opacity: 0.6;
+    background: var(--surface-2);
+}
+.admin-root .ak-uprow__icon {
+    font-size: 18px;
+    flex: none;
+}
+
+/* ══ Analytics metric tile ════════════════════════════════════════════════ */
+.admin-root .ak-metric {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: 12px 16px;
+}
+.admin-root .ak-metric__num {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    margin-top: 6px;
+}
+
+/* ══ Calendar ═════════════════════════════════════════════════════════════ */
+.admin-root .ak-cal__nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.admin-root .ak-cal__nav:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+.admin-root .ak-cal__cell {
+    padding: 6px;
+    min-height: 72px;
+    border-radius: var(--r-sm);
+    text-align: left;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.admin-root .ak-cal__cell:hover {
+    background: var(--surface-2);
+}

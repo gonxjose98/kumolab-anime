@@ -21,6 +21,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
 
 type Step = 'idle' | 'downloading' | 'drafting' | 'done';
 
@@ -89,175 +90,80 @@ export default function ImportFromUrlButton() {
 
     return (
         <>
-            <button
-                onClick={() => setOpen(true)}
-                className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5"
-                style={{
-                    background: 'linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.10))',
-                    border: '1px solid rgba(0,212,255,0.35)',
-                    color: '#7be0ff',
-                    fontFamily: 'var(--font-display)',
-                }}
-            >
-                + Import from URL
+            <button onClick={() => setOpen(true)} className="ak-btn ak-btn--secondary ak-btn--sm">
+                <Plus size={13} /> Import from URL
             </button>
 
             {open && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                    style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-                    onClick={closeModal}
-                >
-                    <div
-                        className="rounded-2xl p-6 w-full max-w-lg"
-                        style={{
-                            background: 'rgba(18, 18, 30, 0.95)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            boxShadow: '0 12px 48px rgba(0,0,0,0.5)',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h2
-                            className="text-lg font-black tracking-tight mb-1"
-                            style={{
-                                fontFamily: 'var(--font-display)',
-                                background: 'linear-gradient(135deg, #00d4ff, #7b61ff)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                            }}
-                        >
-                            Import from URL
-                        </h2>
-                        <p className="text-[11px] mb-4" style={{ color: 'var(--text-muted)' }}>
-                            Paste an X or Instagram post link. We&apos;ll download the video and
-                            draft a title and caption for you to review.
-                        </p>
+                <div className="ak-modal__scrim" onClick={closeModal}>
+                    <div className="ak-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="ak-modal__head">
+                            <span className="ak-title">Import from URL</span>
+                            <button type="button" className="ak-btn ak-btn--ghost ak-btn--sm" onClick={closeModal} disabled={busy}>Close</button>
+                        </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-3">
-                            <div>
-                                <label
-                                    className="block text-[10px] font-bold uppercase tracking-wider mb-1"
-                                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                                >
-                                    Post URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={url}
-                                    onChange={(e) => setUrl(e.target.value)}
-                                    disabled={busy}
-                                    placeholder="https://x.com/… or https://www.instagram.com/p/…"
-                                    className="w-full px-3 py-2 rounded-md text-sm outline-none"
-                                    style={{
-                                        background: 'rgba(0,0,0,0.4)',
-                                        border: '1px solid rgba(255,255,255,0.10)',
-                                        color: 'var(--text-primary)',
-                                    }}
-                                    autoFocus
-                                />
+                        <form onSubmit={handleSubmit}>
+                            <div className="ak-modal__body flex flex-col gap-4">
+                                <p className="ak-body-sm">
+                                    Paste an X or Instagram post link. We&apos;ll download the video and
+                                    draft a title and caption for you to review.
+                                </p>
+
+                                <div className="ak-field">
+                                    <label className="ak-field__label">Post URL</label>
+                                    <input
+                                        type="url"
+                                        value={url}
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        disabled={busy}
+                                        placeholder="https://x.com/… or https://www.instagram.com/p/…"
+                                        className="ak-field__input"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="ak-field">
+                                    <label className="ak-field__label">Notes for AI <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--ink-3)' }}>(optional)</span></label>
+                                    <textarea
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        disabled={busy}
+                                        placeholder="e.g. MAPPA dropping Chainsaw S2 ED preview"
+                                        rows={2}
+                                        className="ak-field__input"
+                                        style={{ height: 'auto', padding: '12px', resize: 'none' }}
+                                    />
+                                </div>
+
+                                {error && <div className="ak-auth__err">{error}</div>}
+
+                                {busy && (
+                                    <div className="ak-body-sm flex items-center gap-2" style={{ color: '#1d5cb4', background: 'var(--blue-soft)', border: '1px solid #bcd4f2', borderRadius: 'var(--r-md)', padding: '10px 12px' }}>
+                                        <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                                        {step === 'downloading' && 'Downloading video…'}
+                                        {step === 'drafting' && 'Generating title + caption…'}
+                                    </div>
+                                )}
+
+                                {step === 'done' && (
+                                    <div className="ak-body-sm" style={{ color: '#1d7a4f', background: '#e2f4ea', border: '1px solid #b9e0c9', borderRadius: 'var(--r-md)', padding: '10px 12px' }}>
+                                        Imported, opening editor…
+                                    </div>
+                                )}
+
+                                <p className="ak-caption">
+                                    Imports skip duplicate detection. You&apos;re curating. They land as
+                                    pending; nothing publishes until you approve in the editor.
+                                </p>
                             </div>
 
-                            <div>
-                                <label
-                                    className="block text-[10px] font-bold uppercase tracking-wider mb-1"
-                                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}
-                                >
-                                    Notes for AI <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
-                                </label>
-                                <textarea
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    disabled={busy}
-                                    placeholder="e.g. MAPPA dropping Chainsaw S2 ED preview"
-                                    rows={2}
-                                    className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none"
-                                    style={{
-                                        background: 'rgba(0,0,0,0.4)',
-                                        border: '1px solid rgba(255,255,255,0.10)',
-                                        color: 'var(--text-primary)',
-                                    }}
-                                />
-                            </div>
-
-                            {error && (
-                                <div
-                                    className="text-[11px] px-3 py-2 rounded-md"
-                                    style={{
-                                        background: 'rgba(255,68,68,0.10)',
-                                        border: '1px solid rgba(255,68,68,0.30)',
-                                        color: '#ff8888',
-                                    }}
-                                >
-                                    {error}
-                                </div>
-                            )}
-
-                            {busy && (
-                                <div
-                                    className="text-[11px] px-3 py-2 rounded-md flex items-center gap-2"
-                                    style={{
-                                        background: 'rgba(0,212,255,0.08)',
-                                        border: '1px solid rgba(0,212,255,0.25)',
-                                        color: '#7be0ff',
-                                    }}
-                                >
-                                    <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                                    {step === 'downloading' && 'Downloading video…'}
-                                    {step === 'drafting' && 'Generating title + caption…'}
-                                </div>
-                            )}
-
-                            {step === 'done' && (
-                                <div
-                                    className="text-[11px] px-3 py-2 rounded-md"
-                                    style={{
-                                        background: 'rgba(0,255,136,0.10)',
-                                        border: '1px solid rgba(0,255,136,0.30)',
-                                        color: '#7af0a8',
-                                    }}
-                                >
-                                    Imported, opening editor…
-                                </div>
-                            )}
-
-                            <div className="flex gap-2 justify-end pt-2">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    disabled={busy}
-                                    className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-40"
-                                    style={{
-                                        background: 'rgba(255,255,255,0.03)',
-                                        border: '1px solid rgba(255,255,255,0.10)',
-                                        color: 'var(--text-secondary)',
-                                        fontFamily: 'var(--font-display)',
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={busy || !url.trim()}
-                                    className="px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(0,212,255,0.30), rgba(123,97,255,0.20))',
-                                        border: '1px solid rgba(0,212,255,0.50)',
-                                        color: '#a3eaff',
-                                        fontFamily: 'var(--font-display)',
-                                    }}
-                                >
+                            <div className="ak-modal__foot">
+                                <button type="button" onClick={closeModal} disabled={busy} className="ak-btn ak-btn--secondary">Cancel</button>
+                                <button type="submit" disabled={busy || !url.trim()} className="ak-btn ak-btn--primary">
                                     {busy ? '…' : 'Import'}
                                 </button>
                             </div>
                         </form>
-
-                        <p
-                            className="text-[10px] mt-4"
-                            style={{ color: 'var(--text-muted)' }}
-                        >
-                            Imports skip duplicate detection. You&apos;re curating. They land as
-                            pending; nothing publishes until you approve in the editor.
-                        </p>
                     </div>
                 </div>
             )}

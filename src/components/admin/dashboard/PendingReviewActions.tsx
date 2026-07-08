@@ -50,32 +50,20 @@ export default function PendingReviewActions({
                 <button
                     onClick={() => call('/api/admin/approve', 'approve')}
                     disabled={!!busy}
-                    className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{
-                        background: 'linear-gradient(135deg, rgba(0,255,136,0.18), rgba(0,212,170,0.10))',
-                        border: '1px solid rgba(0,255,136,0.35)',
-                        color: '#7af0a8',
-                        fontFamily: 'var(--font-display)',
-                    }}
+                    className="ak-btn ak-btn--primary ak-btn--sm"
                 >
                     {busy === 'approve' ? '…' : 'Approve'}
                 </button>
                 <button
                     onClick={() => call('/api/admin/decline', 'decline')}
                     disabled={!!busy}
-                    className="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        color: 'var(--text-tertiary)',
-                        fontFamily: 'var(--font-display)',
-                    }}
+                    className="ak-btn ak-btn--ghost ak-btn--sm"
                 >
                     {busy === 'decline' ? '…' : 'Decline'}
                 </button>
             </div>
             {error && (
-                <span className="text-[9px]" style={{ color: '#ff7777' }}>
+                <span className="ak-caption" style={{ color: 'var(--sun)' }}>
                     {error}
                 </span>
             )}
