@@ -1597,3 +1597,213 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     overflow: hidden;
 }
 .admin-root .ak-vhub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* ══ Orders board ═══════════════════════════════════════════════════════════
+   Live-from-Printful order tracking. Each order rides a 4-node track:
+   Received → In production → Shipped → Delivered. Sea-to-sky glass throughout. */
+.admin-root .ak-ord { display: flex; flex-direction: column; gap: 16px; }
+
+/* Summary strip */
+.admin-root .ak-ord-summary {
+    display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap;
+}
+.admin-root .ak-ord-chip {
+    display: flex; align-items: center; gap: 9px;
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--glass-border);
+    background: var(--surface);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: var(--shadow-0), var(--glass-inset);
+    min-width: 132px;
+}
+.admin-root .ak-ord-chip__value { font-family: var(--ak-display); font-weight: 800; font-size: 22px; line-height: 1; color: var(--ink); }
+.admin-root .ak-ord-chip__label { font-size: 11.5px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.01em; }
+.admin-root .ak-ord-chip--received { color: var(--blue); }
+.admin-root .ak-ord-chip--production { color: #d9a441; }
+.admin-root .ak-ord-chip--shipped { color: #4c9be0; }
+.admin-root .ak-ord-chip--delivered { color: #35a877; }
+.admin-root .ak-ord-summary__spacer { flex: 1 1 auto; min-width: 0; }
+.admin-root .ak-ord-rev {
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
+    padding: 10px 18px; border-radius: var(--r-md);
+    border: 1px solid var(--glass-border);
+    background: var(--gold-grad); color: var(--gold-ink);
+    box-shadow: var(--shadow-0);
+}
+.admin-root .ak-ord-rev__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.72; }
+.admin-root .ak-ord-rev__value { font-family: var(--ak-display); font-weight: 800; font-size: 22px; line-height: 1.1; }
+
+/* Controls */
+.admin-root .ak-ord-controls {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+}
+.admin-root .ak-ord-filters { display: flex; gap: 7px; flex-wrap: wrap; }
+.admin-root .ak-ord-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--ink-2);
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    transition: all 0.14s ease;
+}
+.admin-root .ak-ord-pill:hover { border-color: var(--gold-hover); color: var(--ink); }
+.admin-root .ak-ord-pill--active {
+    background: var(--gold-grad); color: var(--gold-ink);
+    border-color: transparent; box-shadow: var(--shadow-0);
+}
+.admin-root .ak-ord-pill__count {
+    font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+    background: rgba(18, 58, 107, 0.12);
+}
+.admin-root .ak-ord-pill--active .ak-ord-pill__count { background: rgba(58, 42, 8, 0.18); }
+
+.admin-root .ak-ord-tools { display: flex; align-items: center; gap: 9px; }
+.admin-root .ak-ord-search {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--ink-3);
+}
+.admin-root .ak-ord-search input {
+    border: none; background: transparent; outline: none;
+    font-size: 13px; color: var(--ink); width: 220px; font-family: var(--ak-sans);
+}
+.admin-root .ak-ord-search input::placeholder { color: var(--ink-3); }
+.admin-root .ak-ord-refresh {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: var(--r-sm);
+    border: 1px solid var(--glass-border); background: var(--surface);
+    color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer;
+    transition: all 0.14s ease;
+}
+.admin-root .ak-ord-refresh:hover:not(:disabled) { border-color: var(--gold-hover); color: var(--gold-text); }
+.admin-root .ak-ord-refresh:disabled { opacity: 0.6; cursor: default; }
+.admin-root .ak-spin { animation: ak-spin 0.9s linear infinite; }
+@keyframes ak-spin { to { transform: rotate(360deg); } }
+
+.admin-root .ak-ord-error {
+    padding: 11px 15px; border-radius: var(--r-sm);
+    border: 1px solid rgba(214, 69, 69, 0.4);
+    background: rgba(214, 69, 69, 0.1); color: var(--sun);
+    font-size: 12.5px; font-weight: 600;
+}
+
+/* Empty */
+.admin-root .ak-ord-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 60px 20px; color: var(--ink-3); text-align: center;
+    border: 1px dashed var(--line); border-radius: var(--r-lg);
+    background: var(--surface);
+}
+.admin-root .ak-ord-empty p { margin: 0; font-size: 13.5px; max-width: 360px; }
+
+/* List + cards */
+.admin-root .ak-ord-list { display: flex; flex-direction: column; gap: 11px; }
+.admin-root .ak-ord-card {
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-border);
+    background: var(--surface);
+    backdrop-filter: blur(22px) saturate(1.45);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    box-shadow: var(--shadow-0), var(--glass-inset);
+    overflow: hidden;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.admin-root .ak-ord-card:hover { box-shadow: var(--shadow-1), var(--glass-inset); }
+.admin-root .ak-ord-card--open { border-color: var(--gold-hover); box-shadow: var(--shadow-1), var(--glass-inset); }
+.admin-root .ak-ord-card--canceled { opacity: 0.72; }
+
+.admin-root .ak-ord-card__head {
+    display: grid;
+    grid-template-columns: 120px minmax(140px, 1fr) minmax(280px, 1.6fr) auto;
+    align-items: center; gap: 18px;
+    width: 100%; padding: 14px 18px;
+    background: transparent; border: none; cursor: pointer; text-align: left;
+}
+.admin-root .ak-ord-card__id { display: flex; flex-direction: column; gap: 2px; }
+.admin-root .ak-ord-card__num { font-family: var(--ak-display); font-weight: 800; font-size: 14.5px; color: var(--ink); }
+.admin-root .ak-ord-card__date { font-size: 11.5px; color: var(--ink-3); }
+.admin-root .ak-ord-card__who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.admin-root .ak-ord-card__name { font-weight: 700; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-ord-card__dest { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--ink-3); }
+
+/* The track */
+.admin-root .ak-ord-track { display: flex; align-items: flex-start; }
+.admin-root .ak-ord-node {
+    position: relative; flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+}
+.admin-root .ak-ord-node__line {
+    position: absolute; top: 13px; right: 50%; width: 100%; height: 2px;
+    background: var(--line-2); z-index: 0;
+}
+.admin-root .ak-ord-node.is-done .ak-ord-node__line,
+.admin-root .ak-ord-node.is-current .ak-ord-node__line { background: var(--gold); }
+.admin-root .ak-ord-node__dot {
+    position: relative; z-index: 1;
+    width: 27px; height: 27px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-2); color: var(--ink-3);
+    border: 1.5px solid var(--line-2);
+    transition: all 0.15s ease;
+}
+.admin-root .ak-ord-node.is-done .ak-ord-node__dot {
+    background: var(--gold); color: var(--gold-ink); border-color: var(--gold);
+}
+.admin-root .ak-ord-node.is-current .ak-ord-node__dot {
+    background: var(--gold-grad); color: var(--gold-ink); border-color: var(--gold-hover);
+    box-shadow: 0 0 0 4px rgba(240, 160, 40, 0.18);
+}
+.admin-root .ak-ord-node__label { font-size: 10.5px; font-weight: 600; color: var(--ink-3); text-align: center; line-height: 1.2; }
+.admin-root .ak-ord-node.is-current .ak-ord-node__label { color: var(--gold-text); font-weight: 800; }
+
+.admin-root .ak-ord-canceled {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 700; color: var(--sun);
+    justify-self: center;
+}
+
+.admin-root .ak-ord-card__right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; position: relative; padding-right: 24px; }
+.admin-root .ak-ord-card__total { font-family: var(--ak-display); font-weight: 800; font-size: 15px; color: var(--ink); }
+.admin-root .ak-ord-card__items { font-size: 11px; color: var(--ink-3); }
+.admin-root .ak-ord-card__chev { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--ink-3); transition: transform 0.18s ease; }
+.admin-root .ak-ord-card--open .ak-ord-card__chev { transform: translateY(-50%) rotate(180deg); color: var(--gold-text); }
+
+/* Expanded detail */
+.admin-root .ak-ord-card__body { border-top: 1px solid var(--line); padding: 16px 18px; }
+.admin-root .ak-ord-detail { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; }
+.admin-root .ak-ord-items { display: flex; flex-direction: column; gap: 9px; }
+.admin-root .ak-ord-item { display: flex; align-items: center; gap: 11px; }
+.admin-root .ak-ord-item img, .admin-root .ak-ord-item__ph {
+    width: 46px; height: 46px; border-radius: var(--r-sm); object-fit: cover;
+    background: var(--surface-2); border: 1px solid var(--line-2); flex: none;
+}
+.admin-root .ak-ord-item__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-root .ak-ord-item__name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.admin-root .ak-ord-item__meta { font-size: 11.5px; color: var(--ink-3); }
+
+.admin-root .ak-ord-side { display: flex; flex-direction: column; gap: 9px; }
+.admin-root .ak-ord-side__row { display: flex; flex-direction: column; gap: 1px; }
+.admin-root .ak-ord-side__k { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.admin-root .ak-ord-side__v { font-size: 13px; color: var(--ink); }
+.admin-root .ak-ord-side__v--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink-2); }
+.admin-root .ak-ord-ship { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.admin-root .ak-ord-ship__none { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
+.admin-root .ak-ord-ship__link {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 11px; border-radius: var(--r-sm);
+    border: 1px solid var(--glass-border); background: var(--surface-2);
+    color: var(--gold-text); font-size: 12.5px; font-weight: 700;
+    text-decoration: none; transition: all 0.14s ease; width: fit-content;
+}
+.admin-root .ak-ord-ship__link:hover { border-color: var(--gold-hover); background: var(--rail-2); }
+
+@media (max-width: 860px) {
+    .admin-root .ak-ord-card__head { grid-template-columns: 1fr auto; grid-auto-rows: auto; gap: 12px; }
+    .admin-root .ak-ord-track { grid-column: 1 / -1; }
+    .admin-root .ak-ord-canceled { grid-column: 1 / -1; justify-self: start; }
+    .admin-root .ak-ord-detail { grid-template-columns: 1fr; }
+    .admin-root .ak-ord-search input { width: 150px; }
+}
