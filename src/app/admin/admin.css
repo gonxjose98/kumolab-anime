@@ -1807,3 +1807,21 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     .admin-root .ak-ord-detail { grid-template-columns: 1fr; }
     .admin-root .ak-ord-search input { width: 150px; }
 }
+
+/* ── Analytics: per-post metrics sync button ─────────────────────────────── */
+.admin-root .ak-syncm { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-root .ak-syncm__btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: var(--r-sm);
+    border: 1px solid var(--glass-border); background: var(--surface);
+    color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer;
+    transition: all 0.14s ease;
+}
+.admin-root .ak-syncm__btn:hover:not(:disabled) { border-color: var(--gold-hover); color: var(--gold-text); }
+.admin-root .ak-syncm__btn:disabled { opacity: 0.65; cursor: default; }
+.admin-root .ak-syncm__msg {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600;
+}
+.admin-root .ak-syncm__msg--ok { color: #35a877; }
+.admin-root .ak-syncm__msg--warn { color: var(--gold-text); }
