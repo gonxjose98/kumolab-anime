@@ -549,6 +549,11 @@ export default function PostEditor() {
                     For non-pending posts there's nothing to approve, so a
                     single plain Save. */}
                 <div className="flex gap-2">
+                    {isVideoPost && (
+                        <button onClick={() => router.push(`/admin/post/${id}/studio`)} className="ak-btn ak-btn--secondary" title="Open the full multi-track video editor">
+                            🎬 Open in Studio
+                        </button>
+                    )}
                     <button onClick={handleCancel} disabled={!!busy} className="ak-btn ak-btn--ghost">
                         Cancel
                     </button>

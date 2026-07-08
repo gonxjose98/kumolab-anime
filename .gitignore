@@ -48,3 +48,4 @@ next-env.d.ts
 # Playwright MCP local artifacts (snapshots, screenshots, console logs)
 .playwright-mcp/
 /*.png
+/public/ffmpeg/

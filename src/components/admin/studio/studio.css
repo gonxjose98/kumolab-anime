@@ -1,0 +1,347 @@
+/* ══ KumoLab Studio — full-screen editor ══════════════════════════════════
+   Scoped under .admin-root so it inherits the Clear Skies tokens. The editor
+   overlays the whole viewport (fixed) on top of AdminShell. The preview stage
+   is intentionally dark (media focus); the chrome stays light Clear Skies. */
+
+.admin-root .st-root {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: var(--bg);
+    color: var(--ink);
+    display: grid;
+    grid-template-columns: 248px 1fr 312px;
+    grid-template-rows: 52px 1fr minmax(200px, 34vh);
+    grid-template-areas:
+        "topbar topbar topbar"
+        "library preview inspector"
+        "timeline timeline timeline";
+    overflow: hidden;
+    font-family: var(--ak-sans);
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────*/
+.admin-root .st-topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+}
+.admin-root .st-topbar__title {
+    font-family: var(--ak-serif);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+}
+.admin-root .st-topbar__sub {
+    font-size: 12px;
+    color: var(--ink-3);
+}
+.admin-root .st-spacer { flex: 1; }
+
+/* ── Panels (library / inspector) ────────────────────────────────────────*/
+.admin-root .st-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.admin-root .st-library { grid-area: library; }
+.admin-root .st-inspector {
+    grid-area: inspector;
+    border-right: 0;
+    border-left: 1px solid var(--line);
+}
+.admin-root .st-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    flex: none;
+}
+.admin-root .st-panel__body {
+    padding: 12px 14px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Media library ───────────────────────────────────────────────────────*/
+.admin-root .st-media-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.admin-root .st-asset {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    background: var(--surface-2);
+    cursor: grab;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.admin-root .st-asset:hover { border-color: var(--blue); }
+.admin-root .st-asset img,
+.admin-root .st-asset video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.admin-root .st-asset__badge {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(10, 23, 48, 0.72);
+    color: #fff;
+}
+.admin-root .st-asset__name {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 2px 5px;
+    font-size: 10px;
+    color: #fff;
+    background: linear-gradient(180deg, transparent, rgba(10,23,48,0.72));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.admin-root .st-drop {
+    border: 1.5px dashed var(--line-2);
+    border-radius: var(--r-md);
+    padding: 16px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.admin-root .st-drop:hover,
+.admin-root .st-drop--over { border-color: var(--blue); background: var(--blue-soft); color: #1d5cb4; }
+
+/* ── Preview stage (dark media surface) ─────────────────────────────────*/
+.admin-root .st-preview {
+    grid-area: preview;
+    background: #0b1220;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    min-width: 0;
+    padding: 16px;
+    gap: 12px;
+    position: relative;
+}
+.admin-root .st-stage {
+    position: relative;
+    background: #000;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    max-height: 100%;
+    max-width: 100%;
+}
+.admin-root .st-stage canvas { display: block; max-height: 100%; max-width: 100%; }
+.admin-root .st-transport {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #c9d6ea;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.admin-root .st-transport button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    cursor: pointer;
+}
+.admin-root .st-transport button:hover { background: rgba(255,255,255,0.12); }
+
+/* ── Timeline ────────────────────────────────────────────────────────────*/
+.admin-root .st-timeline {
+    grid-area: timeline;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.admin-root .st-timeline__bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line);
+    flex: none;
+}
+.admin-root .st-timeline__scroll {
+    position: relative;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+}
+.admin-root .st-timeline__inner {
+    position: relative;
+    min-width: 100%;
+}
+.admin-root .st-ruler {
+    position: sticky;
+    top: 0;
+    height: 22px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    z-index: 3;
+}
+.admin-root .st-ruler__tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--line-2);
+    padding-left: 4px;
+    font-size: 9px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+.admin-root .st-track {
+    position: relative;
+    height: 56px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+}
+.admin-root .st-track--audio { background: #f7faf8; }
+.admin-root .st-track--text { background: #faf8f4; }
+.admin-root .st-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--sun);
+    z-index: 5;
+    pointer-events: none;
+}
+.admin-root .st-playhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -4px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--sun);
+}
+
+/* ── Clip ────────────────────────────────────────────────────────────────*/
+.admin-root .st-clip {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    border-radius: 6px;
+    background: var(--blue-soft);
+    border: 1px solid #bcd4f2;
+    overflow: hidden;
+    cursor: grab;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    color: #1d5cb4;
+    white-space: nowrap;
+}
+.admin-root .st-clip--video { background: #e7eefb; border-color: #bcd4f2; color: #1d5cb4; }
+.admin-root .st-clip--audio { background: #e2f4ea; border-color: #b9e0c9; color: #1d7a4f; }
+.admin-root .st-clip--text { background: #fdf3e0; border-color: #ecd9ae; color: #8a6420; }
+.admin-root .st-clip--image { background: #efe9fb; border-color: #d6c9f2; color: #5b3fc4; }
+.admin-root .st-clip--selected { outline: 2px solid var(--blue); outline-offset: 0; z-index: 4; }
+.admin-root .st-clip__handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+    background: rgba(36, 114, 220, 0.25);
+}
+.admin-root .st-clip__handle--l { left: 0; }
+.admin-root .st-clip__handle--r { right: 0; }
+.admin-root .st-clip__thumb {
+    position: absolute;
+    inset: 0;
+    opacity: 0.35;
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+.admin-root .st-clip__label { position: relative; z-index: 1; }
+
+/* ── Inspector rows ──────────────────────────────────────────────────────*/
+.admin-root .st-field { margin-bottom: 14px; }
+.admin-root .st-field__label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-bottom: 5px;
+}
+.admin-root .st-row { display: flex; align-items: center; gap: 8px; }
+.admin-root .st-range { width: 100%; accent-color: var(--blue); }
+.admin-root .st-num {
+    width: 56px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+/* ── Track header rail ───────────────────────────────────────────────────*/
+.admin-root .st-thead {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    width: 128px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--line);
+}
+.admin-root .st-thead__row {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.admin-root .st-empty-hint {
+    color: var(--ink-3);
+    font-size: 12px;
+    text-align: center;
+    padding: 20px 8px;
+}

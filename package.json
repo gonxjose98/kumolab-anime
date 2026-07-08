@@ -13,6 +13,9 @@
     "engine:hourly": "tsx scripts/run-engine.ts hourly"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@napi-rs/canvas": "^0.1.88",
     "@supabase/auth-helpers-react": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
