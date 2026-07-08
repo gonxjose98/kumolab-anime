@@ -1061,6 +1061,40 @@
     .moonHolder { width: 22vmin; height: 22vmin; }
     .island { left: 14%; }
     .boatDrift { left: 66%; }
+
+    /* ── Mobile performance ──────────────────────────────────────────────
+       The scroll dolly (transform via --z) is GPU-cheap and stays. What janks
+       a phone is the pile of CONTINUOUS ambient animations running on top of
+       it — twinkles, drifts, god-rays, the boat bob — plus the SMIL waves/
+       birds (gated off in JS). Freeze those to a static scene on small screens;
+       the dive still reads beautifully, just without the per-frame ambient churn. */
+    .glint,
+    .shimmer,
+    .star,
+    .godrays,
+    .moonRays,
+    .sunRing,
+    .cloudDriftM,
+    .cloudDriftN,
+    .boatBob,
+    .boatDrift,
+    .scrollLine::after {
+        animation: none !important;
+    }
+    .motes,
+    .moonGlitter,
+    .birdLayer {
+        display: none;
+    }
+    /* Promote the big scaled layers to their own GPU layer so the zoom
+       composites instead of repainting. */
+    .skyWorld,
+    .layerNear,
+    .layerMid,
+    .layerWisp,
+    .sea {
+        will-change: transform;
+    }
 }
 
 /* ── REDUCED MOTION — a gorgeous static sea-and-sky key visual ─────── */
