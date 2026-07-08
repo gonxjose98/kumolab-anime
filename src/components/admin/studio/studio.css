@@ -28,9 +28,10 @@
     inset: 0;
     z-index: 120;
     color: var(--ink);
+    /* Homepage night-sky gradient so the editor is the same world as the admin. */
     background:
-        radial-gradient(120% 80% at 50% -20%, #16233f 0%, transparent 60%),
-        linear-gradient(180deg, #0b1428 0%, #070d18 100%);
+        radial-gradient(120% 85% at 50% -15%, #1a2652 0%, transparent 55%),
+        linear-gradient(180deg, #121c42 0%, #0c1431 55%, #070b1c 100%);
     display: grid;
     grid-template-columns: 256px 1fr 320px;
     grid-template-rows: 56px 1fr minmax(210px, 34vh);

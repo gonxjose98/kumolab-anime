@@ -191,8 +191,31 @@ export default async function DashboardPage() {
     const data = await fetchDashboardData();
     const { stats } = data;
 
+    const stormy = stats.errors24h > 0;
+
     return (
         <div className="flex flex-col gap-6">
+            {/* ── Weather-status hero ──────────────────────────────── */}
+            <div className={`ak-card ak-weather ${stormy ? 'ak-weather--storm' : 'ak-weather--clear'}`}>
+                <div>
+                    <div className="ak-overline" style={{ marginBottom: '4px' }}>本部 · Command Center</div>
+                    <div className="ak-display" style={{ fontSize: '22px' }}>Welcome back</div>
+                </div>
+                <div className="ak-weather__status">
+                    <span className="ak-weather__glyph" aria-hidden="true" />
+                    <div>
+                        <div className="ak-weather__headline">
+                            {stormy ? `Storm warning` : 'Clear skies over KumoLab'}
+                        </div>
+                        <div className="ak-weather__sub">
+                            {stormy
+                                ? `${stats.errors24h} error${stats.errors24h === 1 ? '' : 's'} in the last 24h · ${stats.pending} awaiting review`
+                                : `${stats.pending} awaiting review · ${stats.scheduled24h} scheduled`}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* ── Stat grid ────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard label="Published · 24h" value={stats.published24h} />
