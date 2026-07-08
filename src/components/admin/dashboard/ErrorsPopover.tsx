@@ -47,11 +47,7 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
     }, [open]);
 
     if (count === 0) {
-        return (
-            <div className="ak-badge ak-badge--success">
-                All systems operational
-            </div>
-        );
+        return <div className="ak-badge ak-badge--success ak-badge--bare">All clear</div>;
     }
 
     return (
@@ -60,11 +56,12 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 className="ak-badge ak-badge--error"
-                style={{ cursor: 'pointer', height: '26px' }}
+                style={{ cursor: 'pointer', height: '24px', maxWidth: '100%' }}
                 aria-haspopup="dialog"
                 aria-expanded={open}
+                title={`${count} error${count === 1 ? '' : 's'} in the last 24h`}
             >
-                {count} error{count === 1 ? '' : 's'} in last 24h
+                View log
                 <span aria-hidden style={{ fontSize: '9px' }}>{open ? '▲' : '▼'}</span>
             </button>
 

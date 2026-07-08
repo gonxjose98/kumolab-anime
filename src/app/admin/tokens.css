@@ -1,62 +1,59 @@
 /* ══ KumoLab Admin — "Clear Skies Console" design tokens ═══════════════════
-   The admin is the daytime cockpit of the same sea-to-sky world as the
-   storefront: calm light surfaces, navy ink, one gold accent, one blue accent.
-   Every value lives on .admin-root so the whole admin inherits the sky palette
-   without touching globals.css or the storefront. A night skin later is just
-   a re-declaration of these vars. (Design direction: Fable 5.) */
+   The admin is the same sea-to-sky world as the homepage, seen from a control
+   tower. Light theme = homepage DAY sky, dark theme = homepage NIGHT sky.
+   Surfaces are frosted glass floating on a real cel-cloud sky (rendered by
+   <AdminSky/>), never a flat opaque background. Design direction: Fable 5. */
 
 .admin-root {
-    /* Surfaces */
-    --bg: #f4f7fb; /* app canvas — sky-tinted off-white, never pure white */
-    --surface: #ffffff; /* cards, panels, table bodies, modals */
-    --surface-2: #eef3f9; /* table headers, wells, inputs, hover rows */
-    --rail: #0a1730; /* sidebar — storefront night navy (sea below) */
-    --rail-2: #12203f; /* sidebar active/hover */
+    /* ── DAY (light) ── */
+    --bg: transparent;                       /* the sky backdrop shows through */
+    --surface: rgba(240, 248, 255, 0.62);    /* frosted glass card */
+    --surface-2: rgba(255, 255, 255, 0.5);   /* wells, inputs, hovers */
+    --rail: #123a80;                          /* sidebar deep-sky (glass over it) */
+    --rail-2: rgba(255, 215, 110, 0.13);      /* active nav chip */
 
-    /* Text */
-    --ink: #17233a; /* headings, primary body, table text */
-    --ink-2: #51617c; /* secondary text, descriptions, meta */
-    --ink-3: #7d8ca3; /* placeholders, timestamps, disabled */
-    --rail-text: #c9d6ea; /* sidebar labels */
-    --rail-text-active: #e6c489; /* sidebar active label + icon (night gold) */
+    --ink: #123a6b;
+    --ink-2: rgba(18, 58, 107, 0.78);
+    --ink-3: rgba(18, 58, 107, 0.55);
+    --rail-text: rgba(242, 249, 255, 0.8);
+    --rail-text-active: #ffd76e;
 
-    /* Lines */
-    --line: #dbe4f0; /* hairlines, row dividers */
-    --line-2: #c3d0e2; /* input borders, emphasized dividers */
+    --line: rgba(196, 146, 44, 0.28);         /* gold hairline (was gray) */
+    --line-2: rgba(18, 58, 107, 0.14);        /* structural hairline in tables */
 
-    /* Accents */
-    --blue: #2472dc; /* links, selected, focus rings, sort arrows */
-    --blue-soft: #e3edfb; /* selected row tint, info chips */
-    --gold: #c49a52; /* primary accent, active pill, featured */
-    --gold-grad: linear-gradient(180deg, #f4c25e, #d99b26); /* primary buttons only */
-    --gold-ink: #3a2b10; /* text on gold */
-    --sun: #c03d33; /* danger / destructive / broken (red-sun mark) */
+    --blue: #2472dc;
+    --blue-soft: rgba(75, 161, 239, 0.16);
+    --gold: #c49a52;
+    --gold-hover: #f0a028;
+    --gold-text: #b47e10;
+    --gold-grad: linear-gradient(180deg, #e9c87e 0%, #c49a52 55%, #a97f3a 100%);
+    --gold-ink: #3a2a08;
+    --sun: #d64545;                           /* danger / red */
 
-    /* Radii */
-    --r-sm: 6px; /* inputs, selects */
-    --r-md: 10px; /* buttons, thumbnails */
-    --r-lg: 14px; /* cards, panels, table containers */
-    --r-xl: 20px; /* modals */
+    --glass-border: rgba(196, 146, 44, 0.42);
+    --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 
-    /* Elevation — borders do the work in light mode; shadows are whispers */
-    --shadow-0: 0 1px 2px rgba(23, 35, 58, 0.05);
-    --shadow-1: 0 4px 16px rgba(23, 35, 58, 0.1);
-    --shadow-2: 0 12px 40px rgba(23, 35, 58, 0.18);
+    --shadow-0: 0 2px 8px rgba(18, 58, 128, 0.1);
+    --shadow-1: 0 8px 30px rgba(18, 58, 128, 0.18);
+    --shadow-2: 0 16px 48px rgba(18, 58, 128, 0.26);
 
-    /* Type families */
+    /* Radii — a touch softer (cloud-round) */
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 22px;
+
+    /* Type — Outfit is the display/anime face, Inter is for reading */
     --ak-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
-    --ak-serif: 'Georgia', 'Times New Roman', serif;
+    --ak-display: var(--font-outfit), 'Outfit', var(--ak-sans);
+    --ak-serif: var(--ak-display);            /* retire Georgia — nothing regresses to serif */
 
-    /* Compatibility shim — the galaxy theme's text/font vars remapped to the
-       Clear Skies ink scale, so any admin markup still referencing the old
-       --text-* / --font-display vars (e.g. the post editor before its full
-       migration) renders as dark ink on the light canvas instead of near-white.
-       Scoped to .admin-root; the storefront's own vars are untouched. */
+    /* Compat shim — legacy galaxy vars remapped to the ink scale. */
     --text-primary: var(--ink);
     --text-secondary: var(--ink-2);
     --text-tertiary: var(--ink-3);
     --text-muted: var(--ink-3);
-    --font-display: var(--ak-sans);
+    --font-display: var(--ak-display);
 
     background: var(--bg);
     color: var(--ink);
@@ -64,41 +61,36 @@
     -webkit-font-smoothing: antialiased;
 }
 
-/* ══ Dark "night sky" theme ════════════════════════════════════════════════
-   Re-declares the tokens when the operator flips to dark. Because every admin
-   surface reads these vars, the whole console re-themes from this one block
-   (plus the component overrides in admin.css for the few hardcoded-light spots).
-   Toggled via <html data-admin-theme="dark"> (set pre-paint by the layout
-   script + the sidebar toggle). */
+/* ══ NIGHT (dark) — homepage starfield ═════════════════════════════════════ */
 html[data-admin-theme='dark'] .admin-root {
-    --bg: #080f1c;
-    --surface: #131f38;
-    --surface-2: #0e1830;
-    --rail: #0a1424;
-    --rail-2: #14223f;
+    --bg: transparent;
+    --surface: rgba(12, 18, 44, 0.55);
+    --surface-2: rgba(20, 30, 64, 0.5);
+    --rail: #070b1c;
+    --rail-2: rgba(255, 215, 110, 0.13);
 
-    --ink: #eaf1fb;
-    --ink-2: #a6b6d0;
-    --ink-3: #6f819e;
-    --rail-text: #c9d6ea;
-    --rail-text-active: #f4d89a;
+    --ink: #f2f9ff;
+    --ink-2: rgba(242, 249, 255, 0.75);
+    --ink-3: rgba(242, 249, 255, 0.52);
+    --rail-text: rgba(242, 249, 255, 0.8);
+    --rail-text-active: #ffd76e;
 
-    --line: rgba(150, 180, 226, 0.13);
-    --line-2: rgba(150, 180, 226, 0.24);
+    --line: rgba(226, 176, 90, 0.26);
+    --line-2: rgba(242, 249, 255, 0.1);
 
-    --blue: #4a9eff;
-    --blue-soft: rgba(74, 158, 255, 0.16);
-    --gold: #e3b25a;
-    --gold-grad: linear-gradient(180deg, #f4c869, #d99b26);
-    --gold-ink: #241803;
-    --sun: #ff6f61;
+    --blue: #6fb2ff;
+    --blue-soft: rgba(111, 178, 255, 0.16);
+    --gold: #e6c489;
+    --gold-hover: #ffca66;
+    --gold-text: #ffd88a;
+    --gold-grad: linear-gradient(180deg, #ffe2a8 0%, #e6c489 55%, #b98f4e 100%);
+    --gold-ink: #241703;
+    --sun: #ff7a6b;
 
-    --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.45);
-    --shadow-1: 0 6px 22px rgba(0, 0, 0, 0.5);
-    --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.6);
+    --glass-border: rgba(226, 176, 90, 0.3);
+    --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
-    background:
-        radial-gradient(120% 90% at 50% -10%, #16233f 0%, transparent 55%),
-        linear-gradient(180deg, #0a1120 0%, #070c16 100%);
+    --shadow-0: 0 2px 10px rgba(0, 0, 0, 0.4);
+    --shadow-1: 0 10px 34px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 18px 56px rgba(0, 0, 0, 0.55);
 }
-

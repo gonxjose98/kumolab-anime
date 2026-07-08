@@ -13,27 +13,28 @@ import {
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
 import ThemeToggle from './ThemeToggle';
+import AdminSky from './AdminSky';
 
-const GROUPS: { label: string; items: { href: string; label: string; icon: typeof LayoutDashboard }[] }[] = [
-    { label: 'Overview', items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+interface NavItem { href: string; label: string; jp: string; icon: typeof LayoutDashboard }
+
+// Dashboard sits alone at the top (it's the room you're in, not a category);
+// the rest are bilingual groups — Publishing / Insight / Shop.
+const TOP: NavItem = { href: '/admin/dashboard', label: 'Dashboard', jp: '本部', icon: LayoutDashboard };
+
+const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     {
-        label: 'Content',
-        items: [
-            { href: '/admin/posts', label: 'Posts', icon: FileText },
-            { href: '/admin/calendar', label: 'Calendar', icon: CalendarDays },
+        label: 'Publishing', jp: '発信', items: [
+            { href: '/admin/posts', label: 'Posts', jp: '記事', icon: FileText },
+            { href: '/admin/calendar', label: 'Calendar', jp: '暦', icon: CalendarDays },
         ],
     },
-    { label: 'Insights', items: [{ href: '/admin/analytics', label: 'Analytics', icon: BarChart3 }] },
-    { label: 'Store', items: [{ href: '/admin/merch', label: 'Merch', icon: ShoppingBag }] },
+    { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3 }] },
+    { label: 'Shop', jp: '売店', items: [{ href: '/admin/merch', label: 'Merch', jp: 'グッズ', icon: ShoppingBag }] },
 ];
 
-const ALL = GROUPS.flatMap((g) => g.items);
+const ALL = [TOP, ...GROUPS.flatMap((g) => g.items)];
 
-/**
- * Clear Skies admin shell — persistent navy sidebar rail + frosted top bar.
- * Replaces the old hamburger AdminHeader. The rail collapses to a drawer
- * below 900px. Active item is derived from the pathname.
- */
+/** The KumoLab admin shell — a gold-chrome cloud rail over the sea-to-sky. */
 export default function AdminShell({
     email,
     children,
@@ -50,67 +51,85 @@ export default function AdminShell({
         return pathname.startsWith(href);
     };
     const title = ALL.find((i) => isActive(i.href))?.label ?? 'Admin';
+    const titleJp = ALL.find((i) => isActive(i.href))?.jp ?? '';
 
-    // Close the drawer on route change
-    useEffect(() => {
-        setOpen(false);
-    }, [pathname]);
+    useEffect(() => { setOpen(false); }, [pathname]);
+
+    const NavRow = ({ it }: { it: NavItem }) => {
+        const Icon = it.icon;
+        const active = isActive(it.href);
+        return (
+            <Link href={it.href} className={`ak-rail__item ${active ? 'ak-rail__item--active' : ''}`}>
+                <Icon size={18} strokeWidth={1.75} />
+                <span className="ak-rail__labels">
+                    <span className="ak-rail__main">{it.label}</span>
+                    <span className="ak-rail__jp">{it.jp}</span>
+                </span>
+            </Link>
+        );
+    };
 
     return (
         <div className="admin-root">
-        <div className="ak-shell">
-            <aside className={`ak-rail ${open ? 'ak-rail--open' : ''}`}>
-                <Link href="/admin/dashboard" className="ak-rail__brand">
+            <AdminSky />
+            <div className="ak-shell">
+                <aside className={`ak-rail ${open ? 'ak-rail--open' : ''}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/kumolab-cloud-mark-gold.png" alt="" />
-                    <span className="ak-rail__brand-name">KumoLab</span>
-                </Link>
-
-                <nav className="ak-rail__nav">
-                    {GROUPS.map((g) => (
-                        <div key={g.label}>
-                            <div className="ak-rail__group">{g.label}</div>
-                            {g.items.map((it) => {
-                                const Icon = it.icon;
-                                const active = isActive(it.href);
-                                return (
-                                    <Link
-                                        key={it.href}
-                                        href={it.href}
-                                        className={`ak-rail__item ${active ? 'ak-rail__item--active' : ''}`}
-                                    >
-                                        <Icon size={17} />
-                                        <span>{it.label}</span>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    ))}
-                </nav>
-
-                <div className="ak-rail__foot">
-                    <ThemeToggle />
-                    {email && <div className="ak-rail__user">{email}</div>}
-                    <LogoutButton />
-                </div>
-            </aside>
-
-            {open && <div className="ak-rail__scrim" onClick={() => setOpen(false)} aria-hidden="true" />}
-
-            <div className="ak-main">
-                <header className="ak-topbar">
-                    <div className="flex items-center gap-3">
-                        <button className="ak-menu-btn" onClick={() => setOpen(true)} aria-label="Open menu">
-                            <Menu size={18} />
-                        </button>
-                        <span className="ak-display" style={{ fontSize: '20px' }}>
-                            {title}
+                    <Link href="/admin/dashboard" className="ak-rail__crest">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/kumolab-cloud-mark-gold.png" alt="" />
+                        <span className="ak-rail__brand">
+                            <span className="ak-rail__brandname">KumoLab</span>
+                            <span className="ak-rail__brandsub">Admin Console</span>
                         </span>
+                    </Link>
+                    <div className="ak-rail__crestline">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/kumolab-cloud-mark-gold.png" alt="" />
                     </div>
-                </header>
-                <div className="ak-content">{children}</div>
+
+                    <nav className="ak-rail__nav">
+                        <NavRow it={TOP} />
+                        {GROUPS.map((g) => (
+                            <div key={g.label} className="ak-rail__group-wrap">
+                                <div className="ak-rail__group">
+                                    <span className="ak-rail__group-en">{g.label}</span>
+                                    <span className="ak-rail__group-jp">{g.jp}</span>
+                                </div>
+                                {g.items.map((it) => <NavRow key={it.href} it={it} />)}
+                            </div>
+                        ))}
+                    </nav>
+
+                    <div className="ak-rail__foot">
+                        <ThemeToggle />
+                        {email && (
+                            <div className="ak-rail__user">
+                                <span className="ak-rail__avatar">{(email[0] || 'K').toUpperCase()}</span>
+                                <span className="ak-rail__email">{email}</span>
+                            </div>
+                        )}
+                        <LogoutButton />
+                    </div>
+                </aside>
+
+                {open && <div className="ak-rail__scrim" onClick={() => setOpen(false)} aria-hidden="true" />}
+
+                <div className="ak-main">
+                    <header className="ak-topbar">
+                        <div className="flex items-center gap-3">
+                            <button className="ak-menu-btn" onClick={() => setOpen(true)} aria-label="Open menu">
+                                <Menu size={18} />
+                            </button>
+                            <span className="ak-topbar__title">
+                                {titleJp && <span className="ak-topbar__jp">{titleJp}</span>}
+                                {title}
+                            </span>
+                        </div>
+                    </header>
+                    <div className="ak-content">{children}</div>
+                </div>
             </div>
-        </div>
         </div>
     );
 }
