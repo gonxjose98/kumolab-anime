@@ -8,8 +8,7 @@ import {
     FileText,
     CalendarDays,
     BarChart3,
-    ShoppingBag,
-    Package,
+    Store,
     Clapperboard,
     Menu,
 } from 'lucide-react';
@@ -32,12 +31,7 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
         ],
     },
     { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3 }] },
-    {
-        label: 'Shop', jp: '売店', items: [
-            { href: '/admin/orders', label: 'Orders', jp: '注文', icon: Package },
-            { href: '/admin/merch', label: 'Merch', jp: 'グッズ', icon: ShoppingBag },
-        ],
-    },
+    { label: 'Shop', jp: '売店', items: [{ href: '/admin/store', label: 'Store', jp: '売店', icon: Store }] },
 ];
 
 const ALL = [TOP, ...GROUPS.flatMap((g) => g.items)];
