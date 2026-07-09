@@ -267,7 +267,9 @@ export default async function DashboardPage() {
             </Suspense>
 
             {/* ── Pending review (hero) + right rail ──────────────── */}
-            <div className="grid lg:grid-cols-3 gap-6 items-start">
+            {/* grid-cols-1 base = minmax(0,1fr) so children shrink on phones
+                instead of sizing to content and overflowing the viewport. */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="ak-card ak-card--flush lg:col-span-2">
                     <div className="flex items-center justify-between gap-3 p-5 pb-3">
                         <div className="flex items-center gap-3">

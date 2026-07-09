@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Top-right errors button that opens a floating popover with the same
 // collapsible error list that previously lived on the dashboard body.
@@ -25,24 +26,49 @@ function timeAgo(iso: string): string {
 
 export default function ErrorsPopover({ count, errors }: { count: number; errors: DashboardError[] }) {
     const [open, setOpen] = useState(false);
+    // The panel is portaled to <body> (see below), so it escapes the errors
+    // stat card's backdrop-filter stacking context — otherwise later frosted
+    // cards (Social pulse) paint on top of it. Position is computed from the
+    // button rect and clamped to the viewport so it never runs off a phone edge.
+    const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
 
-    // Click-outside + ESC close so the popover feels like a normal menu.
+    const place = () => {
+        const b = btnRef.current;
+        if (!b || typeof window === 'undefined') return;
+        const r = b.getBoundingClientRect();
+        const width = Math.min(440, window.innerWidth - 32);
+        // Align the panel's right edge to the button, then clamp within [16, vw-16].
+        let left = r.right - width;
+        left = Math.max(16, Math.min(left, window.innerWidth - width - 16));
+        setPos({ top: r.bottom + 8, left, width });
+    };
+
+    // Click-outside + ESC close, and keep the panel pinned under the button
+    // while scrolling/resizing (it's position:fixed via the portal).
     useEffect(() => {
         if (!open) return;
+        place();
         function onClick(e: MouseEvent) {
-            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
+            const t = e.target as Node;
+            if (wrapRef.current?.contains(t)) return;
+            if (panelRef.current?.contains(t)) return;
+            setOpen(false);
         }
         function onKey(e: KeyboardEvent) {
             if (e.key === 'Escape') setOpen(false);
         }
         document.addEventListener('mousedown', onClick);
         document.addEventListener('keydown', onKey);
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
         return () => {
             document.removeEventListener('mousedown', onClick);
             document.removeEventListener('keydown', onKey);
+            window.removeEventListener('resize', place);
+            window.removeEventListener('scroll', place, true);
         };
     }, [open]);
 
@@ -50,9 +76,63 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
         return <div className="ak-badge ak-badge--success ak-badge--bare">All clear</div>;
     }
 
+    const panel = open && pos && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+                ref={panelRef}
+                className="rounded-xl overflow-hidden"
+                style={{
+                    position: 'fixed',
+                    top: pos.top,
+                    left: pos.left,
+                    width: pos.width,
+                    maxHeight: 'min(70vh, 600px)',
+                    background: 'var(--surface)',
+                    backdropFilter: 'blur(26px) saturate(1.6)',
+                    WebkitBackdropFilter: 'blur(26px) saturate(1.6)',
+                    border: '1px solid #f0c4be',
+                    boxShadow: 'var(--shadow-2)',
+                    zIndex: 1000,
+                }}
+                role="dialog"
+                aria-label="Recent errors"
+            >
+                <div className="px-4 py-3 flex items-center justify-between"
+                     style={{ borderBottom: '1px solid var(--line)' }}>
+                    <span className="ak-overline">Recent Errors (24h)</span>
+                    <button
+                        type="button"
+                        onClick={() => setOpen(false)}
+                        className="ak-btn ak-btn--ghost ak-btn--sm"
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div className="overflow-y-auto" style={{ maxHeight: 'calc(min(70vh, 600px) - 50px)' }}>
+                    {errors.length === 0 ? (
+                        <p className="px-4 py-6 ak-caption text-center">
+                            No error rows available.
+                        </p>
+                    ) : (
+                        <ul>
+                            {errors.map(err => (
+                                <li key={err.id} style={{ borderTop: '1px solid var(--line)' }}>
+                                    <ErrorRow err={err} />
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>,
+            document.body,
+        )
+        : null;
+
     return (
         <div ref={wrapRef} className="relative">
             <button
+                ref={btnRef}
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 className="ak-badge ak-badge--error"
@@ -64,49 +144,7 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
                 View log
                 <span aria-hidden style={{ fontSize: '9px' }}>{open ? '▲' : '▼'}</span>
             </button>
-
-            {open && (
-                <div
-                    className="absolute right-0 mt-2 z-50 rounded-xl overflow-hidden"
-                    style={{
-                        width: 'min(440px, calc(100vw - 32px))',
-                        maxHeight: 'min(70vh, 600px)',
-                        background: 'var(--surface)',
-                        border: '1px solid #f0c4be',
-                        boxShadow: 'var(--shadow-2)',
-                    }}
-                    role="dialog"
-                    aria-label="Recent errors"
-                >
-                    <div className="px-4 py-3 flex items-center justify-between"
-                         style={{ borderBottom: '1px solid var(--line)' }}>
-                        <span className="ak-overline">Recent Errors (24h)</span>
-                        <button
-                            type="button"
-                            onClick={() => setOpen(false)}
-                            className="ak-btn ak-btn--ghost ak-btn--sm"
-                            aria-label="Close"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    <div className="overflow-y-auto" style={{ maxHeight: 'calc(min(70vh, 600px) - 50px)' }}>
-                        {errors.length === 0 ? (
-                            <p className="px-4 py-6 ak-caption text-center">
-                                No error rows available.
-                            </p>
-                        ) : (
-                            <ul>
-                                {errors.map(err => (
-                                    <li key={err.id} style={{ borderTop: '1px solid var(--line)' }}>
-                                        <ErrorRow err={err} />
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-            )}
+            {panel}
         </div>
     );
 }
