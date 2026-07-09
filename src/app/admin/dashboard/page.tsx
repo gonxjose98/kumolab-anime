@@ -5,6 +5,9 @@ import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActi
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
 import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
+import { getScheduleRows } from '@/lib/schedule';
+import { fetchOrders } from '@/lib/orders';
+import { fetchIGDashboardData } from '@/lib/social/ig-insights';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,18 +20,6 @@ function timeAgo(iso: string | null | undefined): string {
     if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
     if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
     return `${Math.floor(ms / 86_400_000)}d ago`;
-}
-
-function formatSlot(iso: string | null): string {
-    if (!iso) return '-';
-    const d = new Date(iso);
-    return d.toLocaleString('en-US', {
-        timeZone: 'America/New_York',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    }) + ' ET';
 }
 
 const CLAIM_LABEL: Record<string, string> = {
@@ -66,7 +57,6 @@ async function fetchDashboardData() {
         { count: errors24h },
         { data: recentErrors },
         { data: pendingPosts },
-        { data: scheduledPosts },
         { data: recentlyPublished },
         { data: sourceHealth },
         { data: recentActivity },
@@ -78,11 +68,20 @@ async function fetchDashboardData() {
         supabaseAdmin.from('error_logs').select('*', { count: 'exact', head: true }).gte('created_at', last24h.toISOString()),
         supabaseAdmin.from('error_logs').select('id, source, error_message, context, created_at').gte('created_at', last24h.toISOString()).order('created_at', { ascending: false }).limit(20),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, youtube_video_id, timestamp').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
-        supabaseAdmin.from('posts').select('id, title, image, source, claim_type, scheduled_post_time, youtube_video_id').eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()).order('scheduled_post_time', { ascending: true }).limit(10),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
     ]);
+
+    // Today's lineup with peak-hour flags (shares the Content > Schedule helper).
+    const lineup = await getScheduleRows({ pastHours: 6, futureHours: 24, limit: 8 });
+
+    // Commerce (live from Printful). Best-effort — degrades to 0 if unreachable.
+    const { orders } = await fetchOrders(150).catch(() => ({ orders: [] as any[] }));
+    const ordersToday = orders.filter((o: any) => o.createdAt && new Date(o.createdAt).getTime() >= last24h.getTime());
+    const revenueToday = ordersToday
+        .filter((o: any) => o.stage !== 'canceled')
+        .reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);
 
     return {
         stats: {
@@ -91,10 +90,13 @@ async function fetchDashboardData() {
             pending: pendingCount ?? 0,
             scheduled24h: scheduledCount ?? 0,
             errors24h: errors24h ?? 0,
+            ordersToday: ordersToday.length,
+            revenueToday,
+            currency: orders[0]?.currency || 'USD',
         },
         recentErrors: recentErrors || [],
         pendingPosts: pendingPosts || [],
-        scheduledPosts: scheduledPosts || [],
+        lineup,
         recentlyPublished: recentlyPublished || [],
         sourceHealth: sourceHealth || [],
         recentActivity: recentActivity || [],
@@ -115,6 +117,46 @@ function HealthCardSkeleton() {
         <div className="ak-card flex items-center justify-between">
             <span className="ak-title">System health</span>
             <span className="ak-caption">Checking…</span>
+        </div>
+    );
+}
+
+async function StreamedSocialPulse() {
+    const ig = await fetchIGDashboardData().catch(() => null);
+    return <SocialPulseCard snapshot={ig?.snapshot} />;
+}
+
+function SocialPulseCard({ snapshot }: { snapshot?: { followers: number | null; reach28d: number | null; views28d: number | null } }) {
+    const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-US'));
+    return (
+        <div className="ak-card">
+            <div className="ak-card__header">
+                <span className="ak-title">Social pulse · Instagram</span>
+                <Link href="/admin/analytics" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full analytics →</Link>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+                <MiniPulse label="Followers" value={fmt(snapshot?.followers)} />
+                <MiniPulse label="Reach · 28d" value={fmt(snapshot?.reach28d)} />
+                <MiniPulse label="Views · 28d" value={fmt(snapshot?.views28d)} />
+            </div>
+        </div>
+    );
+}
+
+function MiniPulse({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <div className="ak-stat__num" style={{ fontSize: '1.2rem' }}>{value}</div>
+            <div className="ak-caption" style={{ marginTop: 2 }}>{label}</div>
+        </div>
+    );
+}
+
+function SocialPulseSkeleton() {
+    return (
+        <div className="ak-card flex items-center justify-between">
+            <span className="ak-title">Social pulse</span>
+            <span className="ak-caption">Loading…</span>
         </div>
     );
 }
@@ -204,10 +246,11 @@ export default async function DashboardPage() {
             </div>
 
             {/* ── Stat grid ────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <StatCard label="Published · 24h" value={stats.published24h} />
                 <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} />
                 <StatCard label="Scheduled · 24h" value={stats.scheduled24h} />
+                <StatCard label="Orders · 24h" value={stats.ordersToday} tone={stats.ordersToday > 0 ? 'attention' : undefined} sub={stats.revenueToday > 0 ? money(stats.revenueToday, stats.currency) : undefined} />
                 <div className="ak-stat" style={stats.errors24h > 0 ? { borderTop: '3px solid var(--sun)' } : undefined}>
                     <div className="flex items-start justify-between gap-2">
                         <span className="ak-overline">Errors · 24h</span>
@@ -217,6 +260,11 @@ export default async function DashboardPage() {
                     <span className="ak-caption">{stats.errors24h > 0 ? 'needs a look' : 'all clear'}</span>
                 </div>
             </div>
+
+            {/* ── Social pulse (streamed — light glance, heavy data in Analytics) ── */}
+            <Suspense fallback={<SocialPulseSkeleton />}>
+                <StreamedSocialPulse />
+            </Suspense>
 
             {/* ── Pending review (hero) + right rail ──────────────── */}
             <div className="grid lg:grid-cols-3 gap-6 items-start">
@@ -256,8 +304,8 @@ export default async function DashboardPage() {
                                 ))}
                             </ul>
                             {stats.pending > 6 && (
-                                <Link href="/admin/posts" className="block text-center px-5 py-3 ak-caption" style={{ borderTop: '1px solid var(--line)', color: 'var(--gold-text)', textDecoration: 'none' }}>
-                                    View all {stats.pending} pending in Posts →
+                                <Link href="/admin/content/posts" className="block text-center px-5 py-3 ak-caption" style={{ borderTop: '1px solid var(--line)', color: 'var(--gold-text)', textDecoration: 'none' }}>
+                                    View all {stats.pending} pending in Content →
                                 </Link>
                             )}
                         </>
@@ -265,22 +313,25 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="flex flex-col gap-6">
-                    {/* Up next */}
+                    {/* Today's lineup (peak-flagged) */}
                     <div className="ak-card">
                         <div className="ak-card__header">
-                            <span className="ak-title">Up next</span>
-                            <span className="ak-caption">next 24h</span>
+                            <span className="ak-title">Today&apos;s lineup</span>
+                            <Link href="/admin/content/schedule" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full schedule →</Link>
                         </div>
-                        {data.scheduledPosts.length === 0 ? (
-                            <EmptyState text="Nothing scheduled in the next day." compact />
+                        {data.lineup.length === 0 ? (
+                            <EmptyState text="Nothing slotted around now — the hourly queue fills through the day." compact />
                         ) : (
                             <ul className="flex flex-col gap-2.5">
-                                {data.scheduledPosts.map((p) => (
-                                    <li key={p.id} className="flex items-center gap-3">
-                                        <span className="ak-caption shrink-0" style={{ color: 'var(--blue)', fontWeight: 600, minWidth: '112px', fontVariantNumeric: 'tabular-nums' }}>
-                                            {formatSlot(p.scheduled_post_time)}
+                                {data.lineup.map((r) => (
+                                    <li key={r.id} className="flex items-center gap-2">
+                                        <span className="ak-caption shrink-0" style={{ color: 'var(--blue)', fontWeight: 600, minWidth: '68px', fontVariantNumeric: 'tabular-nums' }}>
+                                            {r.slotLabel}
                                         </span>
-                                        <span className="ak-body-sm truncate">{p.title}</span>
+                                        {r.isPeak && (
+                                            <span className="ak-badge ak-badge--bare" style={{ background: 'var(--gold-grad)', color: 'var(--gold-ink)', borderColor: 'transparent', fontWeight: 800, fontSize: '10px' }}>★ Peak</span>
+                                        )}
+                                        <span className="ak-body-sm truncate flex-1">{r.title}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -403,12 +454,14 @@ export default async function DashboardPage() {
 
 // ─── Sub-components ───────────────────────────────────────────
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone?: 'attention' }) {
+const money = (n: number, ccy: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: ccy || 'USD' }).format(n || 0);
+
+function StatCard({ label, value, tone, sub }: { label: string; value: number | string; tone?: 'attention'; sub?: string }) {
     return (
         <div className="ak-stat">
             <span className="ak-overline">{label}</span>
             <div className="ak-stat__num" style={tone === 'attention' ? { color: '#8a6420' } : undefined}>{value}</div>
-            <span className="ak-caption">&nbsp;</span>
+            <span className="ak-caption">{sub || ' '}</span>
         </div>
     );
 }
