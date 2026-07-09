@@ -40,8 +40,12 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
     const snap = ig.snapshot;
     const igEngRate = snap.totalInteractions28d && snap.reach28d
         ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
-    // Social account metrics are capped at Meta's 30-day window; the rest follow the picked range.
-    const socialLabel = `${socialDays}d`;
+    // Meta caps IG/FB/Threads account insights at a 30-day window, so past 30d the
+    // social numbers physically can't widen. Label them "30d max" (not a plain "30d")
+    // when a longer range is picked, so the selection doesn't look ignored — the
+    // website / posts / revenue metrics below still follow the chosen range.
+    const socialCapped = range === 0 || range > 30;
+    const socialLabel = socialCapped ? '30d max' : `${socialDays}d`;
     const rangeShort = range === 0 ? 'all-time' : `${range}d`;
 
     const router = useRouter();
@@ -81,6 +85,14 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     <SyncMetricsButton />
                 </div>
             </div>
+
+            {/* Meta 30-day cap note — only when the picked range exceeds it and a
+                social card is on screen, so the "30d max" labels make sense. */}
+            {socialCapped && anyCard && (
+                <p className="ak-caption" style={{ marginTop: -8 }}>
+                    Instagram, Facebook and Threads limit account insights to a 30-day window, so those cards stay at 30 days. Website, posts and revenue follow your selected range.
+                </p>
+            )}
 
             {/* Per-platform snapshot cards */}
             {anyCard && (
