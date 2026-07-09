@@ -330,15 +330,18 @@
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-0);
-    padding: 20px;
+    padding: 15px 17px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 .admin-root .ak-stat__num {
-    font-size: 28px;
-    font-weight: 600;
+    font-size: 26px;
+    font-weight: 700;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
-    line-height: 1.1;
-    margin: 6px 0 4px;
+    line-height: 1.05;
+    margin: 1px 0 0;
 }
 .admin-root .ak-stat--alarm {
     border-top: 3px solid var(--sun);
@@ -1508,11 +1511,10 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     flex-wrap: wrap;
     padding: 18px 24px;
 }
-.admin-root .ak-weather--clear { border-top: 3px solid rgba(196, 146, 44, 0.7); }
-.admin-root .ak-weather--storm { border-top: 3px solid var(--sun); }
+.admin-root .ak-weather--clear,
+.admin-root .ak-weather--storm { border-top: 3px solid rgba(196, 146, 44, 0.7); }
 .admin-root .ak-weather__status { display: flex; align-items: center; gap: 14px; }
 .admin-root .ak-weather__headline { font-family: var(--ak-display); font-weight: 800; font-size: 17px; color: var(--ink); }
-.admin-root .ak-weather--storm .ak-weather__headline { color: var(--sun); }
 .admin-root .ak-weather__sub { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
 .admin-root .ak-weather__glyph { width: 46px; height: 46px; flex: none; }
 .admin-root .ak-weather--clear .ak-weather__glyph {
@@ -1521,7 +1523,7 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     box-shadow: 0 0 22px rgba(255, 199, 102, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.6);
 }
 .admin-root .ak-weather--storm .ak-weather__glyph {
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18' fill='%237e93b0'%3E%3Cpath d='M6 14h11a4 4 0 0 0 .4-8 5 5 0 0 0-9.5-1.4A4 4 0 0 0 6 14z'/%3E%3Cpath d='M9 15l-1.5 3M13 15l-1.5 3M17 15l-1.5 3' stroke='%23ff8a7a' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 18' fill='%237e93b0'%3E%3Cpath d='M6 14h11a4 4 0 0 0 .4-8 5 5 0 0 0-9.5-1.4A4 4 0 0 0 6 14z'/%3E%3Cpath d='M9 15l-1.5 3M13 15l-1.5 3M17 15l-1.5 3' stroke='%23c49a52' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
 }
 
 /* ── Studio video hub ─────────────────────────────────────────────────── */

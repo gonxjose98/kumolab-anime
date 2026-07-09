@@ -134,7 +134,7 @@ function SocialPulseCard({ snapshot }: { snapshot?: { followers: number | null; 
                 <span className="ak-title">Social pulse · Instagram</span>
                 <Link href="/admin/analytics" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full analytics →</Link>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="flex gap-10 flex-wrap">
                 <MiniPulse label="Followers" value={fmt(snapshot?.followers)} />
                 <MiniPulse label="Reach · 28d" value={fmt(snapshot?.reach28d)} />
                 <MiniPulse label="Views · 28d" value={fmt(snapshot?.views28d)} />
@@ -234,7 +234,7 @@ export default async function DashboardPage() {
                     <span className="ak-weather__glyph" aria-hidden="true" />
                     <div>
                         <div className="ak-weather__headline">
-                            {stormy ? `Storm warning` : 'Clear skies over KumoLab'}
+                            {stormy ? 'A few things need you' : 'Clear skies over KumoLab'}
                         </div>
                         <div className="ak-weather__sub">
                             {stormy
@@ -251,12 +251,12 @@ export default async function DashboardPage() {
                 <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} />
                 <StatCard label="Scheduled · 24h" value={stats.scheduled24h} />
                 <StatCard label="Orders · 24h" value={stats.ordersToday} tone={stats.ordersToday > 0 ? 'attention' : undefined} sub={stats.revenueToday > 0 ? money(stats.revenueToday, stats.currency) : undefined} />
-                <div className="ak-stat" style={stats.errors24h > 0 ? { borderTop: '3px solid var(--sun)' } : undefined}>
+                <div className="ak-stat">
                     <div className="flex items-start justify-between gap-2">
                         <span className="ak-overline">Errors · 24h</span>
                         <ErrorsPopover count={stats.errors24h} errors={data.recentErrors} />
                     </div>
-                    <div className="ak-stat__num" style={stats.errors24h > 0 ? { color: 'var(--sun)' } : undefined}>{stats.errors24h}</div>
+                    <div className="ak-stat__num" style={stats.errors24h > 0 ? { color: 'var(--gold-text)' } : undefined}>{stats.errors24h}</div>
                     <span className="ak-caption">{stats.errors24h > 0 ? 'needs a look' : 'all clear'}</span>
                 </div>
             </div>
