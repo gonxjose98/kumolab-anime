@@ -290,18 +290,24 @@ export default async function DashboardPage() {
                         <>
                             <ul>
                                 {data.pendingPosts.slice(0, 6).map((p) => (
-                                    <li key={p.id} className="flex items-center gap-4 px-5 py-3" style={{ borderTop: '1px solid var(--line)' }}>
-                                        <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
-                                        <div className="flex-1 min-w-0">
-                                            <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
-                                                {p.title}
-                                            </Link>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <ClaimPill claim={p.claim_type} />
-                                                <span className="ak-caption">{p.source} · {timeAgo(p.timestamp)}</span>
+                                    <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5" style={{ borderTop: '1px solid var(--line)' }}>
+                                        {/* Thumb + title share the top line; on phones the actions
+                                            wrap to their own full-width line beneath (see w-full below). */}
+                                        <div className="flex items-center gap-3 flex-1 min-w-0" style={{ minWidth: '180px' }}>
+                                            <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
+                                            <div className="flex-1 min-w-0">
+                                                <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
+                                                    {p.title}
+                                                </Link>
+                                                <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                                                    <ClaimPill claim={p.claim_type} />
+                                                    <span className="ak-caption truncate">{p.source} · {timeAgo(p.timestamp)}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <PendingReviewActions postId={p.id} postTitle={p.title} />
+                                        <div className="w-full sm:w-auto shrink-0">
+                                            <PendingReviewActions postId={p.id} postTitle={p.title} />
+                                        </div>
                                     </li>
                                 ))}
                             </ul>

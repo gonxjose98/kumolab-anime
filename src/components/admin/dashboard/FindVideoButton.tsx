@@ -184,7 +184,7 @@ export default function FindVideoButton({
         <>
             <button
                 onClick={() => setOpen(true)}
-                className="ak-btn ak-btn--secondary ak-btn--sm"
+                className="ak-btn ak-btn--secondary ak-btn--sm flex-1 sm:flex-none justify-center whitespace-nowrap"
                 title="Find a YouTube video to attach to this pending post"
             >
                 <Search size={13} /> Find Video
