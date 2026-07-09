@@ -981,14 +981,25 @@ body:has(.admin-root) {
     }
     .admin-root .ak-merch__meta {
         flex-basis: 60%;
+        min-width: 0;
     }
+    /* min-width:0 lets the input row shrink to the card instead of expanding
+       to the inputs' intrinsic size (which overflowed the viewport). */
     .admin-root .ak-merch__inputs {
         flex-basis: 100%;
+        min-width: 0;
+    }
+    /* flex:1 must sit on the anchor WRAPPER (the input is inside a column),
+       so anchor + label each take half the row and shrink cleanly. */
+    .admin-root .ak-merch__anchorwrap {
+        flex: 1;
+        min-width: 0;
     }
     .admin-root .ak-merch__anchor,
     .admin-root .ak-merch__label {
         flex: 1;
         width: auto;
+        min-width: 0;
     }
 }
 
