@@ -1,10 +1,14 @@
 /**
  * scheduler.ts — v2
  *
- * Assigns a scheduled publish time to an auto-approved post using a 3-lane model:
- *   - BREAKING: detected_at < 2h ago + time-sensitive claim → publish immediately (next few min)
- *   - STANDARD: paced through platform peak-hour windows, respecting per-platform daily caps
- *   - FILL: last-resort slot, only considered if STANDARD queue was light
+ * Assigns a scheduled publish time to an auto-approved post.
+ *
+ * Cadence: STRICT HOURLY (Jose, 2026-07-09). Every post is slotted to the top
+ * of an hour inside the ET posting window, one post per hour, dedup'd against
+ * already-claimed hours. The old BREAKING fast lane (publish ~3 min out) was
+ * disabled because batches detected together published minutes apart; the lane
+ * is still *classified* for observability but no longer changes the timing.
+ * See assignScheduledSlot() for the flip-it-back note.
  *
  * Caps, windows, and diversity rules live in automation-config.ts.
  *
@@ -215,30 +219,27 @@ export async function assignScheduledSlot(input: SchedulerInput): Promise<Schedu
     const lane = classifyLane(input);
     const platforms = targetPlatforms(input.isT1YouTube, input.claim_type);
 
-    if (lane === 'BREAKING') {
-        // Schedule 3 minutes out so revalidation + social broadcasts don't race the insert.
-        const slot = new Date(now.getTime() + 3 * 60 * 1000);
-        return {
-            lane,
-            scheduled_at: slot.toISOString(),
-            platforms,
-            reason: `BREAKING: ${input.claim_type || 'unknown'} < ${BREAKING_MAX_AGE_MINUTES}m old`,
-        };
-    }
-
-    // STANDARD: daily caps removed per Jose. Spacing is enforced by findStandardSlot
-    // via DIVERSITY.MIN_GAP_MINUTES. Posts flow freely; spacing protects algo health.
+    // ── Strict hourly cadence (Jose, 2026-07-09) ───────────────────
+    // The BREAKING fast lane used to schedule time-sensitive posts at
+    // now+3min with NO spacing check. When a detection cycle surfaced 2-3
+    // fresh items at once, they each got a slot minutes apart and all
+    // drained in the next hourly publish run (e.g. 06:03 + 06:09 today,
+    // 07:03 + 07:03 + 07:04 on 07-08). Jose wants a predictable hourly
+    // rhythm, so EVERY post now flows through the top-of-hour grid below:
+    // one post per hour, on the hour, dedup'd against already-claimed hours
+    // (findStandardSlot). The lane is still classified for observability
+    // (logs note "was breaking"), and the fast-lane path can be restored
+    // here — ideally as fast-lane-plus-min-gap — if we ever want it back.
     //
-    // Publish priority (Run 3, 2026-06-06): priority-studio posts (TOHO) claim
-    // the premium peak-hour slots; everything else fills the off-peak pool
-    // first, reserving high-first-hour-engagement windows for breakout-class
-    // content. See PREMIUM_PUBLISH_STUDIOS in automation-config.ts.
+    // Publish priority (Run 3, 2026-06-06): priority-studio posts (TOHO)
+    // claim the premium peak-hour slots; everything else fills the off-peak
+    // pool first. See PREMIUM_PUBLISH_STUDIOS in automation-config.ts.
     const preferPremium = isPremiumStudio(input.source);
     const slot = await findStandardSlot(now, preferPremium);
     return {
         lane,
         scheduled_at: slot.toISOString(),
         platforms,
-        reason: `STANDARD: queued at ET hour ${etHour(slot)}${preferPremium ? ' (priority studio → premium)' : ' (off-peak pool)'}`,
+        reason: `HOURLY${lane === 'BREAKING' ? ' (was breaking)' : ''}: ET hour ${etHour(slot)}${preferPremium ? ' · premium studio' : ' · off-peak pool'}`,
     };
 }
