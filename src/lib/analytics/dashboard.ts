@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIGDashboardData, type IGDashboardData } from '@/lib/social/ig-insights';
 import { fetchFacebookSnapshot, fetchThreadsSnapshot, type PlatformSnapshot } from '@/lib/social/social-insights';
 import { fetchWebsiteTraffic, type WebsiteTraffic } from '@/lib/analytics/page-views';
+import { fetchOrders } from '@/lib/orders';
 
 export interface DayPoint { day: string; label: string; views: number; }
 export interface PipelinePoint { day: string; label: string; published: number; accepted: number; found: number; score: number; }
@@ -21,6 +22,16 @@ export interface TopPost {
 }
 export interface ClaimPerf { claim: string; posts: number; totalViews: number; avgViews: number; }
 
+export interface RevenuePoint { day: string; label: string; amount: number; }
+export interface RevenueSummary {
+    total: number;      // active (non-canceled) revenue in the window
+    orders: number;
+    aov: number;        // average order value
+    currency: string;
+    series: RevenuePoint[]; // revenue per day, last 30 days
+    ok: boolean;        // false when Printful/Stripe isn't wired yet
+}
+
 export interface AnalyticsData {
     ig: IGDashboardData;
     fb: PlatformSnapshot;
@@ -31,6 +42,7 @@ export interface AnalyticsData {
     topPosts: TopPost[];
     claimPerf: ClaimPerf[];
     postedTotal: number;
+    revenue: RevenueSummary;
 }
 
 const FALLBACK_IG: IGDashboardData = {
@@ -167,8 +179,33 @@ async function topPostsAndClaims(): Promise<{ topPosts: TopPost[]; claimPerf: Cl
 
 const DEAD_SNAP = (reason: string): PlatformSnapshot => ({ ok: false, reason, followers: null, views28d: null, engagement28d: null });
 
+/** Order/merch revenue from the live Printful order feed, per-day for 30 days. */
+async function getRevenue(): Promise<RevenueSummary> {
+    try {
+        const { orders } = await fetchOrders(150);
+        const active = (orders || []).filter((o) => o.stage !== 'canceled');
+        const total = active.reduce((s, o) => s + (Number(o.total) || 0), 0);
+        const count = active.length;
+        const currency = orders[0]?.currency || 'USD';
+        const buckets = new Map<string, number>();
+        for (let i = 0; i < 30; i++) buckets.set(dayKey(new Date(Date.now() - i * 86_400_000)), 0);
+        for (const o of active) {
+            if (!o.createdAt) continue;
+            const k = dayKey(new Date(o.createdAt));
+            if (buckets.has(k)) buckets.set(k, (buckets.get(k) || 0) + (Number(o.total) || 0));
+        }
+        const series = [...buckets.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([day, amount]) => ({ day, label: dayLabel(day), amount: Math.round(amount * 100) / 100 }));
+        return { total, orders: count, aov: count ? total / count : 0, currency, series, ok: true };
+    } catch (e: any) {
+        console.error('getRevenue:', e?.message || e);
+        return { total: 0, orders: 0, aov: 0, currency: 'USD', series: [], ok: false };
+    }
+}
+
 export async function getAnalyticsData(): Promise<AnalyticsData> {
-    const [ig, fb, threads, web, viewsSeries, pipeline, posts] = await Promise.all([
+    const [ig, fb, threads, web, viewsSeries, pipeline, posts, revenue] = await Promise.all([
         fetchIGDashboardData().catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
         fetchFacebookSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'FB fetch failed')),
         fetchThreadsSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
@@ -176,6 +213,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
         viewsPerDay(30),
         pipelineHistory(30),
         topPostsAndClaims(),
+        getRevenue(),
     ]);
-    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts };
+    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts, revenue };
 }

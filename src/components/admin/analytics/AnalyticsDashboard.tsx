@@ -17,9 +17,11 @@ const CLAIM_LABEL: Record<string, string> = {
 };
 const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-US'));
 const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
+const money = (n: number, ccy: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: ccy || 'USD' }).format(n || 0);
+const GREEN = '#35a877';
 
 export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
-    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf } = data;
+    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue } = data;
     const snap = ig.snapshot;
     const igEngRate = snap.totalInteractions28d && snap.reach28d
         ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
@@ -65,6 +67,36 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                         <Area type="monotone" dataKey="views" stroke={BLUE} strokeWidth={2} fill="url(#ak-v)" />
                     </AreaChart>
                 </ResponsiveContainer>
+            </div>
+
+            {/* Revenue */}
+            <div className="ak-card">
+                <div className="flex items-baseline justify-between mb-3">
+                    <span className="ak-overline">Revenue · last 30 days</span>
+                    <span className="ak-caption">{revenue.ok ? 'live from Printful orders' : 'store not connected'}</span>
+                </div>
+                {revenue.orders === 0 ? (
+                    <Empty text={revenue.ok
+                        ? 'No orders yet. Revenue and order trends appear here the moment the store starts taking payments.'
+                        : 'Store not connected yet.'} />
+                ) : (
+                    <>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            <Kpi label="Revenue · 30d" value={money(revenue.total, revenue.currency)} />
+                            <Kpi label="Orders" value={fmt(revenue.orders)} />
+                            <Kpi label="Avg order" value={money(revenue.aov, revenue.currency)} />
+                        </div>
+                        <ResponsiveContainer width="100%" height={160}>
+                            <BarChart data={revenue.series} margin={{ top: 4, right: 6, left: -12, bottom: 0 }}>
+                                <CartesianGrid stroke={GRID} vertical={false} />
+                                <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 10 }} interval={4} tickLine={false} axisLine={false} />
+                                <YAxis tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} axisLine={false} width={48} tickFormatter={(v: any) => money(Number(v), revenue.currency)} />
+                                <Tooltip {...tooltip} formatter={(v: any) => [money(Number(v), revenue.currency), 'revenue']} />
+                                <Bar dataKey="amount" fill={GREEN} radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </>
+                )}
             </div>
 
             {/* Top performing posts — the "use my data" table */}
