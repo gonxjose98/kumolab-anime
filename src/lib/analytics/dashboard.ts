@@ -50,7 +50,9 @@ export interface AnalyticsData {
     claimPerf: ClaimPerf[];
     postedTotal: number;
     revenue: RevenueSummary;
-    range: number; // active time-range in days (0 = all-time)
+    range: number;        // active time-range in days (0 = all-time)
+    socialDays: number;   // effective window for social account metrics (Meta caps at 30)
+    siteViewsRange: number; // total website views in the active range
 }
 
 const FALLBACK_IG: IGDashboardData = {
@@ -223,16 +225,19 @@ async function getRevenue(days = 30): Promise<RevenueSummary> {
 export async function getAnalyticsData(rangeDays = 30): Promise<AnalyticsData> {
     // rangeDays 0 = all-time; cap windowed queries at 365 days so charts stay sane.
     const chartDays = rangeDays === 0 ? 365 : rangeDays;
+    // Social account metrics can only window up to 30 days (hard Meta API limit).
+    const socialDays = rangeDays === 0 ? 30 : Math.min(rangeDays, 30);
     const sinceIso = rangeDays === 0 ? null : new Date(Date.now() - rangeDays * 86_400_000).toISOString();
     const [ig, fb, threads, web, viewsSeries, pipeline, posts, revenue] = await Promise.all([
-        fetchIGDashboardData().catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
-        fetchFacebookSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'FB fetch failed')),
-        fetchThreadsSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
+        fetchIGDashboardData(socialDays).catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
+        fetchFacebookSnapshot(socialDays).catch((e) => DEAD_SNAP(e?.message ?? 'FB fetch failed')),
+        fetchThreadsSnapshot(socialDays).catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
         fetchWebsiteTraffic(),
         viewsPerDay(chartDays),
         pipelineHistory(30),
         topPostsAndClaims(sinceIso, chartDays),
         getRevenue(chartDays),
     ]);
-    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts, revenue, range: rangeDays };
+    const siteViewsRange = viewsSeries.reduce((s, d) => s + d.views, 0);
+    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts, revenue, range: rangeDays, socialDays, siteViewsRange };
 }

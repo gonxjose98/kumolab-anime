@@ -19,10 +19,13 @@ export interface PlatformSnapshot {
 
 const DEAD = (reason: string): PlatformSnapshot => ({ ok: false, reason, followers: null, views28d: null, engagement28d: null });
 
-const win28d = () => ({
-    since: Math.floor((Date.now() - 28 * 86400 * 1000) / 1000),
-    until: Math.floor(Date.now() / 1000),
-});
+const win = (days = 28) => {
+    const w = Math.min(days, 30); // Meta caps page/threads insights at a 30-day window
+    return {
+        since: Math.floor((Date.now() - w * 86400 * 1000) / 1000),
+        until: Math.floor(Date.now() / 1000),
+    };
+};
 
 /** Sum a Graph insights `data[]` array's daily values (handles total_value + values[]). */
 function sumInsight(row: any): number {
@@ -33,10 +36,10 @@ function sumInsight(row: any): number {
 }
 
 // ── Facebook Page ──────────────────────────────────────────────────────────
-export async function fetchFacebookSnapshot(): Promise<PlatformSnapshot> {
+export async function fetchFacebookSnapshot(days = 28): Promise<PlatformSnapshot> {
     if (!META_ACCESS_TOKEN) return DEAD('META_ACCESS_TOKEN missing');
     try {
-        const { since, until } = win28d();
+        const { since, until } = win(days);
         // 1) Follower count (page profile field).
         const profRes = await fetch(`${GRAPH}/${FB_PAGE_ID}?fields=followers_count,fan_count&access_token=${META_ACCESS_TOKEN}`, { cache: 'no-store' });
         const prof = await profRes.json();
@@ -68,10 +71,10 @@ export async function fetchFacebookSnapshot(): Promise<PlatformSnapshot> {
 }
 
 // ── Threads ────────────────────────────────────────────────────────────────
-export async function fetchThreadsSnapshot(): Promise<PlatformSnapshot> {
+export async function fetchThreadsSnapshot(days = 28): Promise<PlatformSnapshot> {
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID) return DEAD('THREADS_ACCESS_TOKEN or THREADS_USER_ID missing');
     try {
-        const { since, until } = win28d();
+        const { since, until } = win(days);
         // followers_count is a point-in-time metric (no since/until); the rest
         // are windowed. Fetch each independently and merge.
         const byName: Record<string, number> = {};

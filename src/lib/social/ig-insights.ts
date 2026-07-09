@@ -57,7 +57,7 @@ const DEAD: IGAccountSnapshot = {
     totalInteractions28d: null,
 };
 
-export async function fetchIGDashboardData(): Promise<IGDashboardData> {
+export async function fetchIGDashboardData(days = 28): Promise<IGDashboardData> {
     if (!META_ACCESS_TOKEN || !META_IG_ID) {
         return {
             snapshot: { ...DEAD, reason: 'META_ACCESS_TOKEN or META_IG_ID missing' },
@@ -66,13 +66,13 @@ export async function fetchIGDashboardData(): Promise<IGDashboardData> {
     }
 
     const [snapshot, topRecent] = await Promise.all([
-        fetchAccountSnapshot(),
+        fetchAccountSnapshot(days),
         fetchTopRecentMedia(8),
     ]);
     return { snapshot, topRecent };
 }
 
-async function fetchAccountSnapshot(): Promise<IGAccountSnapshot> {
+async function fetchAccountSnapshot(days = 28): Promise<IGAccountSnapshot> {
     try {
         // 1) Static profile fields
         const fieldsUrl = `${GRAPH}/${META_IG_ID}?fields=followers_count,follows_count,media_count&access_token=${META_ACCESS_TOKEN}`;
@@ -89,7 +89,8 @@ async function fetchAccountSnapshot(): Promise<IGAccountSnapshot> {
         // `metric_type=total_value`. `views` is the headline metric (total
         // plays/impressions across content) and is much larger than `reach`
         // (unique accounts) — do NOT conflate the two.
-        const since = Math.floor((Date.now() - 28 * 86400 * 1000) / 1000);
+        const win = Math.min(days, 30); // Meta caps account insights at a 30-day window
+        const since = Math.floor((Date.now() - win * 86400 * 1000) / 1000);
         const until = Math.floor(Date.now() / 1000);
         const byName: Record<string, number> = {};
         // Each metric must be requested separately on v22 — the API

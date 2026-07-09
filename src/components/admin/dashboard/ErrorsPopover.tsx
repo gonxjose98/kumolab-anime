@@ -56,7 +56,7 @@ export default function ErrorsPopover({ count, errors }: { count: number; errors
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 className="ak-badge ak-badge--error"
-                style={{ cursor: 'pointer', height: '24px', maxWidth: '100%' }}
+                style={{ cursor: 'pointer', height: '24px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 title={`${count} error${count === 1 ? '' : 's'} in the last 24h`}

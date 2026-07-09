@@ -247,10 +247,10 @@ export default async function DashboardPage() {
 
             {/* ── Stat grid ────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <StatCard label="Published · 24h" value={stats.published24h} />
-                <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} />
-                <StatCard label="Scheduled · 24h" value={stats.scheduled24h} />
-                <StatCard label="Orders · 24h" value={stats.ordersToday} tone={stats.ordersToday > 0 ? 'attention' : undefined} sub={stats.revenueToday > 0 ? money(stats.revenueToday, stats.currency) : undefined} />
+                <StatCard label="Published · 24h" value={stats.published24h} sub="posts live" />
+                <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} sub={stats.pending > 0 ? 'awaiting you' : 'all reviewed'} />
+                <StatCard label="Scheduled · 24h" value={stats.scheduled24h} sub="in the queue" />
+                <StatCard label="Orders · 24h" value={stats.ordersToday} tone={stats.ordersToday > 0 ? 'attention' : undefined} sub={stats.revenueToday > 0 ? money(stats.revenueToday, stats.currency) : 'no sales yet'} />
                 <div className="ak-stat">
                     <div className="flex items-start justify-between gap-2">
                         <span className="ak-overline">Errors · 24h</span>

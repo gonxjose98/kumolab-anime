@@ -36,10 +36,13 @@ const RANGES: { key: string; label: string }[] = [
 ];
 
 export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
-    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue, range } = data;
+    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue, range, socialDays, siteViewsRange } = data;
     const snap = ig.snapshot;
     const igEngRate = snap.totalInteractions28d && snap.reach28d
         ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
+    // Social account metrics are capped at Meta's 30-day window; the rest follow the picked range.
+    const socialLabel = `${socialDays}d`;
+    const rangeShort = range === 0 ? 'all-time' : `${range}d`;
 
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -82,19 +85,19 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
             {/* Per-platform snapshot cards */}
             {anyCard && (
                 <div className={show.all ? 'grid grid-cols-1 md:grid-cols-3 gap-3' : 'grid grid-cols-1 gap-3'}>
-                    {show.ig && <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={snap.views28d} eng={igEngRate} engLabel="Eng. rate" />}
-                    {show.fb && <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} eng={fmt(fb.engagement28d)} engLabel="Engagements" />}
-                    {show.threads && <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} eng={fmt(threads.engagement28d)} engLabel="Engagements" />}
+                    {show.ig && <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={snap.views28d} viewsLabel={`Views · ${socialLabel}`} eng={igEngRate} engLabel="Eng. rate" />}
+                    {show.fb && <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(fb.engagement28d)} engLabel="Engagements" />}
+                    {show.threads && <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(threads.engagement28d)} engLabel="Engagements" />}
                 </div>
             )}
 
-            {/* Reach + site views KPIs */}
+            {/* Reach + site views KPIs (range-aware) */}
             {show.all && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Kpi label="IG reach · 28d" value={fmt(snap.reach28d)} />
-                    <Kpi label="Posts published" value={fmt(data.postedTotal)} />
-                    <Kpi label="Site views · 30d" value={web.ok ? fmt(web.views30d) : '—'} />
-                    <Kpi label="Site views · 7d" value={web.ok ? fmt(web.views7d) : '—'} />
+                    <Kpi label={`IG reach · ${socialLabel}`} value={fmt(snap.reach28d)} />
+                    <Kpi label={`IG interactions · ${socialLabel}`} value={fmt(snap.totalInteractions28d)} />
+                    <Kpi label={`Site views · ${rangeShort}`} value={web.ok ? fmt(siteViewsRange) : '—'} />
+                    <Kpi label={`Posts published · ${rangeShort}`} value={fmt(data.postedTotal)} />
                 </div>
             )}
 
@@ -256,9 +259,9 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
     );
 }
 
-function PlatformCard({ name, ok, reason, followers, views, eng, engLabel }: {
+function PlatformCard({ name, ok, reason, followers, views, viewsLabel, eng, engLabel }: {
     name: string; ok: boolean; reason?: string;
-    followers: number | null; views: number | null; eng: string; engLabel: string;
+    followers: number | null; views: number | null; viewsLabel: string; eng: string; engLabel: string;
 }) {
     return (
         <div className="ak-card">
@@ -268,7 +271,7 @@ function PlatformCard({ name, ok, reason, followers, views, eng, engLabel }: {
             </div>
             <div className="grid grid-cols-3 gap-2">
                 <MiniStat label="Followers" value={fmt(followers)} />
-                <MiniStat label="Views · 28d" value={fmt(views)} />
+                <MiniStat label={viewsLabel} value={fmt(views)} />
                 <MiniStat label={engLabel} value={eng} />
             </div>
         </div>
