@@ -1922,3 +1922,22 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 .admin-root .ak-postdetail__plat { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold-text); margin-bottom: 6px; }
 .admin-root .ak-postdetail__row { display: flex; justify-content: space-between; gap: 20px; font-size: 12.5px; color: var(--ink-2); padding: 2px 0; }
 .admin-root .ak-postdetail__row strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ── Dashboard social pulse (evenly-distributed stat panel) ───────────────── */
+.admin-root .ak-pulse__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.admin-root .ak-pulse__grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.admin-root .ak-pulse__stat {
+    display: flex; flex-direction: column; gap: 4px;
+    padding-left: 24px; border-left: 1px solid var(--line-2);
+}
+.admin-root .ak-pulse__stat:first-child { padding-left: 0; border-left: none; }
+.admin-root .ak-pulse__num {
+    font-family: var(--ak-display); font-weight: 800; font-size: 1.6rem; line-height: 1.05;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.admin-root .ak-pulse__lbl { font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+
+@media (max-width: 640px) {
+    .admin-root .ak-pulse__grid { grid-template-columns: 1fr; gap: 14px; }
+    .admin-root .ak-pulse__stat { padding-left: 0; border-left: none; }
+}

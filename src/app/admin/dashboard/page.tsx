@@ -129,12 +129,12 @@ async function StreamedSocialPulse() {
 function SocialPulseCard({ snapshot }: { snapshot?: { followers: number | null; reach28d: number | null; views28d: number | null } }) {
     const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-US'));
     return (
-        <div className="ak-card">
-            <div className="ak-card__header">
-                <span className="ak-title">Social pulse · Instagram</span>
+        <div className="ak-card ak-pulse">
+            <div className="ak-pulse__head">
+                <span className="ak-overline">Social pulse · Instagram</span>
                 <Link href="/admin/analytics" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full analytics →</Link>
             </div>
-            <div className="flex gap-10 flex-wrap">
+            <div className="ak-pulse__grid">
                 <MiniPulse label="Followers" value={fmt(snapshot?.followers)} />
                 <MiniPulse label="Reach · 28d" value={fmt(snapshot?.reach28d)} />
                 <MiniPulse label="Views · 28d" value={fmt(snapshot?.views28d)} />
@@ -145,9 +145,9 @@ function SocialPulseCard({ snapshot }: { snapshot?: { followers: number | null; 
 
 function MiniPulse({ label, value }: { label: string; value: string }) {
     return (
-        <div>
-            <div className="ak-stat__num" style={{ fontSize: '1.2rem' }}>{value}</div>
-            <div className="ak-caption" style={{ marginTop: 2 }}>{label}</div>
+        <div className="ak-pulse__stat">
+            <div className="ak-pulse__num">{value}</div>
+            <div className="ak-pulse__lbl">{label}</div>
         </div>
     );
 }
