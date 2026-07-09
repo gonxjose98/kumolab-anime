@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AdminShell from '@/components/admin/AdminShell';
+import StudioTabs from '@/components/admin/studio/StudioTabs';
 
 export default async function StudioHubLayout({ children }: { children: React.ReactNode }) {
     const cookieStore = await cookies();
@@ -14,5 +15,10 @@ export default async function StudioHubLayout({ children }: { children: React.Re
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) redirect('/admin/login');
 
-    return <AdminShell email={session.user.email}>{children}</AdminShell>;
+    return (
+        <AdminShell email={session.user.email}>
+            <StudioTabs />
+            {children}
+        </AdminShell>
+    );
 }
