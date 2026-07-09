@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIGDashboardData, type IGDashboardData } from '@/lib/social/ig-insights';
+import { fetchFacebookSnapshot, fetchThreadsSnapshot, type PlatformSnapshot } from '@/lib/social/social-insights';
 import { fetchWebsiteTraffic, type WebsiteTraffic } from '@/lib/analytics/page-views';
 
 export interface DayPoint { day: string; label: string; views: number; }
@@ -14,14 +15,16 @@ export interface TopPost {
     image: string | null;
     isVideo: boolean;
     webViews: number;   // real on-site views (from page_views matched to slug)
-    views: number;      // social views (ig+fb+tw)
-    engagement: number; // likes + comments
-    ig: number; fb: number; tw: number; // per-platform views
+    views: number;      // social views (ig+fb+tw+th)
+    engagement: number; // likes + comments across platforms
+    ig: number; fb: number; tw: number; th: number; // per-platform views
 }
 export interface ClaimPerf { claim: string; posts: number; totalViews: number; avgViews: number; }
 
 export interface AnalyticsData {
     ig: IGDashboardData;
+    fb: PlatformSnapshot;
+    threads: PlatformSnapshot;
     web: WebsiteTraffic;
     viewsSeries: DayPoint[];
     pipeline: PipelinePoint[];
@@ -128,18 +131,20 @@ async function topPostsAndClaims(): Promise<{ topPosts: TopPost[]; claimPerf: Cl
             const ig = Number(m.instagram?.views || 0);
             const fb = Number(m.facebook?.views || 0);
             const tw = Number(m.twitter?.views || 0);
-            const views = ig + fb + tw;
+            const th = Number(m.threads?.views || 0);
+            const views = ig + fb + tw + th;
             const engagement =
                 Number(m.instagram?.likes || 0) + Number(m.instagram?.comments || 0) +
                 Number(m.facebook?.likes || 0) + Number(m.facebook?.comments || 0) +
-                Number(m.twitter?.likes || 0) + Number(m.twitter?.comments || 0);
+                Number(m.twitter?.likes || 0) + Number(m.twitter?.comments || 0) +
+                Number(m.threads?.likes || 0) + Number(m.threads?.comments || 0);
             const webViews = webBySlug.get(p.slug) || 0;
             rows.push({
                 id: p.id, title: p.title, slug: p.slug,
                 claim: (p.claim_type as string) || null, source: p.source || null,
                 publishedAt: p.published_at || null, image: p.image || null,
                 isVideo: !!(p.social_ids as any)?.staged_video_url,
-                webViews, views, engagement, ig, fb, tw,
+                webViews, views, engagement, ig, fb, tw, th,
             });
             const key = (p.claim_type as string) || 'OTHER';
             const agg = claimAgg.get(key) || { posts: 0, views: 0 };
@@ -160,13 +165,17 @@ async function topPostsAndClaims(): Promise<{ topPosts: TopPost[]; claimPerf: Cl
     }
 }
 
+const DEAD_SNAP = (reason: string): PlatformSnapshot => ({ ok: false, reason, followers: null, views28d: null, engagement28d: null });
+
 export async function getAnalyticsData(): Promise<AnalyticsData> {
-    const [ig, web, viewsSeries, pipeline, posts] = await Promise.all([
+    const [ig, fb, threads, web, viewsSeries, pipeline, posts] = await Promise.all([
         fetchIGDashboardData().catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
+        fetchFacebookSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'FB fetch failed')),
+        fetchThreadsSnapshot().catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
         fetchWebsiteTraffic(),
         viewsPerDay(30),
         pipelineHistory(30),
         topPostsAndClaims(),
     ]);
-    return { ig, web, viewsSeries, pipeline, ...posts };
+    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts };
 }

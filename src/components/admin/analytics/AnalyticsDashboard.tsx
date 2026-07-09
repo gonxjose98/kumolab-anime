@@ -19,19 +19,27 @@ const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleStr
 const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
 export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
-    const { ig, web, viewsSeries, pipeline, topPosts, claimPerf } = data;
+    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf } = data;
     const snap = ig.snapshot;
-    const engRate = snap.totalInteractions28d && snap.reach28d
+    const igEngRate = snap.totalInteractions28d && snap.reach28d
         ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
 
     return (
         <div className="max-w-6xl mx-auto flex flex-col gap-6">
-            {/* KPI overview */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <Kpi label="Followers" value={fmt(snap.followers)} />
-                <Kpi label="IG Views · 28d" value={fmt(snap.views28d)} />
-                <Kpi label="Reach · 28d" value={fmt(snap.reach28d)} />
-                <Kpi label="Engagement rate" value={engRate} sub="interactions ÷ reach" />
+            {/* Per-platform snapshot — followers · 28-day views · engagement */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason}
+                    followers={snap.followers} views={snap.views28d} eng={igEngRate} engLabel="Eng. rate" />
+                <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason}
+                    followers={fb.followers} views={fb.views28d} eng={fmt(fb.engagement28d)} engLabel="Engagements" />
+                <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason}
+                    followers={threads.followers} views={threads.views28d} eng={fmt(threads.engagement28d)} engLabel="Engagements" />
+            </div>
+
+            {/* Reach + site views */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Kpi label="IG reach · 28d" value={fmt(snap.reach28d)} />
+                <Kpi label="Posts published" value={fmt(data.postedTotal)} />
                 <Kpi label="Site views · 30d" value={web.ok ? fmt(web.views30d) : '—'} />
                 <Kpi label="Site views · 7d" value={web.ok ? fmt(web.views7d) : '—'} />
             </div>
@@ -152,6 +160,34 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
     );
 }
 
+function PlatformCard({ name, ok, reason, followers, views, eng, engLabel }: {
+    name: string; ok: boolean; reason?: string;
+    followers: number | null; views: number | null; eng: string; engLabel: string;
+}) {
+    return (
+        <div className="ak-card">
+            <div className="flex items-baseline justify-between mb-3">
+                <span className="ak-overline">{name}</span>
+                {!ok && <span className="ak-caption" title={reason} style={{ color: 'var(--sun)' }}>not connected</span>}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+                <MiniStat label="Followers" value={fmt(followers)} />
+                <MiniStat label="Views · 28d" value={fmt(views)} />
+                <MiniStat label={engLabel} value={eng} />
+            </div>
+        </div>
+    );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <div style={{ fontFamily: 'var(--ak-display)', fontWeight: 800, fontSize: '1.15rem', lineHeight: 1.1, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+            <div className="ak-caption" style={{ marginTop: 2 }}>{label}</div>
+        </div>
+    );
+}
+
 function TopPostsCard({ posts }: { posts: TopPost[] }) {
     const [sort, setSort] = useState<'webViews' | 'engagement'>('webViews');
     const sorted = [...posts].sort((a, b) => b[sort] - a[sort]);
@@ -196,6 +232,7 @@ function TopPostsCard({ posts }: { posts: TopPost[] }) {
                                         <span className="ak-caption" style={{ display: 'inline-flex', gap: 6 }}>
                                             {p.ig > 0 && <span title={`Instagram ${fmt(p.ig)}`}>IG</span>}
                                             {p.fb > 0 && <span title={`Facebook ${fmt(p.fb)}`}>FB</span>}
+                                            {p.th > 0 && <span title={`Threads ${fmt(p.th)}`}>TH</span>}
                                             {p.tw > 0 && <span title={`X ${fmt(p.tw)}`}>X</span>}
                                         </span>
                                     </td>
