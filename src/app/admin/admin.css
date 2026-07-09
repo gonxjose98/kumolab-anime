@@ -538,7 +538,7 @@
 /* ══ Shell — sidebar rail + frosted top bar (used from the next pass) ═════ */
 .admin-root .ak-shell {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 264px 1fr;
     min-height: 100vh;
 }
 .admin-root .ak-rail {
@@ -717,6 +717,37 @@
     .admin-root .ak-topbar {
         padding: 0 16px;
     }
+}
+
+/* ── Phone polish: keep the sidebar collapsed layout legible ─────────────── */
+@media (max-width: 560px) {
+    .admin-root .ak-content { padding: 14px 13px 40px; }
+    .admin-root .ak-topbar { height: 52px; }
+    .admin-root .ak-topbar__title { font-size: 17px; gap: 7px; }
+    .admin-root .ak-topbar__jp { font-size: 12px; }
+
+    /* Welcome hero: stack the greeting above the status so nothing wraps oddly. */
+    .admin-root .ak-weather { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 18px; }
+    .admin-root .ak-weather__status { align-items: flex-start; }
+    .admin-root .ak-weather__glyph { width: 38px; height: 38px; }
+
+    /* Stat tiles: give labels room, dial the display number down a touch. */
+    .admin-root .ak-stat { padding: 13px 14px; }
+    .admin-root .ak-stat .ak-overline { letter-spacing: 0.05em; }
+    .admin-root .ak-stat__num { font-size: 23px; }
+
+    /* Section sub-tabs scroll horizontally instead of overflowing the frame. */
+    .admin-root .ak-subtabs {
+        display: flex; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; border-radius: var(--r-md);
+    }
+    .admin-root .ak-subtabs::-webkit-scrollbar { display: none; }
+    .admin-root .ak-subtab { flex: 1 0 auto; justify-content: center; padding: 8px 13px; }
+
+    /* Analytics controls + schedule summary wrap tidily. */
+    .admin-root .ak-anctrl { flex-direction: column; align-items: stretch; }
+    .admin-root .ak-anctrl__right { justify-content: space-between; }
+    .admin-root .ak-sched__stat { flex: 1; min-width: 0; }
 }
 
 /* ── Admin page reset ─────────────────────────────────────────────────────
@@ -1214,7 +1245,9 @@ html[data-admin-theme='dark'] .admin-root .ak-sky__veil { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .admin-root .ak-sky__cloud { animation: none; } }
 
 /* ── Shell sits above the sky ─────────────────────────────────────────── */
-.admin-root .ak-shell { position: relative; z-index: 1; grid-template-columns: 264px 1fr; }
+/* Sits above the sky. Grid columns live in the base rule (line ~540) so the
+   mobile collapse (@media 900px → single column) is never re-overridden here. */
+.admin-root .ak-shell { position: relative; z-index: 1; }
 
 /* ── Frosted-glass surfaces ───────────────────────────────────────────── */
 .admin-root .ak-card,
@@ -1940,4 +1973,25 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 @media (max-width: 640px) {
     .admin-root .ak-pulse__grid { grid-template-columns: 1fr; gap: 14px; }
     .admin-root .ak-pulse__stat { padding-left: 0; border-left: none; }
+}
+
+/* ══ Mobile rail — MUST stay last so it beats the decorative .ak-rail rule ═══
+   The gold-chrome rail block (~line 1345) re-declares position:relative/width
+   unconditionally, which otherwise clobbers the off-canvas drawer defined in
+   the 900px query far above it. Re-asserting the drawer here (last in source
+   order, equal specificity) guarantees the sidebar collapses off-screen on
+   phones instead of sitting in-flow and shoving all content below the fold. */
+@media (max-width: 900px) {
+    .admin-root .ak-rail {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: min(84vw, 300px);
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        z-index: 200;
+    }
+    .admin-root .ak-rail--open { transform: translateX(0); }
 }
