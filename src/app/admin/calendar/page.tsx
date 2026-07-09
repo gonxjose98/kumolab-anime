@@ -1,7 +1,6 @@
-export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 
-import CalendarPageClient from '@/components/admin/CalendarPage';
-
-export default function CalendarPage() {
-    return <CalendarPageClient />;
+// Calendar moved under the unified Content tab.
+export default function LegacyCalendarRedirect() {
+    redirect('/admin/content/calendar');
 }

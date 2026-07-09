@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import {
     LayoutDashboard,
     FileText,
-    CalendarDays,
     BarChart3,
     Store,
     Clapperboard,
@@ -25,9 +24,8 @@ const TOP: NavItem = { href: '/admin/dashboard', label: 'Dashboard', jp: '本部
 const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     {
         label: 'Publishing', jp: '発信', items: [
-            { href: '/admin/posts', label: 'Posts', jp: '記事', icon: FileText },
+            { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText },
             { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard },
-            { href: '/admin/calendar', label: 'Calendar', jp: '暦', icon: CalendarDays },
         ],
     },
     { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3 }] },
@@ -51,7 +49,8 @@ export default function AdminShell({
         if (href === '/admin/dashboard') return pathname === href;
         // The video editor (/admin/post/[id]/studio) lights up Studio, not Posts.
         if (href === '/admin/studio') return pathname.startsWith('/admin/studio') || pathname.endsWith('/studio');
-        if (href === '/admin/posts') return (pathname.startsWith('/admin/posts') || pathname.startsWith('/admin/post/')) && !pathname.endsWith('/studio');
+        // Content owns the old Posts + Calendar routes and the post editor.
+        if (href === '/admin/content') return (pathname.startsWith('/admin/content') || pathname.startsWith('/admin/posts') || pathname.startsWith('/admin/post/') || pathname.startsWith('/admin/calendar')) && !pathname.endsWith('/studio');
         return pathname.startsWith(href);
     };
     const title = ALL.find((i) => isActive(i.href))?.label ?? 'Admin';
