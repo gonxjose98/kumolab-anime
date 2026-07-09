@@ -1,17 +1,19 @@
 import { getAnalyticsData } from '@/lib/analytics/dashboard';
 import AnalyticsDashboard from '@/components/admin/analytics/AnalyticsDashboard';
-import SyncMetricsButton from '@/components/admin/analytics/SyncMetricsButton';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AnalyticsPage() {
-    const data = await getAnalyticsData();
+const RANGE_MAP: Record<string, number> = { '7': 7, '30': 30, '60': 60, '90': 90, all: 0 };
+
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+    const sp = await searchParams;
+    const rangeDays = RANGE_MAP[sp?.range ?? '30'] ?? 30;
+    const data = await getAnalyticsData(rangeDays);
     return (
         <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-                <p className="ak-caption">What the cloud has been seeing · Instagram 28-day + live website + per-post performance</p>
-                <SyncMetricsButton />
-            </div>
+            <p className="ak-caption" style={{ marginBottom: 14 }}>
+                What the cloud has been seeing · filter by platform and time range · per-post detail on click
+            </p>
             <AnalyticsDashboard data={data} />
         </div>
     );

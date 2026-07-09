@@ -1909,3 +1909,16 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     .admin-root .ak-sched__row { grid-template-columns: 64px 1fr auto; }
     .admin-root .ak-sched__off, .admin-root .ak-sched__claim { display: none; }
 }
+
+/* ── Analytics: controls bar + per-post expand detail ────────────────────── */
+.admin-root .ak-anctrl { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-root .ak-anctrl__right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-root .ak-pills--busy { opacity: 0.55; pointer-events: none; }
+
+.admin-root .ak-trow--open > td { background: var(--surface-2); }
+.admin-root .ak-trow-detail > td { padding: 0; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.admin-root .ak-postdetail { display: flex; flex-wrap: wrap; gap: 30px; padding: 14px 18px 16px; }
+.admin-root .ak-postdetail__col { min-width: 128px; }
+.admin-root .ak-postdetail__plat { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold-text); margin-bottom: 6px; }
+.admin-root .ak-postdetail__row { display: flex; justify-content: space-between; gap: 20px; font-size: 12.5px; color: var(--ink-2); padding: 2px 0; }
+.admin-root .ak-postdetail__row strong { color: var(--ink); font-variant-numeric: tabular-nums; }
