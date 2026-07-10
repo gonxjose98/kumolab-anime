@@ -2006,3 +2006,66 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     }
     .admin-root .ak-rail--open { transform: translateX(0); }
 }
+
+/* ══ Reschedule: editable slot time + wheel/manual picker ═════════════════ */
+.admin-root .ak-sched__time--edit {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: 0; cursor: pointer; font: inherit;
+    color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: 3px 7px; margin: -3px -7px; border-radius: var(--r-sm);
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.admin-root .ak-sched__time--edit:hover { background: var(--surface-2); color: var(--gold-text); }
+.admin-root .ak-sched__time--edit svg { opacity: 0.5; flex: none; }
+
+/* Mode toggle */
+.admin-root .ak-segmented {
+    display: inline-flex; align-self: center; gap: 2px; padding: 3px; margin-bottom: 16px;
+    border-radius: 999px; border: 1px solid var(--glass-border); background: var(--surface-2);
+}
+.admin-root .ak-segmented button {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 18px; border-radius: 999px; border: 0; background: none;
+    font-size: 12.5px; font-weight: 700; color: var(--ink-2); cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+.admin-root .ak-segmented button.is-on { background: var(--gold-grad); color: var(--gold-ink); }
+
+/* Wheel picker */
+.admin-root .ak-wheel-row {
+    position: relative; display: grid; grid-template-columns: 1.5fr 0.85fr 0.85fr 0.75fr; gap: 6px;
+}
+.admin-root .ak-wheel-row__band {
+    position: absolute; left: 4px; right: 4px; top: 98px; height: 40px; /* cap 18px + pad 80px */
+    border-top: 1px solid var(--gold); border-bottom: 1px solid var(--gold);
+    background: rgba(217, 164, 65, 0.09); border-radius: 8px; pointer-events: none;
+}
+.admin-root .ak-wheel-col { display: flex; flex-direction: column; min-width: 0; }
+.admin-root .ak-wheel__cap {
+    text-align: center; font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-3); height: 18px; line-height: 18px;
+}
+.admin-root .ak-wheel { position: relative; height: 200px; overflow: hidden; }
+.admin-root .ak-wheel__scroll {
+    height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 28%, #000 72%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 28%, #000 72%, transparent);
+}
+.admin-root .ak-wheel__scroll::-webkit-scrollbar { display: none; }
+.admin-root .ak-wheel__item {
+    height: 40px; display: flex; align-items: center; justify-content: center;
+    scroll-snap-align: center; font-size: 15px; font-weight: 600; color: var(--ink-3);
+    cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums;
+    transition: color 0.1s ease, transform 0.1s ease;
+}
+.admin-root .ak-wheel__item--on { color: var(--ink); font-weight: 800; transform: scale(1.05); }
+
+/* Selection summary */
+.admin-root .ak-pick-summary { text-align: center; font-size: 13.5px; color: var(--ink-2); margin-top: 16px; }
+.admin-root .ak-pick-summary strong { color: var(--ink); }
+.admin-root .ak-pick-peak {
+    display: inline-flex; align-items: center; gap: 5px; margin-left: 9px;
+    padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800;
+}
+.admin-root .ak-pick-peak--peak { background: var(--gold-grad); color: var(--gold-ink); }
+.admin-root .ak-pick-peak--off { background: var(--surface-2); color: var(--ink-3); }

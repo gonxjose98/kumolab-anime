@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Star, Clock } from 'lucide-react';
 import type { ScheduleRow } from '@/lib/schedule';
+import ScheduleSlotButton from './ScheduleSlotButton';
 
 const CLAIM_LABEL: Record<string, string> = {
     TRAILER_DROP: 'Trailer', NEW_KEY_VISUAL: 'Key Visual', NEW_SEASON_CONFIRMED: 'New Season',
@@ -48,7 +49,13 @@ export default function ScheduleView({ rows }: { rows: ScheduleRow[] }) {
                             <div className="ak-sched__rows">
                                 {g.items.map((r) => (
                                     <div key={r.id} className={`ak-sched__row ${r.isPeak ? 'ak-sched__row--peak' : ''} ${r.isFuture ? '' : 'ak-sched__row--done'}`}>
-                                        <span className="ak-sched__time">{r.slotLabel}</span>
+                                        <ScheduleSlotButton
+                                            id={r.id}
+                                            title={r.title}
+                                            iso={r.scheduledPostTime}
+                                            slotLabel={r.slotLabel}
+                                            editable={r.isFuture && r.status === 'approved'}
+                                        />
                                         {r.isPeak
                                             ? <span className="ak-sched__peak"><Star size={11} /> Peak</span>
                                             : <span className="ak-sched__off">Off-peak</span>}
