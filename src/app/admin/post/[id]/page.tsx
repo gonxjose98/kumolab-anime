@@ -63,6 +63,12 @@ export default function PostEditor() {
     const [busy, setBusy] = useState<null | 'save' | 'render' | 'approve' | 'decline' | 'delete'>(null);
     const [error, setError] = useState<string | null>(null);
     const [imageError, setImageError] = useState<string | null>(null);
+    // Autosave: persists edits (settings + title/caption/hashtags) after every
+    // change, marks studio activity, and promotes pending → draft. The explicit
+    // Save still renders + publishes the image bytes.
+    const [autosave, setAutosave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const autosaveSnap = useRef<string>('');
+    const autosaveTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Editable fields
     const [title, setTitle] = useState('');
@@ -230,6 +236,37 @@ export default function PostEditor() {
         // Reference the JSON so any change to the array triggers re-render.
         JSON.stringify(settings.purpleWordIndices),
     ]);
+
+    // Autosave: ~1.5s after any edit, persist the edit state so work is never
+    // lost. Best-effort, in place (no navigation, no image re-bake). Skips while
+    // an explicit Save is running to avoid clobbering it.
+    useEffect(() => {
+        if (!initialLoadDone.current || !post) return;
+        const snap = JSON.stringify({ title, excerpt, content, hashtags, settings, sourceUrl });
+        if (snap === autosaveSnap.current) return;
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = setTimeout(async () => {
+            if (busy) return; // explicit save owns the write right now
+            setAutosave('saving');
+            try {
+                const res = await fetch('/api/admin/studio/autosave-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ postId: id, title, excerpt, content, hashtags, settings, sourceUrl }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || json.success === false) throw new Error(json.error || 'Autosave failed');
+                autosaveSnap.current = snap;
+                if (json.status && post.status !== json.status) setPost((p: any) => (p ? { ...p, status: json.status } : p));
+                setAutosave('saved');
+            } catch {
+                setAutosave('error');
+            }
+        }, 1500);
+        return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [title, excerpt, content, hashtags, JSON.stringify(settings), sourceUrl]);
 
     // Preview-render helper that doesn't depend on the title/excerpt useState
     // values (avoids the "stale state" race when called from inside the
@@ -541,6 +578,11 @@ export default function PostEditor() {
                         <span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             {claimLabel} · {post.source}
                         </span>
+                        {autosave !== 'idle' && (
+                            <span className="ak-caption" style={{ color: autosave === 'error' ? 'var(--sun)' : 'var(--ink-3)' }}>
+                                {autosave === 'saving' ? '· Saving…' : autosave === 'saved' ? '· Saved' : '· Autosave failed'}
+                            </span>
+                        )}
                     </div>
                 </div>
                 {/* Cancel · Save draft · Save. Save draft keeps the post
