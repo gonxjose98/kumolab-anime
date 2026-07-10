@@ -1571,6 +1571,19 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 }
 
 /* ── Studio video hub ─────────────────────────────────────────────────── */
+/* List/card view toggle (Content > Posts). */
+.admin-root .ak-viewtoggle {
+    display: inline-flex; padding: 3px; gap: 2px; flex: none;
+    border-radius: var(--r-md); border: 1px solid var(--glass-border); background: var(--surface-2);
+}
+.admin-root .ak-viewtoggle button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 28px; border: 0; border-radius: var(--r-sm);
+    background: none; color: var(--ink-3); cursor: pointer; transition: all 0.14s ease;
+}
+.admin-root .ak-viewtoggle button:hover { color: var(--ink); }
+.admin-root .ak-viewtoggle button.is-on { background: var(--gold-grad); color: var(--gold-ink); }
+
 /* Studio workbench header: count on the left, Library button on the right. */
 .admin-root .ak-studio-head {
     display: flex; align-items: center; justify-content: space-between;

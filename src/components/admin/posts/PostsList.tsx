@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useMemo, useEffect } from 'react';
-import { Upload, Sparkles, Pencil, Play } from 'lucide-react';
+import { Upload, Sparkles, Pencil, Play, LayoutGrid, List as ListIcon } from 'lucide-react';
 import SchedulePicker from '@/components/admin/content/SchedulePicker';
 
 type Post = {
@@ -69,6 +69,16 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const [reschedulePost, setReschedulePost] = useState<Post | null>(null);
     const [rescheduleBusy, setRescheduleBusy] = useState(false);
     const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+    // List (default) vs the Studio-style card grid. Remembered across visits.
+    const [view, setView] = useState<'list' | 'cards'>('list');
+    useEffect(() => {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('admin-posts-view') : null;
+        if (saved === 'cards' || saved === 'list') setView(saved);
+    }, []);
+    const chooseView = (v: 'list' | 'cards') => {
+        setView(v);
+        if (typeof window !== 'undefined') localStorage.setItem('admin-posts-view', v);
+    };
 
     async function saveReschedule(when: Date) {
         if (!reschedulePost) return;
@@ -134,28 +144,44 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
                 </div>
             </div>
 
-            {/* Filter tabs */}
-            <div className="ak-pills" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
-                {FILTERS.map(f => {
-                    const active = filter === f.key;
-                    return (
-                        <button
-                            key={f.key}
-                            onClick={() => setFilter(f.key)}
-                            className={`ak-pill ${active ? 'ak-pill--active' : ''}`}
-                        >
-                            <span>{f.label}</span>
-                            <span className="ak-pill__count">{counts[f.key]}</span>
-                        </button>
-                    );
-                })}
+            {/* Filter tabs + view toggle */}
+            <div className="flex items-center justify-between gap-3 flex-wrap" style={{ marginBottom: '16px' }}>
+                <div className="ak-pills" style={{ flexWrap: 'wrap' }}>
+                    {FILTERS.map(f => {
+                        const active = filter === f.key;
+                        return (
+                            <button
+                                key={f.key}
+                                onClick={() => setFilter(f.key)}
+                                className={`ak-pill ${active ? 'ak-pill--active' : ''}`}
+                            >
+                                <span>{f.label}</span>
+                                <span className="ak-pill__count">{counts[f.key]}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="ak-viewtoggle" role="group" aria-label="View">
+                    <button className={view === 'list' ? 'is-on' : ''} onClick={() => chooseView('list')} title="List view" aria-label="List view">
+                        <ListIcon size={16} />
+                    </button>
+                    <button className={view === 'cards' ? 'is-on' : ''} onClick={() => chooseView('cards')} title="Card view" aria-label="Card view">
+                        <LayoutGrid size={16} />
+                    </button>
+                </div>
             </div>
 
-            {/* Posts list */}
+            {/* Posts */}
             {visible.length === 0 ? (
                 <div className="ak-empty">
                     <span className="ak-empty__glyph" aria-hidden="true">雲</span>
                     <p className="ak-body-sm">No {FILTERS.find(f => f.key === filter)?.label.toLowerCase()} posts.</p>
+                </div>
+            ) : view === 'cards' ? (
+                <div className="ak-vhub-grid">
+                    {visible.map((p) => (
+                        <PostCard key={p.id} post={p} onClick={() => router.push(`/admin/post/${p.id}`)} />
+                    ))}
                 </div>
             ) : (
                 <div className="ak-card ak-card--flush">
@@ -238,6 +264,41 @@ function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: bool
                 </button>
             )}
         </div>
+    );
+}
+
+// Studio-style card for the Content card view (same look as the Studio hubs).
+const CARD_STATUS_CLASS: Record<string, string> = {
+    pending: 'ak-badge--pending', draft: 'ak-badge--draft', approved: 'ak-badge--scheduled', published: 'ak-badge--published', declined: 'ak-badge--error',
+};
+const CARD_STATUS_LABEL: Record<string, string> = {
+    pending: 'Pending', draft: 'Draft', approved: 'Scheduled', published: 'Published', declined: 'Declined',
+};
+
+function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
+    const thumb = thumbUrl(post);
+    const isVideo = !!(post.social_ids?.staged_video_url || post.youtube_video_id);
+    const ts = post.published_at || post.timestamp;
+    const claimKey = (post.claim_type || 'OTHER').toUpperCase();
+    return (
+        <button className="ak-vhub-card" onClick={onClick}>
+            <div className="ak-vhub-thumb">
+                {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" />
+                ) : (
+                    <span className="ak-vhub-thumb__fallback">{isVideo ? <Play size={26} /> : '雲'}</span>
+                )}
+                <span className="ak-vhub-play">{isVideo ? <Play size={16} fill="currentColor" /> : <Pencil size={14} />}</span>
+            </div>
+            <div className="ak-vhub-meta">
+                <div className="ak-vhub-title">{post.title}</div>
+                <div className="ak-vhub-row">
+                    {post.status && <span className={`ak-badge ${CARD_STATUS_CLASS[post.status] || 'ak-badge--draft'}`}>{CARD_STATUS_LABEL[post.status] || post.status}</span>}
+                    <span className="ak-caption">{CLAIM_LABEL[claimKey] || CLAIM_LABEL.OTHER} · {timeAgo(ts)}</span>
+                </div>
+            </div>
+        </button>
     );
 }
 
