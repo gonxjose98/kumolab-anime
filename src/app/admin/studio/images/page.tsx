@@ -3,8 +3,11 @@ import ImageHub, { type ImageRow } from '@/components/admin/studio/ImageHub';
 
 export const dynamic = 'force-dynamic';
 
+// Same workbench rule as videos: drafts + recently edited (last 60 days).
+const RECENT_MS = 60 * 86_400_000;
+
 /**
- * Studio > Images — image posts (an image, no staged video) in one place,
+ * Studio > Images — image work in progress (drafts + recently edited),
  * openable in the post editor's image flow (card art, overlays, caption).
  */
 export default async function StudioImagesPage() {
@@ -14,18 +17,26 @@ export default async function StudioImagesPage() {
         .not('image', 'is', null)
         .is('social_ids->>staged_video_url', null)
         .order('timestamp', { ascending: false })
-        .limit(150);
+        .limit(400);
 
+    const now = Date.now();
     const rows: ImageRow[] = (data || [])
-        .filter((p: any) => p.image && !String(p.image).includes('placeholder'))
+        .filter((p: any) => {
+            if (!p.image || String(p.image).includes('placeholder')) return false;
+            if (p.status === 'draft') return true;
+            const t = p.image_settings?.studio_edited_at;
+            return t && now - new Date(t).getTime() < RECENT_MS;
+        })
         .map((p: any) => ({
             id: p.id,
             title: p.title,
             status: p.status,
             image: p.image,
             timestamp: p.published_at || p.timestamp,
-            edited: !!p.image_settings && Object.keys(p.image_settings).length > 0,
-        }));
+            editedAt: p.image_settings?.studio_edited_at || null,
+            edited: !!p.image_settings?.studio_edited_at,
+        }))
+        .sort((a, b) => new Date(b.editedAt || b.timestamp || 0).getTime() - new Date(a.editedAt || a.timestamp || 0).getTime());
 
     if (error) {
         return (
@@ -35,5 +46,5 @@ export default async function StudioImagesPage() {
         );
     }
 
-    return <ImageHub rows={rows} />;
+    return <ImageHub rows={rows} kind="images" />;
 }

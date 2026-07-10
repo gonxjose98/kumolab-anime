@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clapperboard, Pencil } from 'lucide-react';
+import Link from 'next/link';
+import { Play, Clapperboard, Pencil, Library } from 'lucide-react';
 
 export interface VideoRow {
     id: string;
@@ -10,19 +10,15 @@ export interface VideoRow {
     status: string | null;
     image: string | null;
     timestamp?: string | null;
+    editedAt?: string | null;
     edited: boolean;
 }
 
-type Filter = 'all' | 'pending' | 'draft' | 'approved' | 'published';
-const FILTERS: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'draft', label: 'Draft' },
-    { key: 'approved', label: 'Scheduled' },
-    { key: 'published', label: 'Published' },
-];
 const STATUS_CLASS: Record<string, string> = {
     pending: 'ak-badge--pending', draft: 'ak-badge--draft', approved: 'ak-badge--scheduled', published: 'ak-badge--published', declined: 'ak-badge--error',
+};
+const STATUS_LABEL: Record<string, string> = {
+    pending: 'Pending', draft: 'Draft', approved: 'Scheduled', published: 'Published', declined: 'Declined',
 };
 
 function timeAgo(iso?: string | null): string {
@@ -33,41 +29,32 @@ function timeAgo(iso?: string | null): string {
     return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
-export default function VideoHub({ rows }: { rows: VideoRow[] }) {
+/** Studio > Videos workbench — drafts + recently-edited video work as cards. */
+export default function VideoHub({ rows }: { rows: VideoRow[]; kind?: 'videos' | 'images' }) {
     const router = useRouter();
-    const [filter, setFilter] = useState<Filter>('all');
-
-    const counts = useMemo(() => {
-        const c: Record<string, number> = { all: rows.length };
-        for (const r of rows) if (r.status) c[r.status] = (c[r.status] || 0) + 1;
-        return c;
-    }, [rows]);
-
-    const visible = filter === 'all' ? rows : rows.filter((r) => r.status === filter);
 
     return (
         <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-                <p className="ak-caption">{rows.length} video{rows.length === 1 ? '' : 's'} · open any in the full editor</p>
+            <div className="ak-studio-head">
+                <p className="ak-caption">
+                    {rows.length === 0 ? 'Nothing in progress' : `${rows.length} in progress · drafts + recently edited`}
+                </p>
+                <Link href="/admin/studio/library" className="ak-btn ak-btn--secondary ak-btn--sm">
+                    <Library size={14} /> Library
+                </Link>
             </div>
 
-            <div className="ak-pills" style={{ marginBottom: '18px', flexWrap: 'wrap' }}>
-                {FILTERS.map((f) => (
-                    <button key={f.key} onClick={() => setFilter(f.key)} className={`ak-pill ${filter === f.key ? 'ak-pill--active' : ''}`}>
-                        <span>{f.label}</span>
-                        <span className="ak-pill__count">{counts[f.key] || 0}</span>
-                    </button>
-                ))}
-            </div>
-
-            {visible.length === 0 ? (
+            {rows.length === 0 ? (
                 <div className="ak-empty">
                     <span className="ak-empty__glyph" aria-hidden="true"><Clapperboard size={34} /></span>
-                    <p className="ak-body-sm">No {filter === 'all' ? '' : filter + ' '}videos yet. Import a video from the Posts tab (Upload / Import from URL) and it lands here.</p>
+                    <p className="ak-body-sm">No video work in progress. Open a piece from the <strong>Library</strong>, or find a video on a Pending post and it lands here as a draft.</p>
+                    <Link href="/admin/studio/library" className="ak-btn ak-btn--primary ak-btn--sm" style={{ marginTop: 14 }}>
+                        <Library size={14} /> Browse Library
+                    </Link>
                 </div>
             ) : (
                 <div className="ak-vhub-grid">
-                    {visible.map((v) => (
+                    {rows.map((v) => (
                         <button key={v.id} className="ak-vhub-card" onClick={() => router.push(`/admin/post/${v.id}/studio`)}>
                             <div className="ak-vhub-thumb">
                                 {v.image ? (
@@ -82,8 +69,8 @@ export default function VideoHub({ rows }: { rows: VideoRow[] }) {
                             <div className="ak-vhub-meta">
                                 <div className="ak-vhub-title">{v.title}</div>
                                 <div className="ak-vhub-row">
-                                    {v.status && <span className={`ak-badge ${STATUS_CLASS[v.status] || 'ak-badge--draft'}`}>{v.status}</span>}
-                                    <span className="ak-caption">{timeAgo(v.timestamp)}</span>
+                                    {v.status && <span className={`ak-badge ${STATUS_CLASS[v.status] || 'ak-badge--draft'}`}>{STATUS_LABEL[v.status] || v.status}</span>}
+                                    <span className="ak-caption">{v.editedAt ? `edited ${timeAgo(v.editedAt)}` : timeAgo(v.timestamp)}</span>
                                 </div>
                             </div>
                         </button>

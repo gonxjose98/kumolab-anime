@@ -1571,6 +1571,21 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 }
 
 /* ── Studio video hub ─────────────────────────────────────────────────── */
+/* Studio workbench header: count on the left, Library button on the right. */
+.admin-root .ak-studio-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.admin-root .ak-lib-search {
+    display: inline-flex; align-items: center; gap: 8px; color: var(--ink-3);
+    flex: 1; min-width: 180px; max-width: 320px;
+}
+.admin-root .ak-lib-search .ak-field__input { flex: 1; }
+.admin-root .ak-lib-copying {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(10, 23, 48, 0.55); color: #fff; font-size: 12px; font-weight: 700;
+    backdrop-filter: blur(2px);
+}
 .admin-root .ak-vhub-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

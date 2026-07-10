@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         // operator wants.
         const { data: post, error: postErr } = await supabaseAdmin
             .from('posts')
-            .select('id, slug, status, social_ids')
+            .select('id, slug, status, social_ids, image_settings')
             .eq('id', postId)
             .maybeSingle();
 
@@ -116,11 +116,21 @@ export async function POST(req: NextRequest) {
             scraped_at: new Date().toISOString(),
         };
 
+        // Downloading a video makes this your active work: move it to draft and
+        // stamp studio activity so it lands in the Studio workbench (Jose,
+        // 2026-07-10 — "if I download a video from pending it goes to drafts").
+        const newImageSettings = {
+            ...((post.image_settings as Record<string, any>) || {}),
+            studio_edited_at: new Date().toISOString(),
+        };
+
         const { error: updErr } = await supabaseAdmin
             .from('posts')
             .update({
                 social_ids: newSocialIds,
                 youtube_video_id: staged.video_id,
+                status: 'draft',
+                image_settings: newImageSettings,
             })
             .eq('id', postId);
 

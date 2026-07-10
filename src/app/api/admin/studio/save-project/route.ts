@@ -26,11 +26,16 @@ export async function POST(req: NextRequest) {
         }
 
         const { data: existing, error: readErr } = await supabaseAdmin
-            .from('posts').select('image_settings').eq('id', postId).single();
+            .from('posts').select('status, image_settings').eq('id', postId).single();
         if (readErr) return NextResponse.json({ success: false, error: readErr.message }, { status: 404 });
 
-        const image_settings = { ...(existing?.image_settings || {}), video_project: project };
-        const { error } = await supabaseAdmin.from('posts').update({ image_settings }).eq('id', postId);
+        // Stamp studio activity so the post surfaces in the Studio workbench
+        // (drafts + recently-edited), and promote a pending post to draft —
+        // once you're editing it in Studio it's your working draft.
+        const image_settings = { ...(existing?.image_settings || {}), video_project: project, studio_edited_at: new Date().toISOString() };
+        const update: Record<string, any> = { image_settings };
+        if (existing?.status === 'pending') update.status = 'draft';
+        const { error } = await supabaseAdmin.from('posts').update(update).eq('id', postId);
         if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
         return NextResponse.json({ success: true });
