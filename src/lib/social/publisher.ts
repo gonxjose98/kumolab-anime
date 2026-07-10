@@ -9,6 +9,11 @@ import { logError } from '../logging/structured-logger';
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
 const FB_PAGE_ID = '833836379820504';
+// Facebook re-enable (Jose, 2026-07-11): under the global video-only policy the
+// FB Page timeline went dormant → 0 reach. We now let high-quality image
+// key-visuals through to Facebook ONLY (IG + Threads stay video-only), capped
+// to keep it a deliberate trickle, not a firehose. Override via env, default 3.
+const FB_IMAGE_DAILY_CAP = Number(process.env.FB_IMAGE_DAILY_CAP ?? 3);
 const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
 const THREADS_USER_ID = process.env.THREADS_USER_ID;
 // Threads "topic" (the "+ Community or topic" field in the composer). The API
@@ -268,18 +273,46 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
     //
     // Intentional, not a fault → action_logs (operational), not error_logs.
     // Mirrors the existing "no screenshot fallback" directive.
+    //
+    // EXCEPTION (Jose, 2026-07-11): Facebook is re-enabled for image
+    // key-visuals. IG + Threads stay video-only (image posts proved dead
+    // weight there), but a capped trickle of NEW_KEY_VISUAL images keeps the
+    // FB Page timeline alive instead of starving it to 0 reach. Key-visuals
+    // already carry the pipeline's source/quality guardrails, so the only
+    // extra gate here is a real (non-placeholder) image + the daily cap.
     if (!stagedVideoUrl) {
         const { supabaseAdmin } = await import('../supabase/admin');
+        const isKeyVisual = String(claim || '').toUpperCase() === 'NEW_KEY_VISUAL';
+        const hasRealImage = !!post.image && !String(post.image).includes('placeholder');
+        let didFb = false;
+
+        if (META_ACCESS_TOKEN && isKeyVisual && hasRealImage && await fbImagePostsUnderCap(FB_IMAGE_DAILY_CAP)) {
+            try {
+                const fbResult = await publishToFacebookPage(post, null);
+                Object.assign(result, fbResult);
+                didFb = !!result.facebook_id;
+            } catch (e: any) {
+                await logError({
+                    source: 'publisher.fb',
+                    errorMessage: `FB key-visual publish threw: ${e?.message || e}`,
+                    stackTrace: e?.stack,
+                    context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                });
+            }
+        }
+
         await supabaseAdmin.from('action_logs').insert({
-            action: 'social_publish_skipped',
+            action: didFb ? 'social_publish_partial' : 'social_publish_skipped',
             actor: 'system',
             entity_type: 'post',
             entity_id: (post as any).id,
             entity_title: post.title,
-            reason: 'Image-only post — video-only social policy (IG analysis Run 3, 2026-06-06)',
-            details: { slug: post.slug, claim_type: claim, type: (post as any).type },
+            reason: didFb
+                ? 'Image key-visual → Facebook only (IG/Threads stay video-only)'
+                : 'Image-only post — video-only for IG/Threads; FB skipped (not a key-visual, no image, or daily cap reached)',
+            details: { slug: post.slug, claim_type: claim, type: (post as any).type, fb_posted: didFb },
         }).then(() => {}, () => {});
-        (result as any).skipped_reason = 'image_only_video_only_policy';
+        (result as any).skipped_reason = didFb ? 'image_fb_keyvisual_only' : 'image_only_video_only_policy';
         return result;
     }
 
@@ -528,6 +561,27 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
 //     finish. Same video URL we feed IG; one bucket, two platforms.
 //   - Otherwise we use /{PAGE_ID}/photos (image + caption in one call)
 //     for image posts, falling back to /{PAGE_ID}/feed for text-only.
+// How many image (non-video) posts have gone to the FB Page in the last 24h.
+// Video FB posts carry a staged_video_url and don't count. Fails CLOSED (returns
+// false) if the count can't be read, so we never over-post past the cap.
+async function fbImagePostsUnderCap(cap: number): Promise<boolean> {
+    if (!(cap > 0)) return false;
+    try {
+        const { supabaseAdmin } = await import('../supabase/admin');
+        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+        const { count, error } = await supabaseAdmin
+            .from('posts')
+            .select('id', { count: 'exact', head: true })
+            .gte('published_at', since)
+            .not('social_ids->>facebook_id', 'is', null)
+            .is('social_ids->>staged_video_url', null);
+        if (error) return false;
+        return (count ?? 0) < cap;
+    } catch {
+        return false;
+    }
+}
+
 async function publishToFacebookPage(post: BlogPost, stagedVideoUrl: string | null = null): Promise<SocialPublishResult> {
     const result: SocialPublishResult = {};
     if (!META_ACCESS_TOKEN) return result;
