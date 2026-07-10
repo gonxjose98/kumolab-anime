@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useMemo, useEffect } from 'react';
 import { Upload, Sparkles, Pencil, Play } from 'lucide-react';
+import SchedulePicker from '@/components/admin/content/SchedulePicker';
 
 type Post = {
     id: string;
@@ -66,6 +67,30 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     const [aiOpen, setAiOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [reschedulePost, setReschedulePost] = useState<Post | null>(null);
+    const [rescheduleBusy, setRescheduleBusy] = useState(false);
+    const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+
+    async function saveReschedule(when: Date) {
+        if (!reschedulePost) return;
+        setRescheduleBusy(true);
+        setRescheduleError(null);
+        try {
+            const res = await fetch('/api/posts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id: reschedulePost.id, scheduled_post_time: when.toISOString() }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) throw new Error(json.error || `Reschedule failed (HTTP ${res.status})`);
+            setReschedulePost(null);
+            router.refresh();
+        } catch (e: any) {
+            setRescheduleError(e?.message || 'Reschedule failed');
+        } finally {
+            setRescheduleBusy(false);
+        }
+    }
 
     // Remember the active tab across navigation. When you open a post and hit
     // Cancel, the editor does router.back() to this list; restoring the last
@@ -149,10 +174,13 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
             {aiOpen && <AiAssistModal onClose={() => setAiOpen(false)} />}
             {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} onSuccess={() => { setUploadOpen(false); router.refresh(); }} />}
             {reschedulePost && (
-                <RescheduleModal
-                    post={reschedulePost}
-                    onClose={() => setReschedulePost(null)}
-                    onSaved={() => { setReschedulePost(null); router.refresh(); }}
+                <SchedulePicker
+                    title={reschedulePost.title}
+                    initialIso={reschedulePost.scheduled_post_time || new Date().toISOString()}
+                    busy={rescheduleBusy}
+                    error={rescheduleError}
+                    onCancel={() => { setReschedulePost(null); setRescheduleError(null); }}
+                    onSave={saveReschedule}
                 />
             )}
         </div>
@@ -164,13 +192,6 @@ function formatSchedule(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' ·');
 }
-// ISO (UTC) → value for <input type="datetime-local"> in the operator's local tz.
-function toLocalInputValue(iso: string): string {
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: boolean; onClick: () => void; onReschedule: () => void }) {
     const claimKey = (post.claim_type || 'OTHER').toUpperCase();
     const claimLabel = CLAIM_LABEL[claimKey] || CLAIM_LABEL.OTHER;
@@ -216,66 +237,6 @@ function PostRow({ post, last, onClick, onReschedule }: { post: Post; last: bool
                     <Pencil size={11} />
                 </button>
             )}
-        </div>
-    );
-}
-
-function RescheduleModal({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: () => void }) {
-    const [value, setValue] = useState(post.scheduled_post_time ? toLocalInputValue(post.scheduled_post_time) : '');
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    async function save() {
-        if (!value) { setError('Pick a date & time'); return; }
-        const when = new Date(value);
-        if (isNaN(when.getTime())) { setError('Invalid date & time'); return; }
-        setBusy(true);
-        setError(null);
-        try {
-            const res = await fetch('/api/posts', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ id: post.id, scheduled_post_time: when.toISOString() }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || json.success === false) throw new Error(json.error || `Reschedule failed (HTTP ${res.status})`);
-            onSaved();
-        } catch (e: any) {
-            setError(e?.message || 'Reschedule failed');
-            setBusy(false);
-        }
-    }
-
-    return (
-        <div className="ak-modal__scrim" onClick={onClose}>
-            <div className="ak-modal" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
-                <div className="ak-modal__head">
-                    <span className="ak-title">Reschedule</span>
-                    <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={onClose}>Close</button>
-                </div>
-                <div className="ak-modal__body">
-                    <p className="ak-body-sm" style={{ marginBottom: '16px' }}>{post.title}</p>
-                    <div className="ak-field">
-                        <label className="ak-field__label">Publish date & time</label>
-                        <input
-                            type="datetime-local"
-                            value={value}
-                            disabled={busy}
-                            onChange={e => { setValue(e.target.value); setError(null); }}
-                            className="ak-field__input"
-                        />
-                        <span className="ak-field__help">Your local time. The post publishes on the next cron tick after this.</span>
-                    </div>
-                    {error && <div className="ak-auth__err" style={{ marginTop: '14px' }}>{error}</div>}
-                </div>
-                <div className="ak-modal__foot">
-                    <button className="ak-btn ak-btn--secondary" onClick={onClose} disabled={busy}>Cancel</button>
-                    <button className="ak-btn ak-btn--primary" onClick={save} disabled={busy || !value}>
-                        {busy ? 'Saving…' : 'Save schedule'}
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
