@@ -53,7 +53,12 @@ export async function POST(req: Request) {
                 total: session.amount_total / 100,
             },
             external_id: session.id, // Link Stripe Session ID to Printful Order
-            confirm: true, // Automatically confirm the order for fulfillment
+            // Manual-approval flow (Jose, 2026-07-11): create as a DRAFT, do NOT
+            // auto-confirm. The customer has already paid (funds are in Stripe),
+            // but Printful only charges the store when the operator approves the
+            // order in the Store tab. This lets Jose verify funds before Printful
+            // bills him, and keeps cash flow under his control.
+            confirm: false,
         };
 
         try {

@@ -23,7 +23,7 @@ const STAGES: { key: OrderStage; label: string; jp: string; icon: typeof Inbox }
     { key: 'shipped', label: 'Shipped', jp: '発送', icon: Truck },
     { key: 'delivered', label: 'Delivered', jp: '到着', icon: PackageCheck },
 ];
-const STAGE_INDEX: Record<OrderStage, number> = { received: 0, production: 1, shipped: 2, delivered: 3, canceled: -1 };
+const STAGE_INDEX: Record<OrderStage, number> = { awaiting: -2, received: 0, production: 1, shipped: 2, delivered: 3, canceled: -1 };
 
 type FilterKey = 'all' | OrderStage;
 
@@ -42,12 +42,36 @@ export default function OrdersBoard({ orders, error }: { orders: KumoOrder[]; er
     const [filter, setFilter] = useState<FilterKey>('all');
     const [query, setQuery] = useState('');
     const [openId, setOpenId] = useState<number | null>(null);
+    const [approvingId, setApprovingId] = useState<number | null>(null);
+    const [approveErr, setApproveErr] = useState<string | null>(null);
 
     const counts = useMemo(() => {
-        const c: Record<FilterKey, number> = { all: orders.length, received: 0, production: 0, shipped: 0, delivered: 0, canceled: 0 };
+        const c: Record<FilterKey, number> = { all: orders.length, awaiting: 0, received: 0, production: 0, shipped: 0, delivered: 0, canceled: 0 };
         for (const o of orders) c[o.stage]++;
         return c;
     }, [orders]);
+
+    const awaiting = useMemo(() => orders.filter((o) => o.stage === 'awaiting'), [orders]);
+
+    async function approve(id: number) {
+        setApprovingId(id);
+        setApproveErr(null);
+        try {
+            const res = await fetch('/api/admin/orders/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ orderId: id }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) throw new Error(json.error || `Approve failed (HTTP ${res.status})`);
+            startTransition(() => router.refresh());
+        } catch (e: any) {
+            setApproveErr(e?.message || 'Could not approve the order');
+        } finally {
+            setApprovingId(null);
+        }
+    }
 
     const revenue = useMemo(
         () => orders.filter((o) => o.stage !== 'canceled').reduce((s, o) => s + o.total, 0),
@@ -58,6 +82,8 @@ export default function OrdersBoard({ orders, error }: { orders: KumoOrder[]; er
     const visible = useMemo(() => {
         const q = query.trim().toLowerCase();
         return orders.filter((o) => {
+            // Awaiting-approval orders live in the top banner, not the card list.
+            if (o.stage === 'awaiting') return false;
             if (filter !== 'all' && o.stage !== filter) return false;
             if (!q) return true;
             return (
@@ -74,8 +100,45 @@ export default function OrdersBoard({ orders, error }: { orders: KumoOrder[]; er
 
     return (
         <div className="ak-ord">
+            {/* Approval banner — paid orders waiting for you to approve before
+                Printful charges + produces them. Most time-sensitive thing here. */}
+            {awaiting.length > 0 && (
+                <div className="ak-ord-approve">
+                    <div className="ak-ord-approve__head">
+                        <span className="ak-ord-approve__badge">{awaiting.length}</span>
+                        <div>
+                            <div className="ak-ord-approve__title">
+                                {awaiting.length === 1 ? 'An order is' : `${awaiting.length} orders are`} awaiting your approval
+                            </div>
+                            <div className="ak-ord-approve__sub">Customer has paid. Approving sends it to Printful for production, which is when Printful charges you.</div>
+                        </div>
+                    </div>
+                    {approveErr && <div className="ak-ord-error" style={{ marginTop: 10 }}>{approveErr}</div>}
+                    <div className="ak-ord-approve__list">
+                        {awaiting.map((o) => (
+                            <div key={o.id} className="ak-ord-approve__row">
+                                <div className="ak-ord-approve__info">
+                                    <span className="ak-ord-approve__num">#{o.id}</span>
+                                    <span className="ak-ord-approve__cust">{o.customerName}</span>
+                                    <span className="ak-ord-approve__items">{o.itemCount} item{o.itemCount === 1 ? '' : 's'} · {o.items.map((i) => i.name).join(', ')}</span>
+                                </div>
+                                <span className="ak-ord-approve__total">{money(o.total, o.currency)}</span>
+                                <button
+                                    className="ak-btn ak-btn--primary ak-btn--sm"
+                                    onClick={() => approve(o.id)}
+                                    disabled={approvingId != null}
+                                >
+                                    {approvingId === o.id ? 'Approving…' : 'Approve'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Summary strip */}
             <div className="ak-ord-summary">
+                {counts.awaiting > 0 && <SummaryChip icon={Inbox} label="To approve" value={counts.awaiting} tone="awaiting" />}
                 <SummaryChip icon={Inbox} label="Received" value={counts.received} tone="received" />
                 <SummaryChip icon={Factory} label="In production" value={counts.production} tone="production" />
                 <SummaryChip icon={Truck} label="Shipped" value={counts.shipped} tone="shipped" />

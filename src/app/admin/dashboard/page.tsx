@@ -82,6 +82,8 @@ async function fetchDashboardData() {
     const revenueToday = ordersToday
         .filter((o: any) => o.stage !== 'canceled')
         .reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);
+    // Paid orders waiting for the operator to approve (before Printful charges).
+    const ordersAwaiting = orders.filter((o: any) => o.stage === 'awaiting').length;
 
     return {
         stats: {
@@ -91,6 +93,7 @@ async function fetchDashboardData() {
             scheduled24h: scheduledCount ?? 0,
             errors24h: errors24h ?? 0,
             ordersToday: ordersToday.length,
+            ordersAwaiting,
             revenueToday,
             currency: orders[0]?.currency || 'USD',
         },
@@ -260,6 +263,18 @@ export default async function DashboardPage() {
                     <span className="ak-caption">{stats.errors24h > 0 ? 'needs a look' : 'all clear'}</span>
                 </div>
             </div>
+
+            {/* ── Orders awaiting approval (time-sensitive: customer paid) ─────── */}
+            {stats.ordersAwaiting > 0 && (
+                <Link href="/admin/store/orders" className="ak-card ak-ord-approve-cta">
+                    <span className="ak-ord-approve__badge">{stats.ordersAwaiting}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="ak-heading">{stats.ordersAwaiting === 1 ? 'An order needs' : `${stats.ordersAwaiting} orders need`} your approval</div>
+                        <div className="ak-caption">Customer paid. Approve in Store to send it to Printful (that&apos;s when you get charged).</div>
+                    </div>
+                    <span className="ak-caption" style={{ color: 'var(--gold-text)', fontWeight: 700, whiteSpace: 'nowrap' }}>Review in Store →</span>
+                </Link>
+            )}
 
             {/* ── Social pulse (streamed — light glance, heavy data in Analytics) ── */}
             <Suspense fallback={<SocialPulseSkeleton />}>

@@ -16,7 +16,7 @@ import { supabaseAdmin } from '../supabase/admin';
 export type ActionType =
     | 'approved' | 'auto_approved' | 'declined' | 'published'
     | 'deleted' | 'hidden' | 'reverted' | 'scheduled'
-    | 'created' | 'updated'
+    | 'created' | 'updated' | 'order_approved'
     // Operational state changes — NOT errors. These go to action_logs so
     // they don't pollute the dashboard's "Errors 24h" counter for routine
     // transient blips. Promote to error_logs only when persistent

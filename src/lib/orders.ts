@@ -18,7 +18,9 @@ import { getCarrierTrackingUrl } from '@/lib/email';
 const PRINTFUL_API_URL = 'https://api.printful.com';
 const ACCESS_TOKEN = process.env.PRINTFUL_ACCESS_TOKEN;
 
-export type OrderStage = 'received' | 'production' | 'shipped' | 'delivered' | 'canceled';
+// 'awaiting' = customer paid, Printful order created as a DRAFT (confirm:false),
+// waiting for the operator to approve before Printful charges + produces it.
+export type OrderStage = 'awaiting' | 'received' | 'production' | 'shipped' | 'delivered' | 'canceled';
 
 export interface OrderShipment {
     carrier: string;
@@ -55,8 +57,8 @@ export interface KumoOrder {
 // Printful order status → our stage. Printful statuses:
 // draft, pending, failed, canceled, inprocess, onhold, partial, fulfilled, archived.
 const STAGE_BY_STATUS: Record<string, OrderStage> = {
-    draft: 'received',
-    pending: 'received',
+    draft: 'awaiting',   // paid, needs your approval before it's charged + made
+    pending: 'received', // approved/confirmed, queued at Printful
     inprocess: 'production',
     onhold: 'production',
     partial: 'production',
