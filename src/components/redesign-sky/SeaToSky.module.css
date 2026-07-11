@@ -1065,10 +1065,11 @@
     /* ── Mobile performance ──────────────────────────────────────────────
        The scroll dolly (transform via --z) is GPU-cheap and stays. What janks
        a phone is the pile of CONTINUOUS ambient animations running on top of
-       it — twinkles, drifts, god-rays, the boat bob. Freeze those to a static
-       scene on small screens; the dive still reads beautifully. The sea waves
-       and the birds ARE kept alive on mobile (Jose's call, 2026-07-11) — waves
-       roll (deep back-swell held static to trim cost) and birds fly + flap. */
+       it — twinkles, drifts, god-rays. Freeze those to a static
+       scene on small screens; the dive still reads beautifully. The sea waves,
+       the birds AND the boat are kept alive on mobile (Jose's call, 2026-07-11
+       / boat added 2026-07-11) — waves roll (deep back-swell held static to
+       trim cost), birds fly + flap, and the boat drifts + bobs like on desktop. */
     .glint,
     .shimmer,
     .star,
@@ -1077,8 +1078,6 @@
     .sunRing,
     .cloudDriftM,
     .cloudDriftN,
-    .boatBob,
-    .boatDrift,
     .scrollLine::after {
         animation: none !important;
     }
