@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
-import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
+import { getAccess } from '@/lib/auth/access';
 import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
 import { getScheduleRows } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
@@ -222,6 +222,8 @@ function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: stri
 export default async function DashboardPage() {
     const data = await fetchDashboardData();
     const { stats } = data;
+    const access = await getAccess();
+    const canReview = access.isOwner || access.perms.pending;
 
     const stormy = stats.errors24h > 0;
 
@@ -284,7 +286,8 @@ export default async function DashboardPage() {
             {/* ── Pending review (hero) + right rail ──────────────── */}
             {/* grid-cols-1 base = minmax(0,1fr) so children shrink on phones
                 instead of sizing to content and overflowing the viewport. */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className={`grid grid-cols-1 ${canReview ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 items-start`}>
+                {canReview && (
                 <div className="ak-card ak-card--flush lg:col-span-2">
                     <div className="flex items-center justify-between gap-3 p-5 pb-3">
                         <div className="flex items-center gap-3">
@@ -293,7 +296,6 @@ export default async function DashboardPage() {
                                 <span className="ak-pill__count">{data.pendingPosts.length}</span>
                             )}
                         </div>
-                        <ImportFromUrlButton />
                     </div>
                     {data.pendingPosts.length === 0 ? (
                         <div className="ak-empty">
@@ -334,6 +336,7 @@ export default async function DashboardPage() {
                         </>
                     )}
                 </div>
+                )}
 
                 <div className="flex flex-col gap-6">
                     {/* Today's lineup (peak-flagged) */}

@@ -9,27 +9,31 @@ import {
     BarChart3,
     Store,
     Clapperboard,
+    Users,
     Menu,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
 import ThemeToggle from './ThemeToggle';
 import AdminSky from './AdminSky';
 
-interface NavItem { href: string; label: string; jp: string; icon: typeof LayoutDashboard }
+// perm = the permission a member needs to see this tab (owner always sees all).
+// Undefined perm = always visible to any signed-in user. ownerOnly = owner only.
+interface NavItem { href: string; label: string; jp: string; icon: typeof LayoutDashboard; perm?: string; ownerOnly?: boolean }
 
 // Dashboard sits alone at the top (it's the room you're in, not a category);
-// the rest are bilingual groups — Publishing / Insight / Shop.
+// the rest are bilingual groups — Publishing / Insight / Shop / Admin.
 const TOP: NavItem = { href: '/admin/dashboard', label: 'Dashboard', jp: '本部', icon: LayoutDashboard };
 
 const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     {
         label: 'Publishing', jp: '発信', items: [
-            { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText },
-            { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard },
+            { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText, perm: 'content' },
+            { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard, perm: 'studio' },
         ],
     },
-    { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3 }] },
-    { label: 'Shop', jp: '売店', items: [{ href: '/admin/store', label: 'Store', jp: '売店', icon: Store }] },
+    { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' }] },
+    { label: 'Shop', jp: '売店', items: [{ href: '/admin/store', label: 'Store', jp: '売店', icon: Store, perm: 'store' }] },
+    { label: 'Admin', jp: '管理', items: [{ href: '/admin/team', label: 'Team', jp: '班', icon: Users, ownerOnly: true }] },
 ];
 
 const ALL = [TOP, ...GROUPS.flatMap((g) => g.items)];
@@ -37,13 +41,25 @@ const ALL = [TOP, ...GROUPS.flatMap((g) => g.items)];
 /** The KumoLab admin shell — a gold-chrome cloud rail over the sea-to-sky. */
 export default function AdminShell({
     email,
+    perms,
+    isOwner = false,
     children,
 }: {
     email?: string | null;
+    perms?: Record<string, boolean>;
+    isOwner?: boolean;
     children: React.ReactNode;
 }) {
     const pathname = usePathname() || '';
     const [open, setOpen] = useState(false);
+
+    // Show a tab only if the member holds its permission (owner sees all).
+    // Undefined perm = always visible; ownerOnly = owner only.
+    const canSee = (it: NavItem) =>
+        it.ownerOnly ? isOwner : (!it.perm || isOwner || !!perms?.[it.perm]);
+    const visibleGroups = GROUPS
+        .map((g) => ({ ...g, items: g.items.filter(canSee) }))
+        .filter((g) => g.items.length > 0);
 
     const isActive = (href: string) => {
         if (href === '/admin/dashboard') return pathname === href;
@@ -93,7 +109,7 @@ export default function AdminShell({
 
                     <nav className="ak-rail__nav">
                         <NavRow it={TOP} />
-                        {GROUPS.map((g) => (
+                        {visibleGroups.map((g) => (
                             <div key={g.label} className="ak-rail__group-wrap">
                                 <div className="ak-rail__group">
                                     <span className="ak-rail__group-en">{g.label}</span>

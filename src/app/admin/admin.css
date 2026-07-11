@@ -181,6 +181,19 @@
     color: var(--sun);
 }
 
+/* Themed checkbox (Team permissions, etc.) */
+.admin-root .ak-checkbox {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    accent-color: var(--blue);
+    cursor: pointer;
+}
+.admin-root .ak-checkbox:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
 /* ── Badge / status tag ───────────────────────────────────────────────── */
 .admin-root .ak-badge {
     display: inline-flex;

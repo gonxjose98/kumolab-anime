@@ -22,9 +22,9 @@ type Post = {
 
 type Filter = 'pending' | 'draft' | 'approved' | 'published';
 
+// Drafts live in Studio (Videos/Images), not Content — no Draft tab here.
 const FILTERS: { key: Filter; label: string }[] = [
     { key: 'pending', label: 'Pending' },
-    { key: 'draft', label: 'Draft' },
     { key: 'approved', label: 'Scheduled' },
     { key: 'published', label: 'Published' },
 ];

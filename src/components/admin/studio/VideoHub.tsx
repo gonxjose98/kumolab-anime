@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Play, Clapperboard, Pencil, Library } from 'lucide-react';
+import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
 
 export interface VideoRow {
     id: string;
@@ -39,9 +40,12 @@ export default function VideoHub({ rows }: { rows: VideoRow[]; kind?: 'videos' |
                 <p className="ak-caption">
                     {rows.length === 0 ? 'Nothing in progress' : `${rows.length} in progress · drafts + recently edited`}
                 </p>
-                <Link href="/admin/studio/library" className="ak-btn ak-btn--secondary ak-btn--sm">
-                    <Library size={14} /> Library
-                </Link>
+                <div className="flex items-center gap-2">
+                    <ImportFromUrlButton />
+                    <Link href="/admin/studio/library" className="ak-btn ak-btn--secondary ak-btn--sm">
+                        <Library size={14} /> Library
+                    </Link>
+                </div>
             </div>
 
             {rows.length === 0 ? (
