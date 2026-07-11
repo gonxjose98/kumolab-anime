@@ -425,6 +425,7 @@ export function WaveBand({
     dur = 11,
     shift = 0,
     animate = true,
+    animateBack,
 }: ArtProps & {
     body: string;
     crest: string;
@@ -432,17 +433,19 @@ export function WaveBand({
     dur?: number;
     shift?: number;
     animate?: boolean;
+    animateBack?: boolean; // deep back-swell morph; defaults to `animate`. Set false on mobile to trim cost.
 }) {
     void id;
     const H = 400;
     const period = 980;
     const amp = 46;
+    const animBack = animateBack ?? animate;
     const bodyVals = crestValues(108, amp, period, H, 1, shift);
     const foamVals = crestValues(92, amp, period, H, 1, shift + 0.18); // rim leads the crest
     const backVals = deep ? crestValues(150, amp * 0.66, period * 1.36, H, -1, shift + 2.4) : '';
     return (
         <svg viewBox="0 0 3000 400" preserveAspectRatio="none" className={className} style={style} aria-hidden="true">
-            {deep ? <MorphWave values={backVals} dur={dur * 1.35} fill={deep} opacity={0.9} animate={animate} /> : null}
+            {deep ? <MorphWave values={backVals} dur={dur * 1.35} fill={deep} opacity={0.9} animate={animBack} /> : null}
             <MorphWave values={foamVals} dur={dur} fill={crest} animate={animate} />
             <MorphWave values={bodyVals} dur={dur} fill={body} animate={animate} />
         </svg>

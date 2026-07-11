@@ -500,10 +500,10 @@ export default function SeaToSky() {
                     <div className={styles.horizonHaze} />
 
                     <div className={`${styles.waveLayer} ${styles.wave2}`}>
-                        <WaveBand id="w2" body="#149fdc" crest="#8fe4ff" deep="#0e86c6" dur={13} shift={0} animate={!reduce} className={styles.waveSvg} />
+                        <WaveBand id="w2" body="#149fdc" crest="#8fe4ff" deep="#0e86c6" dur={13} shift={0} animate={!reduce} animateBack={!reduce && !isMobile} className={styles.waveSvg} />
                     </div>
                     <div className={`${styles.waveLayer} ${styles.wave3}`}>
-                        <WaveBand id="w3" body="#0d7fca" crest="#5fd0f5" deep="#0968ad" dur={10.5} shift={2.2} animate={!reduce} className={styles.waveSvg} />
+                        <WaveBand id="w3" body="#0d7fca" crest="#5fd0f5" deep="#0968ad" dur={10.5} shift={2.2} animate={!reduce} animateBack={!reduce && !isMobile} className={styles.waveSvg} />
                     </div>
 
                     {/* moonlight glitter path on the water — night only (--t) */}
@@ -557,13 +557,13 @@ export default function SeaToSky() {
                        out as the zoom dive begins, faint at night ── */}
                 <div className={styles.birdLayer} aria-hidden="true">
                     <div className={styles.flightA}>
-                        <Birds id="fa" animate={!reduce && !isMobile} className={styles.birdSvg} />
+                        <Birds id="fa" animate={!reduce} className={styles.birdSvg} />
                     </div>
                     <div className={styles.flightB}>
-                        <Birds id="fb" animate={!reduce && !isMobile} className={styles.birdSvg} />
+                        <Birds id="fb" animate={!reduce} className={styles.birdSvg} />
                     </div>
                     <div className={styles.flightC}>
-                        <Birds id="fc" animate={!reduce && !isMobile} className={styles.birdSvg} />
+                        <Birds id="fc" animate={!reduce} className={styles.birdSvg} />
                     </div>
                 </div>
 
