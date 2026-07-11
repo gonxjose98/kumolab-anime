@@ -75,9 +75,26 @@ async function persistSocialIds(
     const ids = buildSocialIds(social);
     if (Object.keys(ids).length === 0) return;
 
+    // MERGE into the existing social_ids rather than overwriting it. A blind
+    // overwrite dropped every key the publish result doesn't carry —
+    // publish_attempts (which broke BOTH the 5-attempt retry cap and the
+    // stuck-post health check, since they key off it), original_video_url (the
+    // immutable re-edit source), staged_video_path, scraped_at, etc.
+    const { data: existing } = await supabaseAdmin
+        .from('posts')
+        .select('social_ids')
+        .eq(target.column, target.value)
+        .maybeSingle();
+    const merged: Record<string, any> = { ...((existing?.social_ids as any) || {}), ...ids };
+    // A real broadcast landed → this post is no longer a pending retry. Clear
+    // the transient skip marker so the republish worker won't pick it up again
+    // and double-post. (Only on genuine success — a failed retry keeps it.)
+    const PLATFORM_KEYS = ['instagram_id', 'facebook_id', 'threads_id', 'tiktok_publish_id', 'youtube_video_id'];
+    if (PLATFORM_KEYS.some((k) => merged[k])) delete merged.skipped_reason;
+
     const { error } = await supabaseAdmin
         .from('posts')
-        .update({ social_ids: ids })
+        .update({ social_ids: merged })
         .eq(target.column, target.value);
 
     if (error) {
@@ -244,11 +261,18 @@ export async function publishScheduledPosts() {
         return;
     }
 
+    // Cap posts per tick, oldest-first. Without this, if auto-publish was
+    // paused (circuit breaker) and a backlog of approved posts all come due,
+    // one tick would fire them ALL to IG/FB/Threads at once — a rate-limit
+    // and timeline-spam risk. The queue then drains a few per hourly tick.
+    const MAX_PUBLISH_PER_TICK = 3;
     const { data: scheduledPosts, error } = await supabaseAdmin
         .from('posts')
         .select('*')
         .eq('status', 'approved')
-        .lte('scheduled_post_time', now.toISOString());
+        .lte('scheduled_post_time', now.toISOString())
+        .order('scheduled_post_time', { ascending: true })
+        .limit(MAX_PUBLISH_PER_TICK);
 
     if (error) {
         await logError({
@@ -291,8 +315,10 @@ export async function publishScheduledPosts() {
             console.log(`[Publisher] ${isRetry ? 'Retrying' : 'Publishing'} post: ${post.title}`);
 
             if (!isRetry) {
-                // Flip status up-front so a concurrent run can't double-publish.
-                const { error: updateError } = await supabaseAdmin
+                // Compare-and-swap: only flip if the row is STILL 'approved'.
+                // If an overlapping cron tick already claimed it, .select()
+                // returns zero rows and we skip — no double-publish.
+                const { data: flipped, error: updateError } = await supabaseAdmin
                     .from('posts')
                     .update({
                         status: 'published',
@@ -301,7 +327,9 @@ export async function publishScheduledPosts() {
                         published_at: now.toISOString(),
                         expires_at: expiresAt,
                     })
-                    .eq('id', post.id);
+                    .eq('id', post.id)
+                    .eq('status', 'approved')
+                    .select('id');
 
                 if (updateError) {
                     await logError({
@@ -309,6 +337,10 @@ export async function publishScheduledPosts() {
                         errorMessage: `Status flip failed for post ${post.id}: ${updateError.message}`,
                         context: { post_id: post.id, title: post.title, code: updateError.code },
                     });
+                    continue;
+                }
+                if (!flipped || flipped.length === 0) {
+                    console.log(`[Publisher] ${post.title} already claimed by another tick — skipping`);
                     continue;
                 }
             } else {
