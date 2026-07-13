@@ -259,6 +259,12 @@
     overflow: auto;
     flex: 1;
     min-height: 0;
+    /* Touch: dedicate horizontal swipes to scrubbing the timeline (vertical
+       swipes bubble up to scroll the page) and keep the pan from chaining
+       into the page's scroll at the ends. Without this the page grabs the
+       gesture and the timeline never scrolls. */
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
 }
 .admin-root .st-timeline__inner {
     position: relative;
@@ -321,6 +327,9 @@
     overflow: hidden;
     cursor: grab;
     user-select: none;
+    /* Claim touch drags for move/trim (the JS pointer handlers) instead of
+       letting the container scroll, so clips can be dragged on a phone. */
+    touch-action: none;
     display: flex;
     align-items: center;
     padding: 0 9px;
@@ -342,6 +351,7 @@
     width: 9px;
     cursor: ew-resize;
     background: rgba(255, 255, 255, 0.18);
+    touch-action: none;
 }
 .admin-root .st-clip__handle:hover { background: rgba(244, 200, 105, 0.5); }
 .admin-root .st-clip__handle--l { left: 0; }
