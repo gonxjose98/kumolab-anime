@@ -409,3 +409,77 @@
 /* Selects inside the dark studio inherit tokens but need explicit option color
    on some platforms. */
 .admin-root .st-root select.ak-field__input option { background: #0e1830; color: var(--ink); }
+
+/* ── Mobile: stack the editor into one scrollable column ──────────────────
+   The desktop grid (256px | 1fr | 320px) crushes the video preview to a
+   sliver and pushes the inspector off-screen on a phone. Below 820px we
+   restack: the video preview pins to the top (full width, watchable) while
+   the timeline, inspector controls, and media library scroll beneath it.
+   Most Studio edits happen on mobile, so this is the primary layout there. */
+@media (max-width: 820px) {
+    .admin-root .st-root {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto auto;
+        grid-template-areas:
+            "topbar"
+            "preview"
+            "timeline"
+            "inspector"
+            "library";
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Topbar and the video stay pinned while the tools scroll under them. */
+    .admin-root .st-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 6;
+        padding: 0 10px;
+        gap: 6px;
+    }
+    /* Compact the action buttons so Export never clips at 390px. */
+    .admin-root .st-topbar .ak-btn { padding: 6px 10px; font-size: 13px; }
+    /* Trim the topbar so Back, the title, and Export all fit one row:
+       drop the logo and the long clip subtitle, and let the title
+       truncate instead of wrapping to a second line. */
+    .admin-root .st-topbar__logo { display: none; }
+    .admin-root .st-topbar__sub { display: none; }
+    .admin-root .st-topbar__title {
+        font-size: 15px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 32vw;
+    }
+
+    .admin-root .st-preview {
+        position: sticky;
+        top: 52px;
+        z-index: 4;
+        height: 38vh;
+        min-height: 200px;
+        padding: 12px;
+        gap: 10px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    /* Panels flow with their content and the page scrolls, side borders
+       become top dividers, and inner scroll areas expand. */
+    .admin-root .st-panel,
+    .admin-root .st-inspector {
+        overflow: visible;
+        border-left: 0;
+        border-right: 0;
+        border-top: 1px solid var(--line);
+        box-shadow: none;
+    }
+    .admin-root .st-panel__body { overflow-y: visible; }
+
+    /* Timeline keeps a usable height and its own horizontal scroll. */
+    .admin-root .st-timeline { min-height: 190px; }
+
+    /* Roomier tap targets for the media thumbnails. */
+    .admin-root .st-media-grid { gap: 12px; }
+}
