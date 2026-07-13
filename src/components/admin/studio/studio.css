@@ -487,7 +487,14 @@
         border-top: 1px solid var(--line);
         box-shadow: none;
     }
-    .admin-root .st-panel__body { overflow-y: visible; }
+    /* flex:1 + flex-basis:0 collapses the body inside an auto grid row, so its
+       content overflowed and spilled over the panel below (the Media Import
+       button landed mid-Inspector). flex:none makes the body take its full
+       content height so the panel grows and the page simply scrolls. */
+    .admin-root .st-panel__body {
+        overflow-y: visible;
+        flex: none;
+    }
 
     /* Timeline keeps a usable height and its own horizontal scroll. */
     .admin-root .st-timeline { min-height: 190px; }
