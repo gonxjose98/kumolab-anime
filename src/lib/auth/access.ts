@@ -42,6 +42,10 @@ export interface Access {
     email: string | null;
     isOwner: boolean;
     perms: Perms;
+    /** Team member's display name (null for the owner or anyone without one set). */
+    name: string | null;
+    /** True when a one-time welcome animation is armed for this user's next login. */
+    welcomePending: boolean;
 }
 
 /**
@@ -57,15 +61,21 @@ export async function getAccess(): Promise<Access> {
     );
     const { data } = await supabase.auth.getUser();
     const email = data?.user?.email?.toLowerCase() ?? null;
-    if (!email) return { email: null, isOwner: false, perms: { ...NONE } };
-    if (email === OWNER_EMAIL) return { email, isOwner: true, perms: { ...ALL } };
+    if (!email) return { email: null, isOwner: false, perms: { ...NONE }, name: null, welcomePending: false };
+    if (email === OWNER_EMAIL) return { email, isOwner: true, perms: { ...ALL }, name: null, welcomePending: false };
 
     try {
         const { data: row } = await supabaseAdmin
-            .from('admin_users').select('permissions').eq('email', email).maybeSingle();
-        return { email, isOwner: false, perms: normalizePerms(row?.permissions) };
+            .from('admin_users').select('permissions, display_name, welcome_pending').eq('email', email).maybeSingle();
+        return {
+            email,
+            isOwner: false,
+            perms: normalizePerms(row?.permissions),
+            name: (row?.display_name as string) || null,
+            welcomePending: row?.welcome_pending === true,
+        };
     } catch {
-        return { email, isOwner: false, perms: { ...NONE } };
+        return { email, isOwner: false, perms: { ...NONE }, name: null, welcomePending: false };
     }
 }
 

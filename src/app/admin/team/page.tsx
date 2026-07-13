@@ -9,7 +9,7 @@ export default async function TeamPage() {
 
     const { data: rows } = await supabaseAdmin
         .from('admin_users')
-        .select('email, permissions, created_at')
+        .select('email, permissions, display_name, welcome_pending, created_at')
         .order('created_at', { ascending: true });
 
     const members: Member[] = (rows ?? [])
@@ -17,6 +17,8 @@ export default async function TeamPage() {
         .filter((r) => (r.email as string).toLowerCase() !== OWNER_EMAIL)
         .map((r) => ({
             email: r.email as string,
+            name: (r.display_name as string) || '',
+            welcome: r.welcome_pending === true,
             perms: normalizePerms(r.permissions) as Perms,
         }));
 

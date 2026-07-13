@@ -33,6 +33,13 @@ function cleanEmail(raw: unknown): string | null {
     return email;
 }
 
+/** A member's display name, trimmed and capped; empty → null (no name). */
+function cleanName(raw: unknown): string | null {
+    if (typeof raw !== 'string') return null;
+    const name = raw.trim().slice(0, 60);
+    return name.length ? name : null;
+}
+
 export async function POST(req: NextRequest) {
     const denied = await requireOwnerOr403();
     if (denied) return denied;
@@ -42,6 +49,8 @@ export async function POST(req: NextRequest) {
         const email = cleanEmail(body?.email);
         const password = typeof body?.password === 'string' ? body.password : '';
         const permissions = normalizePerms(body?.permissions);
+        const displayName = cleanName(body?.name);
+        const welcomePending = body?.welcome === true;
 
         if (!email) return NextResponse.json({ success: false, error: 'A valid email is required' }, { status: 400 });
         if (password.length < 8) return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 });
@@ -61,6 +70,8 @@ export async function POST(req: NextRequest) {
             user_id: created.user.id,
             email,
             permissions,
+            display_name: displayName,
+            welcome_pending: welcomePending,
             created_by: OWNER_EMAIL,
         });
         if (insertErr) {
@@ -84,10 +95,15 @@ export async function PUT(req: NextRequest) {
         const body = await req.json().catch(() => ({}));
         const email = cleanEmail(body?.email);
         const permissions = normalizePerms(body?.permissions);
+        const displayName = cleanName(body?.name);
+        const welcomePending = body?.welcome === true;
         if (!email) return NextResponse.json({ success: false, error: 'A valid email is required' }, { status: 400 });
         if (email === OWNER_EMAIL) return NextResponse.json({ success: false, error: 'The owner cannot be edited.' }, { status: 400 });
 
-        const { error } = await supabaseAdmin.from('admin_users').update({ permissions }).eq('email', email);
+        const { error } = await supabaseAdmin
+            .from('admin_users')
+            .update({ permissions, display_name: displayName, welcome_pending: welcomePending })
+            .eq('email', email);
         if (error) return NextResponse.json({ success: false, error: error.message }, { status: 400 });
 
         await logAction({ action: 'team_member_updated', entityType: 'admin_user', entityId: email, actor: 'Owner', reason: `Updated permissions for ${email}` }).catch(() => {});

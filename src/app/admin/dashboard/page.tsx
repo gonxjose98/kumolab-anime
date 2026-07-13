@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { getAccess } from '@/lib/auth/access';
+import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
 import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
 import { getScheduleRows } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
@@ -224,16 +225,20 @@ export default async function DashboardPage() {
     const { stats } = data;
     const access = await getAccess();
     const canReview = access.isOwner || access.perms.pending;
+    // First name only keeps the greeting tight ("Welcome back, Jonathan").
+    const firstName = access.name ? access.name.trim().split(/\s+/)[0] : '';
+    const showWelcome = access.welcomePending && !!access.name;
 
     const stormy = stats.errors24h > 0;
 
     return (
         <div className="flex flex-col gap-6">
+            {showWelcome && <WelcomeGate name={access.name!.trim()} />}
             {/* ── Weather-status hero ──────────────────────────────── */}
             <div className={`ak-card ak-weather ${stormy ? 'ak-weather--storm' : 'ak-weather--clear'}`}>
                 <div>
                     <div className="ak-overline" style={{ marginBottom: '4px' }}>本部 · Command Center</div>
-                    <div className="ak-display" style={{ fontSize: '22px' }}>Welcome back</div>
+                    <div className="ak-display" style={{ fontSize: '22px' }}>{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
                 </div>
                 <div className="ak-weather__status">
                     <span className="ak-weather__glyph" aria-hidden="true" />
