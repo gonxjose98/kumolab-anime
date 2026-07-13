@@ -38,7 +38,7 @@ const DIVE_MS = 5000;
 const DIVE_DELAY = 150;
 const LEAVE_AT = 6300;
 const LEAVE_AT_REDUCED = 1600;
-const EXIT_MS = 650;
+const EXIT_MS = 1000;
 
 /* == Layer placements: the homepage's own choreography ================
    Same viewport coordinates as SeaToSky (top in vh, left in %), kept

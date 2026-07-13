@@ -45,8 +45,14 @@
 }
 
 .overlay.leaving {
-    animation: overlayOut 0.65s ease both;
+    animation: overlayOut 1s cubic-bezier(0.4, 0, 0.2, 1) both;
     pointer-events: none;
+}
+
+/* The greeting lifts and clears a touch ahead of the sky, so the exit
+   reads as rising away into the light rather than a flat cut. */
+.overlay.leaving .card {
+    animation: cardOut 0.85s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 /* == SKY PANORAMA: the exact homepage zenith-to-horizon gradient.
@@ -91,7 +97,6 @@
     position: absolute;
     max-width: 200px;
     opacity: 0.92;
-    filter: drop-shadow(0 4px 14px rgba(30, 90, 160, 0.12));
     animation: cloudSway 20s ease-in-out infinite alternate;
 }
 
@@ -369,10 +374,6 @@
     animation: cloudSway ease-in-out infinite alternate;
 }
 
-.cloudDriftN {
-    filter: drop-shadow(0 18px 30px rgba(20, 70, 140, 0.18));
-}
-
 .cloudSvg {
     display: block;
     width: 100%;
@@ -414,7 +415,6 @@
 .frameCloud {
     position: absolute;
     height: auto;
-    filter: drop-shadow(0 10px 24px rgba(30, 90, 160, 0.14));
     animation: cloudSway 22s ease-in-out infinite alternate;
 }
 
@@ -545,9 +545,7 @@
     padding: 8px 16px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.4);
-    background: rgba(14, 42, 84, 0.32);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(14, 42, 84, 0.5);
     font-family: var(--ak-sans, 'Inter', system-ui, sans-serif);
     font-size: 0.82rem;
     letter-spacing: 0.08em;
@@ -572,8 +570,31 @@
 }
 
 @keyframes overlayOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    60% {
+        opacity: 0.7;
+    }
+    to {
+        opacity: 0;
+        transform: scale(1.06);
+    }
+}
+
+/* the greeting drifts up and softens as we rise away */
+@keyframes cardOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-3vh);
+        filter: blur(3px);
+    }
 }
 
 @keyframes fadeIn {
