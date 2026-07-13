@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Upload, Plus, Type } from 'lucide-react';
+import { Upload, Plus, Type, ChevronDown } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { useMediaStore } from './store/mediaStore';
@@ -15,6 +15,8 @@ export default function MediaLibrary() {
     const fileRef = useRef<HTMLInputElement | null>(null);
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
+    // Collapsible on mobile (a dropdown); always expanded on desktop via CSS.
+    const [open, setOpen] = useState(false);
 
     if (!project) return null;
 
@@ -45,12 +47,15 @@ export default function MediaLibrary() {
     }
 
     return (
-        <div className="st-panel st-library">
-            <div className="st-panel__head">
+        <div className={`st-panel st-library ${open ? 'st-library--open' : ''}`}>
+            <div className="st-panel__head st-library__head" onClick={() => setOpen((o) => !o)}>
                 <span className="ak-overline">Media</span>
-                <button className="ak-btn ak-btn--secondary ak-btn--sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-                    <Upload size={13} /> {busy ? '…' : 'Import'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button className="ak-btn ak-btn--secondary ak-btn--sm" disabled={busy} onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}>
+                        <Upload size={13} /> {busy ? '…' : 'Import'}
+                    </button>
+                    <ChevronDown size={16} className="st-collapse-chevron" aria-hidden />
+                </div>
                 <input ref={fileRef} type="file" accept="video/*,audio/*,image/*" multiple hidden onChange={(e) => importFiles(e.target.files)} />
             </div>
             <div className="st-panel__body">

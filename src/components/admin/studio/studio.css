@@ -114,6 +114,8 @@
     flex: 1;
     min-height: 0;
 }
+/* The Media collapse chevron only exists on mobile (see the mobile block). */
+.admin-root .st-collapse-chevron { display: none; }
 
 /* ── Media library ───────────────────────────────────────────────────────*/
 .admin-root .st-media-grid {
@@ -492,4 +494,16 @@
 
     /* Roomier tap targets for the media thumbnails. */
     .admin-root .st-media-grid { gap: 12px; }
+
+    /* Media becomes a dropdown on mobile: tap the header to expand the
+       assets + Add text; collapsed by default so it doesn't eat the page. */
+    .admin-root .st-library__head { cursor: pointer; }
+    .admin-root .st-collapse-chevron {
+        display: inline-flex;
+        color: var(--ink-2);
+        transition: transform 0.2s ease;
+        flex: none;
+    }
+    .admin-root .st-library--open .st-collapse-chevron { transform: rotate(180deg); }
+    .admin-root .st-library:not(.st-library--open) .st-panel__body { display: none; }
 }

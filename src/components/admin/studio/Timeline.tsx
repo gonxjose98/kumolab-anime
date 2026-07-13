@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import type { Clip, Track } from './types';
@@ -11,7 +11,26 @@ export default function Timeline() {
     const selectedClipIds = useProjectStore((s) => s.selectedClipIds);
     const pxPerSec = usePlaybackStore((s) => s.pxPerSec);
     const currentTime = usePlaybackStore((s) => s.currentTime);
+    const isPlaying = usePlaybackStore((s) => s.isPlaying);
     const scrollRef = useRef<HTMLDivElement | null>(null);
+
+    // While playing, keep the timeline scrolled so the playhead stays put —
+    // the video scrubs the strip past the head instead of the head running off
+    // screen. The scroll handler ignores these programmatic scrolls (it only
+    // scrubs while paused), so there's no feedback loop.
+    useEffect(() => {
+        if (!isPlaying) return;
+        const scroll = scrollRef.current;
+        if (!scroll) return;
+        let raf = 0;
+        const follow = () => {
+            const pb = usePlaybackStore.getState();
+            scroll.scrollLeft = pb.currentTime * pb.pxPerSec;
+            raf = requestAnimationFrame(follow);
+        };
+        raf = requestAnimationFrame(follow);
+        return () => cancelAnimationFrame(raf);
+    }, [isPlaying]);
 
     if (!project) return null;
 
@@ -24,6 +43,23 @@ export default function Timeline() {
         const rect = scroll.getBoundingClientRect();
         const x = e.clientX - rect.left + scroll.scrollLeft - TRACK_HEADER_W;
         usePlaybackStore.getState().setCurrentTime(Math.max(0, x / pxPerSec));
+    };
+
+    // Scrolling/swiping the timeline scrubs the video: the scroll position
+    // drives currentTime so the preview follows the strip. Guarded to only run
+    // while paused, so the play-follow effect above doesn't re-trigger it.
+    const onScrub = () => {
+        if (usePlaybackStore.getState().isPlaying) return;
+        const scroll = scrollRef.current;
+        if (!scroll) return;
+        const t = scroll.scrollLeft / usePlaybackStore.getState().pxPerSec;
+        usePlaybackStore.getState().setCurrentTime(Math.min(project.durationSec, Math.max(0, t)));
+    };
+
+    // Grabbing the timeline during playback pauses it, so the swipe scrubs
+    // rather than fighting the auto-follow.
+    const onGrab = () => {
+        if (usePlaybackStore.getState().isPlaying) usePlaybackStore.getState().pause();
     };
 
     // Ruler ticks — every 1s, labeled every 5s (adapt when zoomed out).
@@ -39,7 +75,7 @@ export default function Timeline() {
                 <span className="ak-caption" style={{ marginLeft: 4 }}>{fmt(currentTime)} / {fmt(project.durationSec)}</span>
             </div>
 
-            <div className="st-timeline__scroll" ref={scrollRef}>
+            <div className="st-timeline__scroll" ref={scrollRef} onScroll={onScrub} onPointerDown={onGrab}>
                 <div className="st-timeline__inner" style={{ width: width + TRACK_HEADER_W, display: 'flex' }}>
                     {/* Sticky track-header rail */}
                     <div className="st-thead">
