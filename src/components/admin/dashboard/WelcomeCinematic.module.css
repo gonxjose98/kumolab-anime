@@ -1,39 +1,53 @@
-/* ══ WelcomeCinematic — "Through the Straw Hat" ═════════════════════════════
-   A one-time anime-adventure homage over the command center. Act I: a
-   sunrise seascape — gold sun low on the horizon, rolling cel waves, a
-   small boat, and on it an ORIGINAL backlit straw-hat voyager silhouette,
-   one arm raised, hat held up to the sky. The camera pushes in slowly,
-   then accelerates and zooms THROUGH the hat crown (warm bloom). Act II:
-   we emerge into open dawn sky — an iris ring, soft cumulus parting —
-   and the greeting reveals: ようこそ → the name snapping in with an
-   impact ring → a glint sweep → the subtitle. Then a graceful fade.
+/* == WelcomeCinematic: "Past the Straw Hat" ==================================
+   A one-time welcome over the command center, set in the SAME world as the
+   homepage SeaToSky hero: the exact daytime sky gradient, the same warm sun
+   core with soft glow and faint god-rays, and the original cel cumulus art
+   (imported from redesign-sky/art). Low-center, back to camera, an ORIGINAL
+   cel-shaded voyager stands above a sunlit cloud bank, both arms raised in a
+   triumphant V, a woven straw hat crowned against the light.
 
-   Timeline (s):  0.0 overlay in · 0.1 sun bloom · 0.25 voyager in ·
-   0.25→4.1 camera push → zoom-through (origin anchored on the hat) ·
-   3.35→4.85 bloom flash · 3.8 sky stage in · 3.95 iris ring ·
-   4.15 hat motif · 4.3 ようこそ · 4.7 "Welcome," · 4.95 name impact +
-   ring · 5.5 subtitle · 5.9 glint · 6.3 exit fade · ~6.95 onDone.
+   The camera mirrors the homepage dolly-in: every layer shares one
+   transform-origin at the hat crown (--ax, --ay) and scales up in lockstep
+   with its own magnitude, near layers hardest, the sky gently, exactly like
+   the homepage's --z model (near x(1+3.4z), mid x(1+2.1z), sky x(1+0.5z)),
+   here baked into per-layer keyframes on a common 4.5s clock. The camera
+   climbs the figure, the peripheral cumulus balloon and sweep past the frame
+   edges, the hat crown grows and slips below the lens (we rise OVER it, with
+   a warm bloom), and we emerge into open bright sky where fresh cumulus
+   settle and the greeting lands.
 
-   Anchor math: the voyager SVG (viewBox 200×260) has its hat crown at
-   y≈36 and its waterline at y≈218. The art is placed so the waterline
-   sits on --horizon, hence the hat lives at
-   (--horizon − 0.91 × --heroW) — that exact point is the camera's
-   transform-origin, so the zoom stays locked on the hat at every
-   aspect ratio (tall phone or wide desktop alike).
+   Timeline (s): 0.0 overlay in / 0.15 to 0.9 settle breath / 0.9 to 3.85
+   dolly forward and up (clouds sweep past; god-rays swell mid-climb) /
+   3.55 to 4.9 bloom as we clear the hat / 3.8 emergence field settles /
+   4.35 hat motif / 4.5 yokoso / 4.85 "Welcome," / 5.1 name impact + ring /
+   5.6 subtitle / 5.9 glint / 6.3 exit fade / ~6.95 onDone.
 
-   Theme: built from the on-rail palette (--rail, --rail-text, --gold-*,
-   --gold-grad) so it adapts to light/dark automatically. */
+   Anchor math: the voyager SVG (viewBox 320x360) has its hat-crown
+   pass-over point at y = 44, i.e. 12.2% of the art height. The art is
+   placed with translate(-50%, -12.2%) at (--ax, --ay), and every dolly rig
+   uses (--ax, --ay) as transform-origin, so the rise past the hat stays
+   locked on the crown on tall phones and wide desktops alike.
+
+   Theme: the sky and character use the concrete homepage palette (a
+   full-bleed sky, identical in light and dark). The greeting/UI text uses
+   the theme tokens (--gold-grad, --gold-hover, --rail-text) so both themes
+   adapt. */
 
 .overlay {
-    --horizon: 63%;
-    --heroW: clamp(150px, 32vmin, 250px);
+    /* the camera anchor: the hat crown */
+    --ax: 50%;
+    --ay: 46%;
+    /* figure width: blends vh and vw so the pose reads on tall phones
+       AND wide desktops (about 80vw at 390px portrait, capped on 1440+) */
+    --figW: clamp(250px, 32vh + 10vw, 470px);
     position: fixed;
     inset: 0;
     z-index: 200;
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--rail, #123a80);
+    /* fallback matches the sky's mid band while layers mount */
+    background: #79c2f6;
     animation: overlayIn 0.5s ease-out both;
 }
 
@@ -42,270 +56,252 @@
     pointer-events: none;
 }
 
-/* ── Act I: the camera rig ────────────────────────────────────────
-   Everything in the seascape lives inside .camera; a single transform
-   (scale about the hat point) is the push AND the zoom-through. */
-.camera {
+/* == THE SKY: exact homepage zenith-to-horizon gradient ================
+   Oversized above the viewport so the dolly (scale 1.5 + downward
+   translate, the homepage sky model) climbs into deeper zenith blue. */
+.skyRig {
     position: absolute;
     inset: 0;
     z-index: 1;
-    transform-origin: 50% calc(var(--horizon) - var(--heroW) * 0.91);
+    transform-origin: var(--ax) var(--ay);
     will-change: transform;
-    background:
-        linear-gradient(
-            180deg,
-            var(--rail, #123a80) 0%,
-            color-mix(in srgb, var(--rail, #123a80) 58%, #2472dc) 40%,
-            color-mix(in srgb, var(--rail, #123a80) 30%, #f0a028) 63%,
-            color-mix(in srgb, var(--rail, #123a80) 52%, #0d7fca) 63.2%,
-            color-mix(in srgb, var(--rail, #123a80) 72%, #041a33) 100%
-        );
-    animation:
-        camJourney 3.85s cubic-bezier(0.45, 0, 0.55, 1) 0.25s both,
-        camFade 0.4s ease 4s both;
+    animation: diveSky 4.5s linear 0.15s both;
 }
 
-/* god-rays: a slow conic fan pivoting on the sun point at the horizon */
-.rays {
+.sky {
     position: absolute;
-    left: 50%;
-    bottom: calc(100% - var(--horizon));
-    width: 220vmax;
-    height: 220vmax;
-    transform: translate(-50%, 50%);
-    border-radius: 50%;
-    background: repeating-conic-gradient(
-        from 0deg,
-        rgba(255, 215, 110, 0.075) 0deg 5deg,
-        transparent 5deg 13deg
+    left: -25vw;
+    right: -25vw;
+    top: -160vh;
+    height: 260vh;
+    background: linear-gradient(
+        180deg,
+        #2472dc 0%,
+        #2e84e7 16%,
+        #429aee 32%,
+        #58acf2 46%,
+        #79c2f6 60%,
+        #9bd4f9 72%,
+        #bce6fc 82%,
+        #dcf3fe 91%,
+        #f2fbff 100%
     );
-    -webkit-mask-image: radial-gradient(closest-side, #000 0%, transparent 62%);
-    mask-image: radial-gradient(closest-side, #000 0%, transparent 62%);
-    animation:
-        raysIn 1.2s ease 0.35s both,
-        raysSpin 90s linear 0.35s infinite;
 }
 
-/* the rising sun — the voyager stands backlit dead-centre in its bloom */
-.sun {
+/* == ANCHORED SUN: homepage core + glow + faint god-rays ==============
+   The light stays anchored while the world scales around it (the
+   homepage orrery behavior); it swells gently as the climb peaks. */
+.light {
     position: absolute;
     left: 50%;
-    bottom: calc(100% - var(--horizon));
-    width: clamp(170px, 44vmin, 400px);
+    top: 10%;
+    width: clamp(84px, 15vmin, 140px);
     aspect-ratio: 1;
-    transform: translate(-50%, 52%);
+    z-index: 2;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: sunSwell 4.5s linear 0.15s both;
+}
+
+.sunCore {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fffdf4 0%, #fff4cb 54%, #ffe199 100%);
+    box-shadow:
+        0 0 34px 10px rgba(255, 244, 200, 0.85),
+        0 0 120px 60px rgba(255, 232, 170, 0.4);
+}
+
+.sunGlow {
+    position: absolute;
+    inset: -140%;
     border-radius: 50%;
     background: radial-gradient(
-        closest-side,
-        #fff3d0 0%,
-        var(--gold-hover, #ffca66) 26%,
-        rgba(255, 178, 80, 0.55) 48%,
-        transparent 72%
+        circle,
+        rgba(255, 242, 194, 0.6) 0%,
+        rgba(255, 222, 150, 0.28) 34%,
+        transparent 66%
     );
-    animation: sunBloom 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) 0.1s both;
+    animation: glowSwell 4.5s linear 0.15s both;
 }
 
-/* soft cel clouds drifting high in the frame */
-.cloud {
+/* subtle conic god-rays: the reference sky is bright and hazy, so these
+   stay faint and only swell while we climb through the cloud line */
+.godrays {
     position: absolute;
-    height: 16vmin;
+    inset: -300%;
     border-radius: 50%;
-    background: radial-gradient(50% 62% at 50% 58%, rgba(255, 255, 255, 0.15), transparent 72%);
-    filter: blur(6px);
-}
-
-.cloudA {
-    top: 7%;
-    left: -6%;
-    width: 44vmin;
-    animation: cloudDrift 26s ease-in-out 0s infinite alternate;
-}
-
-.cloudB {
-    top: 15%;
-    right: -5%;
-    width: 36vmin;
-    animation: cloudDrift 32s ease-in-out -9s infinite alternate-reverse;
-}
-
-/* glowing dawn line where sea meets sky */
-.horizonGlow {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: var(--horizon);
-    height: 2px;
-    z-index: 2;
-    background: linear-gradient(90deg, transparent 6%, rgba(255, 214, 110, 0.8) 50%, transparent 94%);
-    box-shadow: 0 0 18px 4px rgba(255, 190, 90, 0.35);
-    filter: blur(0.5px);
-    animation: fadeIn 1.2s ease 0.5s both;
-}
-
-/* ── Rolling cel waves — 200%-wide periodic strips, drifted by
-      exactly one period (−25%) for a seamless loop ── */
-.waveBack,
-.waveFront {
-    position: absolute;
-    left: 0;
-    width: 200%;
-    animation: waveDrift 13s linear infinite;
-}
-
-.waveBack {
-    top: calc(var(--horizon) - 1.2%);
-    height: 8%;
-    z-index: 3;
-}
-
-.waveFront {
-    top: calc(var(--horizon) + 1.5%);
-    height: 19%;
-    z-index: 5;
-    animation-duration: 8.5s;
-    animation-direction: reverse;
-}
-
-.waveSvg {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-/* ── The voyager — boat + silhouette + raised straw hat ──
-      Placed so the SVG waterline (y=218/260 → 83.8% of its height)
-      sits exactly on --horizon; gentle bob about the hull. */
-.hero {
-    position: absolute;
-    left: 50%;
-    top: var(--horizon);
-    width: var(--heroW);
-    z-index: 4;
-    transform: translate(-50%, -83.8%);
-    transform-origin: 50% 80%;
-    filter: drop-shadow(0 0 18px rgba(255, 196, 96, 0.28));
+    opacity: 0.25;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(255, 244, 200, 0) 0deg,
+        rgba(255, 244, 200, 0.5) 3deg,
+        rgba(255, 244, 200, 0) 8deg
+    );
+    -webkit-mask: radial-gradient(circle, #000 6%, transparent 60%);
+    mask: radial-gradient(circle, #000 6%, transparent 60%);
     animation:
-        heroIn 0.9s ease 0.25s both,
-        heroBob 5.6s ease-in-out infinite;
+        raySpin 64s linear infinite,
+        raysSwell 4.5s linear 0.15s both;
 }
 
-/* gold sea-sparkle motes rising off the water */
+/* == CLOUD LAYERS: homepage cel cumulus, corner-anchored =============== */
+.cel {
+    position: absolute;
+    height: auto;
+    filter: drop-shadow(0 10px 24px rgba(30, 90, 160, 0.14));
+    animation: cloudFloat 20s ease-in-out infinite alternate;
+}
+
+.midRig {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    transform-origin: var(--ax) var(--ay);
+    will-change: transform;
+    animation: diveMid 4.5s linear 0.15s both;
+}
+
+/* the voyager rig: scales hardest (the camera's target), then translates
+   down so the hat crown slips below the lens as we rise over it */
+.figureRig {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    transform-origin: var(--ax) var(--ay);
+    will-change: transform, opacity;
+    animation: diveFigure 4.5s linear 0.15s both;
+}
+
+.voyager {
+    position: absolute;
+    left: var(--ax);
+    top: var(--ay);
+    width: var(--figW);
+    height: auto;
+    /* hat-crown pass-over point (y = 44 of 360) sits ON the anchor */
+    transform: translate(-50%, -12.2%);
+    /* soft backlit halo, sun overhead */
+    filter: drop-shadow(0 0 28px rgba(255, 240, 200, 0.38));
+}
+
+.bankRig {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    transform-origin: var(--ax) var(--ay);
+    will-change: transform;
+    animation: diveBank 4.5s linear 0.15s both;
+}
+
+.wispRig {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    transform-origin: var(--ax) var(--ay);
+    will-change: transform, opacity;
+    animation: diveWisp 4.5s linear 0.15s both;
+    pointer-events: none;
+}
+
+/* == LENS FLARES: soft camera-space orbs drifting off the sun ========== */
+.flare {
+    position: absolute;
+    z-index: 7;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: flarePulse 5s ease-in-out infinite alternate;
+}
+
+.flareA {
+    left: 38%;
+    top: 30%;
+    width: 9vmin;
+    aspect-ratio: 1;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 68%);
+}
+
+.flareB {
+    left: 58%;
+    top: 44%;
+    width: 6vmin;
+    aspect-ratio: 1;
+    background: radial-gradient(circle, rgba(205, 238, 195, 0.24) 0%, transparent 66%);
+    animation-delay: -1.7s;
+}
+
+.flareC {
+    left: 66%;
+    top: 20%;
+    width: 11vmin;
+    aspect-ratio: 1;
+    background: radial-gradient(circle, rgba(255, 250, 228, 0.26) 0%, transparent 70%);
+    animation-delay: -3.2s;
+}
+
+/* == EMERGENCE: fresh sunlit cumulus settle from too-close to at-rest == */
+.emergeField {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    transform-origin: var(--ax) var(--ay);
+    will-change: transform, opacity;
+    animation: emergeIn 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) 3.8s both;
+}
+
+/* == LIGHT MOTES rising through the ascent ============================= */
 .sparkles {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 6%;
-    height: 30%;
-    z-index: 6;
+    bottom: 0;
+    height: 42%;
+    z-index: 7;
+    pointer-events: none;
 }
 
 .sparkle {
     position: absolute;
-    bottom: 0;
+    bottom: 4%;
     border-radius: 50%;
-    background: #ffe9b0;
-    box-shadow: 0 0 10px 2px rgba(255, 214, 110, 0.55);
+    background: #ffffff;
+    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.7);
     opacity: 0;
     animation: sparkleRise var(--du, 3.5s) linear var(--de, 0s) infinite;
 }
 
-/* gentle cinematic vignette */
-.vignette {
+/* airy bright edge haze (the reference frame is hazy, never dark) */
+.haze {
     position: absolute;
     inset: 0;
-    z-index: 7;
-    background: radial-gradient(120% 120% at 50% 44%, transparent 55%, rgba(4, 10, 28, 0.5) 100%);
+    z-index: 8;
+    pointer-events: none;
+    background: radial-gradient(120% 120% at 50% 46%, transparent 55%, rgba(236, 249, 255, 0.38) 100%);
+    animation: fadeIn 1.2s ease 0.3s both;
 }
 
-/* ── Act II: the open dawn sky beyond the hat ─────────────────── */
-.skyStage {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    opacity: 0;
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--rail, #123a80) 30%, #7fc2f0) 0%,
-            color-mix(in srgb, var(--rail, #123a80) 12%, #bfe2fa) 44%,
-            color-mix(in srgb, var(--rail, #123a80) 8%, #ffe6ae) 100%
-        );
-    animation: skyIn 0.85s ease 3.8s both;
-}
-
-/* warm heart of the sky, where the greeting lands */
-.skyCore {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-        72% 58% at 50% 58%,
-        rgba(255, 240, 200, 0.65) 0%,
-        rgba(255, 226, 160, 0.28) 46%,
-        transparent 74%
-    );
-}
-
-/* the "emergence" — clouds settle from slightly-too-close to at-rest */
-.puffField {
-    position: absolute;
-    inset: 0;
-    animation: fieldSettle 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) 3.85s both;
-}
-
-.puff {
-    position: absolute;
-    border-radius: 50%;
-    background: radial-gradient(50% 60% at 50% 55%, rgba(255, 255, 255, 0.92), transparent 70%);
-    filter: blur(7px);
-    animation:
-        puffIn 1.1s ease 3.95s both,
-        puffDrift 30s ease-in-out infinite alternate;
-}
-
-.puffA { top: 9%; left: -4%; width: 46vmin; height: 15vmin; }
-.puffB { top: 20%; right: -6%; width: 40vmin; height: 13vmin; animation-delay: 4.05s, -8s; animation-duration: 1.1s, 34s; }
-.puffC { bottom: 16%; left: 4%; width: 36vmin; height: 12vmin; animation-delay: 4.15s, -16s; animation-duration: 1.1s, 27s; }
-.puffD { bottom: 8%; right: 2%; width: 44vmin; height: 14vmin; animation-delay: 4.1s, -4s; animation-duration: 1.1s, 38s; }
-.puffE { top: 40%; left: -8%; width: 30vmin; height: 10vmin; animation-delay: 4.2s, -22s; animation-duration: 1.1s, 31s; }
-
-/* iris ring of light — the hat opening handing off to the wide sky */
-.iris {
-    position: absolute;
-    left: 50%;
-    top: 46%;
-    width: clamp(180px, 46vmin, 420px);
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 244, 214, 0.9);
-    box-shadow:
-        0 0 40px rgba(255, 220, 140, 0.5),
-        inset 0 0 30px rgba(255, 220, 140, 0.35);
-    transform: translate(-50%, -50%) scale(0.2);
-    opacity: 0;
-    animation: irisBurst 1.15s cubic-bezier(0.2, 0.7, 0.3, 1) 3.95s both;
-}
-
-/* ── The pass-through bloom ───────────────────────────────────── */
+/* == THE PASS-OVER BLOOM: warm sunlight as we clear the hat crown ====== */
 .bloom {
     position: absolute;
     inset: 0;
-    z-index: 3;
+    z-index: 9;
     opacity: 0;
     pointer-events: none;
     background: radial-gradient(
-        120% 120% at 50% 44%,
-        #fff6dd 0%,
-        #ffe3a1 45%,
-        rgba(255, 214, 130, 0.9) 70%,
-        rgba(255, 203, 112, 0.65) 100%
+        120% 120% at 50% 42%,
+        #fffdf4 0%,
+        #fff4cb 46%,
+        rgba(255, 231, 172, 0.9) 72%,
+        rgba(255, 225, 153, 0.7) 100%
     );
-    animation: bloomFlash 1.5s ease-in-out 3.35s both;
+    animation: bloomFlash 1.35s ease-in-out 3.55s both;
 }
 
-/* ── Greeting card ────────────────────────────────────────────── */
+/* == GREETING CARD ===================================================== */
 .card {
     position: relative;
-    z-index: 4;
+    z-index: 10;
     display: grid;
     justify-items: center;
     gap: clamp(10px, 2.4vmin, 18px);
@@ -315,14 +311,14 @@
     text-align: center;
 }
 
-/* small straw-hat motif crowning the greeting */
+/* small worn-hat motif crowning the greeting */
 .hatMark {
     width: clamp(34px, 6vmin, 46px);
-    filter: drop-shadow(0 3px 10px rgba(120, 80, 10, 0.35));
-    animation: fadeUp 0.6s ease 4.15s both;
+    filter: drop-shadow(0 3px 10px rgba(24, 74, 140, 0.35));
+    animation: fadeUp 0.6s ease 4.35s both;
 }
 
-/* ようこそ — gold accent word, letters condensing into place */
+/* yokoso: gold accent word, letters condensing into place */
 .kana {
     font-family: var(--ak-display, var(--font-display, 'Outfit', sans-serif));
     font-weight: 600;
@@ -333,8 +329,8 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(0 1px 6px rgba(120, 80, 10, 0.3));
-    animation: kanaIn 0.8s ease 4.3s both;
+    filter: drop-shadow(0 2px 10px rgba(20, 80, 160, 0.35));
+    animation: kanaIn 0.8s ease 4.5s both;
 }
 
 .greeting {
@@ -351,15 +347,18 @@
     font-weight: 500;
     font-size: clamp(1rem, 2.8vmin, 1.35rem);
     letter-spacing: 0.05em;
-    color: color-mix(in srgb, var(--rail, #123a80) 86%, #041022);
-    animation: fadeUp 0.55s ease 4.7s both;
+    color: var(--rail-text, rgba(242, 249, 255, 0.9));
+    text-shadow:
+        0 2px 18px rgba(16, 72, 140, 0.55),
+        0 1px 4px rgba(16, 72, 140, 0.35);
+    animation: fadeUp 0.55s ease 4.85s both;
 }
 
 .nameWrap {
     position: relative;
     display: inline-block;
     max-width: 100%;
-    filter: drop-shadow(0 6px 28px rgba(255, 190, 90, 0.3));
+    filter: drop-shadow(0 6px 28px rgba(20, 80, 160, 0.35));
 }
 
 /* the name: impact snap-in, then a glint sweeping the letterforms.
@@ -383,8 +382,8 @@
     background-clip: text;
     color: transparent;
     animation:
-        nameIn 0.85s cubic-bezier(0.2, 0.9, 0.3, 1) 4.95s both,
-        nameGlint 1.15s ease-in-out 5.9s both;
+        nameIn 0.85s cubic-bezier(0.2, 0.9, 0.3, 1) 5.1s both,
+        nameGlint 1.1s ease-in-out 5.9s both;
 }
 
 /* impact ring bursting outward as the name lands */
@@ -395,37 +394,39 @@
     width: clamp(170px, 42vmin, 340px);
     aspect-ratio: 1;
     border-radius: 50%;
-    border: 2px solid rgba(255, 214, 110, 0.7);
+    border: 2px solid rgba(255, 244, 204, 0.85);
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0;
-    animation: ringBurst 0.9s ease-out 5.05s both;
+    animation: ringBurst 0.9s ease-out 5.2s both;
 }
 
 .sub {
     font-family: var(--ak-sans, 'Inter', system-ui, sans-serif);
     font-size: clamp(0.78rem, 2.2vmin, 0.95rem);
     letter-spacing: 0.22em;
-    color: color-mix(in srgb, var(--rail, #123a80) 80%, #041022);
-    animation: fadeUp 0.7s ease 5.5s both;
+    color: var(--rail-text, rgba(242, 249, 255, 0.9));
+    text-shadow:
+        0 2px 16px rgba(16, 72, 140, 0.55),
+        0 1px 4px rgba(16, 72, 140, 0.35);
+    animation: fadeUp 0.7s ease 5.6s both;
 }
 
-/* ── Skip affordance ──────────────────────────────────────────── */
-
+/* == SKIP AFFORDANCE =================================================== */
 .skip {
     position: absolute;
-    z-index: 5;
+    z-index: 11;
     right: clamp(14px, 3vw, 28px);
     bottom: calc(clamp(14px, 3vw, 28px) + env(safe-area-inset-bottom, 0px));
     padding: 8px 16px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 215, 110, 0.35);
-    background: rgba(20, 30, 60, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(14, 42, 84, 0.32);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     font-family: var(--ak-sans, 'Inter', system-ui, sans-serif);
     font-size: 0.82rem;
     letter-spacing: 0.08em;
-    color: rgba(242, 249, 255, 0.85);
+    color: var(--rail-text, rgba(242, 249, 255, 0.85));
     cursor: pointer;
     transition: color 0.2s ease, border-color 0.2s ease;
     animation: fadeIn 0.6s ease 1s both;
@@ -433,12 +434,12 @@
 
 .skip:hover,
 .skip:focus-visible {
-    color: var(--rail-text-active, #ffd76e);
-    border-color: rgba(255, 215, 110, 0.7);
+    color: var(--gold-hover, #ffca66);
+    border-color: rgba(255, 231, 166, 0.8);
     outline: none;
 }
 
-/* ── Keyframes ────────────────────────────────────────────────── */
+/* == KEYFRAMES ========================================================= */
 
 @keyframes overlayIn {
     from { opacity: 0; }
@@ -468,25 +469,168 @@
     }
 }
 
-/* the whole journey: slow push (anticipation), then the accelerating
-   zoom THROUGH the hat — one transform, origin locked on the hat */
-@keyframes camJourney {
+/* THE DOLLY: one 4.5s clock, per-layer magnitudes, shared beats.
+   0 to 16%: settle breath / 16 to 55%: the push builds / 55 to 82%:
+   the through-the-clouds sweep and the rise past the hat / 82 to 100%:
+   ease out into the open sky. Timing functions shape each segment. */
+
+/* sky: gentle scale + downward glide into deeper zenith blue */
+@keyframes diveSky {
     0% {
-        transform: scale(1);
-        animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+        transform: translate3d(0, 0, 0) scale(1);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
     }
-    46% {
-        transform: scale(1.6);
-        animation-timing-function: cubic-bezier(0.65, 0, 0.85, 0.35);
+    16% {
+        transform: translate3d(0, 0.6vh, 0) scale(1.015);
+        animation-timing-function: cubic-bezier(0.55, 0.05, 0.75, 0.35);
+    }
+    55% {
+        transform: translate3d(0, 14vh, 0) scale(1.22);
+        animation-timing-function: cubic-bezier(0.45, 0.1, 0.65, 0.5);
+    }
+    82% {
+        transform: translate3d(0, 34vh, 0) scale(1.44);
+        animation-timing-function: cubic-bezier(0.2, 0.55, 0.3, 1);
     }
     100% {
-        transform: scale(38);
+        transform: translate3d(0, 42vh, 0) scale(1.5);
     }
 }
 
-@keyframes camFade {
-    from { opacity: 1; }
-    to { opacity: 0; }
+/* mid cumulus: balloon and sweep radially past the frame edges */
+@keyframes diveMid {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    16% {
+        transform: translate3d(0, 0.2vh, 0) scale(1.02);
+        animation-timing-function: cubic-bezier(0.55, 0.05, 0.75, 0.35);
+    }
+    55% {
+        transform: translate3d(0, 4vh, 0) scale(1.9);
+        animation-timing-function: cubic-bezier(0.45, 0.1, 0.65, 0.5);
+    }
+    82% {
+        transform: translate3d(0, 7vh, 0) scale(3);
+        animation-timing-function: cubic-bezier(0.2, 0.55, 0.3, 1);
+    }
+    100% {
+        transform: translate3d(0, 8vh, 0) scale(3.3);
+    }
+}
+
+/* the cloud bank at the feet: falls away hard beneath the camera */
+@keyframes diveBank {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    16% {
+        transform: translate3d(0, 0.3vh, 0) scale(1.02);
+        animation-timing-function: cubic-bezier(0.55, 0.05, 0.75, 0.35);
+    }
+    55% {
+        transform: translate3d(0, 6vh, 0) scale(3.2);
+        animation-timing-function: cubic-bezier(0.45, 0.1, 0.65, 0.5);
+    }
+    82% {
+        transform: translate3d(0, 16vh, 0) scale(7);
+        animation-timing-function: cubic-bezier(0.2, 0.55, 0.3, 1);
+    }
+    100% {
+        transform: translate3d(0, 19vh, 0) scale(7.8);
+    }
+}
+
+/* wisps: fastest layer, they streak and vanish past the lens */
+@keyframes diveWisp {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        opacity: 0.7;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    16% {
+        transform: translate3d(0, 0.3vh, 0) scale(1.03);
+        opacity: 0.75;
+        animation-timing-function: cubic-bezier(0.55, 0.05, 0.75, 0.35);
+    }
+    55% {
+        transform: translate3d(0, 5vh, 0) scale(3.6);
+        opacity: 0.85;
+        animation-timing-function: cubic-bezier(0.45, 0.1, 0.65, 0.5);
+    }
+    82% {
+        transform: translate3d(0, 9vh, 0) scale(7);
+        opacity: 0.12;
+        animation-timing-function: cubic-bezier(0.2, 0.55, 0.3, 1);
+    }
+    100% {
+        transform: translate3d(0, 10vh, 0) scale(7.6);
+        opacity: 0;
+    }
+}
+
+/* the voyager: the camera's target. Scale about the crown climbs the
+   figure; the late downward translate carries the hat below the lens
+   (we rise OVER it), fading under the bloom. */
+@keyframes diveFigure {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        opacity: 1;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    16% {
+        transform: translate3d(0, 0, 0) scale(1.02);
+        opacity: 1;
+        animation-timing-function: cubic-bezier(0.55, 0.05, 0.75, 0.35);
+    }
+    55% {
+        transform: translate3d(0, 3vh, 0) scale(3.6);
+        opacity: 1;
+        animation-timing-function: cubic-bezier(0.45, 0.1, 0.65, 0.5);
+    }
+    82% {
+        transform: translate3d(0, 26vh, 0) scale(8.5);
+        opacity: 1;
+        animation-timing-function: cubic-bezier(0.3, 0.4, 0.4, 1);
+    }
+    94% {
+        transform: translate3d(0, 82vh, 0) scale(10.8);
+        opacity: 0.08;
+        animation-timing-function: cubic-bezier(0.2, 0.55, 0.3, 1);
+    }
+    100% {
+        transform: translate3d(0, 108vh, 0) scale(11.5);
+        opacity: 0;
+    }
+}
+
+/* the anchored sun swells gently as the climb peaks, then settles */
+@keyframes sunSwell {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    55% { transform: translate(-50%, -50%) scale(1.14); }
+    82% { transform: translate(-50%, -50%) scale(1.3); }
+    100% { transform: translate(-50%, -50%) scale(1.08); }
+}
+
+@keyframes glowSwell {
+    0% { opacity: 0.55; }
+    55% { opacity: 0.8; }
+    82% { opacity: 1; }
+    100% { opacity: 0.65; }
+}
+
+@keyframes raysSwell {
+    0% { opacity: 0.12; }
+    16% { opacity: 0.16; }
+    55% { opacity: 0.4; }
+    82% { opacity: 0.6; }
+    100% { opacity: 0.25; }
+}
+
+@keyframes raySpin {
+    to { transform: rotate(360deg); }
 }
 
 @keyframes bloomFlash {
@@ -496,84 +640,23 @@
     100% { opacity: 0; }
 }
 
-@keyframes skyIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes fieldSettle {
-    from { transform: scale(1.14); }
-    to { transform: scale(1); }
-}
-
-@keyframes puffIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes puffDrift {
-    from { transform: translateX(0); }
-    to { transform: translateX(5vw); }
-}
-
-@keyframes irisBurst {
+/* the emergence field settles from too-close to at-rest */
+@keyframes emergeIn {
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.2);
+        transform: scale(1.5);
     }
-    18% { opacity: 0.95; }
+    30% { opacity: 1; }
     100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(3);
-    }
-}
-
-@keyframes sunBloom {
-    from {
-        opacity: 0;
-        transform: translate(-50%, 52%) scale(0.55);
-    }
-    to {
         opacity: 1;
-        transform: translate(-50%, 52%) scale(1);
+        transform: scale(1);
     }
 }
 
-@keyframes raysIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes raysSpin {
-    from { rotate: 0deg; }
-    to { rotate: 360deg; }
-}
-
-@keyframes cloudDrift {
-    from { transform: translateX(0); }
-    to { transform: translateX(6vw); }
-}
-
-@keyframes waveDrift {
-    from { transform: translateX(0); }
-    to { transform: translateX(-25%); }
-}
-
-@keyframes heroIn {
-    from {
-        opacity: 0;
-        filter: drop-shadow(0 0 18px rgba(255, 196, 96, 0)) blur(3px);
-    }
-    to {
-        opacity: 1;
-        filter: drop-shadow(0 0 18px rgba(255, 196, 96, 0.28)) blur(0);
-    }
-}
-
-@keyframes heroBob {
-    0%,
-    100% { transform: translate(-50%, -83.8%) rotate(-1.4deg); }
-    50% { transform: translate(-50%, -83.2%) rotate(1.4deg); }
+/* gentle wind breath for the cel clouds, homepage-style */
+@keyframes cloudFloat {
+    from { transform: translate3d(-2.5%, 0.8%, 0); }
+    to { transform: translate3d(2.5%, -0.8%, 0); }
 }
 
 @keyframes sparkleRise {
@@ -581,12 +664,17 @@
         opacity: 0;
         transform: translateY(0);
     }
-    15% { opacity: 0.9; }
-    70% { opacity: 0.45; }
+    15% { opacity: 0.85; }
+    70% { opacity: 0.4; }
     100% {
         opacity: 0;
-        transform: translateY(-26vh);
+        transform: translateY(-30vh);
     }
+}
+
+@keyframes flarePulse {
+    from { opacity: 0.5; }
+    to { opacity: 1; }
 }
 
 @keyframes kanaIn {
@@ -638,26 +726,29 @@
     }
 }
 
-/* ── Reduced motion: one elegant static key frame — the voyager and
-      raised straw hat over the sunrise, greeting on glass — fade in,
-      hold, fade out. No push, no zoom-through. ── */
-
+/* == REDUCED MOTION: one elegant static key frame ======================
+   The voyager, arms raised, straw hat crowned against the bright
+   homepage sky with its cel clouds and sun, greeting on light glass.
+   No dolly, no bloom; fade in, hold ~1.6s (JS timer), fade out. */
 @media (prefers-reduced-motion: reduce) {
-    .sparkles,
     .bloom,
-    .skyStage,
+    .emergeField,
+    .sparkles,
+    .wispRig,
     .ring,
-    .rays {
+    .flare {
         display: none;
     }
 
-    .camera,
-    .hero,
-    .sun,
-    .horizonGlow,
-    .cloud,
-    .waveBack,
-    .waveFront,
+    .skyRig,
+    .midRig,
+    .figureRig,
+    .bankRig,
+    .light,
+    .sunGlow,
+    .godrays,
+    .cel,
+    .haze,
     .hatMark,
     .kana,
     .hello,
@@ -667,20 +758,16 @@
         animation: none;
     }
 
+    /* lift the greeting into the open V of sky between the raised arms */
     .card {
-        background: rgba(6, 14, 38, 0.42);
-        border: 1px solid var(--glass-border, rgba(226, 176, 90, 0.3));
+        transform: translateY(-16vh);
+        width: auto;
+        background: rgba(16, 46, 96, 0.34);
+        border: 1px solid rgba(255, 255, 255, 0.28);
         border-radius: var(--r-xl, 22px);
-        box-shadow: var(--shadow-2, 0 16px 48px rgba(0, 0, 0, 0.4));
+        box-shadow: 0 16px 48px rgba(10, 40, 90, 0.25);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        width: auto;
-    }
-
-    /* the greeting sits over the dark seascape here, not the bright sky */
-    .hello,
-    .sub {
-        color: var(--rail-text, rgba(242, 249, 255, 0.8));
     }
 
     .overlay {
