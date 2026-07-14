@@ -2,6 +2,7 @@
 
 import { useCartStore } from '@/store/useCartStore';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import SkyContentRoot from '@/components/sky-content';
 import SkyFooter from '@/components/redesign-sky/SkyFooter';
@@ -20,6 +21,7 @@ const COUNTRIES = [
 // so most customers land on the right country without touching the dropdown.
 export default function CartClient({ initialCountry }: { initialCountry: string }) {
     const { items, removeItem, updateQuantity, getTotal } = useCartStore();
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [country, setCountry] = useState(initialCountry);
     const [shipping, setShipping] = useState<number | null>(null);
@@ -64,24 +66,11 @@ export default function CartClient({ initialCountry }: { initialCountry: string 
     const total = subtotal + (shipping ?? 0);
     const canCheckout = !isLoading && !shipLoading && shipping != null && !shipError;
 
-    const handleCheckout = async () => {
+    // Go to our own on-site checkout page (Stripe Embedded Checkout renders
+    // there); the customer never leaves the site.
+    const handleCheckout = () => {
         setIsLoading(true);
-        try {
-            const response = await fetch('/api/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items, countryCode: country }),
-            });
-
-            const { url, error } = await response.json();
-            if (error) throw new Error(error);
-            if (url) window.location.href = url; // Redirect to Stripe Checkout
-        } catch (error: any) {
-            console.error('Checkout failed:', error);
-            alert(error?.message || 'Checkout failed. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
+        router.push(`/merch/checkout?country=${encodeURIComponent(country)}`);
     };
 
     return (

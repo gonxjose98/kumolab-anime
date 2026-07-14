@@ -64,11 +64,14 @@ export async function POST(req: Request) {
         const shippingCents = Math.round(parseFloat(rate.rate) * 100);
 
         const session = await stripe.checkout.sessions.create({
+            // Embedded UI: the payment + address form renders on our own
+            // /merch/checkout page (the customer never leaves the site). On
+            // completion Stripe sends them to return_url (our success page).
+            ui_mode: 'embedded',
             payment_method_types: ['card'],
             line_items: lineItems,
             mode: 'payment',
-            success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/cart`,
+            return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/success?session_id={CHECKOUT_SESSION_ID}`,
             // Lock the address to the country we quoted so the shipping we
             // charge always matches the destination.
             shipping_address_collection: {
@@ -93,7 +96,7 @@ export async function POST(req: Request) {
             }
         });
 
-        return NextResponse.json({ sessionId: session.id, url: session.url });
+        return NextResponse.json({ clientSecret: session.client_secret });
     } catch (error: any) {
         console.error('Checkout Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

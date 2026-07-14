@@ -1,0 +1,72 @@
+.wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 1rem 0 3rem;
+}
+
+.head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+}
+
+.title {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #0b2547;
+    margin: 0;
+}
+
+.back {
+    color: #1c6fa8;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none;
+}
+
+.back:hover {
+    text-decoration: underline;
+}
+
+/* The Stripe embedded component gets a frosted-glass card to sit in. */
+.embed {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(196, 146, 44, 0.35);
+    border-radius: 18px;
+    box-shadow: 0 20px 50px -24px rgba(20, 60, 120, 0.4);
+    padding: 1.1rem;
+}
+
+.empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: rgba(11, 37, 71, 0.8);
+}
+
+.empty p {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+:global([data-sky='night']) .title {
+    color: #eaf2ff;
+}
+
+:global([data-sky='night']) .back {
+    color: #8fc3ee;
+}
+
+:global([data-sky='night']) .embed {
+    background: rgba(12, 18, 44, 0.55);
+    border-color: rgba(226, 176, 90, 0.28);
+    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.6);
+}
+
+:global([data-sky='night']) .empty {
+    color: rgba(220, 232, 255, 0.7);
+}
