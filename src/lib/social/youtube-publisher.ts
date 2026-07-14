@@ -69,6 +69,14 @@ export async function publishToYouTubeShorts(input: YouTubePublishInput): Promis
     if (process.env.AUTO_PUBLISH_SOCIALS !== 'true') {
         return { skipped: 'AUTO_PUBLISH_SOCIALS disabled' };
     }
+    // Dedicated YouTube gate (separate from the other socials). The pipeline
+    // stages imported/repost clips as videos, and raw reposts on YouTube risk
+    // copyright strikes and channel suspension. YouTube is reserved for
+    // edited/original content only, so it stays OFF until that edited-only
+    // pipeline is built, even though the OAuth token is fully configured.
+    if (process.env.YOUTUBE_AUTO_PUBLISH !== 'true') {
+        return { skipped: 'YOUTUBE_AUTO_PUBLISH disabled — YT reserved for edited-only content' };
+    }
 
     try {
         const accessToken = await getAccessToken();
