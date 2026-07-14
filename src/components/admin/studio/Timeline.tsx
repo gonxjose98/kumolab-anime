@@ -86,7 +86,10 @@ export default function Timeline() {
                     className={`ak-btn ak-btn--sm ${project.meta.watermark ? 'ak-btn--secondary' : 'ak-btn--ghost'}`}
                     title="Toggle the @kumolabanime watermark (burned in on export)"
                     aria-pressed={project.meta.watermark}
-                    onClick={() => useProjectStore.getState().setMeta({ watermark: !project.meta.watermark })}
+                    onClick={() => {
+                        const cur = useProjectStore.getState().project?.meta.watermark ?? true;
+                        useProjectStore.getState().setMeta({ watermark: !cur });
+                    }}
                 >
                     <Droplet size={13} /> {project.meta.watermark ? 'Watermark on' : 'Watermark off'}
                 </button>
