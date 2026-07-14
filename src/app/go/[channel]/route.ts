@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic';
  *   https://kumolabanime.com/go/ig
  * This resolves the channel to UTM attribution, drops it in a short-lived
  * cookie (read and cleared by captureUtm on the landing page), then redirects to
- * the link-in-bio hub. Result: the bio link looks legit AND the click is still
+ * a clean homepage URL. Result: the bio link looks legit AND the click is still
  * attributed to the channel that drove it, with no query string on the landing.
+ * (The /links hub still exists and can be used directly whenever wanted.)
  */
 
 const CHANNELS: Record<string, { source: string; medium: string }> = {
@@ -39,7 +40,7 @@ export async function GET(
     // so a new bio link never breaks even before it is added to the map above.
     const cfg = CHANNELS[key] || { source: key || 'link', medium: 'bio' };
 
-    const res = NextResponse.redirect(new URL('/links', req.nextUrl.origin), 307);
+    const res = NextResponse.redirect(new URL('/', req.nextUrl.origin), 307);
     res.cookies.set(
         'kumolab_ref',
         JSON.stringify({ source: cfg.source, medium: cfg.medium, campaign: 'bio' }),
