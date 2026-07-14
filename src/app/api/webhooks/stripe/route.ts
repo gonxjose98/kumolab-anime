@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createPrintfulOrder, getPrintfulOrderByExternalId } from '@/lib/printful';
+import { recordBuyer, sendOrderConfirmation, type OrderLine } from '@/lib/email/order';
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
         // string, which is capped at 500 chars and can truncate a big cart
         // into invalid JSON, silently dropping a paid order.
         let items: { sync_variant_id: number; quantity: number }[] = [];
+        let displayLines: OrderLine[] = [];
         try {
             const lineItems = await stripe.checkout.sessions.listLineItems(externalId, {
                 expand: ['data.price.product'],
@@ -55,6 +57,13 @@ export async function POST(req: Request) {
                     return { sync_variant_id: Number(vid), quantity: li.quantity ?? 1 };
                 })
                 .filter((i) => Number.isFinite(i.sync_variant_id) && i.sync_variant_id > 0);
+
+            // Human-readable lines for the confirmation email (name + line total).
+            displayLines = lineItems.data.map((li: any) => ({
+                name: li.description || li.price?.product?.name || 'Item',
+                quantity: li.quantity ?? 1,
+                amount: (li.amount_total ?? 0) / 100,
+            }));
 
             if (items.length !== lineItems.data.length) {
                 console.error(`[stripe webhook] ${externalId}: resolved ${items.length}/${lineItems.data.length} line items — some had no variantId.`);
@@ -107,6 +116,22 @@ export async function POST(req: Request) {
             console.error(`Failed to create Printful order for session ${externalId}:`, error);
             // In a production app, you'd want to retry or alert here
         }
+
+        // The customer has paid, so confirm the order and capture them onto the
+        // owned email list regardless of whether the Printful draft succeeded.
+        // Both are best-effort (never throw) and run once per session because
+        // the idempotency guard above short-circuits Stripe's event retries.
+        const orderNumber = externalId.slice(-8).toUpperCase();
+        await recordBuyer(customerEmail, shippingDetails?.name);
+        await sendOrderConfirmation({
+            to: customerEmail,
+            name: shippingDetails?.name,
+            orderNumber,
+            lines: displayLines,
+            subtotal: (session.amount_subtotal ?? 0) / 100,
+            shipping: (session.total_details?.amount_shipping ?? 0) / 100,
+            total: (session.amount_total ?? 0) / 100,
+        });
     }
 
     return NextResponse.json({ received: true });
