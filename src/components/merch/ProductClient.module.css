@@ -39,8 +39,11 @@
     font-weight: 800;
 }
 
-.variants h3,
-.quantitySection h3 {
+.optionBlock {
+    margin-bottom: 1.6rem;
+}
+
+.optionBlock h3 {
     font-size: 0.82rem;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -49,36 +52,52 @@
     margin: 0 0 0.7rem;
 }
 
-.variantGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-    gap: 0.55rem;
-    margin-bottom: 2rem;
+.optionValue {
+    text-transform: none;
+    letter-spacing: 0;
+    color: #0b2547;
 }
 
-.variantBtn {
-    padding: 0.7rem 0.6rem;
-    border: 1px solid rgba(120, 160, 210, 0.5);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(6px);
-    color: #123a63;
+/* Color swatches: round chips, image or hex fill, gold ring when selected. */
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.swatch {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(120, 160, 210, 0.55);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
     cursor: pointer;
-    transition: all 0.18s ease;
-    font-size: 0.85rem;
-    font-weight: 600;
+    padding: 0;
+    outline-offset: 3px;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
-.variantBtn:hover {
-    border-color: rgba(28, 127, 214, 0.6);
-    background: rgba(255, 255, 255, 0.82);
+.swatch:hover {
+    transform: translateY(-1px);
 }
 
-.variantBtn.active {
-    background: linear-gradient(180deg, #f4c25e, #d99b26);
-    color: #3a2a05;
-    border-color: #d99b26;
-    box-shadow: 0 6px 16px -6px rgba(196, 146, 44, 0.6);
+.swatchActive {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #d99b26;
+    transform: translateY(-1px);
+}
+
+/* Size dropdown: frosted-glass select, matches the cart selector. */
+.sizeSelect {
+    width: 100%;
+    max-width: 220px;
+    padding: 0.7rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid rgba(120, 160, 210, 0.5);
+    background: rgba(255, 255, 255, 0.7);
+    color: #123a63;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 .quantityControls {
@@ -144,30 +163,27 @@
 
 :global([data-sky='night']) .title,
 :global([data-sky='night']) .price,
+:global([data-sky='night']) .optionValue,
 :global([data-sky='night']) .quantityControls span {
     color: #eaf2ff;
 }
 
-:global([data-sky='night']) .variants h3,
-:global([data-sky='night']) .quantitySection h3 {
+:global([data-sky='night']) .optionBlock h3 {
     color: rgba(220, 232, 255, 0.66);
 }
 
-:global([data-sky='night']) .variantBtn {
-    background: rgba(180, 205, 255, 0.08);
-    border-color: rgba(160, 190, 255, 0.28);
-    color: #d6e4ff;
+:global([data-sky='night']) .sizeSelect {
+    background: rgba(20, 30, 64, 0.7);
+    border-color: rgba(160, 190, 255, 0.3);
+    color: #eaf2ff;
 }
 
-:global([data-sky='night']) .variantBtn:hover {
-    background: rgba(180, 205, 255, 0.16);
-    border-color: rgba(157, 184, 255, 0.5);
+:global([data-sky='night']) .swatch {
+    border-color: rgba(160, 190, 255, 0.35);
 }
 
-:global([data-sky='night']) .variantBtn.active {
-    background: linear-gradient(180deg, #ffd88a, #e6b45a);
-    color: #2a1e04;
-    border-color: #e6b45a;
+:global([data-sky='night']) .swatchActive {
+    box-shadow: 0 0 0 2px #0a1730, 0 0 0 4px #e6b45a;
 }
 
 :global([data-sky='night']) .quantityControls button {
