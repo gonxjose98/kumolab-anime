@@ -1,54 +1,43 @@
+/**
+ * Public homepage signup. Writes straight into our own list
+ * (email_subscribers) instead of ConvertKit: KumoLab owns its audience.
+ * Idempotent: re-submitting the same email succeeds without a duplicate.
+ */
 
 import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+export const dynamic = 'force-dynamic';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
     try {
-        const { email } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
-
-        // Secrets come from env only. No hardcoded fallback: a committed API
-        // key is a leaked credential (rotate it in ConvertKit if it ever was).
-        const API_KEY = process.env.CONVERTKIT_API_KEY;
-        const FORM_ID = process.env.CONVERTKIT_FORM_ID;
-        const TAG_ID = process.env.CONVERTKIT_TAG_ID || '14489422'; // tag id, not a secret
-
-        if (!API_KEY || !FORM_ID) {
-            console.error('Missing ConvertKit configuration (CONVERTKIT_API_KEY / CONVERTKIT_FORM_ID)');
-            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+        if (!EMAIL_RE.test(email) || email.length > 254) {
+            return NextResponse.json({ error: 'Please enter a valid email' }, { status: 400 });
         }
 
-        // 1. Subscribe to Form
-        const formUrl = `https://api.convertkit.com/v3/forms/${FORM_ID}/subscribe`;
-        const formResponse = await fetch(formUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: API_KEY, email: email }),
-        });
+        // Upsert on email: signing up again (even after unsubscribing) simply
+        // re-subscribes; it never errors and never creates a duplicate row.
+        const { error } = await supabaseAdmin
+            .from('email_subscribers')
+            .upsert(
+                { email, status: 'subscribed', source: 'homepage', unsubscribed_at: null },
+                { onConflict: 'email' },
+            );
 
-        const formData = await formResponse.json();
-
-        if (!formResponse.ok) {
-            return NextResponse.json({ error: formData.message || 'Failed to subscribe to form' }, { status: formResponse.status });
+        if (error) {
+            console.error('Subscribe insert failed:', error.message);
+            return NextResponse.json({ error: 'Could not subscribe right now, please try again' }, { status: 500 });
         }
 
-        // 2. Add Tag
-        const tagUrl = `https://api.convertkit.com/v3/tags/${TAG_ID}/subscribe`;
-        const tagResponse = await fetch(tagUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: API_KEY, email: email }),
-        });
-
-        // We don't strictly fail if tagging fails, but we log it
-        if (!tagResponse.ok) {
-            const tagData = await tagResponse.json();
-            console.error('Failed to add tag:', tagData);
-        }
-
-        return NextResponse.json({ success: true, data: formData });
+        return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Subscribe error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -23,7 +23,7 @@ const ADMIN_PUBLIC_API: ReadonlySet<string> = new Set();
 // area's API directly (e.g. confirming a Printful order = spending money).
 // The owner (by email) bypasses everything. Mirrors the page-layout gates.
 const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? 'gonxjose98@gmail.com').toLowerCase();
-const OWNER_ONLY_PREFIXES = ['/api/admin/team'];
+const OWNER_ONLY_PREFIXES = ['/api/admin/team', '/api/admin/email'];
 const ROUTE_PERMS: { prefix: string; perm: string }[] = [
     { prefix: '/api/admin/orders', perm: 'store' },
     { prefix: '/api/admin/merch-settings', perm: 'store' },

@@ -10,6 +10,7 @@ import {
     Store,
     Clapperboard,
     Users,
+    Mail,
     Menu,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
@@ -33,7 +34,12 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     },
     { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' }] },
     { label: 'Shop', jp: '売店', items: [{ href: '/admin/store', label: 'Store', jp: '売店', icon: Store, perm: 'store' }] },
-    { label: 'Admin', jp: '管理', items: [{ href: '/admin/team', label: 'Team', jp: '班', icon: Users, ownerOnly: true }] },
+    {
+        label: 'Admin', jp: '管理', items: [
+            { href: '/admin/team', label: 'Team', jp: '班', icon: Users, ownerOnly: true },
+            { href: '/admin/email', label: 'Email', jp: '便', icon: Mail, ownerOnly: true },
+        ],
+    },
 ];
 
 const ALL = [TOP, ...GROUPS.flatMap((g) => g.items)];
