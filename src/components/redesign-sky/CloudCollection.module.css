@@ -210,6 +210,8 @@
     max-width: 300px;
     aspect-ratio: 1;
     object-fit: contain;
+    /* Round the square mockup so it reads as a soft card, not a hard square. */
+    border-radius: 18px;
     /* The global `img { opacity: 0; animation: imgIn }` fade-in is overridden
        by productFloat below, so opacity would stay stuck at 0 — set it visible
        explicitly (the Reveal wrapper already provides the entrance fade). */
