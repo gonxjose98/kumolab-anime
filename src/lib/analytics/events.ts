@@ -25,6 +25,27 @@ type StoredUtm = Utm & { capturedAt: number };
 
 const hasWindow = () => typeof window !== 'undefined';
 
+/** Read + parse the attribution cookie a /go/<channel> redirect may have set. */
+function readRefCookie(): Utm | null {
+    try {
+        const m = document.cookie.match(/(?:^|;\s*)kumolab_ref=([^;]+)/);
+        if (!m) return null;
+        const parsed = JSON.parse(decodeURIComponent(m[1])) as Utm;
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Clear the seed cookie once its attribution has been adopted into storage. */
+function clearRefCookie(): void {
+    try {
+        document.cookie = 'kumolab_ref=; Path=/; Max-Age=0; SameSite=Lax';
+    } catch {
+        // ignore
+    }
+}
+
 /**
  * Read utm_* params off the current URL and, if any are present, store them as
  * the active attribution (overwriting older ones — last-touch). Safe to call on
@@ -46,9 +67,17 @@ export function captureUtm(): void {
             const v = q.get(param);
             if (v) utm[key] = v.slice(0, 128);
         }
+        // Fall back to attribution seeded by a /go/<channel> redirect cookie, so
+        // a clean bio link (kumolabanime.com/go/ig) still attributes without an
+        // ugly utm query string ever appearing on the landing URL.
+        if (Object.keys(utm).length === 0) {
+            const seeded = readRefCookie();
+            if (seeded) Object.assign(utm, seeded);
+        }
         if (Object.keys(utm).length === 0) return; // nothing to capture
         const stored: StoredUtm = { ...utm, capturedAt: Date.now() };
         window.localStorage.setItem(UTM_KEY, JSON.stringify(stored));
+        clearRefCookie();
     } catch {
         // ignore — attribution is best-effort
     }
