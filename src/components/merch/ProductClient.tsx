@@ -21,6 +21,12 @@ export default function ProductClient({ productData, anchorPrice = null, label =
     const hasAnchor = anchorPrice != null && anchorPrice > realPrice;
     const pct = hasAnchor ? Math.round((1 - realPrice / anchorPrice) * 100) : 0;
 
+    // Prefer Printful's full-res `preview_url` over the tiny `thumbnail_url`
+    // (the thumbnail is ~120px and looks blurry when shown large in the cart
+    // and on the product page). Per-variant so the selected color is correct.
+    const previewFile = selectedVariant.files?.find((f: any) => f.type === 'preview');
+    const imageUrl = previewFile?.preview_url || previewFile?.thumbnail_url || sync_product.thumbnail_url;
+
     const handleAddToCart = () => {
         addItem({
             variantId: selectedVariant.id,
@@ -28,7 +34,7 @@ export default function ProductClient({ productData, anchorPrice = null, label =
             name: selectedVariant.name,
             price: parseFloat(selectedVariant.retail_price),
             quantity: quantity,
-            image: selectedVariant.files.find((f: any) => f.type === 'preview')?.thumbnail_url || sync_product.thumbnail_url,
+            image: imageUrl,
             size: selectedVariant.size,
             color: selectedVariant.color,
         });
@@ -40,7 +46,7 @@ export default function ProductClient({ productData, anchorPrice = null, label =
             <div className={styles.imageSection}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                    src={selectedVariant.files.find((f: any) => f.type === 'preview')?.thumbnail_url || sync_product.thumbnail_url}
+                    src={imageUrl}
                     alt={sync_product.name}
                     className={styles.mainImage}
                 />
