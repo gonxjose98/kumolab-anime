@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Type, Droplet } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
+import { addTextClip } from './clipFactory';
 import type { Clip, Track } from './types';
 
 /** Whole-timeline view: ruler + one row per track + clips + playhead. */
@@ -72,7 +74,22 @@ export default function Timeline() {
             <div className="st-timeline__bar">
                 <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => usePlaybackStore.getState().zoomBy(0.8)} title="Zoom out">−</button>
                 <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => usePlaybackStore.getState().zoomBy(1.25)} title="Zoom in">+</button>
-                <span className="ak-caption" style={{ marginLeft: 4 }}>{fmt(currentTime)} / {fmt(project.durationSec)}</span>
+                <span className="ak-caption st-time" style={{ marginLeft: 4 }}>{fmt(currentTime)} / {fmt(project.durationSec)}</span>
+                {/* Always-visible content actions (were buried in the collapsed
+                    Media panel / the Export dialog on mobile). */}
+                <button className="ak-btn ak-btn--secondary ak-btn--sm" title="Add a text overlay at the playhead"
+                    onClick={() => addTextClip(usePlaybackStore.getState().currentTime)}>
+                    <Type size={13} /> Add text
+                </button>
+                <div className="st-spacer" />
+                <button
+                    className={`ak-btn ak-btn--sm ${project.meta.watermark ? 'ak-btn--secondary' : 'ak-btn--ghost'}`}
+                    title="Toggle the @kumolabanime watermark (burned in on export)"
+                    aria-pressed={project.meta.watermark}
+                    onClick={() => useProjectStore.getState().setMeta({ watermark: !project.meta.watermark })}
+                >
+                    <Droplet size={13} /> {project.meta.watermark ? 'Watermark on' : 'Watermark off'}
+                </button>
             </div>
 
             <div className="st-timeline__scroll" ref={scrollRef} onScroll={onScrub} onPointerDown={onGrab}>

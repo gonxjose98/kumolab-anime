@@ -255,6 +255,7 @@
     padding: 7px 12px;
     border-bottom: 1px solid var(--line);
     flex: none;
+    flex-wrap: wrap;
 }
 .admin-root .st-timeline__scroll {
     position: relative;
@@ -422,26 +423,94 @@
    on some platforms. */
 .admin-root .st-root select.ak-field__input option { background: #0e1830; color: var(--ink); }
 
+/* ── Inspector sections + segmented controls ─────────────────────────────
+   Group related controls under a titled section with a divider, and give the
+   Frame's Fit/Background their own segmented control so they read as a
+   deliberate part of the system rather than stray dropdowns. */
+.admin-root .st-section {
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+}
+.admin-root .st-section:last-child { margin-bottom: 0; padding-bottom: 4px; border-bottom: 0; }
+.admin-root .st-section__title {
+    display: block;
+    font-family: var(--ak-serif);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.01em;
+    margin-bottom: 12px;
+}
+.admin-root .st-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--ink-3);
+    line-height: 1.4;
+}
+.admin-root .st-seg {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    background: rgba(10, 21, 38, 0.7);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+}
+.admin-root .st-seg__btn {
+    flex: 1;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.14s, color 0.14s, box-shadow 0.14s;
+}
+.admin-root .st-seg__btn:hover { color: var(--ink); }
+.admin-root .st-seg__btn--on {
+    background: var(--gold-grad);
+    color: var(--gold-ink);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 /* ── Mobile: stack the editor into one scrollable column ──────────────────
-   The desktop grid (256px | 1fr | 320px) crushes the video preview to a
-   sliver and pushes the inspector off-screen on a phone. Below 820px we
-   restack: the video preview pins to the top (full width, watchable) while
-   the timeline, inspector controls, and media library scroll beneath it.
-   Most Studio edits happen on mobile, so this is the primary layout there. */
+   The desktop 3-column grid crushes the video preview to a sliver on a phone.
+   The previous mobile fix kept CSS grid, but a fixed-height grid container
+   distributed leftover space to the Inspector row, whose tall content then
+   overflowed and overlapped the Media panel below it, and made scrolling
+   unreliable. We now use a plain flex COLUMN: every section sizes to its own
+   content (flex: 0 0 auto) so nothing overlaps, and the overlay scrolls as one
+   page. The video pins to the top while the tools scroll beneath it. Most
+   Studio edits happen on mobile, so this is the primary layout there. */
 @media (max-width: 820px) {
     .admin-root .st-root {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto auto auto;
-        grid-template-areas:
-            "topbar"
-            "preview"
-            "timeline"
-            "inspector"
-            "library";
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+        grid-template-rows: none;
+        grid-template-areas: none;
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
     }
+
+    /* DOM order is topbar, media, preview, inspector, timeline; reorder to the
+       mobile reading order: video up top, then the tools beneath it. */
+    .admin-root .st-topbar    { order: 1; }
+    .admin-root .st-preview   { order: 2; }
+    .admin-root .st-timeline  { order: 3; }
+    .admin-root .st-inspector { order: 4; }
+    .admin-root .st-library   { order: 5; }
+
+    /* Content-sized, never shrinking, so panels stack instead of overlapping. */
+    .admin-root .st-topbar,
+    .admin-root .st-preview,
+    .admin-root .st-timeline,
+    .admin-root .st-inspector,
+    .admin-root .st-library { flex: 0 0 auto; }
 
     /* Topbar and the video stay pinned while the tools scroll under them. */
     .admin-root .st-topbar {
@@ -453,9 +522,7 @@
     }
     /* Compact the action buttons so Export never clips at 390px. */
     .admin-root .st-topbar .ak-btn { padding: 6px 10px; font-size: 13px; }
-    /* Trim the topbar so Back, the title, and Export all fit one row:
-       drop the logo and the long clip subtitle, and let the title
-       truncate instead of wrapping to a second line. */
+    /* Trim the topbar so Back, the title, and Export all fit one row. */
     .admin-root .st-topbar__logo { display: none; }
     .admin-root .st-topbar__sub { display: none; }
     .admin-root .st-topbar__title {
@@ -470,15 +537,14 @@
         position: sticky;
         top: 52px;
         z-index: 4;
-        height: 38vh;
-        min-height: 200px;
+        height: 40vh;
+        min-height: 210px;
         padding: 12px;
         gap: 10px;
         border-bottom: 1px solid var(--line);
     }
 
-    /* Panels flow with their content and the page scrolls, side borders
-       become top dividers, and inner scroll areas expand. */
+    /* Panels flow with their content; side borders become top dividers. */
     .admin-root .st-panel,
     .admin-root .st-inspector {
         overflow: visible;
@@ -486,24 +552,25 @@
         border-right: 0;
         border-top: 1px solid var(--line);
         box-shadow: none;
+        min-height: 0;
     }
-    /* flex:1 + flex-basis:0 collapses the body inside an auto grid row, so its
-       content overflowed and spilled over the panel below (the Media Import
-       button landed mid-Inspector). flex:none makes the body take its full
-       content height so the panel grows and the page simply scrolls. */
+    /* The body takes its full content height so the panel grows and the page
+       scrolls (a collapsed flex body was what spilled onto the Media panel). */
     .admin-root .st-panel__body {
         overflow-y: visible;
         flex: none;
     }
 
-    /* Timeline keeps a usable height and its own horizontal scroll. */
-    .admin-root .st-timeline { min-height: 190px; }
+    /* Timeline keeps a definite height so its own horizontal strip still
+       scrolls (overflow stays hidden from the base rule). */
+    .admin-root .st-timeline { min-height: 230px; }
 
     /* Roomier tap targets for the media thumbnails. */
     .admin-root .st-media-grid { gap: 12px; }
 
-    /* Media becomes a dropdown on mobile: tap the header to expand the
-       assets + Add text; collapsed by default so it doesn't eat the page. */
+    /* Media becomes a dropdown on mobile: tap the header to expand the assets;
+       collapsed by default so it doesn't eat the page. Add text + the watermark
+       toggle now live in the always-visible timeline bar instead of in here. */
     .admin-root .st-library__head { cursor: pointer; }
     .admin-root .st-collapse-chevron {
         display: inline-flex;

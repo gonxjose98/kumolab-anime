@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { useMediaStore } from './store/mediaStore';
-import type { Clip, Track, Transform, VideoProject } from './types';
+import type { Clip, ClipEffectType, Track, Transform, VideoProject } from './types';
 
 /**
  * Live compositor. Draws the frame at the current playhead by stacking each
@@ -89,8 +89,29 @@ export default function PreviewCanvas() {
             return out;
         };
 
+        // Build a CSS filter string from a clip's colour/blur effects so the
+        // live preview matches what the exporter bakes in (WYSIWYG). Without
+        // this the Blur / Brightness / Contrast / Saturation / Grayscale sliders
+        // changed nothing on screen and only appeared after export.
+        const effectFilter = (effects: Clip['effects']): string => {
+            if (!effects || !effects.length) return 'none';
+            const get = (t: ClipEffectType, neutral: number) => {
+                const e = effects.find((x) => x.type === t);
+                return e ? e.amount : neutral;
+            };
+            const b = get('brightness', 0), c = get('contrast', 1), s = get('saturation', 1);
+            const g = get('grayscale', 0), bl = get('blur', 0);
+            const parts: string[] = [];
+            if (b !== 0) parts.push(`brightness(${(1 + b).toFixed(3)})`);
+            if (c !== 1) parts.push(`contrast(${c.toFixed(3)})`);
+            if (s !== 1) parts.push(`saturate(${s.toFixed(3)})`);
+            if (g > 0) parts.push(`grayscale(${Math.min(1, g)})`);
+            if (bl > 0) parts.push(`blur(${bl}px)`);
+            return parts.length ? parts.join(' ') : 'none';
+        };
+
         const drawTransformed = (
-            src: CanvasImageSource, sw: number, sh: number, tr: Transform | undefined,
+            src: CanvasImageSource, sw: number, sh: number, tr: Transform | undefined, filter: string = 'none',
         ) => {
             const transform: Transform = tr ?? { xPct: 0.5, yPct: 0.5, scale: 1, rotationDeg: 0, opacity: 1, fit: 'contain' };
             const targetAspect = cw / ch;
@@ -121,9 +142,26 @@ export default function PreviewCanvas() {
 
             ctx.save();
             ctx.globalAlpha = transform.opacity ?? 1;
+            ctx.filter = filter; // brightness/contrast/saturation/grayscale/blur
             ctx.translate(cx, cy);
             if (transform.rotationDeg) ctx.rotate((transform.rotationDeg * Math.PI) / 180);
             ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
+            ctx.restore();
+        };
+
+        // Burn the @kumolabanime handle bottom-right, matching the exporter, so
+        // the operator sees the watermark before exporting (toggle in the
+        // timeline bar). Purely a preview overlay; export draws its own.
+        const drawWatermark = () => {
+            ctx.save();
+            const fs = Math.round(ch * 0.024);
+            ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.shadowColor = 'rgba(0,0,0,0.55)';
+            ctx.shadowBlur = fs * 0.35;
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillText('@kumolabanime', cw - ch * 0.018, ch - ch * 0.018);
             ctx.restore();
         };
 
@@ -162,14 +200,16 @@ export default function PreviewCanvas() {
             for (const { clip, track } of activeClipsAt(p, t)) {
                 if (track.kind === 'text') { drawText(clip); continue; }
                 if (track.kind === 'audio') continue;
+                const filter = effectFilter(clip.effects);
                 if (clip.mediaId && track.kind === 'video') {
                     const v = videoPool.current.get(clip.mediaId);
-                    if (v && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform);
+                    if (v && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform, filter);
                 } else if (clip.mediaId && track.kind === 'image') {
                     const img = imagePool.current.get(clip.mediaId);
-                    if (img && img.complete) drawTransformed(img, img.naturalWidth, img.naturalHeight, clip.transform);
+                    if (img && img.complete) drawTransformed(img, img.naturalWidth, img.naturalHeight, clip.transform, filter);
                 }
             }
+            if (p.meta.watermark) drawWatermark();
         };
 
         const syncVideos = (t: number, playing: boolean) => {

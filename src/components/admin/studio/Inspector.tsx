@@ -16,6 +16,28 @@ function withEffect(clip: Clip, type: ClipEffectType, amount: number, neutral: n
     return amount === neutral ? rest : [...rest, { type, amount }];
 }
 
+/** Segmented button group — a clearer, more tactile control than a raw select
+ *  for the Frame's Fit / Background choices. */
+function Seg<T extends string>({ value, options, onChange }: {
+    value: T; options: { value: T; label: string }[]; onChange: (v: T) => void;
+}) {
+    return (
+        <div className="st-seg" role="group">
+            {options.map((o) => (
+                <button
+                    key={o.value}
+                    type="button"
+                    className={`st-seg__btn ${value === o.value ? 'st-seg__btn--on' : ''}`}
+                    aria-pressed={value === o.value}
+                    onClick={() => onChange(o.value)}
+                >
+                    {o.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 function Check({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }) {
     return (
         <label className="st-row" style={{ gap: 6, cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)' }}>
@@ -99,47 +121,68 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
 
             {(track.kind === 'video' || track.kind === 'image') && clip.transform && (
                 <>
-                    <div className="st-field">
-                        <span className="st-field__label">Fit</span>
-                        <div className="st-row">
-                            <select className="ak-field__input" value={clip.transform.fit} onChange={(e) => setTransform({ fit: e.target.value as any })}>
-                                <option value="contain">Contain (fit + fill)</option>
-                                <option value="cover">Cover (crop)</option>
-                            </select>
-                        </div>
-                    </div>
-                    {clip.transform.fit === 'contain' && (
+                    {/* ── Frame: how the clip fills the vertical canvas ── */}
+                    <div className="st-section">
+                        <span className="st-section__title">Frame</span>
                         <div className="st-field">
-                            <span className="st-field__label">Background fill</span>
-                            <select className="ak-field__input" value={clip.transform.fillStyle ?? 'blur'} onChange={(e) => setTransform({ fillStyle: e.target.value as any })}>
-                                <option value="blur">Blur</option><option value="black">Black</option><option value="white">White</option>
-                            </select>
+                            <span className="st-field__label">Fit</span>
+                            <Seg
+                                value={clip.transform.fit}
+                                options={[{ value: 'contain', label: 'Fit' }, { value: 'cover', label: 'Crop' }]}
+                                onChange={(v) => setTransform({ fit: v })}
+                            />
+                            <span className="st-hint">{clip.transform.fit === 'contain' ? 'Whole clip visible, sides filled.' : 'Fills the frame, edges cropped.'}</span>
                         </div>
-                    )}
-                    <RangeRow label="Scale" min={0.2} max={3} step={0.05} value={clip.transform.scale}
-                        fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ scale: v })} />
-                    <RangeRow label="Opacity" min={0} max={1} step={0.05} value={clip.transform.opacity}
-                        fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ opacity: v })} />
-                    <RangeRow label="Position X" min={0} max={1} step={0.01} value={clip.transform.xPct}
-                        fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ xPct: v })} />
-                    <RangeRow label="Position Y" min={0} max={1} step={0.01} value={clip.transform.yPct}
-                        fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ yPct: v })} />
+                        {clip.transform.fit === 'contain' && (
+                            <>
+                                <div className="st-field">
+                                    <span className="st-field__label">Background</span>
+                                    <Seg
+                                        value={clip.transform.fillStyle ?? 'blur'}
+                                        options={[{ value: 'blur', label: 'Blur' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }]}
+                                        onChange={(v) => setTransform({ fillStyle: v })}
+                                    />
+                                </div>
+                                {(clip.transform.fillStyle ?? 'blur') === 'blur' && (
+                                    <RangeRow label="Background blur" min={0} max={60} step={1} value={clip.transform.blurIntensity ?? 20}
+                                        fmt={(v) => `${Math.round(v)}px`} onChange={(v) => setTransform({ blurIntensity: v })} />
+                                )}
+                            </>
+                        )}
+                    </div>
 
-                    {/* Colour effects */}
-                    <RangeRow label="Brightness" min={-0.5} max={0.5} step={0.02} value={effectVal(clip, 'brightness', 0)}
-                        fmt={(v) => v.toFixed(2)} onChange={(v) => set({ effects: withEffect(clip, 'brightness', v, 0) })} />
-                    <RangeRow label="Contrast" min={0.5} max={1.8} step={0.02} value={effectVal(clip, 'contrast', 1)}
-                        fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'contrast', v, 1) })} />
-                    <RangeRow label="Saturation" min={0} max={2.5} step={0.05} value={effectVal(clip, 'saturation', 1)}
-                        fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'saturation', v, 1) })} />
-                    <RangeRow label="Blur" min={0} max={20} step={1} value={effectVal(clip, 'blur', 0)}
-                        fmt={(v) => (v ? `${Math.round(v)}px` : 'off')} onChange={(v) => set({ effects: withEffect(clip, 'blur', v, 0) })} />
-                    <div className="st-field">
-                        <span className="st-field__label">Filters</span>
-                        <div className="st-row" style={{ gap: 12, flexWrap: 'wrap' }}>
-                            <Check label="Grayscale" on={effectVal(clip, 'grayscale', 0) > 0} onToggle={(on) => set({ effects: withEffect(clip, 'grayscale', on ? 1 : 0, 0) })} />
-                            <Check label="Fade in" on={!!clip.fadeIn} onToggle={(on) => set({ fadeIn: on ? 0.4 : 0 })} />
-                            <Check label="Fade out" on={!!clip.fadeOut} onToggle={(on) => set({ fadeOut: on ? 0.4 : 0 })} />
+                    {/* ── Position & size ── */}
+                    <div className="st-section">
+                        <span className="st-section__title">Position &amp; size</span>
+                        <RangeRow label="Scale" min={0.2} max={3} step={0.05} value={clip.transform.scale}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ scale: v })} />
+                        <RangeRow label="Position X" min={0} max={1} step={0.01} value={clip.transform.xPct}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ xPct: v })} />
+                        <RangeRow label="Position Y" min={0} max={1} step={0.01} value={clip.transform.yPct}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ yPct: v })} />
+                        <RangeRow label="Opacity" min={0} max={1} step={0.05} value={clip.transform.opacity}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ opacity: v })} />
+                    </div>
+
+                    {/* ── Adjust: colour + soften (whole-clip effects, distinct from
+                         the background Blur above) ── */}
+                    <div className="st-section">
+                        <span className="st-section__title">Adjust</span>
+                        <RangeRow label="Brightness" min={-0.5} max={0.5} step={0.02} value={effectVal(clip, 'brightness', 0)}
+                            fmt={(v) => v.toFixed(2)} onChange={(v) => set({ effects: withEffect(clip, 'brightness', v, 0) })} />
+                        <RangeRow label="Contrast" min={0.5} max={1.8} step={0.02} value={effectVal(clip, 'contrast', 1)}
+                            fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'contrast', v, 1) })} />
+                        <RangeRow label="Saturation" min={0} max={2.5} step={0.05} value={effectVal(clip, 'saturation', 1)}
+                            fmt={(v) => `${v.toFixed(2)}×`} onChange={(v) => set({ effects: withEffect(clip, 'saturation', v, 1) })} />
+                        <RangeRow label="Soften" min={0} max={20} step={1} value={effectVal(clip, 'blur', 0)}
+                            fmt={(v) => (v ? `${Math.round(v)}px` : 'off')} onChange={(v) => set({ effects: withEffect(clip, 'blur', v, 0) })} />
+                        <div className="st-field">
+                            <span className="st-field__label">Filters</span>
+                            <div className="st-row" style={{ gap: 12, flexWrap: 'wrap' }}>
+                                <Check label="Grayscale" on={effectVal(clip, 'grayscale', 0) > 0} onToggle={(on) => set({ effects: withEffect(clip, 'grayscale', on ? 1 : 0, 0) })} />
+                                <Check label="Fade in" on={!!clip.fadeIn} onToggle={(on) => set({ fadeIn: on ? 0.4 : 0 })} />
+                                <Check label="Fade out" on={!!clip.fadeOut} onToggle={(on) => set({ fadeOut: on ? 0.4 : 0 })} />
+                            </div>
                         </div>
                     </div>
                 </>
