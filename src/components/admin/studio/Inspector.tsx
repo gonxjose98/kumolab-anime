@@ -99,23 +99,39 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
 
             {track.kind === 'text' && clip.text && (
                 <>
-                    <div className="st-field">
-                        <span className="st-field__label">Text</span>
-                        <textarea className="ak-field__input" style={{ height: 'auto', padding: 10, resize: 'vertical' }} rows={2}
-                            value={clip.text.text} onChange={(e) => setText({ text: e.target.value })} />
-                    </div>
-                    <div className="st-field">
-                        <span className="st-field__label">Color</span>
-                        <div className="st-row">
-                            <input type="color" value={clip.text.color} onChange={(e) => setText({ color: e.target.value })}
-                                style={{ width: 40, height: 30, padding: 0, border: '1px solid var(--line-2)', borderRadius: 6, background: 'transparent' }} />
-                            <select className="ak-field__input" value={clip.text.align ?? 'center'} onChange={(e) => setText({ align: e.target.value as any })}>
-                                <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-                            </select>
+                    <div className="st-section">
+                        <span className="st-section__title">Text</span>
+                        <div className="st-field">
+                            <span className="st-field__label">Content</span>
+                            <textarea className="ak-field__input" style={{ height: 'auto', padding: 10, resize: 'vertical' }} rows={2}
+                                value={clip.text.text} onChange={(e) => setText({ text: e.target.value })} />
                         </div>
+                        <div className="st-field">
+                            <span className="st-field__label">Color &amp; align</span>
+                            <div className="st-row" style={{ gap: 10 }}>
+                                <input type="color" value={clip.text.color} onChange={(e) => setText({ color: e.target.value })}
+                                    style={{ width: 40, height: 34, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                                <div style={{ flex: 1 }}>
+                                    <Seg
+                                        value={clip.text.align ?? 'center'}
+                                        options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]}
+                                        onChange={(v) => setText({ align: v })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <RangeRow label="Size" min={0.02} max={0.2} step={0.005} value={clip.text.sizePct}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setText({ sizePct: v })} />
                     </div>
-                    <RangeRow label="Size" min={0.02} max={0.14} step={0.005} value={clip.text.sizePct}
-                        fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setText({ sizePct: v })} />
+
+                    <div className="st-section">
+                        <span className="st-section__title">Position</span>
+                        <RangeRow label="Position Y" min={0} max={1} step={0.01} value={clip.transform?.yPct ?? 0.8}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ yPct: v })} />
+                        <RangeRow label="Position X" min={0} max={1} step={0.01} value={clip.transform?.xPct ?? 0.5}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ xPct: v })} />
+                        <span className="st-hint">Lower third by default. Slide Y up toward the top, down toward the bottom.</span>
+                    </div>
                 </>
             )}
 

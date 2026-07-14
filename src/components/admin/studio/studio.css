@@ -190,6 +190,22 @@
     color: #f0d59a;
 }
 
+/* KumoLab preset assets (logos): show the whole mark, not a cropped fill. */
+.admin-root .st-preset-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+}
+.admin-root .st-asset--preset {
+    cursor: pointer;
+    padding: 0;
+    background: radial-gradient(120% 100% at 50% 0%, #16233f, #0a1526);
+}
+.admin-root .st-asset--preset img { object-fit: contain; padding: 20%; }
+
 /* ── Preview stage (near-black media surface) ───────────────────────────*/
 .admin-root .st-preview {
     grid-area: preview;
@@ -512,11 +528,16 @@
     .admin-root .st-inspector,
     .admin-root .st-library { flex: 0 0 auto; }
 
-    /* Topbar and the video stay pinned while the tools scroll under them. */
+    /* Topbar and the video stay pinned while the tools scroll under them. A
+       fixed topbar height that the preview's sticky `top` matches exactly is
+       what keeps the video from being shoved down (a mismatch left a gap under
+       the topbar AND pushed the preview over the Add-text bar below it). */
     .admin-root .st-topbar {
         position: sticky;
         top: 0;
         z-index: 6;
+        height: 48px;
+        flex: 0 0 48px;
         padding: 0 10px;
         gap: 6px;
     }
@@ -535,12 +556,12 @@
 
     .admin-root .st-preview {
         position: sticky;
-        top: 52px;
+        top: 48px; /* == topbar height, so sticky adds no downward shift */
         z-index: 4;
-        height: 40vh;
-        min-height: 210px;
-        padding: 12px;
-        gap: 10px;
+        height: 38vh;
+        min-height: 200px;
+        padding: 10px 12px;
+        gap: 8px;
         border-bottom: 1px solid var(--line);
     }
 

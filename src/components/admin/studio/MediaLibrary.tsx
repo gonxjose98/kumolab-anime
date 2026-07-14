@@ -9,6 +9,33 @@ import { probeMedia } from './store/blobStore';
 import { addAssetToTimeline, addTextClip } from './clipFactory';
 import { uid, type MediaAsset } from './types';
 
+/** KumoLab-branded assets available in every project by default. They are NOT
+ *  auto-placed; tapping one adds it to the timeline on demand. Bytes are pulled
+ *  from /public on first use and cached like any other remote media. */
+const PRESETS: { name: string; url: string }[] = [
+    { name: 'KumoLab mark (gold)', url: '/kumolab-cloud-mark-gold.png' },
+];
+
+/** Drop a preset onto the timeline as its own image clip. A fresh id each time
+ *  allows multiple placements; remoteUrl lets preview + export fetch the bytes. */
+function addPreset(p: { name: string; url: string }) {
+    const asset: MediaAsset = {
+        id: uid(), kind: 'image', name: p.name, origin: 'upload',
+        remoteUrl: p.url, durationSec: 0, createdAt: Date.now(),
+    };
+    const store = useProjectStore.getState();
+    store.addMedia(asset);
+    const clipId = addAssetToTimeline(asset);
+    // A logo is an OVERLAY, not a base layer: paint it in front of the video
+    // (high z, like text), keep it transparent (no background fill), and size it
+    // as a mark rather than a full frame.
+    store.updateClip(clipId, {
+        z: 20,
+        transform: { xPct: 0.5, yPct: 0.5, scale: 0.4, rotationDeg: 0, opacity: 1, fit: 'contain', fillStyle: undefined },
+    });
+    store.select([clipId]);
+}
+
 /** Left rail: the project's media assets + import (post original is added by the app). */
 export default function MediaLibrary() {
     const project = useProjectStore((s) => s.project);
@@ -65,6 +92,19 @@ export default function MediaLibrary() {
                     onClick={() => addTextClip(usePlaybackStore.getState().currentTime)}>
                     <Type size={13} /> Add text
                 </button>
+
+                {/* KumoLab presets — always available, added on tap (never auto-placed). */}
+                <div className="st-preset-label">Presets</div>
+                <div className="st-media-grid" style={{ marginBottom: 16 }}>
+                    {PRESETS.map((p) => (
+                        <button key={p.url} type="button" className="st-asset st-asset--preset" title={`Add ${p.name}`} onClick={() => addPreset(p)}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={p.url} alt={p.name} />
+                            <span className="st-asset__badge">logo</span>
+                            <span className="st-asset__name">{p.name}</span>
+                        </button>
+                    ))}
+                </div>
 
                 {project.media.length === 0 ? (
                     <div className="st-drop" onClick={() => fileRef.current?.click()}>

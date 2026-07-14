@@ -55,7 +55,10 @@ export function addTextClip(atSec: number): string {
         speed: 1,
         volume: 1,
         muted: false,
-        transform: { ...DEFAULT_TRANSFORM, fillStyle: undefined },
+        // Land captions in the lower third, horizontally centred — where anime
+        // clips put them, and clear of the top action. The operator can still
+        // drag it anywhere with the Position sliders.
+        transform: { ...DEFAULT_TRANSFORM, fillStyle: undefined, xPct: 0.5, yPct: 0.8 },
         text: { ...DEFAULT_TEXT },
         z: 10,
     };
