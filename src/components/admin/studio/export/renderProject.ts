@@ -33,12 +33,12 @@ async function assetBytes(asset: MediaAsset): Promise<Uint8Array> {
 
 /** contain-with-blur / contain-solid / cover video filter to WxH. */
 function fitFilter(tr: Transform | undefined, W: number, H: number): string {
-    const t = tr ?? ({ fit: 'contain', fillStyle: 'blur', blurIntensity: 20 } as Transform);
+    const t = tr ?? ({ fit: 'contain', fillStyle: 'blur', blurIntensity: 60 } as Transform);
     if (t.fit === 'cover') {
         return `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
     }
     if (t.fillStyle === 'blur') {
-        const s = t.blurIntensity ?? 20;
+        const s = t.blurIntensity ?? 60;
         return `split=2[bg][fg];[bg]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=${s}[bgb];[fg]scale=${W}:${H}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2`;
     }
     const color = t.fillStyle === 'white' ? 'white' : 'black';

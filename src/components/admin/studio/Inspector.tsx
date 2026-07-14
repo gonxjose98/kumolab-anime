@@ -224,8 +224,8 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                                     />
                                 </div>
                                 {(clip.transform.fillStyle ?? 'blur') === 'blur' && (
-                                    <RangeRow label="Background blur" min={0} max={60} step={1} value={clip.transform.blurIntensity ?? 20}
-                                        fmt={(v) => `${Math.round(v)}px`} onChange={(v) => setTransform({ blurIntensity: v })} />
+                                    <RangeRow label="Background blur" min={0} max={160} step={2} value={clip.transform.blurIntensity ?? 60}
+                                        fmt={(v) => (v <= 1 ? 'off' : `${Math.round(v)}`)} onChange={(v) => setTransform({ blurIntensity: v })} />
                                 )}
                             </>
                         )}

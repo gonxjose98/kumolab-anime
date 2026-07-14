@@ -132,7 +132,7 @@ export default function PreviewCanvas() {
                 if (transform.fillStyle === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
                 else if (transform.fillStyle === 'blur') {
                     ctx.save();
-                    ctx.filter = `blur(${(transform.blurIntensity ?? 20)}px)`;
+                    ctx.filter = `blur(${(transform.blurIntensity ?? 60)}px)`;
                     // cover-draw a blurred copy behind
                     let bw: number, bh: number;
                     if (srcAspect > targetAspect) { bh = ch; bw = ch * srcAspect; } else { bw = cw; bh = cw / srcAspect; }

@@ -144,7 +144,7 @@ export const DEFAULT_TRANSFORM: Transform = {
     opacity: 1,
     fit: 'contain',
     fillStyle: 'blur',
-    blurIntensity: 20,
+    blurIntensity: 60,
 };
 
 export const DEFAULT_TEXT: TextStyle = {
