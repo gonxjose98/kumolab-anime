@@ -1,9 +1,53 @@
 'use client';
 
+import { useState } from 'react';
 import { Scissors, Trash2 } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
-import type { Clip, Track, ClipEffect, ClipEffectType } from './types';
+import { saveTextTemplate } from './textTemplate';
+import type { Clip, Track, ClipEffect, ClipEffectType, TextStyle } from './types';
+
+/** Tap a word to give it its own colour (highlight key words). Only shown for
+ *  multi-word captions. Indices track the space-split words, matching paintText. */
+function WordColors({ clipId, text, wordColors, baseColor, onChange }: {
+    clipId: string; text: string; wordColors: (string | null)[] | undefined; baseColor: string;
+    onChange: (wc: (string | null)[] | undefined) => void;
+}) {
+    const [sel, setSel] = useState<number | null>(null);
+    const words = text.split(' ');
+    const wc = wordColors ?? [];
+    if (words.filter(Boolean).length < 2) return null;
+
+    const setWord = (i: number, color: string | null) => {
+        const next = words.map((_, idx) => (idx === i ? color : wc[idx] ?? null));
+        while (next.length && next[next.length - 1] == null) next.pop();
+        onChange(next.length ? next : undefined);
+    };
+
+    return (
+        <div className="st-field" key={clipId}>
+            <span className="st-field__label">Word colors</span>
+            <div className="st-wordchips">
+                {words.map((w, i) => (w ? (
+                    <button key={i} type="button"
+                        className={`st-wordchip ${sel === i ? 'st-wordchip--sel' : ''} ${wc[i] ? 'st-wordchip--set' : ''}`}
+                        style={{ color: wc[i] || baseColor }}
+                        onClick={() => setSel(sel === i ? null : i)}>
+                        {w}
+                    </button>
+                ) : null))}
+            </div>
+            {sel != null && words[sel] && (
+                <div className="st-row" style={{ marginTop: 8, gap: 8 }}>
+                    <input type="color" value={wc[sel] || baseColor} onChange={(e) => setWord(sel, e.target.value)}
+                        style={{ width: 40, height: 32, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                    <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => setWord(sel, null)}>Reset word</button>
+                </div>
+            )}
+            <span className="st-hint">Tap a word, then pick a colour to highlight it.</span>
+        </div>
+    );
+}
 
 /** Read a clip's effect amount (or the neutral default when unset). */
 function effectVal(clip: Clip, type: ClipEffectType, neutral: number): number {
@@ -87,6 +131,7 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
         set({ transform: { ...(clip.transform ?? ({} as any)), ...patch } });
     const setText = (patch: Partial<NonNullable<Clip['text']>>) =>
         set({ text: { ...(clip.text ?? ({} as any)), ...patch } });
+    const [tplSaved, setTplSaved] = useState(false);
 
     return (
         <>
@@ -122,6 +167,8 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                         </div>
                         <RangeRow label="Size" min={0.02} max={0.2} step={0.005} value={clip.text.sizePct}
                             fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setText({ sizePct: v })} />
+                        <WordColors clipId={clip.id} text={clip.text.text} wordColors={clip.text.wordColors}
+                            baseColor={clip.text.color} onChange={(wc) => setText({ wordColors: wc })} />
                     </div>
 
                     <div className="st-section">
@@ -131,6 +178,23 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                         <RangeRow label="Position X" min={0} max={1} step={0.01} value={clip.transform?.xPct ?? 0.5}
                             fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransform({ xPct: v })} />
                         <span className="st-hint">Lower third by default. Slide Y up toward the top, down toward the bottom.</span>
+                    </div>
+
+                    <div className="st-section">
+                        <button className="ak-btn ak-btn--secondary ak-btn--sm ak-btn--block"
+                            onClick={() => {
+                                const t = clip.text as TextStyle;
+                                saveTextTemplate({
+                                    style: { color: t.color, sizePct: t.sizePct, weight: t.weight, align: t.align, bg: t.bg, strokePx: t.strokePx, strokeColor: t.strokeColor },
+                                    xPct: clip.transform?.xPct ?? 0.5,
+                                    yPct: clip.transform?.yPct ?? 0.8,
+                                });
+                                setTplSaved(true);
+                                setTimeout(() => setTplSaved(false), 1600);
+                            }}>
+                            {tplSaved ? 'Saved as template ✓' : 'Save as template'}
+                        </button>
+                        <span className="st-hint">New text clips reuse this style and placement.</span>
                     </div>
                 </>
             )}

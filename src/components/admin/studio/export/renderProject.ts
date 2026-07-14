@@ -5,6 +5,7 @@ import { getFFmpeg } from './ffmpegClient';
 import { getBlob } from '../store/blobStore';
 import { useMediaStore } from '../store/mediaStore';
 import type { VideoProject, Clip, Track, MediaAsset, TextStyle, Transform } from '../types';
+import { paintText } from '../paintText';
 
 export interface ExportOptions {
     width: number;
@@ -98,26 +99,10 @@ function textPng(clip: Clip, W: number, H: number): Promise<Uint8Array> {
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d')!;
-    const fontPx = ts.sizePct * H;
-    ctx.font = `${ts.weight ?? 800} ${fontPx}px ${ts.fontFamily || 'Inter, system-ui, sans-serif'}`;
-    ctx.textAlign = (ts.align ?? 'center') as CanvasTextAlign;
-    ctx.textBaseline = 'middle';
     const x = (clip.transform?.xPct ?? 0.5) * W;
     const y = (clip.transform?.yPct ?? 0.5) * H;
-    if (ts.bg) {
-        const m = ctx.measureText(ts.text);
-        const pad = fontPx * 0.25;
-        ctx.fillStyle = ts.bg;
-        ctx.fillRect(x - m.width / 2 - pad, y - fontPx / 2 - pad, m.width + pad * 2, fontPx + pad * 2);
-    }
-    if (ts.strokePx) {
-        ctx.lineWidth = ts.strokePx * (fontPx / 40);
-        ctx.strokeStyle = ts.strokeColor || 'rgba(0,0,0,0.85)';
-        ctx.lineJoin = 'round';
-        ctx.strokeText(ts.text, x, y);
-    }
-    ctx.fillStyle = ts.color;
-    ctx.fillText(ts.text, x, y);
+    // Shared with the live preview so export matches exactly (incl. per-word colours).
+    paintText(ctx, ts, x, y, H);
     return new Promise((resolve, reject) => {
         canvas.toBlob((b) => {
             if (!b) return reject(new Error('text render failed'));

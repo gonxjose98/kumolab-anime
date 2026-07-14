@@ -492,6 +492,25 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+/* Per-word colour chips (highlight individual words in a caption). */
+.admin-root .st-wordchips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.admin-root .st-wordchip {
+    padding: 5px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line-2);
+    background: rgba(10, 21, 38, 0.7);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.14s, box-shadow 0.14s;
+}
+.admin-root .st-wordchip--set { border-color: rgba(227, 178, 90, 0.5); }
+.admin-root .st-wordchip--sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+
 /* ── Mobile: stack the editor into one scrollable column ──────────────────
    The desktop 3-column grid crushes the video preview to a sliver on a phone.
    The previous mobile fix kept CSS grid, but a fixed-height grid container

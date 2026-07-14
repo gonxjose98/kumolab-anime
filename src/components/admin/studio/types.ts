@@ -51,14 +51,15 @@ export interface Transform {
 
 export interface TextStyle {
     text: string;
-    color: string;
-    sizePct: number;       // font size as a fraction of canvas height
+    color: string;                        // base colour for the whole line
+    sizePct: number;                      // font size as a fraction of canvas height
     fontFamily?: string;
     weight?: number;
     align?: 'left' | 'center' | 'right';
-    bg?: string | null;    // optional caption box
+    bg?: string | null;                   // optional caption box
     strokePx?: number;
     strokeColor?: string;
+    wordColors?: (string | null)[];       // per-word colour overrides (parallel to space-split words)
 }
 
 export type TransitionKind = 'none' | 'fade' | 'crossfade' | 'slide';

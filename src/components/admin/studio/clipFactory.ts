@@ -1,6 +1,7 @@
 'use client';
 
 import { useProjectStore } from './store/projectStore';
+import { loadTextTemplate } from './textTemplate';
 import { DEFAULT_TRANSFORM, DEFAULT_TEXT, type MediaAsset, type TrackKind, type Clip } from './types';
 
 const IMAGE_DEFAULT_SEC = 5;
@@ -47,6 +48,11 @@ export function addTextClip(atSec: number): string {
     let track = p.tracks.find((t) => t.kind === 'text' && !t.locked);
     let trackId = track?.id;
     if (!trackId) trackId = store.addTrack('text');
+    // Reuse the operator's saved look (colour/size/stroke/placement) if any;
+    // otherwise land captions in the lower third, horizontally centred — where
+    // anime clips put them, and clear of the top action. Either way the words
+    // stay the placeholder and it can be dragged with the Position sliders.
+    const tpl = loadTextTemplate();
     const clip: Omit<Clip, 'id' | 'trackId'> = {
         srcStart: 0,
         srcEnd: 3,
@@ -55,11 +61,13 @@ export function addTextClip(atSec: number): string {
         speed: 1,
         volume: 1,
         muted: false,
-        // Land captions in the lower third, horizontally centred — where anime
-        // clips put them, and clear of the top action. The operator can still
-        // drag it anywhere with the Position sliders.
-        transform: { ...DEFAULT_TRANSFORM, fillStyle: undefined, xPct: 0.5, yPct: 0.8 },
-        text: { ...DEFAULT_TEXT },
+        transform: {
+            ...DEFAULT_TRANSFORM,
+            fillStyle: undefined,
+            xPct: tpl?.xPct ?? 0.5,
+            yPct: tpl?.yPct ?? 0.8,
+        },
+        text: { ...DEFAULT_TEXT, ...(tpl?.style ?? {}), text: DEFAULT_TEXT.text },
         z: 10,
     };
     const id = store.addClip(trackId, clip);

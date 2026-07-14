@@ -5,6 +5,7 @@ import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { useMediaStore } from './store/mediaStore';
 import type { Clip, ClipEffectType, Track, Transform, VideoProject } from './types';
+import { paintText } from './paintText';
 
 /**
  * Live compositor. Draws the frame at the current playhead by stacking each
@@ -168,28 +169,9 @@ export default function PreviewCanvas() {
         const drawText = (clip: Clip) => {
             const ts = clip.text;
             if (!ts) return;
-            const fontPx = ts.sizePct * ch;
-            ctx.save();
-            ctx.font = `${ts.weight ?? 800} ${fontPx}px ${ts.fontFamily || 'Inter, system-ui, sans-serif'}`;
-            ctx.textAlign = (ts.align ?? 'center') as CanvasTextAlign;
-            ctx.textBaseline = 'middle';
             const x = (clip.transform?.xPct ?? 0.5) * cw;
             const y = (clip.transform?.yPct ?? 0.5) * ch;
-            if (ts.bg) {
-                const m = ctx.measureText(ts.text);
-                const pad = fontPx * 0.25;
-                ctx.fillStyle = ts.bg;
-                ctx.fillRect(x - m.width / 2 - pad, y - fontPx / 2 - pad, m.width + pad * 2, fontPx + pad * 2);
-            }
-            if (ts.strokePx) {
-                ctx.lineWidth = ts.strokePx * (fontPx / 40);
-                ctx.strokeStyle = ts.strokeColor || 'rgba(0,0,0,0.85)';
-                ctx.lineJoin = 'round';
-                ctx.strokeText(ts.text, x, y);
-            }
-            ctx.fillStyle = ts.color;
-            ctx.fillText(ts.text, x, y);
-            ctx.restore();
+            paintText(ctx, ts, x, y, ch);
         };
 
         const renderFrame = (t: number) => {
