@@ -85,11 +85,16 @@ function TwitterDetailEmbed({ tweetId }: { tweetId: string }) {
     );
 }
 
-export default function PostBody({ slug }: { slug: string }) {
-    const [post, setPost] = useState<BlogPost | null>(null);
-    const [loading, setLoading] = useState(true);
+export default function PostBody({ slug, initialPost }: { slug: string; initialPost?: BlogPost | null }) {
+    // When the server already resolved the post (the normal path), seed state
+    // with it so the article renders in the SSR HTML — no loading flash, and the
+    // content is present for crawlers/link unfurls. Only fall back to the
+    // client fetch when no initial post was provided.
+    const [post, setPost] = useState<BlogPost | null>(initialPost ?? null);
+    const [loading, setLoading] = useState(!initialPost);
 
     useEffect(() => {
+        if (initialPost) return; // already have server-rendered data
         if (!slug) return;
 
         async function fetchPost() {
@@ -125,7 +130,7 @@ export default function PostBody({ slug }: { slug: string }) {
         }
 
         fetchPost();
-    }, [slug]);
+    }, [slug, initialPost]);
 
     if (loading) {
         return (
