@@ -18,8 +18,49 @@ import { NextResponse, type NextRequest } from 'next/server';
 // (none today; reserved for any future "set-cookie" exchange route).
 const ADMIN_PUBLIC_API: ReadonlySet<string> = new Set();
 
+// Per-permission gate for the JSON admin APIs. Being logged in is not enough:
+// a sub-user whose toggle is OFF for an area must not be able to call that
+// area's API directly (e.g. confirming a Printful order = spending money).
+// The owner (by email) bypasses everything. Mirrors the page-layout gates.
+const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? 'gonxjose98@gmail.com').toLowerCase();
+const OWNER_ONLY_PREFIXES = ['/api/admin/team'];
+const ROUTE_PERMS: { prefix: string; perm: string }[] = [
+    { prefix: '/api/admin/orders', perm: 'store' },
+    { prefix: '/api/admin/merch-settings', perm: 'store' },
+    { prefix: '/api/admin/store', perm: 'store' },
+    { prefix: '/api/admin/studio', perm: 'studio' },
+    { prefix: '/api/admin/approve', perm: 'pending' },
+    { prefix: '/api/admin/decline', perm: 'pending' },
+    { prefix: '/api/admin/bulk-delete', perm: 'content' },
+    { prefix: '/api/admin/custom-post', perm: 'content' },
+    { prefix: '/api/admin/import-from-url', perm: 'content' },
+];
+
 function unauthorized(message: string) {
     return NextResponse.json({ error: 'Unauthorized', detail: message }, { status: 401 });
+}
+
+function forbidden(message: string) {
+    return NextResponse.json({ error: 'Forbidden', detail: message }, { status: 403 });
+}
+
+/** Read a sub-user's permission booleans via the service role (RLS bypass);
+ *  runs only for non-owner callers on permission-gated routes. */
+async function fetchPerms(email: string): Promise<Record<string, boolean>> {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const svc = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !svc) return {};
+    try {
+        const r = await fetch(
+            `${url}/rest/v1/admin_users?email=eq.${encodeURIComponent(email)}&select=permissions`,
+            { headers: { apikey: svc, Authorization: `Bearer ${svc}` }, cache: 'no-store' },
+        );
+        if (!r.ok) return {};
+        const rows = (await r.json()) as { permissions?: Record<string, boolean> }[];
+        return rows?.[0]?.permissions ?? {};
+    } catch {
+        return {};
+    }
 }
 
 function checkCron(req: NextRequest): NextResponse | null {
@@ -58,6 +99,20 @@ async function checkAdmin(req: NextRequest): Promise<NextResponse | null> {
 
     const { data, error } = await supabase.auth.getUser();
     if (error || !data?.user) return unauthorized('admin requires authenticated session');
+
+    // Per-permission enforcement (defense in depth beyond the page layouts).
+    const email = data.user.email?.toLowerCase() ?? '';
+    if (email === OWNER_EMAIL) return res; // owner: full access
+
+    const path = req.nextUrl.pathname;
+    if (OWNER_ONLY_PREFIXES.some((p) => path.startsWith(p))) {
+        return forbidden('owner only');
+    }
+    const need = ROUTE_PERMS.find((r) => path.startsWith(r.prefix));
+    if (need) {
+        const perms = await fetchPerms(email);
+        if (perms[need.perm] !== true) return forbidden(`requires ${need.perm} permission`);
+    }
 
     return res;
 }

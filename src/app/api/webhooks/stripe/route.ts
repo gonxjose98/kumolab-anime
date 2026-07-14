@@ -2,7 +2,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { createPrintfulOrder } from '@/lib/printful';
+import { createPrintfulOrder, getPrintfulOrderByExternalId } from '@/lib/printful';
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -24,13 +24,55 @@ export async function POST(req: Request) {
 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as any;
+        const externalId = session.id as string;
 
-        // Extract shipping and item details
+        // IDEMPOTENCY: Stripe delivers events at-least-once (retries), so a
+        // redelivery could create a duplicate Printful order. Skip if we've
+        // already created one for this session.
+        try {
+            const existing = await getPrintfulOrderByExternalId(externalId);
+            if (existing) {
+                console.log(`Printful order already exists for session ${externalId} — skipping`);
+                return NextResponse.json({ received: true });
+            }
+        } catch (e) {
+            console.error(`Idempotency check failed for ${externalId}:`, e);
+        }
+
+        // AUTHORITATIVE line items: read them back from Stripe (with the
+        // variant id we stamped on each product) instead of the metadata
+        // string, which is capped at 500 chars and can truncate a big cart
+        // into invalid JSON, silently dropping a paid order.
+        let items: { sync_variant_id: number; quantity: number }[] = [];
+        try {
+            const lineItems = await stripe.checkout.sessions.listLineItems(externalId, {
+                expand: ['data.price.product'],
+                limit: 100,
+            });
+            items = lineItems.data
+                .map((li: any) => {
+                    const vid = li.price?.product?.metadata?.variantId;
+                    return { sync_variant_id: Number(vid), quantity: li.quantity ?? 1 };
+                })
+                .filter((i) => Number.isFinite(i.sync_variant_id) && i.sync_variant_id > 0);
+
+            if (items.length !== lineItems.data.length) {
+                console.error(`[stripe webhook] ${externalId}: resolved ${items.length}/${lineItems.data.length} line items — some had no variantId.`);
+            }
+        } catch (e) {
+            console.error(`[stripe webhook] Failed to read line items for ${externalId}:`, e);
+        }
+
+        if (items.length === 0) {
+            // Customer paid but we can't build the order. Do NOT silently pass:
+            // log loudly so it can be reconciled by hand from the Stripe session.
+            console.error(`[stripe webhook] PAID session ${externalId} produced NO resolvable items — Printful order NOT created. Needs manual follow-up.`);
+            return NextResponse.json({ received: true, warning: 'no resolvable line items' });
+        }
+
         const shippingDetails = session.shipping_details;
         const customerEmail = session.customer_details?.email;
-        const itemsMetadata = JSON.parse(session.metadata?.items || '[]');
 
-        // Construct Printful Order
         const printfulOrder = {
             recipient: {
                 name: shippingDetails?.name,
@@ -42,17 +84,14 @@ export async function POST(req: Request) {
                 zip: shippingDetails?.address?.postal_code,
                 email: customerEmail,
             },
-            items: itemsMetadata.map((item: any) => ({
-                sync_variant_id: item.variantId,
-                quantity: item.quantity,
-            })),
+            items,
             retail_costs: {
                 currency: 'USD',
                 subtotal: session.amount_subtotal / 100,
                 shipping: session.total_details?.amount_shipping / 100,
                 total: session.amount_total / 100,
             },
-            external_id: session.id, // Link Stripe Session ID to Printful Order
+            external_id: externalId, // Link Stripe Session ID to Printful Order
             // Manual-approval flow (Jose, 2026-07-11): create as a DRAFT, do NOT
             // auto-confirm. The customer has already paid (funds are in Stripe),
             // but Printful only charges the store when the operator approves the
@@ -63,9 +102,9 @@ export async function POST(req: Request) {
 
         try {
             await createPrintfulOrder(printfulOrder);
-            console.log(`Printful order created for session ${session.id}`);
+            console.log(`Printful order created for session ${externalId}`);
         } catch (error) {
-            console.error(`Failed to create Printful order for session ${session.id}:`, error);
+            console.error(`Failed to create Printful order for session ${externalId}:`, error);
             // In a production app, you'd want to retry or alert here
         }
     }

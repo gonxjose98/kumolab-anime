@@ -77,6 +77,27 @@ export async function createPrintfulOrder(orderData: any) {
 }
 
 /**
+ * Look up a Printful order by our external_id (the Stripe session id). Used for
+ * webhook idempotency so a redelivered Stripe event can't create a duplicate
+ * order. Returns the order if it exists, null on 404, and null (logged) on
+ * other errors so a transient failure doesn't block a first-time order.
+ */
+export async function getPrintfulOrderByExternalId(externalId: string) {
+    if (!ACCESS_TOKEN) throw new Error('PRINTFUL_ACCESS_TOKEN is not defined');
+    const res = await fetch(`${PRINTFUL_API_URL}/orders/@${encodeURIComponent(externalId)}`, {
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+        cache: 'no-store',
+    });
+    if (res.status === 404) return null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        console.error('getPrintfulOrderByExternalId error:', data);
+        return null;
+    }
+    return data.result ?? null;
+}
+
+/**
  * Confirm a draft Printful order — this is what actually submits it for
  * fulfillment AND triggers Printful to charge the store's billing method.
  * Called only when the operator approves a paid order (manual-approval flow),

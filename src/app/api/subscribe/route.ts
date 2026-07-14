@@ -9,12 +9,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        const API_KEY = process.env.CONVERTKIT_API_KEY || 'sklg2ChUDpveNjcQR3rVVQ';
-        const FORM_ID = process.env.CONVERTKIT_FORM_ID || '8753533';
-        const TAG_ID = '14489422'; // KumoLab Subscribers Tag
+        // Secrets come from env only. No hardcoded fallback: a committed API
+        // key is a leaked credential (rotate it in ConvertKit if it ever was).
+        const API_KEY = process.env.CONVERTKIT_API_KEY;
+        const FORM_ID = process.env.CONVERTKIT_FORM_ID;
+        const TAG_ID = process.env.CONVERTKIT_TAG_ID || '14489422'; // tag id, not a secret
 
         if (!API_KEY || !FORM_ID) {
-            console.error('Missing ConvertKit configuration');
+            console.error('Missing ConvertKit configuration (CONVERTKIT_API_KEY / CONVERTKIT_FORM_ID)');
             return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
         }
 
