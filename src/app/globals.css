@@ -110,6 +110,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  /* Stop the iOS rubber-band overscroll from revealing the dark body
+     background above/below light sky-themed pages (the "black flash" on
+     swipe). Also prevents scroll-chaining jank. */
+  overscroll-behavior-y: none;
 }
 
 a {
