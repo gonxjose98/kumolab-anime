@@ -23,6 +23,7 @@ export default function PreviewCanvas() {
     const poolRef = useRef<HTMLDivElement | null>(null);
     const videoPool = useRef<Map<string, HTMLVideoElement>>(new Map());
     const imagePool = useRef<Map<string, HTMLImageElement>>(new Map());
+    const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const rafRef = useRef<number>(0);
 
     const cw = project?.meta.canvasWidth ?? 1080;
@@ -131,13 +132,25 @@ export default function PreviewCanvas() {
             if (transform.fit === 'contain' && (dw < cw || dh < ch)) {
                 if (transform.fillStyle === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
                 else if (transform.fillStyle === 'blur') {
-                    ctx.save();
-                    ctx.filter = `blur(${(transform.blurIntensity ?? 60)}px)`;
-                    // cover-draw a blurred copy behind
-                    let bw: number, bh: number;
-                    if (srcAspect > targetAspect) { bh = ch; bw = ch * srcAspect; } else { bw = cw; bh = cw / srcAspect; }
-                    ctx.drawImage(src, (cw - bw) / 2, (ch - bh) / 2, bw, bh);
-                    ctx.restore();
+                    // Blur a heavily downscaled copy, then upscale it. A full-res
+                    // blur(120px) on 1080x1920 EVERY frame stalls phones so hard the
+                    // preview appears frozen while scrubbing; blurring a 1/6-size
+                    // copy is ~36x cheaper and looks identical once scaled back up.
+                    const DS = 6;
+                    const lw = Math.max(2, Math.round(cw / DS));
+                    const lh = Math.max(2, Math.round(ch / DS));
+                    const bc = blurCanvasRef.current ?? (blurCanvasRef.current = document.createElement('canvas'));
+                    if (bc.width !== lw || bc.height !== lh) { bc.width = lw; bc.height = lh; }
+                    const bctx = bc.getContext('2d');
+                    if (bctx) {
+                        bctx.clearRect(0, 0, lw, lh);
+                        let bw: number, bh: number;
+                        if (srcAspect > targetAspect) { bh = lh; bw = lh * srcAspect; } else { bw = lw; bh = lw / srcAspect; }
+                        bctx.filter = `blur(${(transform.blurIntensity ?? 60) / DS}px)`;
+                        bctx.drawImage(src, (lw - bw) / 2, (lh - bh) / 2, bw, bh);
+                        bctx.filter = 'none';
+                        ctx.drawImage(bc, 0, 0, cw, ch);
+                    } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
                 } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
             }
 
@@ -231,8 +244,9 @@ export default function PreviewCanvas() {
                 if (t >= dur) { t = dur; usePlaybackStore.getState().pause(); }
                 usePlaybackStore.getState().setCurrentTime(t);
             }
-            syncVideos(t, pb.isPlaying);
-            renderFrame(t);
+            // Never let one bad frame kill the loop — a thrown error here would
+            // silently freeze the whole preview (and make scrubbing look broken).
+            try { syncVideos(t, pb.isPlaying); renderFrame(t); } catch { /* skip this frame */ }
             rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
