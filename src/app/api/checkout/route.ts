@@ -2,58 +2,87 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { CartItem } from '@/store/useCartStore';
-import { getSyncVariantPrice } from '@/lib/merch';
+import { getSyncVariantInfo } from '@/lib/merch';
+import { getShippingRates, cheapestRate } from '@/lib/printful';
+import { SHIP_COUNTRIES } from '@/lib/shipping';
 
 export async function POST(req: Request) {
     try {
-        const { items } = await req.json();
+        const { items, countryCode } = await req.json();
 
         if (!items || items.length === 0) {
             return NextResponse.json({ error: 'No items in cart' }, { status: 400 });
         }
 
-        // SECURITY / PRICE INTEGRITY: never trust the client-sent price. The
-        // cart lives in the browser, so item.price is attacker-controllable.
-        // Re-fetch each variant's live Printful retail_price server-side and
-        // charge THAT. If any variant can't be resolved we abort the whole
-        // checkout rather than fall back to a client price — a price we can't
-        // verify against Printful must never reach Stripe.
-        const lineItems = await Promise.all(
+        const country = SHIP_COUNTRIES[countryCode];
+        if (!country) {
+            return NextResponse.json({ error: 'Please choose a shipping country.' }, { status: 400 });
+        }
+
+        // SECURITY / PRICE INTEGRITY: never trust client-sent money. The cart
+        // lives in the browser, so item.price (and any shipping) is
+        // attacker-controllable. Re-resolve each variant's live Printful
+        // retail_price AND its catalog id server-side, and recompute shipping
+        // from Printful below. If anything can't be verified we abort the whole
+        // checkout rather than charge a value we can't stand behind.
+        const resolved = await Promise.all(
             items.map(async (item: CartItem) => {
-                const livePrice = await getSyncVariantPrice(item.variantId);
-                if (livePrice == null || livePrice <= 0) {
-                    throw new Error(`Could not verify price for "${item.name}". Please refresh and try again.`);
+                const info = await getSyncVariantInfo(item.variantId);
+                if (info?.retailPrice == null || info.retailPrice <= 0 || !info.catalogVariantId) {
+                    throw new Error(`Could not verify "${item.name}". Please refresh and try again.`);
                 }
-                return {
-                    price_data: {
-                        currency: 'usd',
-                        product_data: {
-                            name: item.name,
-                            images: [item.image],
-                            metadata: {
-                                productId: item.productId,
-                                variantId: item.variantId,
-                                size: item.size || '',
-                                color: item.color || '',
-                            },
-                        },
-                        // Authoritative price from Printful, not item.price.
-                        unit_amount: Math.round(livePrice * 100),
-                    },
-                    quantity: item.quantity,
-                };
-            })
+                return { item, info };
+            }),
         );
+
+        const lineItems = resolved.map(({ item, info }) => ({
+            price_data: {
+                currency: 'usd',
+                product_data: {
+                    name: item.name,
+                    images: [item.image],
+                    metadata: {
+                        productId: item.productId,
+                        variantId: item.variantId,
+                        size: item.size || '',
+                        color: item.color || '',
+                    },
+                },
+                // Authoritative price from Printful, not item.price.
+                unit_amount: Math.round(info.retailPrice! * 100),
+            },
+            quantity: item.quantity,
+        }));
+
+        // Authoritative shipping: recompute from Printful for the chosen country
+        // (the same call the cart estimate used). Never the client's number.
+        const rateItems = resolved.map(({ item, info }) => ({ variant_id: info.catalogVariantId!, quantity: item.quantity }));
+        const rate = cheapestRate(await getShippingRates(country.recipient, rateItems));
+        if (!rate) {
+            return NextResponse.json({ error: 'Could not calculate shipping for that country. Please try again.' }, { status: 502 });
+        }
+        const shippingCents = Math.round(parseFloat(rate.rate) * 100);
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: lineItems,
             mode: 'payment',
             success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch`,
+            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/cart`,
+            // Lock the address to the country we quoted so the shipping we
+            // charge always matches the destination.
             shipping_address_collection: {
-                allowed_countries: ['US', 'CA', 'GB', 'AU'], // Expand as needed
+                allowed_countries: [countryCode],
             },
+            shipping_options: [
+                {
+                    shipping_rate_data: {
+                        display_name: 'Shipping',
+                        type: 'fixed_amount',
+                        fixed_amount: { amount: shippingCents, currency: 'usd' },
+                    },
+                },
+            ],
             metadata: {
                 // Store a stringified version of items for the webhook
                 items: JSON.stringify(items.map((i: CartItem) => ({

@@ -170,6 +170,17 @@ export async function getFeaturedProducts(): Promise<Product[]> {
 // Returns null if the variant can't be resolved (caller must treat as a hard
 // failure — never fall back to a client price).
 export async function getSyncVariantPrice(variantId: number | string): Promise<number | null> {
+    return (await getSyncVariantInfo(variantId))?.retailPrice ?? null;
+}
+
+/**
+ * Resolve a sync variant to its live retail price AND its Printful catalog
+ * variant_id (needed for shipping-rate lookups). Single source of truth for
+ * both; returns null on any failure so callers treat it as a hard error.
+ */
+export async function getSyncVariantInfo(
+    variantId: number | string,
+): Promise<{ retailPrice: number | null; catalogVariantId: number | null } | null> {
     if (!ACCESS_TOKEN) return null;
     try {
         const res = await fetch(`${PRINTFUL_API_URL}/sync/variant/${variantId}`, {
@@ -178,11 +189,15 @@ export async function getSyncVariantPrice(variantId: number | string): Promise<n
         });
         if (!res.ok) return null;
         const data = await res.json();
-        const rp = data.result?.sync_variant?.retail_price ?? data.result?.retail_price;
-        const price = parseFloat(rp);
-        return Number.isFinite(price) ? price : null;
+        const sv = data.result?.sync_variant ?? data.result;
+        const price = parseFloat(sv?.retail_price);
+        const cvid = sv?.variant_id;
+        return {
+            retailPrice: Number.isFinite(price) ? price : null,
+            catalogVariantId: typeof cvid === 'number' ? cvid : (cvid ? Number(cvid) : null),
+        };
     } catch (e: any) {
-        console.error(`getSyncVariantPrice(${variantId}) threw:`, e?.message || e);
+        console.error(`getSyncVariantInfo(${variantId}) threw:`, e?.message || e);
         return null;
     }
 }

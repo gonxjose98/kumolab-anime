@@ -133,6 +133,38 @@
     color: #0b2547;
 }
 
+.shipCountry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(120, 160, 210, 0.35);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: rgba(11, 37, 71, 0.8);
+}
+
+.shipCountry select {
+    flex: 1;
+    max-width: 60%;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid rgba(196, 146, 44, 0.45);
+    background: rgba(255, 255, 255, 0.75);
+    color: #0b2547;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.shipErr {
+    margin: 0.5rem 0 0;
+    font-size: 0.82rem;
+    color: #c0392b;
+}
+
 .summaryRow {
     display: flex;
     justify-content: space-between;
@@ -249,8 +281,19 @@
 
 :global([data-sky='night']) .itemMeta,
 :global([data-sky='night']) .summaryRow,
+:global([data-sky='night']) .shipCountry,
 :global([data-sky='night']) .emptyContainer p {
     color: rgba(220, 232, 255, 0.66);
+}
+
+:global([data-sky='night']) .shipCountry {
+    border-bottom-color: rgba(160, 190, 255, 0.25);
+}
+
+:global([data-sky='night']) .shipCountry select {
+    background: rgba(20, 30, 64, 0.7);
+    border-color: rgba(226, 176, 90, 0.4);
+    color: #eaf2ff;
 }
 
 :global([data-sky='night']) .quantity button {

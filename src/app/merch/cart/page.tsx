@@ -6,11 +6,61 @@ import { ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import SkyContentRoot from '@/components/sky-content';
 import SkyFooter from '@/components/redesign-sky/SkyFooter';
 import styles from './cart.module.css';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+
+// Dropdown options; the server validates against the real ship list.
+const COUNTRIES = [
+    { code: 'US', label: 'United States' },
+    { code: 'CA', label: 'Canada' },
+    { code: 'GB', label: 'United Kingdom' },
+    { code: 'AU', label: 'Australia' },
+];
 
 export default function CartPage() {
     const { items, removeItem, updateQuantity, getTotal } = useCartStore();
     const [isLoading, setIsLoading] = useState(false);
+    const [country, setCountry] = useState('US');
+    const [shipping, setShipping] = useState<number | null>(null);
+    const [shipLoading, setShipLoading] = useState(false);
+    const [shipError, setShipError] = useState<string | null>(null);
+
+    const subtotal = getTotal();
+    // Stable key so the estimate refetches when the cart contents or country change.
+    const cartKey = useMemo(
+        () => items.map((i) => `${i.variantId}x${i.quantity}`).join(','),
+        [items],
+    );
+
+    useEffect(() => {
+        if (items.length === 0) { setShipping(null); setShipError(null); return; }
+        let cancelled = false;
+        setShipLoading(true);
+        setShipError(null);
+        (async () => {
+            try {
+                const res = await fetch('/api/shipping-estimate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        countryCode: country,
+                        items: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+                    }),
+                });
+                const data = await res.json();
+                if (cancelled) return;
+                if (!res.ok) throw new Error(data.error || 'Could not estimate shipping');
+                setShipping(typeof data.shipping === 'number' ? data.shipping : null);
+            } catch (e: any) {
+                if (!cancelled) { setShipping(null); setShipError(e?.message || 'Could not estimate shipping'); }
+            } finally {
+                if (!cancelled) setShipLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [cartKey, country, items]);
+
+    const total = subtotal + (shipping ?? 0);
+    const canCheckout = !isLoading && !shipLoading && shipping != null && !shipError;
 
     const handleCheckout = async () => {
         setIsLoading(true);
@@ -18,7 +68,7 @@ export default function CartPage() {
             const response = await fetch('/api/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items }),
+                body: JSON.stringify({ items, countryCode: country }),
             });
 
             const { url, error } = await response.json();
@@ -26,7 +76,7 @@ export default function CartPage() {
             if (url) window.location.href = url; // Redirect to Stripe Checkout
         } catch (error: any) {
             console.error('Checkout failed:', error);
-            alert('Checkout failed. Please try again.');
+            alert(error?.message || 'Checkout failed. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -77,30 +127,52 @@ export default function CartPage() {
 
                         <div className={styles.summary}>
                             <h2>Order Summary</h2>
+
+                            <label className={styles.shipCountry}>
+                                <span>Ship to</span>
+                                <select value={country} onChange={(e) => setCountry(e.target.value)} disabled={isLoading}>
+                                    {COUNTRIES.map((c) => (
+                                        <option key={c.code} value={c.code}>{c.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+
                             <div className={styles.summaryRow}>
                                 <span>Subtotal</span>
-                                <span>${getTotal().toFixed(2)}</span>
+                                <span>${subtotal.toFixed(2)}</span>
                             </div>
                             <div className={styles.summaryRow}>
                                 <span>Shipping</span>
-                                <span>Calculated at checkout</span>
+                                <span>
+                                    {shipLoading
+                                        ? 'Calculating…'
+                                        : shipError
+                                            ? 'Unavailable'
+                                            : shipping != null
+                                                ? `$${shipping.toFixed(2)}`
+                                                : '—'}
+                                </span>
                             </div>
                             <div className={`${styles.summaryRow} ${styles.total}`}>
                                 <span>Total</span>
-                                <span>${getTotal().toFixed(2)}</span>
+                                <span>${total.toFixed(2)}</span>
                             </div>
+
+                            {shipError && (
+                                <p className={styles.shipErr}>{shipError}. Please try again in a moment.</p>
+                            )}
 
                             <button
                                 className={styles.checkoutBtn}
                                 onClick={handleCheckout}
-                                disabled={isLoading}
+                                disabled={!canCheckout}
                             >
-                                {isLoading ? 'Processing...' : 'Proceed to Checkout'}
-                                {!isLoading && <ArrowRight size={20} />}
+                                {isLoading ? 'Processing...' : shipLoading ? 'Calculating shipping…' : 'Proceed to Checkout'}
+                                {canCheckout && !isLoading && <ArrowRight size={20} />}
                             </button>
 
                             <p className={styles.checkoutNote}>
-                                Payments processed securely via Stripe.
+                                Shipping is calculated live from our print partner. Payments processed securely via Stripe.
                             </p>
                         </div>
                     </div>
