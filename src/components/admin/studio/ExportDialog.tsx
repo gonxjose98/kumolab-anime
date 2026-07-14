@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { CheckCircle2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { renderProject } from './export/renderProject';
+import ExportScheduleSheet from './ExportScheduleSheet';
 import { CAPS } from './types';
 
 type Phase = 'idle' | 'rendering' | 'uploading' | 'done' | 'error';
@@ -76,6 +77,11 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
         }
     }
 
+    // After a successful export, hand off to the scheduling sheet (same scrim slot).
+    if (phase === 'done') {
+        return <ExportScheduleSheet postId={postId} resultUrl={resultUrl} onClose={onClose} />;
+    }
+
     return (
         <div className="ak-modal__scrim" onClick={busy ? undefined : onClose}>
             <div className="ak-modal" onClick={(e) => e.stopPropagation()}>
@@ -84,54 +90,41 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
                     <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={onClose} disabled={busy}><X size={15} /></button>
                 </div>
                 <div className="ak-modal__body flex flex-col gap-4">
-                    {phase === 'done' ? (
-                        <div className="text-center flex flex-col items-center gap-2" style={{ padding: '8px 0' }}>
-                            <CheckCircle2 size={34} style={{ color: '#1d7a4f' }} />
-                            <div className="ak-heading" style={{ color: '#1d7a4f' }}>Exported &amp; attached</div>
-                            <div className="ak-caption">This reel is now what publishes for this post. Approve it from the post editor to send it live.</div>
-                            {resultUrl && <a className="ak-btn ak-btn--secondary ak-btn--sm" href={resultUrl} target="_blank" rel="noopener noreferrer">Preview file ↗</a>}
+                    <div className="ak-field">
+                        <label className="ak-field__label">Format</label>
+                        <select className="ak-field__input" value={preset} disabled={busy} onChange={(e) => setPreset(e.target.value)}>
+                            {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                        </select>
+                    </div>
+
+                    <label className="ak-body-sm" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={watermark} disabled={busy}
+                            onChange={(e) => useProjectStore.getState().setMeta({ watermark: e.target.checked })} />
+                        Burn in the <strong>@kumolabanime</strong> watermark
+                    </label>
+
+                    <div className="ak-body-sm">
+                        Duration <strong>{dur.toFixed(1)}s</strong> · renders in your browser.
+                        {dur > CAPS.warnDurationSec && !overCap && <span style={{ color: '#8a6420' }}> Long export: this may take a couple minutes.</span>}
+                    </div>
+                    {overCap && (
+                        <div className="ak-auth__err" style={{ textAlign: 'left' }}>
+                            Project is {dur.toFixed(0)}s, over the {CAPS.maxDurationSec}s export cap. Trim it down first.
                         </div>
-                    ) : (
-                        <>
-                            <div className="ak-field">
-                                <label className="ak-field__label">Format</label>
-                                <select className="ak-field__input" value={preset} disabled={busy} onChange={(e) => setPreset(e.target.value)}>
-                                    {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-                                </select>
-                            </div>
-
-                            <label className="ak-body-sm" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={watermark} disabled={busy}
-                                    onChange={(e) => useProjectStore.getState().setMeta({ watermark: e.target.checked })} />
-                                Burn in the <strong>@kumolabanime</strong> watermark
-                            </label>
-
-                            <div className="ak-body-sm">
-                                Duration <strong>{dur.toFixed(1)}s</strong> · renders in your browser.
-                                {dur > CAPS.warnDurationSec && !overCap && <span style={{ color: '#8a6420' }}> Long export — this may take a couple minutes.</span>}
-                            </div>
-                            {overCap && (
-                                <div className="ak-auth__err" style={{ textAlign: 'left' }}>
-                                    Project is {dur.toFixed(0)}s — over the {CAPS.maxDurationSec}s export cap. Trim it down first.
-                                </div>
-                            )}
-
-                            {busy && (
-                                <div className="flex flex-col gap-2">
-                                    <div className="ak-caption">{stage}… {Math.round(progress * 100)}%</div>
-                                    <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                                        <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: 'var(--gold-grad)', transition: 'width 0.2s' }} />
-                                    </div>
-                                </div>
-                            )}
-                            {error && <div className="ak-auth__err" style={{ textAlign: 'left' }}>{error}</div>}
-                        </>
                     )}
+
+                    {busy && (
+                        <div className="flex flex-col gap-2">
+                            <div className="ak-caption">{stage}… {Math.round(progress * 100)}%</div>
+                            <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: 'var(--gold-grad)', transition: 'width 0.2s' }} />
+                            </div>
+                        </div>
+                    )}
+                    {error && <div className="ak-auth__err" style={{ textAlign: 'left' }}>{error}</div>}
                 </div>
                 <div className="ak-modal__foot">
-                    {phase === 'done' ? (
-                        <button className="ak-btn ak-btn--primary" onClick={onClose}>Done</button>
-                    ) : busy ? (
+                    {busy ? (
                         <button className="ak-btn ak-btn--secondary" onClick={() => abortRef.current?.abort()}>Cancel</button>
                     ) : (
                         <>
