@@ -12,7 +12,7 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakart
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://kumolab-anime.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com'),
   title: {
     default: 'KumoLab | Anime Intelligence & Verified News',
     template: '%s | KumoLab'
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://kumolab-anime.com',
+    url: 'https://kumolabanime.com',
     siteName: 'KumoLab',
     title: 'KumoLab | Anime Intelligence & Verified News',
     description: 'Daily anime updates, verified news, release dates, trailers, and industry intel - without the noise.',
@@ -57,10 +57,13 @@ export const metadata: Metadata = {
     creator: '@KumoLabAnime'
   },
   verification: {
-    google: 'your-google-verification-code', // Add when available
+    // Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION in Vercel to the token from
+    // Google Search Console. When unset, Next omits the meta tag entirely
+    // (no bogus token is emitted).
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   alternates: {
-    canonical: 'https://kumolab-anime.com'
+    canonical: 'https://kumolabanime.com'
   }
 };
 

@@ -1,6 +1,6 @@
 // Static sitemap - no database calls at build time
 export default function sitemap() {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolab-anime.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kumolabanime.com';
     
     // Static pages only - blog posts will be discovered by Googlebot
     return [

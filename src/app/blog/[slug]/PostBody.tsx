@@ -160,7 +160,7 @@ export default function PostBody({ slug }: { slug: string }) {
     const stagedVideoUrl: string | undefined = (post as any).social_ids?.staged_video_url;
     const hasUploadedVideo = !!stagedVideoUrl && !post.youtube_video_id && !isTwitterPost;
 
-    const postUrl = `https://kumolab-anime.com/blog/${post.slug}`;
+    const postUrl = `https://kumolabanime.com/blog/${post.slug}`;
 
     return (
         <article className={styles.container}>

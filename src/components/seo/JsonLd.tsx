@@ -5,8 +5,8 @@ export function OrganizationJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'KumoLab',
-    url: 'https://kumolab-anime.com',
-    logo: 'https://kumolab-anime.com/kumolab-logo.png',
+    url: 'https://kumolabanime.com',
+    logo: 'https://kumolabanime.com/kumolab-logo.png',
     sameAs: [
       'https://x.com/KumoLabAnime',
     ],
@@ -25,7 +25,7 @@ export function WebSiteJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'KumoLab',
-    url: 'https://kumolab-anime.com',
+    url: 'https://kumolabanime.com',
     description: 'Daily anime updates, verified news, release dates, trailers, and industry intel - without the noise.',
     publisher: {
       '@type': 'Organization',
@@ -42,7 +42,7 @@ export function WebSiteJsonLd() {
 }
 
 export function ArticleJsonLd({ post }: { post: BlogPost }) {
-  const baseUrl = 'https://kumolab-anime.com';
+  const baseUrl = 'https://kumolabanime.com';
   const data = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
