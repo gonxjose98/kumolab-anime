@@ -52,6 +52,7 @@ export interface AnalyticsData {
     revenue: RevenueSummary;
     range: number;        // active time-range in days (0 = all-time)
     socialDays: number;   // effective window for social account metrics (Meta caps at 30)
+    igViewsRange: number | null; // IG views for ranges past the 30d cap, summed from per-post lifetime insights (null = use the account window)
     siteViewsRange: number; // total website views in the active range
 }
 
@@ -196,6 +197,40 @@ async function topPostsAndClaims(sinceIso: string | null = null, webDays = 60): 
 
 const DEAD_SNAP = (reason: string): PlatformSnapshot => ({ ok: false, reason, followers: null, views28d: null, engagement28d: null });
 
+/**
+ * IG views for ranges past Meta's 30-day account-insights cap, summed from the
+ * per-post lifetime insights that metrics-sync already stores in
+ * posts.social_metrics. Per-post insights are lifetime (no window cap), so the
+ * sum reflects true all-time views instead of a 30-day slice. Reach is a
+ * de-duplicated unique-accounts metric and cannot be summed across posts, so
+ * it stays on the windowed account number. Returns null when nothing is
+ * synced yet, so the UI can fall back to the capped window honestly.
+ */
+async function igViewsFromPosts(sinceIso: string | null): Promise<number | null> {
+    try {
+        let q = supabaseAdmin
+            .from('posts')
+            .select('social_metrics')
+            .eq('status', 'published')
+            .not('social_metrics->instagram', 'is', null)
+            .limit(2000);
+        if (sinceIso) q = q.gte('published_at', sinceIso);
+        const { data, error } = await q;
+        if (error || !data) return null;
+        let sum = 0;
+        let counted = 0;
+        for (const row of data) {
+            const v = Number((row.social_metrics as any)?.instagram?.views || 0);
+            if (v > 0) counted++;
+            sum += v;
+        }
+        return counted > 0 ? sum : null;
+    } catch (e: any) {
+        console.error('igViewsFromPosts:', e?.message || e);
+        return null;
+    }
+}
+
 /** Order/merch revenue from the live Printful order feed, per-day for 30 days. */
 async function getRevenue(days = 30): Promise<RevenueSummary> {
     try {
@@ -228,7 +263,7 @@ export async function getAnalyticsData(rangeDays = 30): Promise<AnalyticsData> {
     // Social account metrics can only window up to 30 days (hard Meta API limit).
     const socialDays = rangeDays === 0 ? 30 : Math.min(rangeDays, 30);
     const sinceIso = rangeDays === 0 ? null : new Date(Date.now() - rangeDays * 86_400_000).toISOString();
-    const [ig, fb, threads, web, viewsSeries, pipeline, posts, revenue] = await Promise.all([
+    const [ig, fb, threads, web, viewsSeries, pipeline, posts, revenue, igViewsRange] = await Promise.all([
         fetchIGDashboardData(socialDays).catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
         fetchFacebookSnapshot(socialDays).catch((e) => DEAD_SNAP(e?.message ?? 'FB fetch failed')),
         fetchThreadsSnapshot(socialDays).catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
@@ -237,7 +272,9 @@ export async function getAnalyticsData(rangeDays = 30): Promise<AnalyticsData> {
         pipelineHistory(30),
         topPostsAndClaims(sinceIso, chartDays),
         getRevenue(chartDays),
+        // Only past the 30-day cap; short ranges keep the account-window number.
+        rangeDays === 0 || rangeDays > 30 ? igViewsFromPosts(sinceIso) : Promise.resolve(null),
     ]);
     const siteViewsRange = viewsSeries.reduce((s, d) => s + d.views, 0);
-    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts, revenue, range: rangeDays, socialDays, siteViewsRange };
+    return { ig, fb, threads, web, viewsSeries, pipeline, ...posts, revenue, range: rangeDays, socialDays, igViewsRange, siteViewsRange };
 }

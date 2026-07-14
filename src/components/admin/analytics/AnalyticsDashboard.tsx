@@ -36,7 +36,7 @@ const RANGES: { key: string; label: string }[] = [
 ];
 
 export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
-    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue, range, socialDays, siteViewsRange } = data;
+    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue, range, socialDays, igViewsRange, siteViewsRange } = data;
     const snap = ig.snapshot;
     const igEngRate = snap.totalInteractions28d && snap.reach28d
         ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
@@ -47,6 +47,11 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
     const socialCapped = range === 0 || range > 30;
     const socialLabel = socialCapped ? '30d max' : `${socialDays}d`;
     const rangeShort = range === 0 ? 'all-time' : `${range}d`;
+    // Past the cap, IG views can still follow the range: per-post insights are
+    // lifetime, so summing them across the range's posts gives a true total.
+    // Reach can't be summed (unique accounts), so it stays on the 30d window.
+    const igViews = igViewsRange ?? snap.views28d;
+    const igViewsLabel = igViewsRange != null ? `Views · ${rangeShort}` : `Views · ${socialLabel}`;
 
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -90,14 +95,16 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                 social card is on screen, so the "30d max" labels make sense. */}
             {socialCapped && anyCard && (
                 <p className="ak-caption" style={{ marginTop: -8 }}>
-                    Instagram, Facebook and Threads limit account insights to a 30-day window, so those cards stay at 30 days. Website, posts and revenue follow your selected range.
+                    {igViewsRange != null
+                        ? 'Meta caps account insights at a 30-day window, so Instagram views here are summed from per-post lifetime insights to cover your full range. IG reach, Facebook and Threads stay at 30 days.'
+                        : 'Instagram, Facebook and Threads limit account insights to a 30-day window, so those cards stay at 30 days. Website, posts and revenue follow your selected range.'}
                 </p>
             )}
 
             {/* Per-platform snapshot cards */}
             {anyCard && (
                 <div className={show.all ? 'grid grid-cols-1 md:grid-cols-3 gap-3' : 'grid grid-cols-1 gap-3'}>
-                    {show.ig && <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={snap.views28d} viewsLabel={`Views · ${socialLabel}`} eng={igEngRate} engLabel="Eng. rate" />}
+                    {show.ig && <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={igViews} viewsLabel={igViewsLabel} eng={igEngRate} engLabel="Eng. rate" />}
                     {show.fb && <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(fb.engagement28d)} engLabel="Engagements" />}
                     {show.threads && <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(threads.engagement28d)} engLabel="Engagements" />}
                 </div>
