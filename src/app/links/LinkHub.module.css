@@ -1,0 +1,204 @@
+.hub {
+    min-height: 100dvh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(2.5rem, 8vh, 5rem) 1.25rem 3rem;
+    background:
+        radial-gradient(120% 70% at 50% 118%, #ffd884 0%, rgba(255, 216, 132, 0) 46%),
+        linear-gradient(180deg, #5c9fe2 0%, #8fc2f1 32%, #c3e0fb 60%, #eaf5ff 82%, #fff5e2 100%);
+}
+
+.inner {
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.mark {
+    width: 108px;
+    height: auto;
+    filter: drop-shadow(0 14px 30px rgba(214, 150, 40, 0.4));
+}
+
+.word {
+    margin: 0.6rem 0 0;
+    font-size: clamp(2.6rem, 11vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    line-height: 1;
+    text-shadow: 0 4px 22px rgba(28, 111, 168, 0.3);
+}
+
+.tag {
+    margin: 0.5rem 0 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #2c5f92;
+}
+
+.links {
+    width: 100%;
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    width: 100%;
+    padding: 1.05rem 1.25rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 12px 30px rgba(24, 70, 120, 0.18);
+    color: #16324f;
+    font-size: 1.02rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 38px rgba(24, 70, 120, 0.26);
+}
+
+.btnPrimary {
+    background: linear-gradient(135deg, #ffe397 0%, #ffbe55 55%, #ff9f3e 100%);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 14px 32px rgba(214, 150, 40, 0.34);
+    color: #3a2708;
+}
+
+.btnKicker {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.btnMain {
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 1.5rem 1.25rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 14px 34px rgba(24, 70, 120, 0.16);
+}
+
+.newsKicker {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #c8871f;
+}
+
+.newsSub {
+    margin: 0.4rem 0 1rem;
+    font-size: 0.92rem;
+    color: #46688c;
+}
+
+.form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+    border-radius: 11px;
+    border: 1px solid rgba(28, 111, 168, 0.28);
+    background: #fff;
+    color: #16324f;
+    font-size: 0.98rem;
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.input:focus {
+    border-color: #e79a1f;
+    box-shadow: 0 0 0 3px rgba(231, 154, 31, 0.18);
+}
+
+.newsBtn {
+    flex-shrink: 0;
+    padding: 0.75rem 1.2rem;
+    border-radius: 11px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #3a2708;
+    background: linear-gradient(135deg, #ffe397 0%, #ffbe55 55%, #ff9f3e 100%);
+    box-shadow: 0 8px 18px rgba(214, 150, 40, 0.32);
+    transition: transform 0.15s ease;
+}
+
+.newsBtn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.newsBtn:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.success {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1c6fa8;
+}
+
+.successKanji {
+    font-size: 1.35rem;
+    color: #e79a1f;
+}
+
+.err {
+    margin: 0.7rem 0 0;
+    color: #c0392b;
+    font-size: 0.86rem;
+}
+
+.explore {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1c6fa8;
+    text-decoration: none;
+    opacity: 0.9;
+    transition: opacity 0.15s ease;
+}
+
+.explore:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
