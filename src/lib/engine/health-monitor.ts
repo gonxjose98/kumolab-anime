@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { checkMetaTokenHealth } from './token-health';
+import { PLATFORM_KEYS } from './engine';
 
 export type HealthLevel = 'ok' | 'warn' | 'crit';
 
@@ -109,17 +110,26 @@ async function checkCronFreshness(): Promise<HealthCheck> {
 }
 
 async function checkStuckPosts(): Promise<HealthCheck> {
-    // Posts that hit auto-retry exhaustion (5 attempts, still no socials)
-    const { data, count } = await supabaseAdmin
+    // Posts that hit auto-retry exhaustion (5 attempts, still no socials).
+    // Matches the publisher's generic retry: any recent non-DROP published
+    // post that never got a platform ID and has burned its attempts. (The old
+    // check only counted `skipped_reason='video_fetch_failed'`, so any other
+    // orphaned-post failure class was invisible here.)
+    const { data } = await supabaseAdmin
         .from('posts')
-        .select('id, title', { count: 'exact' })
+        .select('id, title, social_ids')
         .eq('status', 'published')
+        .neq('type', 'DROP')
         .gte('published_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString())
-        .filter('social_ids->>skipped_reason', 'eq', 'video_fetch_failed')
-        .filter('social_ids->>publish_attempts', 'gte', '5')
-        .limit(5);
+        .limit(200);
 
-    const n = count ?? data?.length ?? 0;
+    const stuck = (data || []).filter((p) => {
+        const sid: any = p.social_ids || {};
+        const hasPlatform = PLATFORM_KEYS.some((k) => !!sid[k]);
+        const attempts = (sid.publish_attempts as number) || 0;
+        return !hasPlatform && attempts >= 5;
+    });
+    const n = stuck.length;
     if (n > 0) {
         return {
             key: 'stuck',

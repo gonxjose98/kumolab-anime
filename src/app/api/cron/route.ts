@@ -347,7 +347,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'republish-social', 'metrics-sync']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'health-monitor']
         }, { status: 400 });
 
     } catch (error: any) {

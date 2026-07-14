@@ -37,6 +37,18 @@ function buildSocialIds(result: SocialPublishResult): Record<string, string> {
     return Object.fromEntries(entries);
 }
 
+// Platform-ID keys that prove a post actually reached at least one social
+// network. A published post carrying NONE of these never broadcast — it's a
+// retry candidate, or (once attempts are exhausted) a "stuck" post. Kept in
+// one place so the publisher retry and the health monitor agree on the
+// definition of "orphaned on the website".
+export const PLATFORM_KEYS = ['instagram_id', 'facebook_id', 'threads_id', 'tiktok_publish_id', 'youtube_video_id'] as const;
+
+function hasAnyPlatformId(socialIds: any): boolean {
+    if (!socialIds) return false;
+    return PLATFORM_KEYS.some((k) => !!socialIds[k]);
+}
+
 async function recordPublishedFingerprint(post: { id?: string; title: string; source_url?: string | null; anime_id?: string | null; claim_type?: string | null; }) {
     if (!post.title) return;
     const fp = createFingerprint(post.title, post.source_url || '');
@@ -89,8 +101,7 @@ async function persistSocialIds(
     // A real broadcast landed → this post is no longer a pending retry. Clear
     // the transient skip marker so the republish worker won't pick it up again
     // and double-post. (Only on genuine success — a failed retry keeps it.)
-    const PLATFORM_KEYS = ['instagram_id', 'facebook_id', 'threads_id', 'tiktok_publish_id', 'youtube_video_id'];
-    if (PLATFORM_KEYS.some((k) => merged[k])) delete merged.skipped_reason;
+    if (hasAnyPlatformId(merged)) delete merged.skipped_reason;
 
     const { error } = await supabaseAdmin
         .from('posts')
@@ -283,23 +294,30 @@ export async function publishScheduledPosts() {
         return;
     }
 
-    // Also pick up posts that published-to-website-only because the
-    // video fetch failed earlier (worker 502, cold-start, proxy issue,
-    // etc.). Retry them on each tick for up to 6 hours / 5 attempts.
-    // Without this, a transient worker hiccup leaves posts orphaned on
-    // the website with no socials forever.
+    // Also pick up posts that published to the website but never reached
+    // socials — whatever the cause (video fetch 502, broadcast threw, token
+    // expired, provider outage). ANY recent non-DROP published post that
+    // still carries no platform IDs is a retry candidate. The old code only
+    // caught `skipped_reason='video_fetch_failed'`, so every other failure
+    // class was orphaned on the website with no socials forever. (Daily Drops
+    // are website-only by design, so they're excluded.)
     const sixHoursAgo = new Date(now.getTime() - 6 * 3600 * 1000).toISOString();
-    const { data: retryPosts } = await supabaseAdmin
+    const { data: recentPublished } = await supabaseAdmin
         .from('posts')
         .select('*')
         .eq('status', 'published')
+        .neq('type', 'DROP')
         .gte('published_at', sixHoursAgo)
-        .filter('social_ids->>skipped_reason', 'eq', 'video_fetch_failed');
+        .order('published_at', { ascending: true })
+        .limit(20);
 
-    const allPosts = [...(scheduledPosts || []), ...(retryPosts || []).filter(rp =>
-        // Cap at 5 attempts to avoid infinite loops on permanently-broken videos
-        ((rp.social_ids?.publish_attempts as number) || 0) < 5
-    )];
+    const retryPosts = (recentPublished || []).filter((rp) =>
+        !hasAnyPlatformId(rp.social_ids) &&
+        // Cap at 5 attempts to avoid infinite loops on permanently-broken posts
+        (((rp.social_ids?.publish_attempts as number) || 0) < 5)
+    );
+
+    const allPosts = [...(scheduledPosts || []), ...retryPosts];
 
     if (allPosts.length === 0) {
         console.log('[Publisher] No posts to publish or retry.');

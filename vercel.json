@@ -35,6 +35,10 @@
     {
       "path": "/api/cron?worker=metrics-sync",
       "schedule": "40 */12 * * *"
+    },
+    {
+      "path": "/api/cron?worker=health-monitor",
+      "schedule": "*/30 * * * *"
     }
   ],
   "build": {
