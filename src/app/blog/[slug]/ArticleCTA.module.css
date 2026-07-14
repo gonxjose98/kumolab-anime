@@ -255,6 +255,67 @@
     color: #1c6fa8;
 }
 
+/* ---- Reveal motion ----
+   Blocks fade in with a small upward drift when scrolled into view, then a
+   soft nudge (a few px, well under a degree) repeats on a calm 7s cycle to
+   draw the eye. Transforms and opacity only, so no layout shift or overflow. */
+.reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.revealIn {
+    opacity: 1;
+    transform: translateY(0);
+    animation: nudge 7s ease-in-out 1.4s infinite;
+}
+
+/* Merch teaser trails the related block slightly, so the entrance reads as
+   choreographed rather than simultaneous. */
+.revealLate {
+    transition-delay: 0.18s;
+}
+
+.revealLate.revealIn {
+    animation-delay: 1.9s;
+}
+
+/* Let the existing hover lift take over while the reader is engaging. */
+.revealIn:hover {
+    animation: none;
+}
+
+/* The wiggle lives in the first ~12% of the cycle; the rest is stillness. */
+@keyframes nudge {
+    0%,
+    12%,
+    100% {
+        transform: translateX(0) rotate(0deg);
+    }
+    3% {
+        transform: translateX(-3px) rotate(-0.3deg);
+    }
+    6% {
+        transform: translateX(3px) rotate(0.3deg);
+    }
+    9% {
+        transform: translateX(-1.5px) rotate(-0.15deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .revealIn {
+        animation: none;
+    }
+}
+
 @media (max-width: 640px) {
     .section {
         padding: 0 1.1rem 3.5rem;

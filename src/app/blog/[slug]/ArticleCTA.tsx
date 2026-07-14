@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useEffect, useRef, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { BlogPost, Product } from '@/types';
 import { trackEvent } from '@/lib/analytics/events';
@@ -20,6 +20,38 @@ function cleanTitle(title: string): string {
 }
 
 /**
+ * Reveals a block the first time it scrolls into view. Toggles a CSS class so
+ * the block fades in, then a gentle CSS nudge draws the eye. Fires once and
+ * disconnects; falls back to visible if IntersectionObserver is unavailable.
+ */
+function useReveal<T extends HTMLElement>() {
+    const ref = useRef<T>(null);
+    const [shown, setShown] = useState(false);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        if (typeof IntersectionObserver === 'undefined') {
+            setShown(true);
+            return;
+        }
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setShown(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.2 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    return { ref, shown };
+}
+
+/**
  * End-of-article capture band (Q1). The blog article page is where ~100% of
  * social clickthrough lands, and until now it captured nothing. This turns a
  * one-and-done reader into an owned relationship: join the newsletter, keep
@@ -35,6 +67,8 @@ export default function ArticleCTA({
 }) {
     const [email, setEmail] = useState('');
     const [status, setStatus] = useState<Status>('idle');
+    const relatedReveal = useReveal<HTMLDivElement>();
+    const merchReveal = useReveal<HTMLAnchorElement>();
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
@@ -92,7 +126,10 @@ export default function ArticleCTA({
 
             {/* Related drops */}
             {related.length > 0 && (
-                <div className={styles.relatedWrap}>
+                <div
+                    ref={relatedReveal.ref}
+                    className={`${styles.relatedWrap} ${styles.reveal} ${relatedReveal.shown ? styles.revealIn : ''}`}
+                >
                     <h3 className={styles.relatedHead}>Keep reading</h3>
                     <div className={styles.relatedGrid}>
                         {related.map((post) => {
@@ -124,7 +161,8 @@ export default function ArticleCTA({
             {product && (
                 <Link
                     href="/merch"
-                    className={styles.merch}
+                    ref={merchReveal.ref}
+                    className={`${styles.merch} ${styles.reveal} ${styles.revealLate} ${merchReveal.shown ? styles.revealIn : ''}`}
                     onClick={() => trackEvent('merch_click', { meta: { from: 'article_cta', productId: product.id } })}
                 >
                     <div className={styles.merchMedia}>
