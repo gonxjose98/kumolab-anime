@@ -3,6 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { Reveal } from './motion';
 import { CelCloud } from './art';
+import { trackEvent } from '@/lib/analytics/events';
 import styles from './Forecast.module.css';
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
@@ -22,6 +23,7 @@ const Forecast = () => {
                 body: JSON.stringify({ email }),
             });
             setStatus(res.ok ? 'done' : 'error');
+            if (res.ok) trackEvent('email_signup', { meta: { source: 'homepage_forecast' } });
         } catch {
             setStatus('error');
         }

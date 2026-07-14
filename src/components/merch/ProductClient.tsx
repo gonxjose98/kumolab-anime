@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { useCartStore } from '@/store/useCartStore';
+import { trackEvent } from '@/lib/analytics/events';
 import styles from './ProductClient.module.css';
 
 interface ProductClientProps {
@@ -104,15 +105,26 @@ export default function ProductClient({ productData, anchorPrice = null, label =
     const pct = hasAnchor ? Math.round((1 - realPrice / anchorPrice) * 100) : 0;
 
     const handleAddToCart = () => {
+        const price = parseFloat(selectedVariant.retail_price);
         addItem({
             variantId: selectedVariant.id,
             productId: sync_product.id,
             name: selectedVariant.name,
-            price: parseFloat(selectedVariant.retail_price),
+            price,
             quantity,
             image: imageUrl,
             size: selectedVariant.size,
             color: selectedVariant.color,
+        });
+        trackEvent('add_to_cart', {
+            value: Number.isFinite(price) ? price * quantity : undefined,
+            meta: {
+                productId: sync_product.id,
+                name: selectedVariant.name,
+                size: selectedVariant.size,
+                color: selectedVariant.color,
+                quantity,
+            },
         });
         alert('Added to cart!');
     };

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { captureUtm } from '@/lib/analytics/events';
 
 /**
  * Records one page view per client-side navigation by POSTing to /api/track,
@@ -18,6 +19,9 @@ export function AnalyticsTracker() {
         if (!pathname) return;
         // Never count admin routes.
         if (pathname.startsWith('/admin')) return;
+        // Persist any UTM attribution on the landing URL (last-touch, 30d) so
+        // downstream signups/purchases can be tied back to the campaign.
+        captureUtm();
         // Guard against React strict-mode double-fire and same-path re-renders.
         if (lastTrackedPath.current === pathname) return;
         lastTrackedPath.current = pathname;

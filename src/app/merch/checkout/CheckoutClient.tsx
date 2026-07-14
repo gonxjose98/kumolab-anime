@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/store/useCartStore';
+import { trackEvent } from '@/lib/analytics/events';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripe-client';
 import SkyContentRoot from '@/components/sky-content';
@@ -23,6 +24,11 @@ export default function CheckoutClient({ country }: { country: string }) {
     // re-creates the session mid-flow.
     const fetchClientSecret = useCallback(async () => {
         const items = useCartStore.getState().items;
+        // Checkout intent: a Stripe session is about to be created for this cart.
+        trackEvent('checkout_start', {
+            value: items.reduce((t, i) => t + i.price * i.quantity, 0),
+            meta: { itemCount: items.reduce((n, i) => n + i.quantity, 0), country },
+        });
         const res = await fetch('/api/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
