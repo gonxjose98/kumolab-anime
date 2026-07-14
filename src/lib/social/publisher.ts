@@ -381,16 +381,28 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         if (tiktok.skipped) console.log('[Social] TikTok:', tiktok.skipped);
         if (tiktok.error) console.error('[Social] TikTok error:', tiktok.error);
 
-        // YouTube Shorts
-        const yt = await publishToYouTubeShorts({
-            title: post.title,
-            description: post.content,
-            videoUrl: stagedVideoUrl,
-        });
-        if (yt.youtube_video_id) result.youtube_video_id = yt.youtube_video_id;
-        if (yt.youtube_url) result.youtube_url = yt.youtube_url;
-        if (yt.skipped) console.log('[Social] YT Shorts:', yt.skipped);
-        if (yt.error) console.error('[Social] YT Shorts error:', yt.error);
+        // YouTube Shorts — EDITED / ORIGINAL ONLY. Unlike every other platform,
+        // reposting someone else's raw video to YouTube risks copyright strikes
+        // and channel suspension, so raw reposts (imported clips), auto-fetched
+        // trailers, and auto image-to-reel conversions must NEVER reach YouTube.
+        // A post counts as edited iff it carries a Studio video project (it was
+        // assembled/trimmed in the editor) — the same signal the Studio admin
+        // uses for "edited". This is defense in depth alongside the
+        // YOUTUBE_AUTO_PUBLISH env gate inside publishToYouTubeShorts.
+        const isStudioEdited = !!(post as any).image_settings?.video_project;
+        if (isStudioEdited) {
+            const yt = await publishToYouTubeShorts({
+                title: post.title,
+                description: post.content,
+                videoUrl: stagedVideoUrl,
+            });
+            if (yt.youtube_video_id) result.youtube_video_id = yt.youtube_video_id;
+            if (yt.youtube_url) result.youtube_url = yt.youtube_url;
+            if (yt.skipped) console.log('[Social] YT Shorts:', yt.skipped);
+            if (yt.error) console.error('[Social] YT Shorts error:', yt.error);
+        } else {
+            console.log('[Social] YT Shorts: skipped (not a Studio-edited video)');
+        }
     }
 
     return result;
