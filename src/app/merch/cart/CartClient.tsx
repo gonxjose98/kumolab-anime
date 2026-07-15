@@ -8,14 +8,11 @@ import SkyContentRoot from '@/components/sky-content';
 import SkyFooter from '@/components/redesign-sky/SkyFooter';
 import styles from './cart.module.css';
 import { useEffect, useMemo, useState } from 'react';
+import { SHIP_COUNTRY_OPTIONS } from '@/lib/shipping';
 
-// Dropdown options; the server validates against the real ship list.
-const COUNTRIES = [
-    { code: 'US', label: 'United States' },
-    { code: 'CA', label: 'Canada' },
-    { code: 'GB', label: 'United Kingdom' },
-    { code: 'AU', label: 'Australia' },
-];
+// Dropdown options derive from the single ship-list source of truth
+// (src/lib/shipping.ts), so the UI can't drift from what checkout supports.
+const COUNTRIES = SHIP_COUNTRY_OPTIONS;
 
 // initialCountry is geo-detected server-side (Vercel x-vercel-ip-country),
 // so most customers land on the right country without touching the dropdown.
