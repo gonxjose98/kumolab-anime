@@ -147,7 +147,7 @@ export default async function MediaKitPage() {
                         <h2 id="proof" className={styles.sectionTitle}>What performance looks like</h2>
                         <div className={styles.reelGrid}>
                             {d.topReels.map((r) => (
-                                <a key={r.permalink} href={r.permalink} target="_blank" rel="noopener noreferrer" className={styles.reel}>
+                                <a key={r.link} href={r.link} className={styles.reel}>
                                     {r.thumbnail ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img src={r.thumbnail} alt="" className={styles.reelThumb} loading="lazy" />

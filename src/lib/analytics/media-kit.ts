@@ -12,7 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export interface MediaKitReel {
     title: string;
-    permalink: string;
+    link: string;        // on-site post (/blog/<slug>) — IG stores no permalink
     thumbnail: string | null;
     views: number;
     likes: number;
@@ -49,6 +49,44 @@ function reelTitle(caption: string): string {
     return clean.length > 72 ? clean.slice(0, 69).trimEnd() + '…' : clean || 'KumoLab Reel';
 }
 
+/**
+ * Genuine top-performing posts by stored lifetime Instagram views. metrics-sync
+ * writes per-post lifetime insights into posts.social_metrics, so this surfaces
+ * real breakouts (tens of thousands of views) rather than IG's most-recent 8.
+ * Ordering by nested JSON in PostgREST sorts as text, so we pull a batch and
+ * rank in JS (same pattern as the analytics dashboard). Links go on-site since
+ * IG stores no permalink.
+ */
+async function topReelsFromPosts(limit = 6): Promise<MediaKitReel[]> {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('posts')
+            .select('title, slug, image, social_metrics')
+            .eq('status', 'published')
+            .not('social_metrics->instagram', 'is', null)
+            .order('published_at', { ascending: false })
+            .limit(400);
+        if (error || !data) return [];
+        return data
+            .map((p: any) => {
+                const ig = p.social_metrics?.instagram || {};
+                return {
+                    title: reelTitle(p.title || ''),
+                    link: `/blog/${p.slug}`,
+                    thumbnail: p.image || null,
+                    views: Number(ig.views || 0),
+                    likes: Number(ig.likes || 0),
+                    comments: Number(ig.comments || 0),
+                };
+            })
+            .filter((r) => r.views > 0)
+            .sort((a, b) => b.views - a.views)
+            .slice(0, limit);
+    } catch {
+        return [];
+    }
+}
+
 /** Count posts published in the last N days (published-status posts on the site). */
 async function postsPublishedLast(days = 30): Promise<number | null> {
     try {
@@ -66,12 +104,13 @@ async function postsPublishedLast(days = 30): Promise<number | null> {
 }
 
 export async function getMediaKitData(): Promise<MediaKitData> {
-    const [ig, fb, threads, web, postsPer30d] = await Promise.all([
+    const [ig, fb, threads, web, postsPer30d, storedReels] = await Promise.all([
         fetchIGDashboardData(30).catch(() => null),
         fetchFacebookSnapshot(30).catch(() => null),
         fetchThreadsSnapshot(30).catch(() => null),
         fetchWebsiteTraffic().catch(() => null),
         postsPublishedLast(30),
+        topReelsFromPosts(6),
     ]);
 
     const snap = ig?.snapshot;
@@ -83,18 +122,22 @@ export async function getMediaKitData(): Promise<MediaKitData> {
             ? [igFollowers, fbFollowers, threadsFollowers].reduce<number>((s, n) => s + (n || 0), 0)
             : null;
 
-    const topReels: MediaKitReel[] = (ig?.topRecent || [])
-        .filter((m) => (m.views || 0) > 0)
-        .sort((a, b) => (b.views || 0) - (a.views || 0))
-        .slice(0, 6)
-        .map((m) => ({
-            title: reelTitle(m.caption),
-            permalink: m.permalink,
-            thumbnail: m.thumbnail,
-            views: m.views || 0,
-            likes: m.likes || 0,
-            comments: m.comments || 0,
-        }));
+    // Prefer genuine all-time top performers (stored lifetime metrics); fall
+    // back to IG's most-recent media only when no stored metrics exist yet.
+    const topReels: MediaKitReel[] = storedReels.length > 0
+        ? storedReels
+        : (ig?.topRecent || [])
+            .filter((m) => (m.views || 0) > 0)
+            .sort((a, b) => (b.views || 0) - (a.views || 0))
+            .slice(0, 6)
+            .map((m) => ({
+                title: reelTitle(m.caption),
+                link: m.permalink,
+                thumbnail: m.thumbnail,
+                views: m.views || 0,
+                likes: m.likes || 0,
+                comments: m.comments || 0,
+            }));
 
     return {
         igFollowers,
