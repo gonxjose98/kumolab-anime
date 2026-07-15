@@ -75,6 +75,9 @@ export async function POST(req: Request) {
             // completion Stripe sends them to return_url (our success page).
             ui_mode: 'embedded',
             payment_method_types: ['card'],
+            // Let customers enter promotion codes (created in the Stripe
+            // dashboard) directly in the embedded checkout form.
+            allow_promotion_codes: true,
             line_items: lineItems,
             mode: 'payment',
             return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/merch/success?session_id={CHECKOUT_SESSION_ID}`,

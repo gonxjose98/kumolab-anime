@@ -125,3 +125,90 @@ export async function sendOrderConfirmation(input: {
         return false;
     }
 }
+
+export interface AbandonedCartItem {
+    name?: string;
+    quantity?: number;
+}
+
+/**
+ * Send ONE cart-recovery email for an expired checkout session (B6).
+ * Same contract as sendOrderConfirmation: best-effort, NEVER throws —
+ * a send failure must not break the Stripe webhook.
+ */
+export async function sendCartRecoveryEmail(
+    email?: string | null,
+    items?: AbandonedCartItem[] | null,
+): Promise<boolean> {
+    try {
+        const to = (email || '').trim();
+        if (!to || !EMAIL_RE.test(to)) return false;
+
+        const apiKey = process.env.RESEND_API_KEY;
+        if (!apiKey) {
+            console.error('[order email] RESEND_API_KEY not set, cart recovery not sent');
+            return false;
+        }
+        const resend = new Resend(apiKey);
+
+        const names = (items || [])
+            .map((i) => `${i.quantity && i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name || ''}`.trim())
+            .filter(Boolean);
+        const itemRows = names
+            .map((n) => `<li style="padding:3px 0;color:#28374a;">${esc(n)}</li>`)
+            .join('');
+        const itemsBlock = itemRows
+            ? `<ul style="margin:0 0 20px;padding-left:20px;font-size:15px;line-height:1.6;">${itemRows}</ul>`
+            : '';
+
+        const html = `
+<div style="background:#eef5fc;padding:32px 12px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(24,70,120,.12);">
+    <div style="background:linear-gradient(135deg,#8fc2f1 0%,#c3e0fb 55%,#fff5e2 100%);padding:26px 32px;text-align:center;">
+      <img src="https://kumolabanime.com/kumolab-cloud-mark-gold.png" width="58" height="auto" alt="" style="display:inline-block;margin-bottom:4px;" />
+      <div style="font-size:24px;font-weight:800;color:#16324f;letter-spacing:-.02em;">KumoLab</div>
+    </div>
+    <div style="padding:28px 32px;">
+      <h1 style="font-size:20px;margin:0 0 8px;color:#16324f;">Your cart is still up here in the clouds.</h1>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#46688c;">
+        You were this close. We kept everything exactly where you left it:
+      </p>
+      ${itemsBlock}
+      <div style="text-align:center;margin:6px 0 4px;">
+        <a href="https://kumolabanime.com/merch" style="display:inline-block;background:#16324f;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 28px;border-radius:999px;">Finish checking out</a>
+      </div>
+      <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#46688c;">
+        Questions? Just reply to this email.
+      </p>
+    </div>
+    <div style="padding:16px 32px;text-align:center;font-size:12px;color:#8aa3bd;background:#f6fafe;">
+      KumoLab &middot; the cloud sees everything first
+    </div>
+  </div>
+</div>`.trim();
+
+        const text =
+            `Your cart is still up here in the clouds.\n\n` +
+            `You were this close. We kept everything exactly where you left it:\n\n` +
+            (names.length ? names.map((n) => `  - ${n}`).join('\n') + '\n\n' : '') +
+            `Finish checking out: https://kumolabanime.com/merch\n\n` +
+            `Questions? Just reply to this email.\n\nKumoLab`;
+
+        const { error } = await resend.emails.send({
+            from: 'KumoLab <news@kumolabanime.com>',
+            to,
+            replyTo: REPLY_TO,
+            subject: 'You left something in your cart',
+            html,
+            text,
+        });
+        if (error) {
+            console.error('[order email] cart recovery send failed:', error.message);
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('[order email] sendCartRecoveryEmail threw:', err);
+        return false;
+    }
+}

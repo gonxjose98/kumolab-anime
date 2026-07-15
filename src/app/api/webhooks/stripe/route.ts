@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createPrintfulOrder, getPrintfulOrderByExternalId } from '@/lib/printful';
-import { recordBuyer, sendOrderConfirmation, type OrderLine } from '@/lib/email/order';
+import { recordBuyer, sendOrderConfirmation, sendCartRecoveryEmail, type OrderLine, type AbandonedCartItem } from '@/lib/email/order';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { logError } from '@/lib/logging/structured-logger';
 
 export async function POST(req: Request) {
@@ -144,6 +145,78 @@ export async function POST(req: Request) {
             shipping: (session.total_details?.amount_shipping ?? 0) / 100,
             total: (session.amount_total ?? 0) / 100,
         });
+    } else if (event.type === 'checkout.session.expired') {
+        // ABANDONED-CART RECOVERY (B6): the customer opened checkout, gave an
+        // email, then walked away and the session expired. Log it and send ONE
+        // recovery email. Everything here is best-effort — this branch must
+        // always end in a 200 so Stripe does not retry-storm the endpoint.
+        const session = event.data.object as any;
+        const sessionId = session.id as string;
+
+        const email = session.customer_details?.email;
+        if (!email) {
+            // No email captured before abandonment — nothing to recover to.
+            return NextResponse.json({ received: true });
+        }
+
+        // Items snapshot: the checkout route stamps metadata.items as a
+        // JSON string capped at 500 chars, so a big cart can truncate into
+        // invalid JSON — parse best-effort and fall back to no item list.
+        let items: AbandonedCartItem[] | null = null;
+        try {
+            const raw = session.metadata?.items;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) items = parsed;
+            }
+        } catch {
+            console.log(`[stripe webhook] ${sessionId}: metadata.items unparseable (likely truncated) — recovery email will skip the item list`);
+        }
+
+        try {
+            // IDEMPOTENCY: Stripe delivers events at-least-once. One row per
+            // session (unique stripe_session_id); if the row already exists we
+            // have already handled (or are handling) this cart — never send a
+            // second email. ignoreDuplicates makes the insert race-safe: only
+            // the call that actually created the row gets data back.
+            const { data: inserted, error: insertError } = await supabaseAdmin
+                .from('abandoned_carts')
+                .upsert(
+                    {
+                        email,
+                        items,
+                        amount: (session.amount_total ?? 0) / 100,
+                        currency: session.currency || 'usd',
+                        stripe_session_id: sessionId,
+                    },
+                    { onConflict: 'stripe_session_id', ignoreDuplicates: true },
+                )
+                .select('id');
+
+            if (insertError) throw insertError;
+            if (!inserted || inserted.length === 0) {
+                // Row already existed — duplicate delivery, skip the email.
+                console.log(`[stripe webhook] abandoned cart already recorded for session ${sessionId} — skipping`);
+                return NextResponse.json({ received: true });
+            }
+
+            const sent = await sendCartRecoveryEmail(email, items || []);
+            if (sent) {
+                await supabaseAdmin
+                    .from('abandoned_carts')
+                    .update({ recovery_sent_at: new Date().toISOString() })
+                    .eq('stripe_session_id', sessionId);
+            }
+        } catch (error: any) {
+            // Never throw out of the webhook: log for reconciliation and 200.
+            console.error(`[stripe webhook] abandoned-cart handling failed for ${sessionId}:`, error);
+            await logError({
+                source: 'stripe.webhook',
+                errorMessage: `Abandoned-cart recovery failed for expired session ${sessionId}: ${error?.message || error}`,
+                stackTrace: error?.stack,
+                context: { sessionId, email },
+            });
+        }
     }
 
     return NextResponse.json({ received: true });
