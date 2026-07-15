@@ -6,8 +6,8 @@ import SkyFooter from '@/components/redesign-sky/SkyFooter';
 import SkyBlogFeed from './SkyBlogFeed';
 import styles from './SkyBlog.module.css';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ISR: cached render, refreshed at most every 5 min (revalidated on publish).
+export const revalidate = 300;
 
 export const metadata: Metadata = {
     title: 'KumoLab — The Feed (Redesign Preview: Content Sky)',

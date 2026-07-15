@@ -3,5 +3,7 @@
 // URL, inheriting the site's production home metadata from the layout.
 export { default } from './redesign-sky/page';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ISR: serve a cached render, refresh at most every 5 min. Publishing calls
+// revalidatePath('/'), so newly-published posts appear immediately rather than
+// waiting for the 300s tick. Was force-dynamic (a fresh DB read per view).
+export const revalidate = 300;

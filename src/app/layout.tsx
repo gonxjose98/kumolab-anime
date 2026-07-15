@@ -70,7 +70,8 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale — blocking pinch-zoom is an accessibility failure (WCAG
+  // 1.4.4) and hurts mobile UX; users must be able to zoom.
 };
 
 import { ThemeProvider } from '@/components/providers/ThemeProvider';

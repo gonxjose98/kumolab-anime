@@ -8,7 +8,10 @@ import ArticleCTA from './ArticleCTA';
 import SkyContentRoot from '@/components/sky-content';
 import SkyFooter from '@/components/redesign-sky/SkyFooter';
 
-export const dynamic = 'force-dynamic';
+// ISR: cache each article's render, refresh at most every 5 min. Publishing
+// calls revalidatePath(`/blog/${slug}`) so edits/new posts appear immediately.
+// Was force-dynamic — two full-table scans per view before the blog.ts fix.
+export const revalidate = 300;
 
 const SITE = 'https://kumolabanime.com';
 

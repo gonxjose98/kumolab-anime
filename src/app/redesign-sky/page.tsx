@@ -4,8 +4,8 @@ import { getFeaturedProducts } from '@/lib/merch';
 import { BlogPost, Product } from '@/types';
 import SkyHome from '@/components/redesign-sky/SkyHome';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ISR: cached render, refreshed at most every 5 min (revalidated on publish).
+export const revalidate = 300;
 
 export const metadata: Metadata = {
     title: 'KumoLab — Sea to Sky (Redesign Preview: Sky)',
