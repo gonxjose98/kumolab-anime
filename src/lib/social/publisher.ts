@@ -194,6 +194,35 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             });
         }
 
+        // Persist the platform ids to the post IMMEDIATELY, merged into
+        // social_ids. A carousel publish (N child polls + parent poll) can run
+        // long enough that the function is killed before the caller's
+        // persistSocialIds runs — as happened on the first live test, which
+        // posted to IG/FB but left social_ids empty. Writing here as soon as we
+        // have the ids makes persistence independent of the caller surviving.
+        try {
+            const { supabaseAdmin } = await import('../supabase/admin');
+            const ids: Record<string, any> = {};
+            if (result.instagram_id) ids.instagram_id = result.instagram_id;
+            if (result.instagram_url) ids.instagram_url = result.instagram_url;
+            if (result.facebook_id) ids.facebook_id = result.facebook_id;
+            if (result.facebook_url) ids.facebook_url = result.facebook_url;
+            if (Object.keys(ids).length > 0) {
+                const { data: existing } = await supabaseAdmin
+                    .from('posts').select('social_ids').eq('id', (post as any).id).maybeSingle();
+                await supabaseAdmin
+                    .from('posts')
+                    .update({ social_ids: { ...((existing?.social_ids as any) || {}), ...ids } })
+                    .eq('id', (post as any).id);
+            }
+        } catch (e: any) {
+            await logError({
+                source: 'publisher.ig.carousel',
+                errorMessage: `Carousel social_ids persist failed: ${e?.message || e}`,
+                context: { post_id: (post as any).id, slug: post.slug },
+            });
+        }
+
         // Operational trail, mirroring the other terminal branches.
         {
             const { supabaseAdmin } = await import('../supabase/admin');
@@ -771,7 +800,7 @@ export async function publishToInstagramCarousel(
         // Phase 2: every child must reach FINISHED before the parent can be
         // assembled. Image ingest is normally seconds; 30s each is generous.
         for (let i = 0; i < childIds.length; i++) {
-            const status = await pollIgCarouselContainer(childIds[i], 30_000, 2_000);
+            const status = await pollIgCarouselContainer(childIds[i], 15_000, 2_000);
             if (status !== 'FINISHED') {
                 await logError({
                     source: 'publisher.ig.carousel',
@@ -819,7 +848,7 @@ export async function publishToInstagramCarousel(
         // Phase 4: wait for the parent to assemble. Terminal failure gives
         // up; a timeout still attempts the publish (mirrors the image flow's
         // "the legacy sleep was usually enough" behavior).
-        const parentStatus = await pollIgCarouselContainer(parentData.id, 60_000, 3_000);
+        const parentStatus = await pollIgCarouselContainer(parentData.id, 30_000, 3_000);
         if (parentStatus === 'ERROR' || parentStatus === 'EXPIRED') {
             await logError({
                 source: 'publisher.ig.carousel',
@@ -843,7 +872,19 @@ export async function publishToInstagramCarousel(
 
         if (publishData.id) {
             result.instagram_id = publishData.id;
-            result.instagram_url = `https://instagram.com/p/${publishData.id}`;
+            // The numeric media id is NOT a valid /p/ URL (IG uses a shortcode),
+            // so fetch the real permalink. Best-effort — fall back to the profile.
+            try {
+                const permRes = await fetchWithTimeout(
+                    `${IG_CAROUSEL_GRAPH_BASE}/${publishData.id}?fields=permalink&access_token=${encodeURIComponent(META_ACCESS_TOKEN)}`,
+                    { method: 'GET' },
+                    10_000,
+                );
+                const permData = await permRes.json().catch(() => ({}));
+                result.instagram_url = permData.permalink || 'https://instagram.com/kumolabanime';
+            } catch {
+                result.instagram_url = 'https://instagram.com/kumolabanime';
+            }
             console.log(`✅ [Instagram] Published carousel (${childIds.length} slides): ${publishData.id}`);
         } else {
             const meta = publishData?.error || {};
