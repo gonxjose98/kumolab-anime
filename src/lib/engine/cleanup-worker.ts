@@ -12,13 +12,24 @@ import { logSchedulerRun } from '../logging/scheduler';
 import { createFingerprint } from './utils';
 
 const STORAGE_BUCKET = 'blog-images';
+const VIDEO_BUCKET = 'blog-videos';
 const STORAGE_ALERT_BYTES = 400 * 1024 * 1024; // 400 MB
+
+/** Pull the object key out of a Supabase public URL for a given bucket, or null. */
+function extractBucketFile(url: string | null | undefined, bucket: string): string | null {
+    if (!url) return null;
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    return url.substring(idx + marker.length);
+}
 
 export interface CleanupResult {
     expiredPostsDeleted: number;
     stalePendingDeclined: number;
     bucketFilesDeleted: number;
     bucketOrphansDeleted: number;
+    videoFilesDeleted: number;
     candidateSweep: number;
     fingerprintSweep: number;
     redirectSweep: number;
@@ -54,6 +65,7 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         stalePendingDeclined: 0,
         bucketFilesDeleted: 0,
         bucketOrphansDeleted: 0,
+        videoFilesDeleted: 0,
         candidateSweep: 0,
         fingerprintSweep: 0,
         redirectSweep: 0,
@@ -117,6 +129,31 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         result.errors.push(`cleanup_old_candidates: ${e.message}`);
     }
 
+    // Pre-capture the blog-videos objects of posts that are about to expire,
+    // keyed by slug. cleanup_expired_posts (below) deletes the rows and returns
+    // only (slug, image), so we grab their video objects NOW and delete them
+    // AFTER — intersected with the slugs the RPC actually removed. That way we
+    // only ever touch videos of posts retention deleted, never a live post's
+    // staged/original reel (which Studio may still re-edit from).
+    const expiringVideos = new Map<string, string[]>();
+    try {
+        const { data: soon } = await supabaseAdmin
+            .from('posts')
+            .select('slug, social_ids')
+            .not('expires_at', 'is', null)
+            .lt('expires_at', new Date().toISOString());
+        for (const p of soon || []) {
+            const sid: any = p.social_ids || {};
+            const files = [
+                extractBucketFile(sid.staged_video_url, VIDEO_BUCKET),
+                extractBucketFile(sid.original_video_url, VIDEO_BUCKET),
+            ].filter((x): x is string => !!x);
+            if (files.length) expiringVideos.set(p.slug, files);
+        }
+    } catch (e: any) {
+        result.errors.push(`expiring_video_precapture: ${e.message}`);
+    }
+
     // 2. Expired posts — function returns (slug, image) rows for deleted posts
     let expiredImages: { slug: string; image: string | null }[] = [];
     try {
@@ -144,6 +181,27 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         }
     }
 
+    // 3b. Delete blog-videos objects for the posts that just expired. Only the
+    // slugs cleanup_expired_posts actually removed, matched against the
+    // pre-captured map — so this never deletes a live post's video. Closes the
+    // storage ratchet: staged reels (up to ~80MB each) were never swept before.
+    if (expiredImages.length > 0 && expiringVideos.size > 0) {
+        const videoFiles = Array.from(
+            new Set(expiredImages.flatMap(r => expiringVideos.get(r.slug) || [])),
+        );
+        if (videoFiles.length > 0) {
+            try {
+                const { data: removed, error } = await supabaseAdmin.storage
+                    .from(VIDEO_BUCKET)
+                    .remove(videoFiles);
+                if (error) result.errors.push(`storage.remove(videos): ${error.message}`);
+                result.videoFilesDeleted = removed?.length || 0;
+            } catch (e: any) {
+                result.errors.push(`storage.remove(videos): ${e.message}`);
+            }
+        }
+    }
+
     // 4. Orphan sweep — files in bucket whose slug no longer has a post row.
     //
     // image-processor.ts uploads as `<slug>-social.png`. The previous regex
@@ -165,12 +223,20 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
     };
 
     try {
-        const { data: bucketList, error: listError } = await supabaseAdmin.storage
-            .from(STORAGE_BUCKET)
-            .list('', { limit: 1000 });
-
-        if (listError) throw listError;
-        if (bucketList && bucketList.length > 0) {
+        // Page through the whole bucket — the single limit:1000 call left any
+        // files past the first 1000 permanently unswept as the archive grew.
+        const bucketList: { name: string }[] = [];
+        const PAGE = 1000;
+        for (let offset = 0; ; offset += PAGE) {
+            const { data: page, error: listError } = await supabaseAdmin.storage
+                .from(STORAGE_BUCKET)
+                .list('', { limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } });
+            if (listError) throw listError;
+            if (!page || page.length === 0) break;
+            bucketList.push(...page.map(f => ({ name: f.name })));
+            if (page.length < PAGE) break;
+        }
+        if (bucketList.length > 0) {
             const candidates = bucketList
                 .map(f => ({ name: f.name, slug: deriveSlug(f.name) }))
                 .filter(c => c.slug !== null) as Array<{ name: string; slug: string }>;
@@ -281,7 +347,7 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
     await logSchedulerRun(
         'cleanup',
         result.errors.length > 0 ? 'error' : 'success',
-        `expired:${result.expiredPostsDeleted} bucket:${result.bucketFilesDeleted}+${result.bucketOrphansDeleted} fp:${result.fingerprintSweep} pv:${result.pageViewSweep} size:${(result.dbSizeBytes / 1024 / 1024).toFixed(1)}MB`,
+        `expired:${result.expiredPostsDeleted} bucket:${result.bucketFilesDeleted}+${result.bucketOrphansDeleted} vid:${result.videoFilesDeleted} fp:${result.fingerprintSweep} pv:${result.pageViewSweep} size:${(result.dbSizeBytes / 1024 / 1024).toFixed(1)}MB`,
         result as any
     );
 
