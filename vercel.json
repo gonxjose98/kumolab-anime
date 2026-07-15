@@ -39,6 +39,10 @@
     {
       "path": "/api/cron?worker=health-monitor",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron?worker=newsletter",
+      "schedule": "0 14 * * 0"
     }
   ],
   "build": {

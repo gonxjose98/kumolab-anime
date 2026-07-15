@@ -245,6 +245,117 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: result.ok, worker: 'metrics-sync', ...result });
         }
 
+        // Weekly Forecast newsletter (B5). Composes the last 7 days of
+        // confirmed news and, by default, sends a PREVIEW to the owner only.
+        // The real list only receives it when NEWSLETTER_AUTO_SEND=true is
+        // set in the environment, so nothing reaches subscribers until the
+        // owner has approved the format.
+        if (worker === 'newsletter') {
+            console.log('[Cron] Composing The Forecast newsletter...');
+            try {
+                const { composeForecast } = await import('@/lib/email/newsletter');
+                const { subject, html, text, itemCount } = await composeForecast();
+
+                if (itemCount === 0) {
+                    return NextResponse.json({ success: true, worker: 'newsletter', skipped: 'no items this week' });
+                }
+
+                if (process.env.NEWSLETTER_AUTO_SEND === 'true') {
+                    // Record the broadcast so the admin Email tab history stays
+                    // accurate (same pattern as /api/admin/email/send). The
+                    // insert is best-effort: a bookkeeping failure must not
+                    // block the weekly send.
+                    let broadcastId: string | null = null;
+                    try {
+                        const { data: broadcast } = await supabaseAdmin
+                            .from('email_broadcasts')
+                            .insert({ subject, body_html: html, body_text: text, status: 'sending' })
+                            .select('id')
+                            .single();
+                        broadcastId = broadcast?.id ?? null;
+                    } catch (e) {
+                        console.error('[Cron] Newsletter: could not record email_broadcasts row:', e);
+                    }
+
+                    const { sendBroadcast } = await import('@/lib/email/send');
+                    let result;
+                    try {
+                        result = await sendBroadcast({ subject, html, text });
+                    } catch (sendErr) {
+                        if (broadcastId) {
+                            await supabaseAdmin.from('email_broadcasts').update({ status: 'failed' }).eq('id', broadcastId);
+                        }
+                        throw sendErr;
+                    }
+
+                    if (broadcastId) {
+                        await supabaseAdmin
+                            .from('email_broadcasts')
+                            .update({
+                                status: result.failed > 0 && result.sent === 0 ? 'failed' : 'sent',
+                                sent_count: result.sent,
+                                sent_at: new Date().toISOString(),
+                            })
+                            .eq('id', broadcastId);
+                    }
+
+                    return NextResponse.json({
+                        success: true,
+                        worker: 'newsletter',
+                        mode: 'broadcast',
+                        itemCount,
+                        sent: result.sent,
+                        failed: result.failed,
+                    });
+                }
+
+                // Preview path: owner-only, so the list stays untouched.
+                const { Resend } = await import('resend');
+                const apiKey = process.env.RESEND_API_KEY;
+                if (!apiKey) {
+                    return NextResponse.json({
+                        success: false,
+                        worker: 'newsletter',
+                        mode: 'preview',
+                        itemCount,
+                        error: 'RESEND_API_KEY is not set',
+                    });
+                }
+                const resend = new Resend(apiKey);
+                const previewTo = process.env.NEWSLETTER_PREVIEW_TO || 'gonxjose98@gmail.com';
+                const { error: sendError } = await resend.emails.send({
+                    from: 'KumoLab <news@kumolabanime.com>',
+                    to: previewTo,
+                    subject: `[PREVIEW] ${subject}`,
+                    html,
+                    text,
+                });
+                if (sendError) {
+                    return NextResponse.json({
+                        success: false,
+                        worker: 'newsletter',
+                        mode: 'preview',
+                        itemCount,
+                        error: sendError.message,
+                    });
+                }
+                return NextResponse.json({
+                    success: true,
+                    worker: 'newsletter',
+                    mode: 'preview',
+                    itemCount,
+                    previewTo,
+                });
+            } catch (e: any) {
+                console.error('[Cron] Newsletter worker failed:', e);
+                return NextResponse.json({
+                    success: false,
+                    worker: 'newsletter',
+                    error: e?.message || 'newsletter exception',
+                });
+            }
+        }
+
         if (worker === 'cleanup') {
             console.log('[Cron] Running Cleanup Worker...');
             const result = await runCleanupWorker();
@@ -347,7 +458,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'health-monitor']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'health-monitor', 'newsletter']
         }, { status: 400 });
 
     } catch (error: any) {
