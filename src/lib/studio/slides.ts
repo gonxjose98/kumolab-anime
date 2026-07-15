@@ -47,7 +47,12 @@ export function pickLayoutSettings(raw: unknown): Record<string, any> {
 }
 
 // Sanitize a client-supplied slides payload down to the persisted shape:
-// { sourceUrl, title, excerpt, settings (SETTING_KEYS only) } per slide.
+// { sourceUrl, title, excerpt, settings (SETTING_KEYS only) } per slide, plus
+// an optional `renderedUrl` — the slide's baked overlay JPEG in Storage,
+// written by the Save flow (render-post-image) and consumed by the IG
+// carousel publisher. Preserved here so an autosave round-trip doesn't wipe
+// the last baked render. Anything else the client sends (e.g. transient
+// previewImage base64 bytes) is dropped — never persisted.
 export function sanitizeSlides(raw: unknown): Array<Record<string, any>> {
     if (!Array.isArray(raw)) return [];
     return raw
@@ -61,6 +66,9 @@ export function sanitizeSlides(raw: unknown): Array<Record<string, any>> {
                 title: typeof sl.title === 'string' ? sl.title : '',
                 excerpt: typeof sl.excerpt === 'string' ? sl.excerpt : '',
                 settings,
+                ...(typeof sl.renderedUrl === 'string' && sl.renderedUrl
+                    ? { renderedUrl: sl.renderedUrl }
+                    : {}),
             };
         });
 }

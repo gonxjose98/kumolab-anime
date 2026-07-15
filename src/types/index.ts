@@ -46,6 +46,10 @@ export interface BlogPost {
             title?: string;
             excerpt?: string;
             settings?: Record<string, unknown>;
+            // The slide's baked overlay JPEG in Storage (written on Save by
+            // render-post-image). The IG carousel publisher posts this,
+            // falling back to sourceUrl when absent.
+            renderedUrl?: string;
         }>;
     };
     is_announcement_tied?: boolean;

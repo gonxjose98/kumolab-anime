@@ -57,6 +57,15 @@ interface IntelImageOptions {
     disableAutoScaling?: boolean;
     classification?: 'CLEAN' | 'TEXT_HEAVY';
     bypassSafety?: boolean;
+    // Storage key override. Default stays `${slug}-social.png` — the
+    // single-image path every existing caller relies on. Carousel slide
+    // renders pass distinct keys like `${slug}-slide-2.jpg` so slides never
+    // clobber the cover or each other.
+    outputFileName?: string;
+    // Encoder for the final buffer. Default 'png' (unchanged for all existing
+    // callers). Carousel slides use 'jpeg' because Meta's image_url
+    // containers require JPEG.
+    outputFormat?: 'png' | 'jpeg';
 }
 
 export interface ImageProcessingResult {
@@ -125,6 +134,8 @@ export async function generateIntelImage({
     disableAutoScaling = false,
     classification,
     bypassSafety = false,
+    outputFileName,
+    outputFormat = 'png',
 }: IntelImageOptions & { skipUpload?: boolean }): Promise<ImageProcessingResult | null> {
     const outputDir = path.join(process.cwd(), 'public/blog/intel');
 
@@ -132,7 +143,7 @@ export async function generateIntelImage({
         fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const outputFileName = `${slug}-social.png`;
+    const finalOutputFileName = outputFileName || `${slug}-social.png`;
 
     const WIDTH = 1080;
     const HEIGHT = 1350;
@@ -469,8 +480,17 @@ export async function generateIntelImage({
             ctx.restore();
         }
 
-        const finalBuffer = await canvas.toBuffer('image/png');
-        const processedImageBase64 = `data:image/png;base64,${finalBuffer.toString('base64')}`;
+        // Encode. PNG stays the default for every existing caller; JPEG is
+        // opt-in for carousel slides (Meta's image_url containers need JPEG).
+        // Canvas always produces PNG; sharp re-encodes for the JPEG case so
+        // the drawing pipeline above is identical for both formats.
+        const pngBuffer = await canvas.toBuffer('image/png');
+        const isJpeg = outputFormat === 'jpeg';
+        const finalBuffer = isJpeg
+            ? await sharp(pngBuffer).jpeg({ quality: 92 }).toBuffer()
+            : pngBuffer;
+        const outMime = isJpeg ? 'image/jpeg' : 'image/png';
+        const processedImageBase64 = `data:${outMime};base64,${finalBuffer.toString('base64')}`;
 
         if (skipUpload) {
             return {
@@ -485,11 +505,11 @@ export async function generateIntelImage({
         const { error: uploadError } = await supabaseAdmin
             .storage
             .from(bucketName)
-            .upload(`${outputFileName}`, finalBuffer, { contentType: 'image/png', upsert: true });
+            .upload(`${finalOutputFileName}`, finalBuffer, { contentType: outMime, upsert: true });
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabaseAdmin.storage.from(bucketName).getPublicUrl(`${outputFileName}`);
+        const { data: { publicUrl } } = supabaseAdmin.storage.from(bucketName).getPublicUrl(`${finalOutputFileName}`);
 
         return {
             processedImage: publicUrl,

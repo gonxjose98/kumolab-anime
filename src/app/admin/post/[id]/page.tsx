@@ -62,6 +62,11 @@ interface SlideState {
     settings: Settings;
     title: string;
     excerpt: string;
+    // Last baked overlay JPEG for this slide (written by the server on Save).
+    // Carried through hydration + autosave so a Save→edit→autosave cycle
+    // doesn't wipe the publisher's carousel image; every explicit Save
+    // re-bakes and overwrites it.
+    renderedUrl?: string;
 }
 
 // ── Layout templates ──────────────────────────────────────────
@@ -108,7 +113,21 @@ function hydrateSettings(raw: any): Settings {
 
 // The wire shape persisted into image_settings.slides for each slide.
 function toPersistSlide(sl: SlideState) {
-    return { sourceUrl: sl.sourceUrl, title: sl.title, excerpt: sl.excerpt, settings: sl.settings };
+    return {
+        sourceUrl: sl.sourceUrl,
+        title: sl.title,
+        excerpt: sl.excerpt,
+        settings: sl.settings,
+        ...(sl.renderedUrl ? { renderedUrl: sl.renderedUrl } : {}),
+    };
+}
+
+// Content-snapshot key for the per-slide preview-bytes cache. Save only
+// promotes cached bytes whose snapshot still matches the slide EXACTLY —
+// any drift (text edit, toggle, new photo) is a cache miss and that slide
+// re-renders server-side. Keeps the WYSIWYG guarantee per slide.
+function slideRenderKey(sl: { sourceUrl: string; settings: Settings; title: string; excerpt: string }): string {
+    return JSON.stringify({ s: sl.sourceUrl, t: sl.title, e: sl.excerpt, g: sl.settings });
 }
 
 // Smaller per-click nudge — 12px gives finer placement without feeling
@@ -207,6 +226,11 @@ export default function PostEditor() {
     // the server so what publishes is byte-for-byte what the user just saw,
     // not a fresh render that might drift.
     const lastPreviewBytes = useRef<string | null>(null);
+    // Per-slide preview bytes, keyed by content snapshot (slideRenderKey).
+    // On a carousel Save, each slide whose snapshot still matches ships its
+    // cached bytes so the server promotes them to that slide's JPEG instead
+    // of re-rendering all N slides (promote-bytes pattern, per slide).
+    const slidePreviewCache = useRef<Map<string, string>>(new Map());
     // Layout metadata from the last render (block top y + total height on the
     // 1080x1350 canvas). Used to place the on-canvas drag handles over the
     // actual text block instead of guessing.
@@ -314,6 +338,7 @@ export default function PostEditor() {
                                 settings: hydrateSettings(sl.settings),
                                 title: i === 0 ? (data.title || '') : (typeof sl.title === 'string' ? sl.title : ''),
                                 excerpt: i === 0 ? (data.excerpt || '') : (typeof sl.excerpt === 'string' ? sl.excerpt : ''),
+                                ...(typeof sl.renderedUrl === 'string' && sl.renderedUrl ? { renderedUrl: sl.renderedUrl } : {}),
                             }));
                     }
                 }
@@ -441,6 +466,21 @@ export default function PostEditor() {
     // source + settings + overlay text in directly, so the render always
     // matches the slide being shown (refresh-safe WYSIWYG). The render route
     // is stateless per call, so any slide can be previewed the same way.
+    // Remember a finished preview render's bytes under its content-snapshot
+    // key. Bounded so a long editing session can't hoard hundreds of base64
+    // frames — oldest entries (Map preserves insertion order) fall out first.
+    function cacheSlidePreview(slide: { sourceUrl: string; settings: Settings; title: string; excerpt: string }, bytes: string) {
+        const cache = slidePreviewCache.current;
+        const key = slideRenderKey(slide);
+        cache.delete(key);
+        cache.set(key, bytes);
+        while (cache.size > 24) {
+            const oldest = cache.keys().next().value;
+            if (oldest === undefined) break;
+            cache.delete(oldest);
+        }
+    }
+
     async function kickPreview(slide: { sourceUrl: string; settings: Settings; title: string; excerpt: string }) {
         const token = ++previewToken.current;
         try {
@@ -458,6 +498,12 @@ export default function PostEditor() {
                 }),
             });
             const json = await res.json().catch(() => ({}));
+            if (json?.success && typeof json.image === 'string' && json.image.startsWith('data:image/')) {
+                // Cache regardless of the supersede token — the render is a
+                // valid picture OF ITS OWN snapshot even if the operator has
+                // since switched slides.
+                cacheSlidePreview(slide, json.image);
+            }
             if (json?.success && json.image && token === previewToken.current) {
                 setImageUrl(json.image);
                 if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
@@ -477,7 +523,9 @@ export default function PostEditor() {
     // the operator is editing right now.
     function syncedSlides(): SlideState[] {
         if (!slides.length) return [{ sourceUrl, settings, title, excerpt }];
-        return slides.map((sl, i) => (i === activeSlide ? { sourceUrl, settings, title, excerpt } : sl));
+        // Spread keeps fields the live editor states don't mirror (e.g. the
+        // slide's last-baked renderedUrl) while folding in the live edits.
+        return slides.map((sl, i) => (i === activeSlide ? { ...sl, sourceUrl, settings, title, excerpt } : sl));
     }
 
     // Mirror a slide into the editor states the whole control panel operates
@@ -823,6 +871,19 @@ export default function PostEditor() {
                 // those bytes must NOT become post.image). Otherwise the
                 // server re-renders the cover from its own settings.
                 const coverPreviewBytes = activeSlide === 0 ? lastPreviewBytes.current : null;
+                // Carousel Saves attach each slide's cached preview bytes
+                // (when the cache snapshot still matches the slide exactly)
+                // as a transient previewImage. The server promotes those
+                // bytes to that slide's baked JPEG; slides without a fresh
+                // cache entry get one server-side render each. Single-image
+                // posts send the plain persisted shape — unchanged.
+                const isCarousel = allSlides.length >= 2;
+                const slidesWire = allSlides.map(sl => {
+                    const persisted = toPersistSlide(sl);
+                    if (!isCarousel) return persisted;
+                    const bytes = slidePreviewCache.current.get(slideRenderKey(sl));
+                    return bytes ? { ...persisted, previewImage: bytes } : persisted;
+                });
                 const renderJson = await callJson('/api/admin/render-post-image', {
                     postId: id,
                     sourceUrl: cover.sourceUrl || undefined,
@@ -834,7 +895,7 @@ export default function PostEditor() {
                     // Full carousel snapshot. The route stores it as
                     // image_settings.slides when there are 2+, and collapses
                     // back to the legacy shape (no slides key) when 0-1.
-                    slides: allSlides.map(toPersistSlide),
+                    slides: slidesWire,
                 });
                 imageBytesForSave = renderJson.image;
             }
@@ -942,6 +1003,7 @@ export default function PostEditor() {
             // image with no second render.
             if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
                 lastPreviewBytes.current = json.image;
+                cacheSlidePreview({ sourceUrl, settings, title, excerpt }, json.image);
             }
             // Keep the drag handles glued to where the text actually is.
             if (json.layout) lastLayout.current = json.layout;

@@ -26,6 +26,113 @@ export const maxDuration = 60;
  * Settings + source URL get snapshotted into posts.image_settings so any
  * later re-render reproduces the user's approved choices.
  */
+
+// ── Carousel slide bake ────────────────────────────────────────
+// When the persisted image_settings carry 2+ slides (a carousel), bake each
+// slide's overlay image to a JPEG in Storage and stamp its public URL into
+// slide.renderedUrl. JPEG because Meta's carousel image_url containers only
+// accept JPEG. Distinct keys (`${slug}-slide-N.jpg`) so slides never clobber
+// the single-image cover key (`${slug}-social.png`) or each other.
+//
+// Efficiency: the editor sends each slide's cached preview bytes as a
+// transient `previewImage` data URL alongside the persisted fields. When
+// present we promote those exact bytes (re-encoded to JPEG) — no server
+// re-render, same WYSIWYG guarantee as the cover's promote-bytes path. Only
+// slides without cached bytes fall back to a server-side render, keeping the
+// common case well under the route's maxDuration.
+//
+// Mutates mergedSettings.slides in place. Returns slide 1's renderedUrl (the
+// carousel cover, which becomes post.image) or null when this isn't a
+// carousel / the cover bake failed (caller then keeps the legacy cover
+// behavior). Per-slide failures are non-fatal: the slide's renderedUrl is
+// cleared so the publisher's sourceUrl fallback kicks in predictably.
+async function bakeCarouselSlides(
+    slug: string,
+    mergedSettings: Record<string, any>,
+    rawSlidesPayload: unknown,
+): Promise<string | null> {
+    const slides = mergedSettings.slides;
+    if (!Array.isArray(slides) || slides.length < 2) return null;
+
+    // Filter the raw client payload with the SAME rule sanitizeSlides uses,
+    // so indices line up with the sanitized slides — that's how each slide's
+    // transient previewImage bytes are matched back up.
+    const rawArr: any[] = Array.isArray(rawSlidesPayload)
+        ? (rawSlidesPayload as any[]).filter(
+            (sl: any) => sl && typeof sl === 'object' && typeof sl.sourceUrl === 'string')
+        : [];
+
+    let coverUrl: string | null = null;
+    for (let i = 0; i < slides.length; i++) {
+        const slide = slides[i];
+        const filename = `${slug}-slide-${i + 1}.jpg`;
+        let publicUrl: string | null = null;
+        try {
+            const preview = rawArr[i]?.previewImage;
+            const m = typeof preview === 'string'
+                ? preview.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i)
+                : null;
+            if (m) {
+                // Promote the editor's exact preview bytes, re-encoded JPEG.
+                const sharp = (await import('sharp')).default;
+                const jpeg = await sharp(Buffer.from(m[2], 'base64'))
+                    .jpeg({ quality: 92 })
+                    .toBuffer();
+                const { error: upErr } = await supabaseAdmin.storage
+                    .from('blog-images')
+                    .upload(filename, jpeg, { contentType: 'image/jpeg', upsert: true });
+                if (upErr) throw new Error(`slide upload failed: ${upErr.message}`);
+                publicUrl = supabaseAdmin.storage.from('blog-images').getPublicUrl(filename).data.publicUrl;
+            } else {
+                // Fallback: server-side render from the slide's persisted
+                // snapshot (same option mapping as the main render call).
+                const st = (slide.settings && typeof slide.settings === 'object' ? slide.settings : {}) as Record<string, any>;
+                const rendered = await generateIntelImage({
+                    sourceUrl: slide.sourceUrl,
+                    animeTitle: typeof slide.title === 'string' ? slide.title : '',
+                    headline: typeof slide.excerpt === 'string' ? slide.excerpt : '',
+                    slug,
+                    outputFileName: filename,
+                    outputFormat: 'jpeg',
+                    scale: st.imageScale ?? 1,
+                    position: st.imagePosition ?? { x: 0, y: 0 },
+                    applyText: st.applyText ?? true,
+                    applyGradient: st.applyGradient ?? true,
+                    applyWatermark: st.applyWatermark ?? true,
+                    gradientPosition: st.gradientPosition ?? 'bottom',
+                    gradientStrength: st.gradientStrength,
+                    titleScale: st.titleScale,
+                    captionScale: st.captionScale,
+                    titleOffset: st.titleOffset,
+                    captionOffset: st.captionOffset,
+                    purpleWordIndices: st.purpleWordIndices ?? [],
+                    watermarkPosition: st.watermarkPosition ?? undefined,
+                    classification: 'CLEAN',
+                    bypassSafety: true,
+                });
+                if (!rendered?.processedImage) {
+                    throw new Error((generateIntelImage as any).lastError || 'renderer returned null');
+                }
+                publicUrl = rendered.processedImage; // upload path returns the public URL
+            }
+        } catch (e: any) {
+            console.error(`[admin/render-post-image] slide ${i + 1} bake failed for ${slug}:`, e?.message || e);
+        }
+        if (publicUrl) {
+            // Version param busts CDN caches — the storage key is reused
+            // across saves (upsert), same convention as post.image.
+            const versioned = `${publicUrl}?v=${Date.now()}`;
+            slide.renderedUrl = versioned;
+            if (i === 0) coverUrl = versioned;
+        } else {
+            // A stale renderedUrl would show the PREVIOUS bake's overlay
+            // text — drop it so the publisher's sourceUrl fallback applies.
+            delete slide.renderedUrl;
+        }
+    }
+    return coverUrl;
+}
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -111,14 +218,20 @@ export async function POST(req: NextRequest) {
             };
             applySlides(mergedSettings, slidesPayload);
 
+            // Carousel (2+ slides): bake every slide to a JPEG and stamp
+            // renderedUrl per slide. Slide 1's JPEG becomes post.image (the
+            // cover). Non-carousel posts get null here and keep the exact
+            // legacy cover write below.
+            const carouselCoverUrl = await bakeCarouselSlides(slug, mergedSettings, slidesPayload);
+
             const { error: updateError } = await supabaseAdmin
                 .from('posts')
-                .update({ image: `${publicUrl}?v=${Date.now()}`, image_settings: mergedSettings })
+                .update({ image: carouselCoverUrl || `${publicUrl}?v=${Date.now()}`, image_settings: mergedSettings })
                 .eq('id', postId);
             if (updateError) {
                 return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
             }
-            return NextResponse.json({ success: true, image: publicUrl, persisted: true, mode: 'promoted' });
+            return NextResponse.json({ success: true, image: carouselCoverUrl || publicUrl, persisted: true, mode: 'promoted' });
         }
 
         const looksLikeImage = (u: string | undefined | null): boolean => {
@@ -248,9 +361,15 @@ export async function POST(req: NextRequest) {
         };
         applySlides(mergedSettings, slidesPayload);
 
+        // Same carousel bake as the promote-bytes path: on a 2+ slide save,
+        // every slide gets a JPEG render + renderedUrl, and slide 1's JPEG
+        // becomes post.image. Null for non-carousel posts (legacy write).
+        const carouselCoverUrl = await bakeCarouselSlides(
+            post.slug || `post-${postId}`, mergedSettings, slidesPayload);
+
         const { data: updated, error: updateError } = await supabaseAdmin
             .from('posts')
-            .update({ image: result.processedImage, image_settings: mergedSettings })
+            .update({ image: carouselCoverUrl || result.processedImage, image_settings: mergedSettings })
             .eq('id', postId)
             .select('id, image')
             .single();

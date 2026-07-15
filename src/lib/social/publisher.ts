@@ -123,6 +123,102 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
 
 async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult): Promise<SocialPublishResult> {
 
+    // ── 0b. Instagram-carousel branch ──────────────────────────
+    // A post whose image_settings carry 2+ slides is an operator-built
+    // carousel (the multi-slide photo editor is the ONLY thing that writes
+    // slides, and only with >=2 entries — the auto-pipeline never does).
+    // Carousels are image sets by construction, so they bypass the video
+    // staging + video-only policy below entirely:
+    //   • Instagram — publish the full carousel (per-slide baked JPEGs).
+    //   • Facebook  — slide 1 (the cover) via the existing /photos path;
+    //     post.image IS slide 1's baked render.
+    //   • Threads   — TODO: Threads carousels need their own children/parent
+    //     container flow; deliberately not wired yet. Skipping matches the
+    //     status quo (the video-only policy already kept image posts off
+    //     Threads), so nothing regresses.
+    // For every other post (no slides key, or a degenerate single entry)
+    // this whole block is a no-op and the flow below is byte-identical.
+    const carouselSlides: Array<{ sourceUrl?: string; renderedUrl?: string }> =
+        Array.isArray((post as any).image_settings?.slides)
+            ? (post as any).image_settings.slides
+            : [];
+    if (carouselSlides.length >= 2) {
+        // Prefer each slide's baked overlay JPEG (renderedUrl, written on
+        // Save); fall back to the raw background (sourceUrl) so a slide whose
+        // bake failed still ships as a picture rather than sinking the set.
+        const slideImageUrls = carouselSlides
+            .map(sl => (typeof sl?.renderedUrl === 'string' && sl.renderedUrl)
+                ? sl.renderedUrl
+                : (typeof sl?.sourceUrl === 'string' ? sl.sourceUrl : ''))
+            .filter(u => /^https?:\/\//i.test(u));
+
+        if (slideImageUrls.length >= 2) {
+            if (META_ACCESS_TOKEN && IG_USER_ID) {
+                try {
+                    const igResult = await publishToInstagramCarousel(post, slideImageUrls);
+                    Object.assign(result, igResult);
+                } catch (e: any) {
+                    await logError({
+                        source: 'publisher.ig',
+                        errorMessage: `IG carousel publish threw: ${e?.message || e}`,
+                        stackTrace: e?.stack,
+                        context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                    });
+                }
+            } else {
+                await logError({
+                    source: 'publisher.ig',
+                    errorMessage: 'Meta credentials missing — META_ACCESS_TOKEN or META_IG_ID not set',
+                    context: { has_token: !!META_ACCESS_TOKEN, has_ig_id: !!IG_USER_ID },
+                });
+            }
+
+            if (META_ACCESS_TOKEN) {
+                try {
+                    const fbResult = await publishToFacebookPage(post, null);
+                    Object.assign(result, fbResult);
+                } catch (e: any) {
+                    await logError({
+                        source: 'publisher.fb',
+                        errorMessage: `FB publish threw: ${e?.message || e}`,
+                        stackTrace: e?.stack,
+                        context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                    });
+                }
+            }
+        } else {
+            await logError({
+                source: 'publisher.ig.carousel',
+                errorMessage: `Carousel post has ${slideImageUrls.length} usable slide image URL(s) — need 2+; skipping socials`,
+                context: { post_id: (post as any).id, slug: post.slug, slide_count: carouselSlides.length },
+            });
+        }
+
+        // Operational trail, mirroring the other terminal branches.
+        {
+            const { supabaseAdmin } = await import('../supabase/admin');
+            const published = !!(result.instagram_id || result.facebook_id);
+            await supabaseAdmin.from('action_logs').insert({
+                action: published ? 'social_publish_carousel' : 'social_publish_skipped',
+                actor: 'system',
+                entity_type: 'post',
+                entity_id: (post as any).id,
+                entity_title: post.title,
+                reason: published
+                    ? 'Carousel post → IG carousel + FB cover photo (Threads carousel not wired yet)'
+                    : 'Carousel post — IG/FB publish did not produce an id (see error_logs)',
+                details: {
+                    slug: post.slug,
+                    slide_count: carouselSlides.length,
+                    usable_urls: slideImageUrls.length,
+                    ig_id: result.instagram_id ?? null,
+                    fb_id: result.facebook_id ?? null,
+                },
+            }).then(() => {}, () => {});
+        }
+        return result;
+    }
+
     // ── 1. Stage YouTube video FIRST (any YouTube source) ─────
     // Per Jose's directive: if the post's source is a YouTube video,
     // the video itself is what should ship to social — not a screenshot
@@ -558,6 +654,220 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
             errorMessage: `IG fetch/publish threw: ${e?.message || e}`,
             stackTrace: e?.stack,
             context: { post_slug: post.slug, post_title: post.title, media_type: isReels ? 'REELS' : 'IMAGE' },
+        });
+    }
+
+    return result;
+}
+
+// ── Instagram carousel publisher ────────────────────────────────
+//
+// Publishes a 2-10 image carousel:
+//   1. one child container per slide (image_url + is_carousel_item=true) —
+//      the URLs must be public JPEGs (Meta rejects PNG for image_url),
+//      which is why the Save flow bakes each slide as `${slug}-slide-N.jpg`;
+//   2. poll every child to FINISHED;
+//   3. parent container (media_type=CAROUSEL, children=comma-joined ids,
+//      caption = the same caption the single-image/Reels flow builds);
+//   4. poll the parent, then media_publish it.
+//
+// New endpoints use Graph v22.0 per current Meta docs; the existing
+// single-image/Reels calls above are deliberately left on their pinned
+// version, untouched.
+const IG_CAROUSEL_GRAPH_BASE = 'https://graph.facebook.com/v22.0';
+
+// Poll an IG media container's status_code until FINISHED, a terminal
+// failure (ERROR/EXPIRED), or timeout. Returns the last observed status
+// (null if it never became readable). Same poll pattern as the Reels flow.
+async function pollIgCarouselContainer(
+    containerId: string,
+    maxWaitMs: number,
+    pollIntervalMs: number,
+): Promise<string | null> {
+    const start = Date.now();
+    let finalStatus: string | null = null;
+    while (Date.now() - start < maxWaitMs) {
+        await new Promise(r => setTimeout(r, pollIntervalMs));
+        const statusRes = await fetchWithTimeout(
+            `${IG_CAROUSEL_GRAPH_BASE}/${containerId}?fields=status_code&access_token=${encodeURIComponent(META_ACCESS_TOKEN || '')}`,
+            { method: 'GET' },
+            10_000,
+        );
+        const statusData = await statusRes.json().catch(() => ({}));
+        finalStatus = statusData.status_code || null;
+        if (finalStatus === 'FINISHED' || finalStatus === 'ERROR' || finalStatus === 'EXPIRED') break;
+    }
+    return finalStatus;
+}
+
+export async function publishToInstagramCarousel(
+    post: BlogPost,
+    slideImageUrls: string[],
+): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!IG_USER_ID || !META_ACCESS_TOKEN) return result;
+
+    // Meta allows 2-10 children per carousel — clamp to the first 10 and
+    // refuse to build a "carousel" of fewer than 2.
+    const urls = (slideImageUrls || [])
+        .filter(u => typeof u === 'string' && /^https?:\/\//i.test(u))
+        .slice(0, 10);
+    if (urls.length < 2) {
+        await logError({
+            source: 'publisher.ig.carousel',
+            errorMessage: `IG carousel needs 2-10 image URLs, got ${urls.length}`,
+            context: { post_slug: post.slug, post_title: post.title, provided: slideImageUrls?.length ?? 0 },
+        });
+        return result;
+    }
+
+    // Identical caption to the single-image/Reels flow (publishToInstagram).
+    const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
+    const hashtags = buildSocialHashtags({
+        title: post.title,
+        claim_type: (post as any).claimType || (post as any).claim_type,
+        anime_id: post.anime_id,
+        override: (post as any).hashtags,
+    }).join(' ');
+    const caption = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 2200);
+
+    try {
+        // Phase 1: one child container per slide.
+        const childIds: string[] = [];
+        for (let i = 0; i < urls.length; i++) {
+            const childParams = new URLSearchParams({
+                image_url: urls[i],
+                is_carousel_item: 'true',
+                access_token: META_ACCESS_TOKEN,
+            });
+            const childRes = await fetchWithTimeout(
+                `${IG_CAROUSEL_GRAPH_BASE}/${IG_USER_ID}/media?${childParams}`,
+                { method: 'POST' },
+                20_000,
+            );
+            const childData = await childRes.json();
+            if (!childData.id) {
+                const meta = childData?.error || {};
+                const reason = meta.code === 190
+                    ? `IG token expired/invalid (Meta code 190): ${meta.message || 'session expired'}`
+                    : `IG carousel child ${i + 1}/${urls.length} container creation failed: ${meta.message || JSON.stringify(childData).substring(0, 300)}`;
+                await logError({
+                    source: 'publisher.ig.carousel',
+                    errorMessage: reason,
+                    context: {
+                        post_slug: post.slug,
+                        post_title: post.title,
+                        meta_code: meta.code,
+                        meta_subcode: meta.error_subcode,
+                        slide_index: i + 1,
+                        image_url: urls[i],
+                    },
+                });
+                return result;
+            }
+            childIds.push(childData.id);
+        }
+
+        // Phase 2: every child must reach FINISHED before the parent can be
+        // assembled. Image ingest is normally seconds; 30s each is generous.
+        for (let i = 0; i < childIds.length; i++) {
+            const status = await pollIgCarouselContainer(childIds[i], 30_000, 2_000);
+            if (status !== 'FINISHED') {
+                await logError({
+                    source: 'publisher.ig.carousel',
+                    errorMessage: `IG carousel child ${i + 1}/${childIds.length} ingest did not FINISH (last status: ${status || 'unknown'})`,
+                    context: {
+                        post_slug: post.slug,
+                        post_title: post.title,
+                        container_id: childIds[i],
+                        slide_index: i + 1,
+                    },
+                });
+                return result;
+            }
+        }
+
+        // Phase 3: parent CAROUSEL container referencing the children.
+        const parentParams = new URLSearchParams({
+            media_type: 'CAROUSEL',
+            children: childIds.join(','),
+            caption,
+            access_token: META_ACCESS_TOKEN,
+        });
+        const parentRes = await fetchWithTimeout(
+            `${IG_CAROUSEL_GRAPH_BASE}/${IG_USER_ID}/media?${parentParams}`,
+            { method: 'POST' },
+            20_000,
+        );
+        const parentData = await parentRes.json();
+        if (!parentData.id) {
+            const meta = parentData?.error || {};
+            await logError({
+                source: 'publisher.ig.carousel',
+                errorMessage: `IG carousel parent container creation failed: ${meta.message || JSON.stringify(parentData).substring(0, 300)}`,
+                context: {
+                    post_slug: post.slug,
+                    post_title: post.title,
+                    meta_code: meta.code,
+                    meta_subcode: meta.error_subcode,
+                    children: childIds.length,
+                },
+            });
+            return result;
+        }
+
+        // Phase 4: wait for the parent to assemble. Terminal failure gives
+        // up; a timeout still attempts the publish (mirrors the image flow's
+        // "the legacy sleep was usually enough" behavior).
+        const parentStatus = await pollIgCarouselContainer(parentData.id, 60_000, 3_000);
+        if (parentStatus === 'ERROR' || parentStatus === 'EXPIRED') {
+            await logError({
+                source: 'publisher.ig.carousel',
+                errorMessage: `IG carousel parent container ingest ${parentStatus}`,
+                context: { post_slug: post.slug, post_title: post.title, container_id: parentData.id },
+            });
+            return result;
+        }
+
+        // Phase 5: publish.
+        const publishParams = new URLSearchParams({
+            creation_id: parentData.id,
+            access_token: META_ACCESS_TOKEN,
+        });
+        const publishRes = await fetchWithTimeout(
+            `${IG_CAROUSEL_GRAPH_BASE}/${IG_USER_ID}/media_publish?${publishParams}`,
+            { method: 'POST' },
+            15_000,
+        );
+        const publishData = await publishRes.json();
+
+        if (publishData.id) {
+            result.instagram_id = publishData.id;
+            result.instagram_url = `https://instagram.com/p/${publishData.id}`;
+            console.log(`✅ [Instagram] Published carousel (${childIds.length} slides): ${publishData.id}`);
+        } else {
+            const meta = publishData?.error || {};
+            const reason = meta.code === 190
+                ? `IG token expired/invalid (Meta code 190): ${meta.message || 'session expired'}`
+                : `IG carousel publish phase failed: ${meta.message || JSON.stringify(publishData).substring(0, 300)}`;
+            await logError({
+                source: 'publisher.ig.carousel',
+                errorMessage: reason,
+                context: {
+                    post_slug: post.slug,
+                    post_title: post.title,
+                    meta_code: meta.code,
+                    meta_subcode: meta.error_subcode,
+                    container_id: parentData.id,
+                },
+            });
+        }
+    } catch (e: any) {
+        await logError({
+            source: 'publisher.ig.carousel',
+            errorMessage: `IG carousel fetch/publish threw: ${e?.message || e}`,
+            stackTrace: e?.stack,
+            context: { post_slug: post.slug, post_title: post.title },
         });
     }
 
