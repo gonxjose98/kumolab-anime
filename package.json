@@ -9,6 +9,8 @@
     "postinstall": "node scripts/copy-ffmpeg-core.mjs",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "engine:08:00": "tsx scripts/run-engine.ts 08:00",
     "engine:12:00": "tsx scripts/run-engine.ts 12:00",
     "engine:16:00": "tsx scripts/run-engine.ts 16:00",
@@ -51,6 +53,7 @@
     "postcss": "^8.4.31",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
