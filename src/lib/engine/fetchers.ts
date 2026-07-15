@@ -923,8 +923,6 @@ export async function fetchAniListTrendingRaw(telemetry?: any): Promise<any[]> {
     }
 }
 
-import { checkSocialSignals } from '../social/signals';
-
 // The Master Aggregator Function
 export async function fetchSmartTrendingCandidates(excludeTitles: string[] = []): Promise<{ candidates: any[], telemetry: any }> {
     const { CONTENT_RULES, SOURCE_TIERS } = await import('./sources-config');

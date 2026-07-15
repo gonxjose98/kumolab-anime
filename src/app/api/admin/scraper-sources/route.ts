@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
-// Default sources — synced with sources-config.ts, x-monitor.ts, expanded-rss.ts
+// Default sources — synced with sources-config.ts
 // Last synced: 2026-03-12
 const DEFAULT_SOURCES = {
     x: [
