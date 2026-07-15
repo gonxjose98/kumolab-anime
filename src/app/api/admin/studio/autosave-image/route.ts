@@ -24,7 +24,7 @@ export const maxDuration = 15;
 const SETTING_KEYS = [
     'applyText', 'applyGradient', 'applyWatermark', 'gradientPosition', 'gradientStrength',
     'titleScale', 'captionScale', 'titleOffset', 'captionOffset', 'watermarkPosition',
-    'purpleWordIndices', 'convertToReel',
+    'purpleWordIndices', 'convertToReel', 'imageScale', 'imagePosition',
 ];
 
 export async function POST(req: NextRequest) {

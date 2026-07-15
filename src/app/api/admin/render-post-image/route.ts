@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
                 purpleWordIndices: settings.purpleWordIndices ?? [],
                 watermarkPosition: settings.watermarkPosition ?? null,
                 convertToReel: settings.convertToReel ?? false,
+                imageScale: settings.imageScale ?? 1,
+                imagePosition: settings.imagePosition ?? { x: 0, y: 0 },
             };
 
             const { error: updateError } = await supabaseAdmin
@@ -220,6 +222,8 @@ export async function POST(req: NextRequest) {
             purpleWordIndices: settings.purpleWordIndices ?? [],
             watermarkPosition: settings.watermarkPosition ?? null,
             convertToReel: settings.convertToReel ?? false,
+            imageScale: settings.imageScale ?? 1,
+            imagePosition: settings.imagePosition ?? { x: 0, y: 0 },
         };
 
         const { data: updated, error: updateError } = await supabaseAdmin

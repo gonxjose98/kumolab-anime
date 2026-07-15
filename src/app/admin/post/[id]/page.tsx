@@ -23,6 +23,8 @@ interface Settings {
     watermarkPosition: XY | null;       // null = renderer's auto bottom-center
     purpleWordIndices: number[];        // indices into the merged title+caption word stream
     convertToReel: boolean;             // if true, image-only post is converted to a 12s Ken-Burns Reel before publishing
+    imageScale: number;                 // background zoom: 1 = cover-fit, 0.5–3 supported by the renderer
+    imagePosition: XY;                  // background pan, FRACTIONS of canvas (renderer multiplies by W/H)
 }
 
 // All overlays default OFF when opening the editor. The user opts in to
@@ -44,6 +46,8 @@ const DEFAULT_SETTINGS: Settings = {
     watermarkPosition: null,
     purpleWordIndices: [],
     convertToReel: false,
+    imageScale: 1,
+    imagePosition: { x: 0, y: 0 },
 };
 
 // Smaller per-click nudge — 12px gives finer placement without feeling
@@ -52,6 +56,16 @@ const NUDGE_PX = 12;
 const KUMOLAB_PURPLE = '#9D7BFF';
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
+
+// On-canvas drag: magnetic snap radius in canvas px. Within this distance
+// of the horizontal center (offset.x → 0) or the bottom caption zone the
+// dragged block clicks into place, with a visible guide (same idea as the
+// VideoEditor's SNAP_THRESHOLD center snap).
+const SNAP_PX = 28;
+// Mirror of the renderer's text-zone centers (image-processor zoneY math):
+// top zone = H*0.175 + 30, bottom zone = H - H*0.175 - 30.
+const ZONE_Y_TOP = CANVAS_H * 0.175 + 30;
+const ZONE_Y_BOTTOM = CANVAS_H - CANVAS_H * 0.175 - 30;
 
 export default function PostEditor() {
     const params = useParams();
@@ -116,6 +130,18 @@ export default function PostEditor() {
     // the server so what publishes is byte-for-byte what the user just saw,
     // not a fresh render that might drift.
     const lastPreviewBytes = useRef<string | null>(null);
+    // Layout metadata from the last render (block top y + total height on the
+    // 1080x1350 canvas). Used to place the on-canvas drag handles over the
+    // actual text block instead of guessing.
+    const lastLayout = useRef<{ y: number; totalHeight: number } | null>(null);
+    // ── On-canvas text drag (title/caption) ──────────────────
+    const previewRef = useRef<HTMLDivElement>(null);
+    const [draggingText, setDraggingText] = useState<null | 'title' | 'caption'>(null);
+    const [snapGuides, setSnapGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+    const dragStart = useRef<{ px: number; py: number; offset: XY } | null>(null);
+    // Drag-and-drop photo upload over the preview card.
+    const [dropActive, setDropActive] = useState(false);
+    const dropDepth = useRef(0);
     // Latest VideoEditor settings snapshot (text overlays, trim, fill…), so the
     // top-bar Save can persist the in-progress video draft for video posts.
     const videoSettingsRef = useRef<any>(null);
@@ -161,31 +187,38 @@ export default function PostEditor() {
                 // hydrate the editor state from it. That way reopening a
                 // published post shows the EXACT toggles + scales + nudges
                 // + word-color choices you approved with — no guessing.
+                // Built as a plain object (not via the setter callback) so the
+                // initial preview render below can use the SAME hydrated
+                // settings — previously it rendered with DEFAULT_SETTINGS,
+                // which showed a bare image after refresh even though the
+                // controls were hydrated ON (WYSIWYG bug).
+                let hydrated: Settings = { ...DEFAULT_SETTINGS };
+                let hydratedSource = '';
                 if (data.image_settings && typeof data.image_settings === 'object') {
                     const s = data.image_settings as any;
-                    setSettings(prev => ({
-                        ...prev,
-                        applyText: s.applyText ?? prev.applyText,
-                        applyGradient: s.applyGradient ?? prev.applyGradient,
-                        applyWatermark: s.applyWatermark ?? prev.applyWatermark,
-                        gradientPosition: s.gradientPosition ?? prev.gradientPosition,
-                        gradientStrength: s.gradientStrength ?? prev.gradientStrength,
-                        titleScale: s.titleScale ?? prev.titleScale,
-                        captionScale: s.captionScale ?? prev.captionScale,
-                        titleOffset: s.titleOffset ?? prev.titleOffset,
-                        captionOffset: s.captionOffset ?? prev.captionOffset,
-                        watermarkPosition: s.watermarkPosition ?? prev.watermarkPosition,
-                        purpleWordIndices: s.purpleWordIndices ?? prev.purpleWordIndices,
-                        convertToReel: s.convertToReel ?? prev.convertToReel,
-                    }));
+                    hydrated = {
+                        ...DEFAULT_SETTINGS,
+                        applyText: s.applyText ?? DEFAULT_SETTINGS.applyText,
+                        applyGradient: s.applyGradient ?? DEFAULT_SETTINGS.applyGradient,
+                        applyWatermark: s.applyWatermark ?? DEFAULT_SETTINGS.applyWatermark,
+                        gradientPosition: s.gradientPosition ?? DEFAULT_SETTINGS.gradientPosition,
+                        gradientStrength: s.gradientStrength ?? DEFAULT_SETTINGS.gradientStrength,
+                        titleScale: s.titleScale ?? DEFAULT_SETTINGS.titleScale,
+                        captionScale: s.captionScale ?? DEFAULT_SETTINGS.captionScale,
+                        titleOffset: s.titleOffset ?? DEFAULT_SETTINGS.titleOffset,
+                        captionOffset: s.captionOffset ?? DEFAULT_SETTINGS.captionOffset,
+                        watermarkPosition: s.watermarkPosition ?? DEFAULT_SETTINGS.watermarkPosition,
+                        purpleWordIndices: s.purpleWordIndices ?? DEFAULT_SETTINGS.purpleWordIndices,
+                        convertToReel: s.convertToReel ?? DEFAULT_SETTINGS.convertToReel,
+                        imageScale: s.imageScale ?? DEFAULT_SETTINGS.imageScale,
+                        imagePosition: s.imagePosition ?? DEFAULT_SETTINGS.imagePosition,
+                    };
                     if (s.sourceUrl && typeof s.sourceUrl === 'string') {
-                        setSourceUrl(s.sourceUrl);
-                    } else {
-                        setSourceUrl('');
+                        hydratedSource = s.sourceUrl;
                     }
-                } else {
-                    setSourceUrl('');
                 }
+                setSettings(hydrated);
+                setSourceUrl(hydratedSource);
                 setImageUrl(data.image || '');
                 // If a staged video exists at all, this post's editor is
                 // a video editor — skip the image preview render. Mirrors
@@ -193,15 +226,12 @@ export default function PostEditor() {
                 // the conditional UI stay in sync.
                 const isVideoImport = !!data.social_ids?.staged_video_url;
                 if (!isVideoImport) {
-                    // Fire a preview render immediately with the default toggle
-                    // state (all OFF). This makes the displayed image actually
-                    // match the toggle UI on open — without it, the editor was
-                    // showing whatever was last persisted to post.image (which
-                    // for posts touched by the pre-fix editor still has overlays
-                    // baked in). Render-on-open also makes Force Regenerate's
-                    // result feel meaningful — the displayed image is now
-                    // demonstrably "what these settings produce right now."
-                    kickPreview(data);
+                    // Fire a preview render immediately with the JUST-HYDRATED
+                    // settings (and source). What the operator saved is what
+                    // they see the moment the editor opens — refresh-safe
+                    // WYSIWYG. Fresh posts with no snapshot still render with
+                    // the all-OFF defaults.
+                    kickPreview(data, hydrated, hydratedSource);
                 }
                 initialLoadDone.current = true;
             } catch (e: any) {
@@ -233,6 +263,7 @@ export default function PostEditor() {
         settings.titleOffset.x, settings.titleOffset.y,
         settings.captionOffset.x, settings.captionOffset.y,
         settings.watermarkPosition?.x, settings.watermarkPosition?.y,
+        settings.imageScale, settings.imagePosition.x, settings.imagePosition.y,
         // Reference the JSON so any change to the array triggers re-render.
         JSON.stringify(settings.purpleWordIndices),
     ]);
@@ -270,8 +301,10 @@ export default function PostEditor() {
 
     // Preview-render helper that doesn't depend on the title/excerpt useState
     // values (avoids the "stale state" race when called from inside the
-    // post-load effect). Pass the just-loaded post in directly.
-    async function kickPreview(loadedPost: any) {
+    // post-load effect). Pass the just-loaded post + just-hydrated settings
+    // in directly, so the opening render matches the hydrated controls
+    // (refresh-safe WYSIWYG) instead of rendering bare defaults.
+    async function kickPreview(loadedPost: any, hydratedSettings: Settings, hydratedSourceUrl?: string) {
         try {
             const res = await fetch('/api/admin/render-post-image', {
                 method: 'POST',
@@ -279,14 +312,21 @@ export default function PostEditor() {
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     postId: loadedPost.id,
+                    sourceUrl: hydratedSourceUrl || undefined,
                     title: loadedPost.title || '',
                     excerpt: loadedPost.excerpt || '',
-                    settings: DEFAULT_SETTINGS,
+                    settings: hydratedSettings,
                     persist: false,
                 }),
             });
             const json = await res.json().catch(() => ({}));
-            if (json?.success && json.image) setImageUrl(json.image);
+            if (json?.success && json.image) {
+                setImageUrl(json.image);
+                if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
+                    lastPreviewBytes.current = json.image;
+                }
+                if (json.layout) lastLayout.current = json.layout;
+            }
         } catch {
             // Soft fail — leave imageUrl as-is and let the user toggle to retry.
         }
@@ -313,6 +353,108 @@ export default function PostEditor() {
     // and trim it — render VideoEditor regardless of whether an image
     // is also present.
     const isVideoPost = !!(post?.social_ids?.staged_video_url);
+
+    // ── On-canvas drag: estimated title/caption bands ─────────
+    // The preview is a flat server-rendered image, so we place transparent
+    // grab bands where the text block sits: block top + height come from the
+    // renderer's layout metadata (falling back to the zone math), shifted by
+    // the current nudge offsets. Values in canvas px (1080x1350).
+    function textBands() {
+        const zoneY = settings.gradientPosition === 'top' ? ZONE_Y_TOP : ZONE_Y_BOTTOM;
+        const blockH = lastLayout.current?.totalHeight ?? 260;
+        const blockTop = lastLayout.current?.y ?? (zoneY - blockH / 2);
+        const hasCaption = (excerpt || '').trim().length > 0;
+        // Title occupies roughly the upper ~62% of the combined block when a
+        // caption exists (caption renders at ~55% of the title size).
+        const titleFrac = hasCaption ? 0.62 : 1;
+        const PAD = 24; // easier grabbing, esp. touch
+        return {
+            hasCaption,
+            title: {
+                top: blockTop + settings.titleOffset.y - PAD,
+                height: blockH * titleFrac + PAD * 2,
+            },
+            caption: {
+                top: blockTop + blockH * titleFrac + settings.captionOffset.y - PAD,
+                height: blockH * (1 - titleFrac) + PAD * 2,
+            },
+        };
+    }
+
+    // Begin dragging a text block. The band elements set touch-action: none,
+    // so on mobile the rest of the preview still scrolls the page while the
+    // text bands drag. Movement is handled by the window-level effect below
+    // (pointer events → mouse + touch), mirroring VideoEditor's approach.
+    function beginTextDrag(target: 'title' | 'caption') {
+        return (e: React.PointerEvent<HTMLDivElement>) => {
+            if (!settings.applyText || busy) return;
+            e.preventDefault();
+            try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+            const offset = target === 'title' ? settings.titleOffset : settings.captionOffset;
+            dragStart.current = { px: e.clientX, py: e.clientY, offset: { ...offset } };
+            setDraggingText(target);
+        };
+    }
+
+    // Track the drag: convert screen-px deltas to canvas px via the preview's
+    // rendered rect ((dx / rect.width) * 1080), then magnet-snap: x clicks to
+    // the horizontal center (offset.x → 0) and y clicks to the bottom caption
+    // zone, each within SNAP_PX, with visible guides.
+    useEffect(() => {
+        if (!draggingText) return;
+        const target = draggingText;
+        const move = (e: PointerEvent) => {
+            const el = previewRef.current;
+            const start = dragStart.current;
+            if (!el || !start) return;
+            const rect = el.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const dx = ((e.clientX - start.px) / rect.width) * CANVAS_W;
+            const dy = ((e.clientY - start.py) / rect.height) * CANVAS_H;
+            let nx = Math.round(start.offset.x + dx);
+            let ny = Math.round(start.offset.y + dy);
+            // Magnetic center snap (horizontal).
+            const snapX = Math.abs(nx) < SNAP_PX;
+            if (snapX) nx = 0;
+            // Gentle snap band at the bottom caption zone. When the layout is
+            // already bottom, that's offset.y = 0; when it's top, it's the
+            // zone-to-zone distance.
+            const bottomTargetY = settings.gradientPosition === 'bottom' ? 0 : Math.round(ZONE_Y_BOTTOM - ZONE_Y_TOP);
+            const snapY = Math.abs(ny - bottomTargetY) < SNAP_PX;
+            if (snapY) ny = bottomTargetY;
+            setSnapGuides(prev => (prev.x === snapX && prev.y === snapY ? prev : { x: snapX, y: snapY }));
+            setSettings(s => target === 'title'
+                ? { ...s, titleOffset: { x: nx, y: ny } }
+                : { ...s, captionOffset: { x: nx, y: ny } });
+        };
+        const up = () => {
+            setDraggingText(null);
+            setSnapGuides({ x: false, y: false });
+            dragStart.current = null;
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+        return () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', up);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draggingText, settings.gradientPosition]);
+
+    // One-tap "Bottom" preset: park the element in the anime-caption bottom
+    // zone. Offset {0,0} + gradientPosition 'bottom' IS the renderer's bottom
+    // layout, so this is exact (not an approximation).
+    function snapToBottom(target: 'title' | 'caption') {
+        setSettings(s => ({
+            ...s,
+            gradientPosition: 'bottom',
+            ...(target === 'title'
+                ? { titleOffset: { x: 0, y: 0 } }
+                : { captionOffset: { x: 0, y: 0 } }),
+        }));
+    }
 
     async function handleSave(opts: { thenApprove?: boolean; asDraft?: boolean } = {}) {
         // What you see is what publishes. We send the exact base64 bytes
@@ -447,6 +589,8 @@ export default function PostEditor() {
             if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
                 lastPreviewBytes.current = json.image;
             }
+            // Keep the drag handles glued to where the text actually is.
+            if (json.layout) lastLayout.current = json.layout;
         } catch (e: any) {
             // A silent render is a background nicety (e.g. title onBlur) — never
             // surface its failure to the operator. Only explicit renders alert.
@@ -770,7 +914,35 @@ export default function PostEditor() {
                 <>
                     {/* ── Image preview ─────────────────────────────── */}
                     <Card>
-                        <div className="aspect-[4/5] w-full relative" style={{ background: 'var(--surface-2)' }}>
+                        <div
+                            ref={previewRef}
+                            className="aspect-[4/5] w-full relative"
+                            style={{ background: 'var(--surface-2)' }}
+                            // Desktop drag-and-drop: dropping a picture anywhere on the
+                            // preview feeds the existing upload flow (same as the
+                            // "Upload image" button in Image source below).
+                            onDragEnter={(e) => {
+                                if (!e.dataTransfer.types.includes('Files')) return;
+                                e.preventDefault();
+                                dropDepth.current += 1;
+                                setDropActive(true);
+                            }}
+                            onDragOver={(e) => {
+                                if (!e.dataTransfer.types.includes('Files')) return;
+                                e.preventDefault();
+                            }}
+                            onDragLeave={() => {
+                                dropDepth.current = Math.max(0, dropDepth.current - 1);
+                                if (dropDepth.current === 0) setDropActive(false);
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                dropDepth.current = 0;
+                                setDropActive(false);
+                                const f = Array.from(e.dataTransfer.files || []).find(x => x.type.startsWith('image/'));
+                                if (f) handleUpload(f);
+                            }}
+                        >
                             {imageUrl && !imageError ? (
                                 <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -779,10 +951,68 @@ export default function PostEditor() {
                                         src={imageUrl}
                                         alt={title}
                                         className="w-full h-full object-cover"
+                                        draggable={false}
                                         onError={() => setImageError('Image failed to load. The source may be expired or blocked.')}
                                     />
+
+                                    {/* Transparent grab bands over the title + caption blocks.
+                                        Drag to reposition (writes titleOffset/captionOffset);
+                                        touch-action none confines scroll-blocking to the bands. */}
+                                    {settings.applyText && (() => {
+                                        const bands = textBands();
+                                        const bandStyle = (band: { top: number; height: number }, active: boolean): React.CSSProperties => ({
+                                            position: 'absolute',
+                                            left: '2%',
+                                            right: '2%',
+                                            top: `${(band.top / CANVAS_H) * 100}%`,
+                                            height: `${(band.height / CANVAS_H) * 100}%`,
+                                            cursor: 'move',
+                                            touchAction: 'none',
+                                            zIndex: 3,
+                                            outline: active ? `1px dashed ${KUMOLAB_PURPLE}` : 'none',
+                                            outlineOffset: 2,
+                                            borderRadius: 6,
+                                            background: active ? 'rgba(157,123,255,0.08)' : 'transparent',
+                                        });
+                                        return (
+                                            <>
+                                                <div
+                                                    aria-label="Drag to move the title"
+                                                    title="Drag to move the title"
+                                                    style={bandStyle(bands.title, draggingText === 'title')}
+                                                    onPointerDown={beginTextDrag('title')}
+                                                />
+                                                {bands.hasCaption && (
+                                                    <div
+                                                        aria-label="Drag to move the sub-caption"
+                                                        title="Drag to move the sub-caption"
+                                                        style={bandStyle(bands.caption, draggingText === 'caption')}
+                                                        onPointerDown={beginTextDrag('caption')}
+                                                    />
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+
+                                    {/* Snap guides — center line + bottom-zone line, shown
+                                        while the dragged block is magnetically snapped. */}
+                                    {draggingText && snapGuides.x && (
+                                        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, transform: 'translateX(-0.5px)', background: 'rgba(157,123,255,0.95)', boxShadow: '0 0 4px rgba(157,123,255,0.8)', zIndex: 5, pointerEvents: 'none' }} />
+                                    )}
+                                    {draggingText && snapGuides.y && (
+                                        <div style={{ position: 'absolute', top: `${(ZONE_Y_BOTTOM / CANVAS_H) * 100}%`, left: 0, right: 0, height: 1, transform: 'translateY(-0.5px)', background: 'rgba(157,123,255,0.95)', boxShadow: '0 0 4px rgba(157,123,255,0.8)', zIndex: 5, pointerEvents: 'none' }} />
+                                    )}
+                                    {draggingText && (
+                                        <div
+                                            className="absolute top-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-[0.2em] pointer-events-none"
+                                            style={{ zIndex: 6, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', color: '#fff' }}
+                                        >
+                                            Moving {draggingText === 'title' ? 'title' : 'sub-caption'} · release to place
+                                        </div>
+                                    )}
+
                                     {busy === 'render' && (
-                                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', zIndex: 7 }}>
                                             <span className="text-[10px] uppercase tracking-[0.3em] font-mono" style={{ color: '#7adfff' }}>
                                                 Rendering…
                                             </span>
@@ -795,11 +1025,28 @@ export default function PostEditor() {
                                         {imageError || 'No image set yet.'}
                                     </span>
                                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                        Open "Image source" below to set one.
+                                        Drop a photo here, or use &quot;Image source&quot; below to upload / paste a URL.
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Drop-a-photo highlight (desktop drag-and-drop). */}
+                            {dropActive && (
+                                <div
+                                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                    style={{ zIndex: 8, outline: `2px dashed ${KUMOLAB_PURPLE}`, outlineOffset: -2, background: 'rgba(157,123,255,0.12)', backdropFilter: 'blur(2px)' }}
+                                >
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.25em]" style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}>
+                                        Drop to replace the photo
                                     </span>
                                 </div>
                             )}
                         </div>
+                        {settings.applyText && imageUrl && !imageError && (
+                            <p className="px-4 py-2 text-[10px] border-t" style={{ color: 'var(--text-muted)', borderColor: 'var(--line)' }}>
+                                Drag the title or sub-caption directly on the image — they snap to the center and to the bottom caption zone.
+                            </p>
+                        )}
                     </Card>
 
                     {/* ── Title — prominent, magazine-style ─────────── */}
@@ -972,6 +1219,26 @@ export default function PostEditor() {
                 <div className="p-5 space-y-4 border-t" style={{ borderColor: 'var(--line)' }}>
                     <SectionLabel>Layout</SectionLabel>
 
+                    {/* Background photo zoom + pan. Scale 1 = cover-fit; the
+                        renderer multiplies the fractional pan by the canvas
+                        size, so the nudge pad converts px → fractions. */}
+                    <ElementControls
+                        label="Background image"
+                        scale={settings.imageScale}
+                        scaleMin={0.5}
+                        scaleMax={3}
+                        onScaleChange={v => setSettings(s => ({ ...s, imageScale: v }))}
+                        offset={{
+                            x: Math.round(settings.imagePosition.x * CANVAS_W),
+                            y: Math.round(settings.imagePosition.y * CANVAS_H),
+                        }}
+                        onNudge={(dx, dy) => setSettings(s => ({
+                            ...s,
+                            imagePosition: { x: s.imagePosition.x + dx / CANVAS_W, y: s.imagePosition.y + dy / CANVAS_H },
+                        }))}
+                        onRecenter={() => setSettings(s => ({ ...s, imagePosition: { x: 0, y: 0 } }))}
+                    />
+
                     <ElementControls
                         label="Title"
                         disabled={!settings.applyText}
@@ -985,6 +1252,7 @@ export default function PostEditor() {
                             titleOffset: { x: s.titleOffset.x + dx, y: s.titleOffset.y + dy },
                         }))}
                         onRecenter={() => setSettings(s => ({ ...s, titleOffset: { x: 0, y: 0 } }))}
+                        onBottom={() => snapToBottom('title')}
                     />
 
                     <ElementControls
@@ -1000,6 +1268,7 @@ export default function PostEditor() {
                             captionOffset: { x: s.captionOffset.x + dx, y: s.captionOffset.y + dy },
                         }))}
                         onRecenter={() => setSettings(s => ({ ...s, captionOffset: { x: 0, y: 0 } }))}
+                        onBottom={() => snapToBottom('caption')}
                     />
 
                     <ElementControls
@@ -1021,11 +1290,13 @@ export default function PostEditor() {
             </Collapsible>
             )}
 
-            {/* ── 5. Image source — collapsed by default ──────────── */}
+            {/* ── 5. Image source — open by default so the Upload button
+                   is immediately discoverable (fresh-photo entry point). ── */}
             {!isVideoPost && (
             <Collapsible
                 title="Image source"
                 hint="Replace the background image: upload, paste a URL, or reset to a fresh original"
+                defaultOpen
             >
                 <div className="p-5">
                     <Field label="Background image" hint="Upload your own picture, paste a direct image URL, or hit Reset to fetch a fresh original (clears any baked-in overlay from prior renders). URL must be a direct image, not a YouTube watch page.">
@@ -1264,6 +1535,7 @@ function ElementControls({
     offset,
     onNudge,
     onRecenter,
+    onBottom,
 }: {
     label: string;
     disabled?: boolean;
@@ -1274,6 +1546,7 @@ function ElementControls({
     offset: XY;
     onNudge: (dx: number, dy: number) => void;
     onRecenter: () => void;
+    onBottom?: () => void;
 }) {
     const dim = disabled ? 0.4 : 1;
     return (
@@ -1324,6 +1597,21 @@ function ElementControls({
                 >
                     Recenter
                 </button>
+                {onBottom && (
+                    <button
+                        onClick={onBottom}
+                        disabled={disabled}
+                        title="Place in the anime-caption bottom zone"
+                        className="px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed"
+                        style={{
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--line-2)',
+                            color: 'var(--ink-2)',
+                        }}
+                    >
+                        Bottom
+                    </button>
+                )}
             </div>
         </div>
     );
