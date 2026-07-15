@@ -22,27 +22,43 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json().catch(() => ({}));
-        const url = typeof body?.url === 'string' ? body.url.trim() : '';
-        if (!url) return NextResponse.json({ success: false, error: 'url is required' }, { status: 400 });
+        // Accepts either a single `url` (legacy, single photo) or a `urls`
+        // array (multi-file upload → one draft whose image_settings.slides
+        // holds one slide per picture — an instant carousel).
+        const rawUrls: unknown[] = Array.isArray(body?.urls)
+            ? body.urls
+            : (typeof body?.url === 'string' ? [body.url] : []);
+        const urls = rawUrls
+            .map(u => (typeof u === 'string' ? u.trim() : ''))
+            .filter(Boolean);
+        if (!urls.length) return NextResponse.json({ success: false, error: 'url is required' }, { status: 400 });
 
         const now = new Date().toISOString();
         const title = typeof body?.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled photo';
+
+        // sourceUrl (slide 1's photo) is what the post editor hydrates as its
+        // render source; studio_edited_at keeps the draft visible in the
+        // Images hub. 2+ photos additionally get a slides array (each with
+        // empty default settings — the editor fills in the all-OFF defaults);
+        // a single photo keeps the exact legacy shape.
+        const image_settings: Record<string, any> = { sourceUrl: urls[0], studio_edited_at: now };
+        if (urls.length >= 2) {
+            image_settings.slides = urls.map(u => ({ sourceUrl: u, title: '', excerpt: '', settings: {} }));
+        }
 
         const draft = {
             slug: `photo-${randomUUID().slice(0, 8)}`, // unique
             title,
             content: '',
             excerpt: '',
-            image: url,
+            image: urls[0],
             type: 'COMMUNITY',
             source: 'KumoLab Studio',
             source_tier: 1,
             status: 'draft',
             is_published: false,
             timestamp: now,
-            // sourceUrl is what the post editor hydrates as its render source;
-            // studio_edited_at keeps the draft visible in the Images hub.
-            image_settings: { sourceUrl: url, studio_edited_at: now },
+            image_settings,
         };
 
         const { data: inserted, error: insErr } = await supabaseAdmin

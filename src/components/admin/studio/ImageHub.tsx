@@ -42,35 +42,43 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
     const dragDepth = useRef(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Fresh-photo flow: upload the picture to the existing editor-uploads
-    // staging (same endpoint the post editor uses), create a clean draft
-    // post around the returned URL, and open its editor.
-    async function startFromPhoto(file: File) {
+    // Fresh-photo flow: upload the picture(s) to the existing editor-uploads
+    // staging (same endpoint the post editor uses), create ONE clean draft
+    // around the returned URL(s), and open its editor. Selecting/dropping
+    // several photos builds a carousel draft — one slide per picture, in
+    // the order they were picked; a single photo keeps the classic
+    // single-image draft.
+    async function startFromPhotos(files: File[]) {
         if (uploading) return;
-        if (!file.type.startsWith('image/')) {
+        const imgs = files.filter(f => f.type.startsWith('image/'));
+        if (!imgs.length) {
             setUploadError('Only image files can be uploaded here.');
             return;
         }
         setUploading(true);
         setUploadError(null);
         try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const upRes = await fetch('/api/admin/upload-image', {
-                method: 'POST',
-                credentials: 'same-origin',
-                body: fd,
-            });
-            const upJson = await upRes.json().catch(() => ({}));
-            if (!upRes.ok || upJson.success === false) {
-                throw new Error(upJson.error || `Upload failed (HTTP ${upRes.status})`);
+            const urls: string[] = [];
+            for (const file of imgs) {
+                const fd = new FormData();
+                fd.append('file', file);
+                const upRes = await fetch('/api/admin/upload-image', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: fd,
+                });
+                const upJson = await upRes.json().catch(() => ({}));
+                if (!upRes.ok || upJson.success === false || !upJson.url) {
+                    throw new Error(upJson.error || `Upload failed (HTTP ${upRes.status})`);
+                }
+                urls.push(upJson.url);
             }
 
             const draftRes = await fetch('/api/admin/studio/new-image-post', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ url: upJson.url }),
+                body: JSON.stringify({ urls }),
             });
             const draftJson = await draftRes.json().catch(() => ({}));
             if (!draftRes.ok || draftJson.success === false || !draftJson.id) {
@@ -89,8 +97,8 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
         e.preventDefault();
         dragDepth.current = 0;
         setDragOver(false);
-        const file = Array.from(e.dataTransfer.files || []).find(f => f.type.startsWith('image/'));
-        if (file) startFromPhoto(file);
+        const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'));
+        if (files.length) startFromPhotos(files);
         else if (e.dataTransfer.files?.length) setUploadError('Only image files can be dropped here.');
     }
 
@@ -133,10 +141,11 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
                         ref={fileInputRef}
                         type="file"
                         accept="image/*"
+                        multiple
                         disabled={uploading}
                         onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) startFromPhoto(f);
+                            const fs = Array.from(e.target.files || []);
+                            if (fs.length) startFromPhotos(fs);
                             e.target.value = '';
                         }}
                         className="hidden"
@@ -158,8 +167,8 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
                     <span className="ak-empty__glyph" aria-hidden="true"><ImageIcon size={34} /></span>
                     <p className="ak-body-sm">
                         {dragOver
-                            ? <strong>Drop your photo to start editing</strong>
-                            : <>No image work in progress. <strong>Upload photo</strong> (or drag a picture anywhere onto this page) to start from a fresh photo, or open a piece from the <strong>Library</strong> to edit its card, overlays &amp; caption.</>}
+                            ? <strong>Drop your photo(s) to start editing</strong>
+                            : <>No image work in progress. <strong>Upload photo</strong> (or drag pictures anywhere onto this page) to start from a fresh photo — pick several at once to start a carousel — or open a piece from the <strong>Library</strong> to edit its card, overlays &amp; caption.</>}
                     </p>
                     <div className="flex items-center justify-center gap-2" style={{ marginTop: 14 }}>
                         <button

@@ -16,16 +16,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { SETTING_KEYS, applySlides } from '@/lib/studio/slides';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
-
-// The overlay-setting keys the editor hydrates from image_settings on load.
-const SETTING_KEYS = [
-    'applyText', 'applyGradient', 'applyWatermark', 'gradientPosition', 'gradientStrength',
-    'titleScale', 'captionScale', 'titleOffset', 'captionOffset', 'watermarkPosition',
-    'purpleWordIndices', 'convertToReel', 'imageScale', 'imagePosition',
-];
 
 export async function POST(req: NextRequest) {
     try {
@@ -42,6 +36,10 @@ export async function POST(req: NextRequest) {
         const s = body?.settings || {};
         for (const k of SETTING_KEYS) if (k in s) image_settings[k] = s[k];
         if (typeof body?.sourceUrl === 'string') image_settings.sourceUrl = body.sourceUrl;
+        // Carousel slides: an explicit array with 2+ entries persists as
+        // image_settings.slides; 0-1 entries collapse back to the legacy
+        // single-image shape (key removed); no field at all = untouched.
+        applySlides(image_settings, body?.slides);
         image_settings.studio_edited_at = new Date().toISOString();
 
         const update: Record<string, any> = { image_settings };

@@ -50,6 +50,53 @@ const DEFAULT_SETTINGS: Settings = {
     imagePosition: { x: 0, y: 0 },
 };
 
+// ── Carousel slides ───────────────────────────────────────────
+// A slide is a full, independent picture: its own background source, its own
+// overlay settings, and its own overlay title/sub-caption. A post with 2+
+// slides is a carousel; 0-1 slides is the legacy single-image path and keeps
+// persisting in the legacy image_settings shape (no slides array), so every
+// auto-pipeline post and existing draft behaves exactly as before.
+interface SlideState {
+    sourceUrl: string;
+    settings: Settings;
+    title: string;
+    excerpt: string;
+}
+
+// Fresh deep copy of the defaults so slides never share offset objects.
+function makeDefaultSettings(): Settings {
+    return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
+
+// Hydrate a Settings object from a raw image_settings-shaped snapshot,
+// key-by-key with default fallbacks — the exact rules the editor has always
+// used for the top-level snapshot, reused per slide.
+function hydrateSettings(raw: any): Settings {
+    const s = raw && typeof raw === 'object' ? raw : {};
+    return {
+        ...DEFAULT_SETTINGS,
+        applyText: s.applyText ?? DEFAULT_SETTINGS.applyText,
+        applyGradient: s.applyGradient ?? DEFAULT_SETTINGS.applyGradient,
+        applyWatermark: s.applyWatermark ?? DEFAULT_SETTINGS.applyWatermark,
+        gradientPosition: s.gradientPosition ?? DEFAULT_SETTINGS.gradientPosition,
+        gradientStrength: s.gradientStrength ?? DEFAULT_SETTINGS.gradientStrength,
+        titleScale: s.titleScale ?? DEFAULT_SETTINGS.titleScale,
+        captionScale: s.captionScale ?? DEFAULT_SETTINGS.captionScale,
+        titleOffset: s.titleOffset ?? DEFAULT_SETTINGS.titleOffset,
+        captionOffset: s.captionOffset ?? DEFAULT_SETTINGS.captionOffset,
+        watermarkPosition: s.watermarkPosition ?? DEFAULT_SETTINGS.watermarkPosition,
+        purpleWordIndices: s.purpleWordIndices ?? DEFAULT_SETTINGS.purpleWordIndices,
+        convertToReel: s.convertToReel ?? DEFAULT_SETTINGS.convertToReel,
+        imageScale: s.imageScale ?? DEFAULT_SETTINGS.imageScale,
+        imagePosition: s.imagePosition ?? DEFAULT_SETTINGS.imagePosition,
+    };
+}
+
+// The wire shape persisted into image_settings.slides for each slide.
+function toPersistSlide(sl: SlideState) {
+    return { sourceUrl: sl.sourceUrl, title: sl.title, excerpt: sl.excerpt, settings: sl.settings };
+}
+
 // Smaller per-click nudge — 12px gives finer placement without feeling
 // laggy. Earlier 30px was overshooting.
 const NUDGE_PX = 12;
@@ -120,6 +167,22 @@ export default function PostEditor() {
 
     // Image overlay toggles — session-local, sent on each render call.
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+    // ── Carousel state ────────────────────────────────────────
+    // slides[] always has >= 1 entry once the post loads. The ACTIVE slide
+    // is mirrored into the existing title/excerpt/sourceUrl/settings states
+    // (so the whole existing control panel keeps operating on plain state),
+    // and syncedSlides() folds the live states back into the array whenever
+    // the full set is needed (autosave, Save, the thumbnail strip).
+    const [slides, setSlides] = useState<SlideState[]>([]);
+    const [activeSlide, setActiveSlide] = useState(0);
+    // True while the preview pager sits on the trailing "+" add-slide tile
+    // (one past the last slide). The active slide stays the last real slide.
+    const [addPane, setAddPane] = useState(false);
+    const addFilesRef = useRef<HTMLInputElement>(null);
+    // Monotonic token so a slow preview render for a previous slide can never
+    // overwrite the preview of the slide the operator has since switched to.
+    const previewToken = useRef(0);
 
     // Live-render plumbing: when a toggle changes (or title/caption is
     // edited and committed), debounce-fire a render so the preview reflects
@@ -194,29 +257,48 @@ export default function PostEditor() {
                 // controls were hydrated ON (WYSIWYG bug).
                 let hydrated: Settings = { ...DEFAULT_SETTINGS };
                 let hydratedSource = '';
+                let hydratedSlides: SlideState[] = [];
                 if (data.image_settings && typeof data.image_settings === 'object') {
                     const s = data.image_settings as any;
-                    hydrated = {
-                        ...DEFAULT_SETTINGS,
-                        applyText: s.applyText ?? DEFAULT_SETTINGS.applyText,
-                        applyGradient: s.applyGradient ?? DEFAULT_SETTINGS.applyGradient,
-                        applyWatermark: s.applyWatermark ?? DEFAULT_SETTINGS.applyWatermark,
-                        gradientPosition: s.gradientPosition ?? DEFAULT_SETTINGS.gradientPosition,
-                        gradientStrength: s.gradientStrength ?? DEFAULT_SETTINGS.gradientStrength,
-                        titleScale: s.titleScale ?? DEFAULT_SETTINGS.titleScale,
-                        captionScale: s.captionScale ?? DEFAULT_SETTINGS.captionScale,
-                        titleOffset: s.titleOffset ?? DEFAULT_SETTINGS.titleOffset,
-                        captionOffset: s.captionOffset ?? DEFAULT_SETTINGS.captionOffset,
-                        watermarkPosition: s.watermarkPosition ?? DEFAULT_SETTINGS.watermarkPosition,
-                        purpleWordIndices: s.purpleWordIndices ?? DEFAULT_SETTINGS.purpleWordIndices,
-                        convertToReel: s.convertToReel ?? DEFAULT_SETTINGS.convertToReel,
-                        imageScale: s.imageScale ?? DEFAULT_SETTINGS.imageScale,
-                        imagePosition: s.imagePosition ?? DEFAULT_SETTINGS.imagePosition,
-                    };
+                    hydrated = hydrateSettings(s);
                     if (s.sourceUrl && typeof s.sourceUrl === 'string') {
                         hydratedSource = s.sourceUrl;
                     }
+                    // Carousel hydration: 2+ saved slides make this a carousel.
+                    // 0-1 slides (every auto-pipeline post + existing drafts)
+                    // takes the legacy single-image path below, byte-identical
+                    // to the pre-carousel editor. Slide 1's overlay text is the
+                    // post's own title/excerpt (canonical DB columns), never a
+                    // possibly-drifted copy inside the slides array.
+                    if (Array.isArray(s.slides) && s.slides.length >= 2) {
+                        hydratedSlides = s.slides
+                            .filter((sl: any) => sl && typeof sl === 'object')
+                            .map((sl: any, i: number): SlideState => ({
+                                sourceUrl: typeof sl.sourceUrl === 'string' ? sl.sourceUrl : '',
+                                settings: hydrateSettings(sl.settings),
+                                title: i === 0 ? (data.title || '') : (typeof sl.title === 'string' ? sl.title : ''),
+                                excerpt: i === 0 ? (data.excerpt || '') : (typeof sl.excerpt === 'string' ? sl.excerpt : ''),
+                            }));
+                    }
                 }
+                if (hydratedSlides.length >= 2) {
+                    // Carousel: the editor opens on slide 1 (the cover). The
+                    // per-slide snapshot is authoritative over the top-level
+                    // legacy keys (which mirror slide 1 for old consumers).
+                    hydrated = hydratedSlides[0].settings;
+                    hydratedSource = hydratedSlides[0].sourceUrl;
+                } else {
+                    // Legacy single-image path: one slide wrapping the same
+                    // state the editor has always hydrated.
+                    hydratedSlides = [{
+                        sourceUrl: hydratedSource,
+                        settings: hydrated,
+                        title: data.title || '',
+                        excerpt: data.excerpt || '',
+                    }];
+                }
+                setSlides(hydratedSlides);
+                setActiveSlide(0);
                 setSettings(hydrated);
                 setSourceUrl(hydratedSource);
                 setImageUrl(data.image || '');
@@ -231,7 +313,7 @@ export default function PostEditor() {
                     // they see the moment the editor opens — refresh-safe
                     // WYSIWYG. Fresh posts with no snapshot still render with
                     // the all-OFF defaults.
-                    kickPreview(data, hydrated, hydratedSource);
+                    kickPreview(hydratedSlides[0]);
                 }
                 initialLoadDone.current = true;
             } catch (e: any) {
@@ -273,7 +355,16 @@ export default function PostEditor() {
     // an explicit Save is running to avoid clobbering it.
     useEffect(() => {
         if (!initialLoadDone.current || !post) return;
-        const snap = JSON.stringify({ title, excerpt, content, hashtags, settings, sourceUrl });
+        // The full slides array (active slide's live state folded in) is
+        // what persists. Post-level fields (title/excerpt/settings/sourceUrl)
+        // always mirror slide 1 — the cover — so a single-image post writes
+        // the exact same payload as before carousels existed, and legacy
+        // consumers (cron rebake, emergency re-render) keep reading a valid
+        // top-level snapshot for carousels too.
+        const all = syncedSlides();
+        const cover = all[0];
+        const payloadSlides = all.map(toPersistSlide);
+        const snap = JSON.stringify({ content, hashtags, slides: payloadSlides });
         if (snap === autosaveSnap.current) return;
         if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         autosaveTimer.current = setTimeout(async () => {
@@ -284,7 +375,16 @@ export default function PostEditor() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ postId: id, title, excerpt, content, hashtags, settings, sourceUrl }),
+                    body: JSON.stringify({
+                        postId: id,
+                        title: cover.title,
+                        excerpt: cover.excerpt,
+                        content,
+                        hashtags,
+                        settings: cover.settings,
+                        sourceUrl: cover.sourceUrl,
+                        slides: payloadSlides,
+                    }),
                 });
                 const json = await res.json().catch(() => ({}));
                 if (!res.ok || json.success === false) throw new Error(json.error || 'Autosave failed');
@@ -297,30 +397,32 @@ export default function PostEditor() {
         }, 1500);
         return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [title, excerpt, content, hashtags, JSON.stringify(settings), sourceUrl]);
+    }, [title, excerpt, content, hashtags, JSON.stringify(settings), sourceUrl, JSON.stringify(slides), activeSlide]);
 
     // Preview-render helper that doesn't depend on the title/excerpt useState
     // values (avoids the "stale state" race when called from inside the
-    // post-load effect). Pass the just-loaded post + just-hydrated settings
-    // in directly, so the opening render matches the hydrated controls
-    // (refresh-safe WYSIWYG) instead of rendering bare defaults.
-    async function kickPreview(loadedPost: any, hydratedSettings: Settings, hydratedSourceUrl?: string) {
+    // post-load effect or right after a slide switch). Pass the slide's
+    // source + settings + overlay text in directly, so the render always
+    // matches the slide being shown (refresh-safe WYSIWYG). The render route
+    // is stateless per call, so any slide can be previewed the same way.
+    async function kickPreview(slide: { sourceUrl: string; settings: Settings; title: string; excerpt: string }) {
+        const token = ++previewToken.current;
         try {
             const res = await fetch('/api/admin/render-post-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    postId: loadedPost.id,
-                    sourceUrl: hydratedSourceUrl || undefined,
-                    title: loadedPost.title || '',
-                    excerpt: loadedPost.excerpt || '',
-                    settings: hydratedSettings,
+                    postId: id,
+                    sourceUrl: slide.sourceUrl || undefined,
+                    title: slide.title || '',
+                    excerpt: slide.excerpt || '',
+                    settings: slide.settings,
                     persist: false,
                 }),
             });
             const json = await res.json().catch(() => ({}));
-            if (json?.success && json.image) {
+            if (json?.success && json.image && token === previewToken.current) {
                 setImageUrl(json.image);
                 if (typeof json.image === 'string' && json.image.startsWith('data:image/')) {
                     lastPreviewBytes.current = json.image;
@@ -329,6 +431,134 @@ export default function PostEditor() {
             }
         } catch {
             // Soft fail — leave imageUrl as-is and let the user toggle to retry.
+        }
+    }
+
+    // ── Carousel helpers ──────────────────────────────────────
+    // The full slides array with the ACTIVE slide's live editor state folded
+    // in. This is the single source of truth handed to autosave, Save, and
+    // the thumbnail strip — the inactive entries in `slides` plus whatever
+    // the operator is editing right now.
+    function syncedSlides(): SlideState[] {
+        if (!slides.length) return [{ sourceUrl, settings, title, excerpt }];
+        return slides.map((sl, i) => (i === activeSlide ? { sourceUrl, settings, title, excerpt } : sl));
+    }
+
+    // Mirror a slide into the editor states the whole control panel operates
+    // on. Clears per-slide render caches so nothing from the previous slide
+    // (preview bytes, drag-band layout) leaks into this one.
+    function loadSlideIntoEditor(sl: SlideState) {
+        setSettings(sl.settings);
+        setSourceUrl(sl.sourceUrl);
+        setTitle(sl.title);
+        setExcerpt(sl.excerpt);
+        lastPreviewBytes.current = null;
+        lastLayout.current = null;
+        setImageError(null);
+        // Instant feedback: show the raw background right away; the rendered
+        // overlay replaces it as soon as kickPreview returns.
+        if (sl.sourceUrl) setImageUrl(sl.sourceUrl);
+    }
+
+    // Make a slide active: stash the current one, load the target, and kick
+    // an immediate preview render for it (the render route is stateless, so
+    // each slide previews with its own source + settings).
+    function goToSlide(idx: number) {
+        if (idx === activeSlide) { setAddPane(false); return; }
+        const cur = syncedSlides();
+        if (idx < 0 || idx >= cur.length) return;
+        setAddPane(false);
+        setSlides(cur);
+        setActiveSlide(idx);
+        loadSlideIntoEditor(cur[idx]);
+        kickPreview(cur[idx]);
+    }
+
+    // Reorder: move the active slide one position left/right. The editor
+    // states already hold this slide's content, so no reload or re-render is
+    // needed — only its index changes. Note that whichever slide sits at
+    // position 1 is the carousel cover (post.image + post title).
+    function moveActive(dir: -1 | 1) {
+        const cur = syncedSlides();
+        const j = activeSlide + dir;
+        if (j < 0 || j >= cur.length) return;
+        const next = [...cur];
+        [next[activeSlide], next[j]] = [next[j], next[activeSlide]];
+        setSlides(next);
+        setActiveSlide(j);
+    }
+
+    // Duplicate the active slide (deep copy) right after itself and select
+    // the copy. The preview is already showing identical content.
+    function duplicateActive() {
+        const cur = syncedSlides();
+        const copy: SlideState = JSON.parse(JSON.stringify(cur[activeSlide]));
+        const next = [...cur.slice(0, activeSlide + 1), copy, ...cur.slice(activeSlide + 1)];
+        setSlides(next);
+        setActiveSlide(activeSlide + 1);
+    }
+
+    // Delete the active slide (never the last remaining one) and select its
+    // neighbour.
+    function deleteActive() {
+        const cur = syncedSlides();
+        if (cur.length <= 1) return;
+        if (!confirm(`Remove slide ${activeSlide + 1}? Its edits are discarded.`)) return;
+        const next = cur.filter((_, i) => i !== activeSlide);
+        const idx = Math.min(activeSlide, next.length - 1);
+        setSlides(next);
+        setActiveSlide(idx);
+        loadSlideIntoEditor(next[idx]);
+        kickPreview(next[idx]);
+    }
+
+    // Upload one file to the editor-uploads staging area, return its URL.
+    async function uploadFile(file: File): Promise<string> {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/admin/upload-image', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false || !json.url) {
+            throw new Error(json.error || `Upload failed (HTTP ${res.status})`);
+        }
+        return json.url;
+    }
+
+    // Append one slide per uploaded image (each starts with the all-OFF
+    // default settings and empty overlay text) and select the first new one.
+    // This is how a single picture becomes a carousel from inside the editor
+    // — via the "+" tile in the strip or the add-slide pane in the preview.
+    async function handleAddSlides(files: File[]) {
+        const imgs = files.filter(f => f.type.startsWith('image/'));
+        if (!imgs.length) return;
+        setBusy('render');
+        setError(null);
+        setImageError(null);
+        try {
+            const urls: string[] = [];
+            for (const f of imgs) urls.push(await uploadFile(f));
+            const cur = syncedSlides();
+            const added: SlideState[] = urls.map(u => ({
+                sourceUrl: u,
+                settings: makeDefaultSettings(),
+                title: '',
+                excerpt: '',
+            }));
+            const next = [...cur, ...added];
+            const idx = cur.length; // first newly-added slide
+            setSlides(next);
+            setActiveSlide(idx);
+            loadSlideIntoEditor(next[idx]);
+            setAddPane(false);
+            await kickPreview(next[idx]);
+        } catch (e: any) {
+            setError(e?.message || 'Upload failed');
+        } finally {
+            setBusy(null);
         }
     }
 
@@ -475,16 +705,32 @@ export default function PostEditor() {
         setBusy(action);
         setError(null);
         try {
+            // Everything persists in terms of slides: slide 1 (the cover) is
+            // what post.image + the post-level snapshot come from, so the
+            // website/feed/publisher see a carousel post exactly like a
+            // single-image post. For a single-image post the cover IS the
+            // active editor state, so this is the same call as always.
+            const allSlides = syncedSlides();
+            const cover = allSlides[0];
             let imageBytesForSave: string | undefined;
             if (!isVideoPost) {
+                // Only promote the cached preview bytes when they belong to
+                // the cover slide (the operator may be looking at slide 3 —
+                // those bytes must NOT become post.image). Otherwise the
+                // server re-renders the cover from its own settings.
+                const coverPreviewBytes = activeSlide === 0 ? lastPreviewBytes.current : null;
                 const renderJson = await callJson('/api/admin/render-post-image', {
                     postId: id,
-                    sourceUrl: sourceUrl || undefined,
-                    title,
-                    excerpt,
-                    settings,
+                    sourceUrl: cover.sourceUrl || undefined,
+                    title: cover.title,
+                    excerpt: cover.excerpt,
+                    settings: cover.settings,
                     persist: true,
-                    previewImage: lastPreviewBytes.current || undefined,
+                    previewImage: coverPreviewBytes || undefined,
+                    // Full carousel snapshot. The route stores it as
+                    // image_settings.slides when there are 2+, and collapses
+                    // back to the legacy shape (no slides key) when 0-1.
+                    slides: allSlides.map(toPersistSlide),
                 });
                 imageBytesForSave = renderJson.image;
             }
@@ -505,7 +751,9 @@ export default function PostEditor() {
                 }
             }
 
-            const putBody: Record<string, any> = { id, title, excerpt, content, hashtags };
+            // Post-level title/excerpt come from the cover slide (for a
+            // single-image post that's exactly the title/excerpt states).
+            const putBody: Record<string, any> = { id, title: cover.title, excerpt: cover.excerpt, content, hashtags };
             if (imageBytesForSave) putBody.image = imageBytesForSave;
             // "Save draft" parks the post in the Draft tab (out of Pending) so
             // the operator can come back to it. Only applied to a post that's
@@ -573,6 +821,7 @@ export default function PostEditor() {
         setBusy('render');
         if (!opts.silent) setError(null);
         setImageError(null);
+        const token = ++previewToken.current;
         try {
             const json = await callJson('/api/admin/render-post-image', {
                 postId: id,
@@ -582,6 +831,7 @@ export default function PostEditor() {
                 settings,
                 persist: false,
             });
+            if (token !== previewToken.current) return; // a newer slide render superseded this one
             setImageUrl(json.image); // base64 data URL — no cache-bust needed
             // Cache the bytes so Save can promote THIS exact render —
             // what the user is looking at right now becomes the published
@@ -631,22 +881,14 @@ export default function PostEditor() {
         setError(null);
         setImageError(null);
         try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const res = await fetch('/api/admin/upload-image', {
-                method: 'POST',
-                credentials: 'same-origin',
-                body: fd,
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || json.success === false) {
-                throw new Error(json.error || `Upload failed (HTTP ${res.status})`);
-            }
+            const url = await uploadFile(file);
             // Use the uploaded URL as the render source for the next render.
-            setSourceUrl(json.url);
-            // Kick a render immediately so the user sees the uploaded
-            // image swap into the preview without manual regenerate.
-            await handleRegenerate({ silent: true });
+            setSourceUrl(url);
+            // Kick a render immediately so the user sees the uploaded image
+            // swap into the preview without manual regenerate. setSourceUrl
+            // hasn't applied yet in this closure, so pass the slide values
+            // explicitly (kickPreview is state-free).
+            await kickPreview({ sourceUrl: url, settings, title, excerpt });
         } catch (e: any) {
             setError(e?.message || 'Upload failed');
         } finally {
@@ -939,11 +1181,51 @@ export default function PostEditor() {
                                 e.preventDefault();
                                 dropDepth.current = 0;
                                 setDropActive(false);
-                                const f = Array.from(e.dataTransfer.files || []).find(x => x.type.startsWith('image/'));
-                                if (f) handleUpload(f);
+                                const files = Array.from(e.dataTransfer.files || []).filter(x => x.type.startsWith('image/'));
+                                if (!files.length) return;
+                                // On the "+" add-slide pane every drop appends;
+                                // on a slide, one file replaces its background
+                                // while multiple files append as new slides.
+                                if (addPane || files.length > 1) handleAddSlides(files);
+                                else handleUpload(files[0]);
                             }}
                         >
-                            {imageUrl && !imageError ? (
+                            {addPane ? (
+                                /* "+" add-slide pane — the position one past the
+                                   last slide. A slide-shaped upload/drop target:
+                                   uploading here appends new slides, turning a
+                                   single picture into a carousel. */
+                                <button
+                                    type="button"
+                                    onClick={() => addFilesRef.current?.click()}
+                                    disabled={!!busy}
+                                    className="absolute inset-0 flex flex-col items-center justify-center gap-3 w-full px-6 text-center"
+                                    style={{ background: 'var(--surface-2)', cursor: busy ? 'wait' : 'pointer' }}
+                                >
+                                    <span
+                                        aria-hidden
+                                        className="flex items-center justify-center"
+                                        style={{
+                                            width: 72,
+                                            height: 90,
+                                            borderRadius: 12,
+                                            border: `2px dashed ${KUMOLAB_PURPLE}`,
+                                            color: KUMOLAB_PURPLE,
+                                            fontSize: 30,
+                                            fontWeight: 700,
+                                            background: 'rgba(157,123,255,0.08)',
+                                        }}
+                                    >
+                                        +
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.25em]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                                        {busy === 'render' ? 'Uploading…' : 'Add slide'}
+                                    </span>
+                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                        Drop photos here or tap to upload — each picture becomes its own slide.
+                                    </span>
+                                </button>
+                            ) : imageUrl && !imageError ? (
                                 <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
@@ -1030,6 +1312,70 @@ export default function PostEditor() {
                                 </div>
                             )}
 
+                            {/* ── Slide pager ──────────────────────────
+                                ‹ › arrows page through the slides; one past
+                                the last slide is always the "+" add tile.
+                                This is the second carousel entry point: from
+                                any single picture, next → "+" → upload. */}
+                            {(() => {
+                                const arrowStyle = (side: 'left' | 'right'): React.CSSProperties => ({
+                                    position: 'absolute',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    [side]: 8,
+                                    zIndex: 6,
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: '50%',
+                                    background: 'rgba(10,23,48,0.55)',
+                                    color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    backdropFilter: 'blur(4px)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 18,
+                                    lineHeight: 1,
+                                    cursor: 'pointer',
+                                });
+                                return (
+                                    <>
+                                        {(addPane || activeSlide > 0) && (
+                                            <button
+                                                type="button"
+                                                aria-label={addPane ? 'Back to last slide' : 'Previous slide'}
+                                                onClick={() => (addPane ? setAddPane(false) : goToSlide(activeSlide - 1))}
+                                                style={arrowStyle('left')}
+                                            >
+                                                ‹
+                                            </button>
+                                        )}
+                                        {!addPane && (
+                                            <button
+                                                type="button"
+                                                aria-label={activeSlide < slides.length - 1 ? 'Next slide' : 'Add a slide'}
+                                                title={activeSlide < slides.length - 1 ? 'Next slide' : 'Add a slide'}
+                                                onClick={() => {
+                                                    if (activeSlide < slides.length - 1) goToSlide(activeSlide + 1);
+                                                    else setAddPane(true);
+                                                }}
+                                                style={arrowStyle('right')}
+                                            >
+                                                {activeSlide < slides.length - 1 ? '›' : '+'}
+                                            </button>
+                                        )}
+                                        {(slides.length > 1 || addPane) && (
+                                            <span
+                                                className="absolute top-2 right-2 px-2 py-1 rounded text-[9px] font-bold font-mono pointer-events-none"
+                                                style={{ zIndex: 6, background: 'rgba(10,23,48,0.55)', color: '#fff', backdropFilter: 'blur(4px)', letterSpacing: '0.08em' }}
+                                            >
+                                                {addPane ? `+ / ${slides.length}` : `${activeSlide + 1} / ${slides.length}`}
+                                            </span>
+                                        )}
+                                    </>
+                                );
+                            })()}
+
                             {/* Drop-a-photo highlight (desktop drag-and-drop). */}
                             {dropActive && (
                                 <div
@@ -1037,22 +1383,126 @@ export default function PostEditor() {
                                     style={{ zIndex: 8, outline: `2px dashed ${KUMOLAB_PURPLE}`, outlineOffset: -2, background: 'rgba(157,123,255,0.12)', backdropFilter: 'blur(2px)' }}
                                 >
                                     <span className="text-[10px] font-bold uppercase tracking-[0.25em]" style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}>
-                                        Drop to replace the photo
+                                        {addPane ? 'Drop to add slides' : 'Drop one photo to replace — several to add slides'}
                                     </span>
                                 </div>
                             )}
                         </div>
-                        {settings.applyText && imageUrl && !imageError && (
+                        {/* ── Slide strip ──────────────────────────────
+                            Thumbnail rail: tap to select, ◀ ▶ to reorder the
+                            active slide, duplicate/delete, trailing "+" tile
+                            to append slides (multi-select supported). */}
+                        <div className="px-3 pt-2.5 pb-2 border-t" style={{ borderColor: 'var(--line)' }}>
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                {syncedSlides().map((sl, i) => {
+                                    const active = !addPane && i === activeSlide;
+                                    const thumb = sl.sourceUrl || (i === 0 ? (post.image || '') : '');
+                                    return (
+                                        <button
+                                            key={`slide-${i}`}
+                                            type="button"
+                                            onClick={() => goToSlide(i)}
+                                            disabled={!!busy}
+                                            title={`Slide ${i + 1} of ${slides.length}`}
+                                            className="relative shrink-0 rounded-md overflow-hidden transition-all"
+                                            style={{
+                                                width: 52,
+                                                height: 65,
+                                                border: active ? `2px solid ${KUMOLAB_PURPLE}` : '1px solid var(--line-2)',
+                                                boxShadow: active ? `0 0 0 2px ${KUMOLAB_PURPLE}33` : 'none',
+                                                background: 'var(--surface-2)',
+                                                opacity: busy ? 0.6 : 1,
+                                            }}
+                                        >
+                                            {thumb ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={thumb} alt="" className="w-full h-full object-cover" draggable={false} />
+                                            ) : (
+                                                <span className="absolute inset-0 flex items-center justify-center text-xs" style={{ color: 'var(--text-muted)' }}>·</span>
+                                            )}
+                                            <span
+                                                className="absolute bottom-0.5 left-0.5 px-1 rounded text-[8px] font-bold font-mono"
+                                                style={{ background: 'rgba(10,23,48,0.6)', color: '#fff' }}
+                                            >
+                                                {i + 1}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    onClick={() => addFilesRef.current?.click()}
+                                    disabled={!!busy}
+                                    title="Add slides — pick one or more photos"
+                                    className="shrink-0 rounded-md flex items-center justify-center text-lg font-bold transition-all hover:bg-black/[0.03]"
+                                    style={{
+                                        width: 52,
+                                        height: 65,
+                                        border: addPane ? `2px dashed ${KUMOLAB_PURPLE}` : '1px dashed var(--line-2)',
+                                        color: addPane ? KUMOLAB_PURPLE : 'var(--ink-3)',
+                                        background: addPane ? 'rgba(157,123,255,0.08)' : 'var(--surface-2)',
+                                    }}
+                                >
+                                    +
+                                </button>
+                            </div>
+                            {!addPane && (
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                        Slide {activeSlide + 1}/{slides.length}
+                                    </span>
+                                    <div className="ml-auto flex items-center gap-1.5">
+                                        <NudgeBtn disabled={!!busy || activeSlide === 0} onClick={() => moveActive(-1)}>←</NudgeBtn>
+                                        <NudgeBtn disabled={!!busy || activeSlide >= slides.length - 1} onClick={() => moveActive(1)}>→</NudgeBtn>
+                                        <button
+                                            type="button"
+                                            onClick={duplicateActive}
+                                            disabled={!!busy}
+                                            className="px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed"
+                                            style={{ background: 'var(--surface-2)', border: '1px solid var(--line-2)', color: 'var(--ink-2)' }}
+                                        >
+                                            Duplicate
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={deleteActive}
+                                            disabled={!!busy || slides.length <= 1}
+                                            className="px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed"
+                                            style={{ background: 'var(--surface-2)', border: '1px solid var(--line-2)', color: slides.length <= 1 ? 'var(--ink-3)' : '#c05555' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <input
+                            ref={addFilesRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            disabled={!!busy}
+                            className="hidden"
+                            onChange={e => {
+                                const fs = Array.from(e.target.files || []);
+                                if (fs.length) handleAddSlides(fs);
+                                e.target.value = '';
+                            }}
+                        />
+                        {settings.applyText && imageUrl && !imageError && !addPane && (
                             <p className="px-4 py-2 text-[10px] border-t" style={{ color: 'var(--text-muted)', borderColor: 'var(--line)' }}>
                                 Drag the title or sub-caption directly on the image — they snap to the center and to the bottom caption zone.
                             </p>
                         )}
                     </Card>
 
-                    {/* ── Title — prominent, magazine-style ─────────── */}
+                    {/* ── Title — prominent, magazine-style ───────────
+                        For a carousel this edits the ACTIVE slide's overlay
+                        title; slide 1's title doubles as the post headline
+                        (exactly the single-image behavior). */}
                     <Card className="p-5">
                         <label className="block text-[10px] font-bold uppercase tracking-[0.22em] mb-2" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
-                            Title
+                            {slides.length >= 2 ? `Title · slide ${activeSlide + 1}` : 'Title'}
                         </label>
                         <input
                             type="text"
@@ -1063,7 +1513,9 @@ export default function PostEditor() {
                             style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
                         />
                         <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            Headline on the website + first line of social captions.
+                            {slides.length >= 2 && activeSlide > 0
+                                ? `Overlay title for slide ${activeSlide + 1} (rendered on that image only). Slide 1's title is the post headline.`
+                                : 'Headline on the website + first line of social captions.'}
                         </p>
                     </Card>
 

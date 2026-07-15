@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateIntelImage } from '@/lib/engine/image-processor';
+import { applySlides } from '@/lib/studio/slides';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -36,6 +37,10 @@ export async function POST(req: NextRequest) {
             excerpt: excerptOverride,
             persist = false,
             previewImage,
+            // Optional carousel snapshot from the editor. An explicit array
+            // is authoritative (2+ entries → image_settings.slides, 0-1 →
+            // legacy shape); absent = leave any existing slides untouched.
+            slides: slidesPayload,
         } = body || {};
 
         if (!postId || typeof postId !== 'string') {
@@ -44,7 +49,7 @@ export async function POST(req: NextRequest) {
 
         const { data: post, error: fetchError } = await supabaseAdmin
             .from('posts')
-            .select('id, slug, title, excerpt, image, source_url, youtube_video_id')
+            .select('id, slug, title, excerpt, image, source_url, youtube_video_id, image_settings')
             .eq('id', postId)
             .single();
 
@@ -97,9 +102,18 @@ export async function POST(req: NextRequest) {
                 imagePosition: settings.imagePosition ?? { x: 0, y: 0 },
             };
 
+            // Merge over the existing image_settings so keys the editor
+            // doesn't own (video_project, studio_edited_at, slides…) survive
+            // a Save, then apply the carousel snapshot if one was sent.
+            const mergedSettings: Record<string, any> = {
+                ...(((post as any).image_settings as Record<string, any>) || {}),
+                ...settingsSnapshot,
+            };
+            applySlides(mergedSettings, slidesPayload);
+
             const { error: updateError } = await supabaseAdmin
                 .from('posts')
-                .update({ image: `${publicUrl}?v=${Date.now()}`, image_settings: settingsSnapshot })
+                .update({ image: `${publicUrl}?v=${Date.now()}`, image_settings: mergedSettings })
                 .eq('id', postId);
             if (updateError) {
                 return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
@@ -226,9 +240,17 @@ export async function POST(req: NextRequest) {
             imagePosition: settings.imagePosition ?? { x: 0, y: 0 },
         };
 
+        // Same merge rules as the promote-bytes path: preserve keys the
+        // editor doesn't own and honor an explicit carousel snapshot.
+        const mergedSettings: Record<string, any> = {
+            ...(((post as any).image_settings as Record<string, any>) || {}),
+            ...settingsSnapshot,
+        };
+        applySlides(mergedSettings, slidesPayload);
+
         const { data: updated, error: updateError } = await supabaseAdmin
             .from('posts')
-            .update({ image: result.processedImage, image_settings: settingsSnapshot })
+            .update({ image: result.processedImage, image_settings: mergedSettings })
             .eq('id', postId)
             .select('id, image')
             .single();

@@ -38,6 +38,15 @@ export interface BlogPost {
         imageScale?: number;
         imagePosition?: { x: number; y: number };
         watermarkPosition?: { x: number; y: number };
+        // Instagram-carousel slides (2+ entries = carousel). Slide 1 is the
+        // cover: post.image + the top-level image_settings keys mirror it,
+        // so consumers that don't know about carousels keep working.
+        slides?: Array<{
+            sourceUrl: string;
+            title?: string;
+            excerpt?: string;
+            settings?: Record<string, unknown>;
+        }>;
     };
     is_announcement_tied?: boolean;
     headline?: string;
