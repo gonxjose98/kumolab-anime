@@ -3,6 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
+import { pickLayoutSettings } from '@/lib/studio/slides';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
 // sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
@@ -61,6 +62,19 @@ interface SlideState {
     settings: Settings;
     title: string;
     excerpt: string;
+}
+
+// ── Layout templates ──────────────────────────────────────────
+// A saved "look": the layout/style subset of a slide's Settings (toggles,
+// gradient, watermark, scales, offsets, image zoom/pan — LAYOUT_TEMPLATE_KEYS
+// in lib/studio/slides.ts). Never the slide's text, image, or word colors.
+// Persisted in the studio_templates table via /api/admin/studio/templates,
+// so templates survive reloads and are shared across posts and devices.
+interface LayoutTemplate {
+    id: string;
+    name: string;
+    settings: Partial<Settings>;
+    created_at?: string;
 }
 
 // Fresh deep copy of the defaults so slides never share offset objects.
@@ -208,6 +222,28 @@ export default function PostEditor() {
     // Latest VideoEditor settings snapshot (text overlays, trim, fill…), so the
     // top-bar Save can persist the in-progress video draft for video posts.
     const videoSettingsRef = useRef<any>(null);
+
+    // ── Layout templates ──────────────────────────────────────
+    // Saved looks, loaded once from the server (DB-backed, so they persist
+    // across sessions and posts). tplBusy serializes save/apply/delete.
+    const [templates, setTemplates] = useState<LayoutTemplate[]>([]);
+    const [tplBusy, setTplBusy] = useState<null | 'save' | 'apply' | 'delete'>(null);
+    const [tplError, setTplError] = useState<string | null>(null);
+    const [appliedTplId, setAppliedTplId] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/admin/studio/templates', { cache: 'no-store', credentials: 'same-origin' });
+                const json = await res.json().catch(() => ({}));
+                if (!cancelled && res.ok && Array.isArray(json.templates)) setTemplates(json.templates);
+            } catch {
+                // Soft fail — the section just shows "no templates yet".
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     // The post + post mutation paths go through /api/posts because RLS is
     // service-role-only — a direct anon-key client read returns zero rows
@@ -455,6 +491,8 @@ export default function PostEditor() {
         lastPreviewBytes.current = null;
         lastLayout.current = null;
         setImageError(null);
+        // The "Applied" marker refers to the slide it was applied to.
+        setAppliedTplId(null);
         // Instant feedback: show the raw background right away; the rendered
         // overlay replaces it as soon as kickPreview returns.
         if (sl.sourceUrl) setImageUrl(sl.sourceUrl);
@@ -510,6 +548,72 @@ export default function PostEditor() {
         setActiveSlide(idx);
         loadSlideIntoEditor(next[idx]);
         kickPreview(next[idx]);
+    }
+
+    // ── Layout template actions ───────────────────────────────
+    // Save the ACTIVE slide's current look as a named template. Only the
+    // layout subset is captured (pickLayoutSettings) — never this slide's
+    // title/excerpt text, its image, or its purple word choices.
+    async function saveLayoutTemplate() {
+        const name = prompt('Template name (e.g. "Bottom caption + soft fade"):')?.trim();
+        if (!name) return;
+        setTplBusy('save');
+        setTplError(null);
+        try {
+            const res = await fetch('/api/admin/studio/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ name, settings: pickLayoutSettings(settings) }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false || !json.template) {
+                throw new Error(json.error || `Save failed (HTTP ${res.status})`);
+            }
+            setTemplates(prev => [json.template, ...prev]);
+        } catch (e: any) {
+            setTplError(e?.message || 'Could not save the template');
+        } finally {
+            setTplBusy(null);
+        }
+    }
+
+    // Merge a template's layout keys into the ACTIVE slide's settings. The
+    // slide keeps its own title/excerpt text, image, and word colors — only
+    // the look changes. setSettings triggers the live preview re-render and
+    // the autosave (both watch the settings state), so the applied look is
+    // visible and persisted without extra plumbing.
+    function applyLayoutTemplate(tpl: LayoutTemplate) {
+        if (busy || tplBusy) return;
+        // Deep-copy so offset objects are never shared between the template
+        // list and the live settings state; re-pick client-side so a stale
+        // or hand-edited row can never inject text/image/word-color keys.
+        const layout = JSON.parse(JSON.stringify(pickLayoutSettings(tpl.settings))) as Partial<Settings>;
+        setSettings(s => ({ ...s, ...layout }));
+        setAppliedTplId(tpl.id);
+        setTplError(null);
+    }
+
+    async function deleteLayoutTemplate(tpl: LayoutTemplate) {
+        if (!confirm(`Delete the template "${tpl.name}"? Slides it was applied to keep their look.`)) return;
+        setTplBusy('delete');
+        setTplError(null);
+        try {
+            const res = await fetch(`/api/admin/studio/templates?id=${encodeURIComponent(tpl.id)}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                throw new Error(json.error || `Delete failed (HTTP ${res.status})`);
+            }
+            setTemplates(prev => prev.filter(t => t.id !== tpl.id));
+            if (appliedTplId === tpl.id) setAppliedTplId(null);
+        } catch (e: any) {
+            setTplError(e?.message || 'Could not delete the template');
+        } finally {
+            setTplBusy(null);
+        }
     }
 
     // Upload one file to the editor-uploads staging area, return its URL.
@@ -1738,6 +1842,84 @@ export default function PostEditor() {
                         })}
                         onRecenter={() => setSettings(s => ({ ...s, watermarkPosition: null }))}
                     />
+                </div>
+
+                {/* Sub-section: layout templates — save the current look,
+                    apply a saved look to this slide/picture. Templates carry
+                    placement + gradient + watermark + scales + image zoom/pan
+                    ONLY — never the slide's text, image, or word colors. */}
+                <div className="p-5 space-y-3 border-t" style={{ borderColor: 'var(--line)' }}>
+                    <div className="flex items-center justify-between gap-2">
+                        <SectionLabel>Layout templates</SectionLabel>
+                        <button
+                            type="button"
+                            onClick={saveLayoutTemplate}
+                            disabled={!!busy || !!tplBusy}
+                            className="ak-btn ak-btn--secondary ak-btn--sm shrink-0"
+                        >
+                            {tplBusy === 'save' ? 'Saving…' : 'Save current look'}
+                        </button>
+                    </div>
+                    <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        A template copies this {slides.length >= 2 ? 'slide' : 'picture'}&apos;s placement, gradient, watermark, scales and image zoom — not its text or photo. Apply one to any {slides.length >= 2 ? 'slide' : 'post'} to reuse the look.
+                    </p>
+                    {tplError && (
+                        <div className="text-[10px]" style={{ color: '#ff7777' }}>{tplError}</div>
+                    )}
+                    {templates.length === 0 ? (
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            No templates saved yet — style {slides.length >= 2 ? 'a slide' : 'the picture'} the way you like, then hit &quot;Save current look&quot;.
+                        </div>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {templates.map(tpl => {
+                                const isApplied = appliedTplId === tpl.id;
+                                return (
+                                    <div
+                                        key={tpl.id}
+                                        className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                                        style={{
+                                            background: 'var(--surface-2)',
+                                            border: `1px solid ${isApplied ? KUMOLAB_PURPLE : 'var(--line-2)'}`,
+                                        }}
+                                    >
+                                        <span className="flex-1 min-w-0 truncate text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                                            {tpl.name}
+                                        </span>
+                                        {isApplied && (
+                                            <span className="text-[9px] font-bold uppercase tracking-wider shrink-0" style={{ color: '#6b4fd6' }}>
+                                                Applied
+                                            </span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => applyLayoutTemplate(tpl)}
+                                            disabled={!!busy || !!tplBusy}
+                                            title={slides.length >= 2 ? `Apply this look to slide ${activeSlide + 1}` : 'Apply this look to the picture'}
+                                            className="px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-black/[0.03] disabled:cursor-not-allowed shrink-0"
+                                            style={{
+                                                background: `${KUMOLAB_PURPLE}18`,
+                                                border: `1px solid ${KUMOLAB_PURPLE}66`,
+                                                color: '#5b3fc4',
+                                            }}
+                                        >
+                                            {slides.length >= 2 ? `Apply to slide ${activeSlide + 1}` : 'Apply'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label={`Delete template ${tpl.name}`}
+                                            onClick={() => deleteLayoutTemplate(tpl)}
+                                            disabled={!!busy || !!tplBusy}
+                                            className="flex items-center justify-center w-6 h-6 rounded text-sm leading-none transition-all hover:bg-black/[0.06] disabled:cursor-not-allowed shrink-0"
+                                            style={{ color: 'var(--ink-3)' }}
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </Collapsible>
             )}

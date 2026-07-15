@@ -24,6 +24,28 @@ export const SETTING_KEYS = [
     'purpleWordIndices', 'convertToReel', 'imageScale', 'imagePosition',
 ] as const;
 
+// The LAYOUT/STYLE subset of SETTING_KEYS that a saved layout template
+// captures: placement, gradient, watermark, scales, and image zoom/pan.
+// Deliberately EXCLUDES the slide's content — title/excerpt text, the
+// sourceUrl image — and purpleWordIndices (word colors are indices into the
+// specific words, so they don't transfer meaningfully between slides).
+export const LAYOUT_TEMPLATE_KEYS = [
+    'applyText', 'applyGradient', 'applyWatermark', 'gradientPosition', 'gradientStrength',
+    'titleScale', 'captionScale', 'titleOffset', 'captionOffset', 'watermarkPosition',
+    'convertToReel', 'imageScale', 'imagePosition',
+] as const;
+
+// Pick the layout-template subset out of a full (or partial) Settings-shaped
+// object. Used by the editor when SAVING a template (capture the active
+// slide's look) and by the templates API when persisting (never trust the
+// client to have filtered out text/image/word-color keys).
+export function pickLayoutSettings(raw: unknown): Record<string, any> {
+    const src = raw && typeof raw === 'object' ? (raw as Record<string, any>) : {};
+    const out: Record<string, any> = {};
+    for (const k of LAYOUT_TEMPLATE_KEYS) if (k in src) out[k] = src[k];
+    return out;
+}
+
 // Sanitize a client-supplied slides payload down to the persisted shape:
 // { sourceUrl, title, excerpt, settings (SETTING_KEYS only) } per slide.
 export function sanitizeSlides(raw: unknown): Array<Record<string, any>> {
