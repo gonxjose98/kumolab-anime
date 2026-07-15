@@ -26,7 +26,7 @@ Three revenue lines, all monetize-now (no follower gate):
 Fable 5 deep audit (2026-07-11, `AUDIT-Fable5-2026-07.md`) verdict: the engineering core is strong and the business is stalled at $0 because every recent deliverable was polish. Ship revenue.
 
 - **Ads:** apply to AdSense, drop the snippet on the blog. Track the gap to premium-network qualification.
-- **Sponsorships:** one-page media kit (reach/engagement from `src/lib/analytics/dashboard.ts`), rate card, 10-target outreach list. Sales drafts; Jose approves before sending.
+- **Sponsorships:** ✅ **live media kit shipped 2026-07-15** at `/media-kit` (noindex, shareable) — pulls real reach live via `src/lib/analytics/media-kit.ts`, with rate card + breakout-Reel proof. Outreach targets + rate rationale in `MEDIA-KIT.md`. Next: Jose confirms rates → send to first 3 targets.
 - **Merch:** store is live end-to-end; plan a first drop, variants, and cadence.
 - **Keep the pipeline stable + growing** in the background — it is the asset all three lines sit on.
 - **Protect the autonomous core:** publish-correctness + health-monitor hardening (2026-07-14) so silent failures surface.
@@ -342,7 +342,7 @@ Engines largely automated; content volume and sponsor pipeline compounding. Kumo
 | Revenue line | Current | Next milestone |
 | --- | --- | --- |
 | Ad revenue | $0 | AdSense approved + first payout |
-| Sponsorship revenue | $0 | First deal closed |
+| Sponsorship revenue | $0 | Media kit LIVE (/media-kit); first deal closed |
 | Merch revenue | $0 | First recurring drop selling |
 | **KumoLab MRR** | **$0** | **First repeatable dollar** |
 
