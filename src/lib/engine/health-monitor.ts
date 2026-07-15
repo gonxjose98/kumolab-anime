@@ -276,6 +276,27 @@ async function checkErrors(): Promise<HealthCheck> {
     };
 }
 
+async function checkStore(): Promise<HealthCheck> {
+    // The money path is invisible until it breaks. The documented failure mode
+    // is a missing key after an env reset (Stripe placeholder → every checkout
+    // errors; no Printful token → merch page renders empty, orders can't be
+    // fulfilled). Cheap presence checks catch exactly that, with no external
+    // call / rate-limit exposure every tick.
+    const hasStripe = !!process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_placeholder';
+    const hasPrintful = !!process.env.PRINTFUL_ACCESS_TOKEN;
+
+    if (!hasStripe && !hasPrintful) {
+        return { key: 'store', label: 'Store', level: 'crit', detail: 'Stripe + Printful keys both missing — checkout and fulfilment are down', actionable: 'Set STRIPE_SECRET_KEY + PRINTFUL_ACCESS_TOKEN in Vercel' };
+    }
+    if (!hasStripe) {
+        return { key: 'store', label: 'Store', level: 'crit', detail: 'STRIPE_SECRET_KEY missing/placeholder — every checkout will fail', actionable: 'Set STRIPE_SECRET_KEY in Vercel' };
+    }
+    if (!hasPrintful) {
+        return { key: 'store', label: 'Store', level: 'crit', detail: 'PRINTFUL_ACCESS_TOKEN missing — paid orders can’t reach Printful', actionable: 'Set PRINTFUL_ACCESS_TOKEN in Vercel' };
+    }
+    return { key: 'store', label: 'Store', level: 'ok', detail: 'Stripe + Printful configured' };
+}
+
 export async function getHealthSnapshot(): Promise<HealthSnapshot> {
     const checks = await Promise.all([
         checkWorker(),
@@ -285,6 +306,7 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
         checkPublishCadence(),
         checkMetaToken(),
         checkErrors(),
+        checkStore(),
     ]);
 
     const overall: HealthLevel = checks.some(c => c.level === 'crit')

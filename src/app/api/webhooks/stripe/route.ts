@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createPrintfulOrder, getPrintfulOrderByExternalId } from '@/lib/printful';
 import { recordBuyer, sendOrderConfirmation, type OrderLine } from '@/lib/email/order';
+import { logError } from '@/lib/logging/structured-logger';
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -76,6 +77,11 @@ export async function POST(req: Request) {
             // Customer paid but we can't build the order. Do NOT silently pass:
             // log loudly so it can be reconciled by hand from the Stripe session.
             console.error(`[stripe webhook] PAID session ${externalId} produced NO resolvable items — Printful order NOT created. Needs manual follow-up.`);
+            await logError({
+                source: 'stripe.webhook',
+                errorMessage: `PAID session ${externalId} produced NO resolvable items — Printful order NOT created. Manual reconciliation needed.`,
+                context: { sessionId: externalId, amountTotal: (session.amount_total ?? 0) / 100, email: session.customer_details?.email },
+            });
             return NextResponse.json({ received: true, warning: 'no resolvable line items' });
         }
 
@@ -112,9 +118,15 @@ export async function POST(req: Request) {
         try {
             await createPrintfulOrder(printfulOrder);
             console.log(`Printful order created for session ${externalId}`);
-        } catch (error) {
+        } catch (error: any) {
             console.error(`Failed to create Printful order for session ${externalId}:`, error);
-            // In a production app, you'd want to retry or alert here
+            // Paid but not fulfilled — the operator must reconcile from Stripe.
+            await logError({
+                source: 'stripe.webhook',
+                errorMessage: `Failed to create Printful order for PAID session ${externalId}: ${error?.message || error}`,
+                stackTrace: error?.stack,
+                context: { sessionId: externalId, amountTotal: (session.amount_total ?? 0) / 100, email: customerEmail },
+            });
         }
 
         // The customer has paid, so confirm the order and capture them onto the

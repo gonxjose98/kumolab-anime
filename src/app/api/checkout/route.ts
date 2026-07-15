@@ -5,6 +5,7 @@ import { CartItem } from '@/store/useCartStore';
 import { getSyncVariantInfo } from '@/lib/merch';
 import { getShippingRates, cheapestRate } from '@/lib/printful';
 import { SHIP_COUNTRIES } from '@/lib/shipping';
+import { logError } from '@/lib/logging/structured-logger';
 
 export async function POST(req: Request) {
     try {
@@ -59,6 +60,11 @@ export async function POST(req: Request) {
         const rateItems = resolved.map(({ item, info }) => ({ variant_id: info.catalogVariantId!, quantity: item.quantity }));
         const rate = cheapestRate(await getShippingRates(country.recipient, rateItems));
         if (!rate) {
+            await logError({
+                source: 'checkout',
+                errorMessage: `Shipping rate lookup returned nothing for ${countryCode} — customer blocked at checkout`,
+                context: { countryCode, itemCount: items.length },
+            });
             return NextResponse.json({ error: 'Could not calculate shipping for that country. Please try again.' }, { status: 502 });
         }
         const shippingCents = Math.round(parseFloat(rate.rate) * 100);
@@ -99,6 +105,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ clientSecret: session.client_secret });
     } catch (error: any) {
         console.error('Checkout Error:', error);
+        await logError({
+            source: 'checkout',
+            errorMessage: `Checkout session creation failed: ${error?.message || error}`,
+            stackTrace: error?.stack,
+        });
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
