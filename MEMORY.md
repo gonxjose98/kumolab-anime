@@ -1,47 +1,38 @@
-# MEMORY.md - Kumolab Workspace
+# MEMORY.md — KumoLab Workspace
 
-## Project Overview
-**Kumolab** - Anime intelligence hub for verified anime news distribution
+> Fast-start context for agents. Read `CLAUDE.md` (operating rules + secrets/runbooks)
+> and `ROADMAP.md` (current phase + build history) before doing work. The company-wide
+> steering docs live in `~/.claude/.claude/` — `APEX.md`, `GLOBAL-ROADMAP.md`, `SCOREBOARD.md`.
 
-### Mission
-Relay official, trusted, verified anime information to fans in a clean, aesthetically pleasing, easy-to-digest format. Everything published should feel accurate, fast, and premium — never messy or outdated.
+## What KumoLab is
+An automated anime news + media brand (`kumolabanime.com`). It relays official, verified
+anime news in a clean, premium format, and fans it out to social automatically. The content
+pipeline is the asset; **the current job is to monetize it, not to keep polishing it.**
 
-### Current Architecture
-- **Scraper System:** Hourly scans of official anime news sources
-- **Post Generation:** Structured posts with title + body, auto-selects relevant official visuals
-- **Approval Workflow:** Pending → Analysis → Approved → Smart Scheduled
-- **Image Engine:** Layered editing with text overlay, gradients, watermarks
+## Current phase — Monetize now (mirrors GLOBAL-ROADMAP Phase 1)
+KumoLab is priority #1 for the $50k MRR goal. It is live and growing; the audience already
+exists. Revenue is NOT gated behind a follower milestone. Three revenue lines to stand up:
+1. **Display ads** — AdSense on the blog to start (Mediavine/Raptive need ~50k sessions/mo later).
+2. **Sponsorships** — media kit + rate card from real analytics, outreach to anime/streaming/game brands.
+3. **Merch** — Printful + Stripe are wired and the store is live; grow it with drops.
 
-### Current Blocker
-**Admin Dashboard - Text Toggle Issue**
-- Editor includes: image preview, title editor, caption editor, toggles (text/gradient/watermark), purple word targeting, text scaling, drag positioning
-- **Problem:** Text is not generating on the preview image even when text toggle is enabled
-- **Status:** Active issue requiring debug and fix
+**Exit condition:** first repeatable revenue from at least one line (ads running, a sponsorship
+closed, or merch selling). Growth work continues in the background but does not block monetization.
 
-### Design Philosophy
-- **Fast understanding:** Clean visuals, readable captions, strong presentation
-- **Current visuals only:** If Season 5 announced → use Season 5 key visuals (never older promotional art)
-- **Zero outdated info tolerance:** Information must always be current
+## Pipeline state (all LIVE, months stable)
+- **Detection → Processing → Auto-approval → Scheduling → Publishing**, all via one entry point
+  (`src/app/api/cron/route.ts`; Vercel cron in `vercel.json`). Detection every 30 min.
+- **Auto-publish is live** to Website + Instagram + Facebook Page + Threads (direct Graph APIs).
+  YouTube Shorts live for edited-only content. TikTok on hold (policy rejection; future Playwright path).
+  X deferred.
+- **Own email list** (`email_subscribers` + Resend), replaced ConvertKit. Studio video editor live.
+- Hardening in place: per-post publish lock, circuit breaker, multi-layer dedup, AI provider chain,
+  token auto-refresh, health monitor (now on cron).
 
-### Content Types
-- New season announcements
-- Official confirmations (sequels, adaptations, renewals)
-- Release date announcements
-- Key visual / trailer drops
-- Casting announcements
-- Production updates
-- Delays or schedule changes
-- Studio/staff confirmations
-- Streaming platform confirmations
-- Major promotional reveals
-
-### Next Phase
-1. Auto-publish to social media platforms (once fully stable)
-2. Spanish language expansion (separate social accounts)
-
-### My Role (COO)
-Optimize efficiency, reliability, automation, quality, trust, reach, growth, and scalability at all times.
+## Role
+Claude Code operates as **Co-CEO** (per APEX): decide and execute toward revenue, keep the
+autonomous pipeline trustworthy, protect quality. Jose has final authority.
 
 ---
 
-*Workspace active. Full repository access granted.*
+*Workspace active. Full repository access. Deploys: push `main` → Vercel auto-deploy.*

@@ -4,25 +4,46 @@
 > KumoLab is ACTIVE. Activated by Jose on 2026-04-20 after the previous Supabase filled up.
 >
 
-**Last updated:** 2026-05-07 | **Status:** 🟢 Live — Tri-platform auto-publishing in production. Every approved post fans out to **Instagram + Facebook Page + Threads** automatically via direct Graph APIs (no cross-post-toggle dependency anywhere). Hardening sprint closed the dedup gaps, idempotency hole, and silent-fail UX issues that surfaced in early Phase 2 traffic — see "Reliability & UX hardening (2026-05-05/06)" below. Manual upload button now lets Jose push reels/photos through the same 4-destination pipeline. Token health on autopilot: Meta refreshes Mondays 05:00 UTC, Threads refreshes Tuesdays 05:00 UTC, both hot-swap Vercel env in place. AI provider chain (Gemini × 2 → Groq → DeepSeek) running free-first; deterministic fallbacks per touchpoint when the chain exhausts. Merch storefront restored 2026-05-07 — single Printful private token (`KumoLab Production`, expires 2028-05-05) replaces two stale tokens; full read+manage scopes across orders/products/files so I can hide, modify, recommend, and place orders programmatically.
+**Last updated:** 2026-07-14 | **Status:** 🟢 Live + **monetizing now.** The pipeline is built, stable, and auto-publishing to Website + Instagram + Facebook Page + Threads (direct Graph APIs), plus YouTube Shorts for edited-only content. The audience exists; **the current job is to turn it into revenue, not to keep polishing the machine.** Monetization is NOT gated behind a follower count (that old "10k unlocks sponsorship" framing is retired — it steered three weeks of effort away from the only goal at 0%). See "Current Focus" below.
 
 ---
 
 ## The Goal
 
-Build KumoLab into a fully automated, multi-platform anime news and media brand generating consistent ad and sponsorship revenue. **North star:** 10k combined followers across all platforms — unlocks sponsorship pursuit.
+Turn KumoLab's existing, growing audience into **KumoLab's first repeatable revenue**, then scale it — contributing to Gonzalez Umbrella Co.'s $50k MRR goal (G1). KumoLab is priority **#1** in `GLOBAL-ROADMAP.md` Phase 1.
+
+Three revenue lines, all monetize-now (no follower gate):
+1. **Display ads** — AdSense on the blog to start; Mediavine/Raptive when traffic qualifies (~50k sessions/mo).
+2. **Sponsorships** — media kit + rate card from real analytics; outreach to anime / streaming / game brands.
+3. **Merch** — Printful + Stripe wired and the store is live; grow with drops.
+
+**Exit condition (this phase):** first repeatable revenue from at least one line — ads running, a sponsorship closed, or merch selling. Audience growth continues in the background but does not block monetization.
+
+---
+
+## Current Focus — Monetization (mirrors GLOBAL-ROADMAP Phase 1)
+
+Fable 5 deep audit (2026-07-11, `AUDIT-Fable5-2026-07.md`) verdict: the engineering core is strong and the business is stalled at $0 because every recent deliverable was polish. Ship revenue.
+
+- **Ads:** apply to AdSense, drop the snippet on the blog. Track the gap to premium-network qualification.
+- **Sponsorships:** one-page media kit (reach/engagement from `src/lib/analytics/dashboard.ts`), rate card, 10-target outreach list. Sales drafts; Jose approves before sending.
+- **Merch:** store is live end-to-end; plan a first drop, variants, and cadence.
+- **Keep the pipeline stable + growing** in the background — it is the asset all three lines sit on.
+- **Protect the autonomous core:** publish-correctness + health-monitor hardening (2026-07-14) so silent failures surface.
 
 ---
 
 ## Phase Overview
 
+Phases here track KumoLab's own build; revenue phases roll up to `GLOBAL-ROADMAP.md`.
+
 | Phase | Name | Status | Description |
 | --- | --- | --- | --- |
 | **Phase 1** | Pipeline Rebuild | ✅ Complete | Storage redesign + automation layer + platform wiring before going live |
-| **Phase 2** | Multi-Platform Launch | 🟢 Active | Go live across all platforms simultaneously |
-| **Phase 3** | Audience Growth | ⬜ Upcoming | Drive to 10k combined followers |
-| **Phase 4** | Monetization | ⬜ Upcoming | Activate ads + pursue first sponsorships |
-| **Phase 5** | Scale | ⬜ Upcoming | Optimize, expand, grow revenue |
+| **Phase 2** | Multi-Platform Launch | ✅ Complete | Live across Website + IG + FB + Threads (+ YT Shorts edited-only) |
+| **Phase 3** | Monetization + Growth | 🟢 Active | Stand up ads + sponsorships + merch NOW; keep growing audience in parallel |
+| **Phase 4** | Scale Revenue | ⬜ Upcoming | Scale the working line(s); premium ad network; repeatable sponsor pipeline |
+| **Phase 5** | Maturity | ⬜ Upcoming | Automated engines; KumoLab MRR compounding toward the $50k global goal |
 
 ---
 
@@ -178,11 +199,9 @@ Folded into Jose's upcoming admin dashboard redesign (separate project). No read
 
 ---
 
-## Phase 2 — Multi-Platform Launch 🟢 Active
+## Phase 2 — Multi-Platform Launch ✅ Complete
 
-**Triggered:** 2026-05-04 — tri-platform direct publishing went live.
-
-**Exit condition:** All platforms publishing consistently for 2 weeks (target: 2026-05-18).
+**Triggered:** 2026-05-04 — tri-platform direct publishing went live. **Closed:** publishing has run consistently across Website + IG + FB + Threads (+ YouTube Shorts for edited-only) for months. The build log below is kept as reference.
 
 **Live now:**
 - ✅ Website/blog — every approved post
@@ -251,50 +270,38 @@ New **↑ Upload** button on `/admin/posts` next to AI Assist. Lets Jose push a 
 
 ---
 
-## Phase 3 — Audience Growth ⬜ Upcoming
+## Phase 3 — Monetization + Growth 🟢 Active
 
-**Trigger:** Phase 2 complete
+**Trigger:** Phase 2 complete (pipeline live + stable).
 
-**Exit condition:** 10k combined followers.
+**Exit condition:** First repeatable KumoLab revenue — display ads running, OR a first sponsorship closed, OR merch selling. (Monetization does NOT wait for a follower milestone.)
 
-| Platform | Target |
-| --- | --- |
-| X | 3,000 |
-| TikTok | 3,000 |
-| Instagram | 2,000 |
-| YouTube | 1,000 |
-| Facebook | 500 |
-| Website MAU | 5,000+ |
-| **Combined** | **10,000+** |
+### Monetize now (the priority)
 
-- Double down on top-performing formats
-- Build trending topics detection layer
-- Increase TikTok + Shorts output — video drives growth fastest
-- Community engagement (agent drafts, Jose approves)
-- Track weekly in [SCOREBOARD.md](http://SCOREBOARD.md)
+- **Display ads:** apply to AdSense, install the snippet on the blog. Confirm traffic, identify the gap to premium-network (Mediavine/Raptive ~50k sessions/mo) qualification.
+- **Sponsorships:** one-page media kit (audience size, reach, engagement from `dashboard.ts`) + rate card + 10-target outreach list (anime brands, Crunchyroll/HIDIVE, figure/game studios). Sales drafts, Jose approves before sending. First target: 1 paid deal, then set an MRR target.
+- **Merch:** store is live end-to-end (Printful + Stripe). Plan first drop, variants, cadence.
+
+### Grow in parallel (does not gate revenue)
+
+- Double down on top-performing formats (video-only is the proven lever: 26 → 1,600+ followers).
+- Increase edited Shorts / video output — video drives growth fastest.
+- Community engagement (agent drafts, Jose approves). Track weekly in `SCOREBOARD.md`.
+- Reference growth checkpoint (informational, not a gate): ~10k combined followers unlocks stronger sponsor rates and premium ad networks.
 
 ---
 
-## Phase 4 — Monetization ⬜ Upcoming
+## Phase 4 — Scale Revenue ⬜ Upcoming
 
-**Trigger:** 10k combined followers
+**Trigger:** First repeatable revenue live (Phase 3 exit).
 
-**Exit condition:** First sponsorship closed + ad revenue generating.
-
-**Ads:** Install display ads on website, enable YouTube AdSense, enable TikTok Creator Fund when qualified.
-
-**Sponsorships:**
-
-- Build media kit — demographics, reach, engagement
-- Target: anime merch brands, Crunchyroll/Funimation/HiDive, figure companies
-- Sales Agent drafts outreach — Jose approves before sending
-- First target: 1 paid deal. Set MRR target after close.
+Scale whatever line is working: premium ad network once traffic qualifies, a repeatable sponsorship pipeline (2–3 active deals), recurring merch drops. Explore affiliate / resale and digital products. Rolls up to `GLOBAL-ROADMAP.md` Phase 2 ($5k MRR combined with Trading).
 
 ---
 
-## Phase 5 — Scale ⬜ Upcoming
+## Phase 5 — Maturity ⬜ Upcoming
 
-Grow content volume, expand sponsorship pipeline (2–3 active deals), explore affiliate and digital products. KumoLab MRR contributing toward global $50k goal.
+Engines largely automated; content volume and sponsor pipeline compounding. KumoLab MRR contributing toward the global $50k goal with Jose operating as CEO, not operator.
 
 ---
 
@@ -314,7 +321,7 @@ Grow content volume, expand sponsorship pipeline (2–3 active deals), explore a
 ## Architecture Reminders
 
 - **Supabase project:** `xzoqsldtcoeaegxcdsia` (new). Service role key in `.credentials/supabase.md` (gitignored).
-- **All crons → `src/app/api/cron/route.ts`** — no parallel entry points. Workers: `detection`, `processing`, `dailydrops`, `daily-report`, `cleanup`.
+- **All crons → `src/app/api/cron/route.ts`** — no parallel entry points (the old GitHub Actions detection fork was deleted 2026-07-14). Scheduled workers (see `vercel.json`): `detection`, `processing`, `publish`, `dailydrops`, `daily-report`, `cleanup`, `health-monitor`, `metrics-sync`, `refresh-meta-token`, `refresh-threads-token`. On-demand: `render`, `republish-social`, `diag-*`.
 - **Source URLs belong in `sources-config.ts`** — never hardcode.
 - **Retention:** posts auto-expire at `published_at + KUMOLAB_DEFAULT_RETENTION_DAYS` (default 60). Unset = evergreen.
 - **Dedup:** primary via `seen_fingerprints` table. Old "anime_id + claim_type + season_label" composite is gone.
@@ -322,7 +329,7 @@ Grow content volume, expand sponsorship pipeline (2–3 active deals), explore a
 - **Circuit breaker:** **10** declines in 24h → auto-publish pauses for 6h (was 3, raised 2026-05-05). Manual reset via `manualResetCircuitBreaker()` or DELETE on `worker_locks` row `lock_key='auto_publish_paused'`.
 - **Publisher idempotency:** every `publishToSocials` call holds a per-post advisory lock (`publish:{post_id}`, 10-min TTL). Force a republish by deleting the lock first.
 - **Dedup signals (in order):** seen_fingerprints exact match → anime_id+claim → anime canonical+claim+24h → subtitle hash+claim+24h → title Jaccard (0.40 same-claim, 0.55 cross-claim).
-- **No-screenshot-fallback rule:** YouTube-source posts that fail video fetch skip socials entirely. `publishScheduledPosts` retries them automatically up to 5 attempts within 6h.
+- **No-screenshot-fallback rule:** YouTube-source posts that fail video fetch skip socials entirely. `publishScheduledPosts` retries ANY recent non-DROP published post that has no platform IDs yet (generalized 2026-07-14 from the old video_fetch_failed-only case) — up to 5 attempts within 6h. `health-monitor` (now on cron) flags posts that exhaust retries.
 - Redeploy Vercel after any `vercel.json` cron changes.
 - Test all cron endpoints with curl before reporting complete.
 
@@ -330,17 +337,23 @@ Grow content volume, expand sponsorship pipeline (2–3 active deals), explore a
 
 ## KumoLab Metrics Tracker
 
-| Metric | Current | Target |
+**Revenue is the phase metric.** Followers are a growth signal, not a gate.
+
+| Revenue line | Current | Next milestone |
 | --- | --- | --- |
-| X followers | — | 3,000 |
-| TikTok followers | — | 3,000 |
-| Instagram followers | — | 2,000 |
-| YouTube subscribers | — | 1,000 |
-| Facebook followers | — | 500 |
-| Website MAU | — | 5,000 |
-| **Combined** | **—** | **10,000** |
-| Ad MRR | — | — |
-| Sponsorship MRR | — | — |
+| Ad revenue | $0 | AdSense approved + first payout |
+| Sponsorship revenue | $0 | First deal closed |
+| Merch revenue | $0 | First recurring drop selling |
+| **KumoLab MRR** | **$0** | **First repeatable dollar** |
+
+Audience (growth signal — refresh from live platforms; scoreboard figures go stale):
+
+| Platform | Note |
+| --- | --- |
+| Instagram | Proven lever (video-only). Primary reach engine. |
+| Facebook / Threads | Secondary; auto fan-out. |
+| YouTube | Edited-only Shorts live; future AdSense line. |
+| Website MAU | Ad-inventory + email-capture surface. |
 
 ---
 
