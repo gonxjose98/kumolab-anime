@@ -24,7 +24,7 @@ const TABS: { key: View; label: string }[] = [
 export default function AnalyticsView({ live, reports }: { live: AnalyticsData; reports: MonthlyReportRow[] }) {
     const [view, setView] = useState<View>('live');
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 min-w-0">
             <div className="ak-pills ak-no-print" style={{ alignSelf: 'flex-start' }}>
                 {TABS.map((t) => (
                     <button key={t.key} className={`ak-pill ${view === t.key ? 'ak-pill--active' : ''}`} onClick={() => setView(t.key)}>

@@ -73,8 +73,50 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
     };
     const anyCard = show.ig || show.fb || show.threads;
 
+    // When a single platform is filtered, lead with a comprehensive KPI band so
+    // every platform reads as equally complete (not "Website = one chart" while
+    // "Instagram = a full card"). Each tile degrades to "—" honestly.
+    const kpiBand: { label: string; value: string }[] =
+        platform === 'website'
+            ? [
+                { label: `Site views · ${rangeShort}`, value: web.ok ? fmt(siteViewsRange) : '—' },
+                { label: 'Views · 7d', value: web.ok ? fmt(web.views7d) : '—' },
+                { label: 'Views · 30d', value: web.ok ? fmt(web.views30d) : '—' },
+                { label: 'Bots filtered · 30d', value: web.ok ? fmt(web.botViews30d) : '—' },
+                { label: 'Referral sources', value: web.ok ? fmt(web.topReferrers.length) : '—' },
+                { label: 'Top page views', value: web.ok && web.topPaths[0] ? fmt(web.topPaths[0].views) : '—' },
+                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
+                { label: 'Tracked pages', value: web.ok ? fmt(web.topPaths.length) : '—' },
+            ]
+            : platform === 'instagram'
+            ? [
+                { label: 'Followers', value: fmt(snap.followers) },
+                { label: `Reach · ${socialLabel}`, value: fmt(snap.reach28d) },
+                { label: igViewsLabel, value: fmt(igViews) },
+                { label: `Interactions · ${socialLabel}`, value: fmt(snap.totalInteractions28d) },
+                { label: 'Eng. rate', value: igEngRate },
+                { label: `Profile visits · ${socialLabel}`, value: fmt(snap.profileViews28d) },
+                { label: `Website clicks · ${socialLabel}`, value: fmt(snap.websiteClicks28d) },
+                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
+            ]
+            : platform === 'facebook'
+            ? [
+                { label: 'Followers', value: fmt(fb.followers) },
+                { label: `Views · ${socialLabel}`, value: fmt(fb.views28d) },
+                { label: `Engagements · ${socialLabel}`, value: fmt(fb.engagement28d) },
+                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
+            ]
+            : platform === 'threads'
+            ? [
+                { label: 'Followers', value: fmt(threads.followers) },
+                { label: `Views · ${socialLabel}`, value: fmt(threads.views28d) },
+                { label: `Engagements · ${socialLabel}`, value: fmt(threads.engagement28d) },
+                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
+            ]
+            : [];
+
     return (
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6 min-w-0 w-full">
             {/* Controls: platform filter · time range · sync */}
             <div className="ak-anctrl">
                 <div className="ak-pills" style={{ flexWrap: 'wrap' }}>
@@ -103,12 +145,20 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                 </p>
             )}
 
-            {/* Per-platform snapshot cards */}
-            {anyCard && (
-                <div className={show.all ? 'grid grid-cols-1 md:grid-cols-3 gap-3' : 'grid grid-cols-1 gap-3'}>
-                    {show.ig && <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={igViews} viewsLabel={igViewsLabel} eng={igEngRate} engLabel="Eng. rate" />}
-                    {show.fb && <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(fb.engagement28d)} engLabel="Engagements" />}
-                    {show.threads && <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(threads.engagement28d)} engLabel="Engagements" />}
+            {/* All-platforms overview: the three social snapshot cards */}
+            {show.all && anyCard && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={igViews} viewsLabel={igViewsLabel} eng={igEngRate} engLabel="Eng. rate" />
+                    <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(fb.engagement28d)} engLabel="Engagements" />
+                    <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(threads.engagement28d)} engLabel="Engagements" />
+                </div>
+            )}
+
+            {/* Single-platform view: a comprehensive KPI band up top so every
+                platform reads as equally complete. */}
+            {!show.all && kpiBand.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {kpiBand.map((k) => <Kpi key={k.label} label={k.label} value={k.value} />)}
                 </div>
             )}
 
@@ -144,6 +194,28 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                             <Area type="monotone" dataKey="views" stroke={BLUE} strokeWidth={2} fill="url(#ak-v)" />
                         </AreaChart>
                     </ResponsiveContainer>
+                </div>
+            )}
+
+            {/* Website sources + pages (single-platform Website view) */}
+            {platform === 'website' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="ak-card">
+                        <div className="ak-overline mb-3">Top pages</div>
+                        {web.ok && web.topPaths.length > 0 ? (
+                            <ul className="flex flex-col gap-2">
+                                {web.topPaths.slice(0, 8).map((r) => <TrafficBar key={r.label} row={r} max={web.topPaths[0].views} />)}
+                            </ul>
+                        ) : <Empty text="No page views recorded in range yet." />}
+                    </div>
+                    <div className="ak-card">
+                        <div className="ak-overline mb-3">Top sources</div>
+                        {web.ok && web.topReferrers.length > 0 ? (
+                            <ul className="flex flex-col gap-2">
+                                {web.topReferrers.map((r) => <TrafficBar key={r.label} row={r} max={web.topReferrers[0].views} />)}
+                            </ul>
+                        ) : <Empty text="No referrers yet — traffic is mostly direct." />}
+                    </div>
                 </div>
             )}
 
