@@ -68,6 +68,41 @@ async function firstVisible(scope, selectors, timeout = 8000) {
     return null;
 }
 
+/**
+ * Dismiss the popups TikTok Studio throws over the upload page: the onboarding
+ * product tour (react-joyride) and modals like "Turn on automatic content
+ * checks?". Only ever clicks safe dismiss controls (Cancel / Skip / × / Not
+ * now) — never "Turn on" / "Allow", so the account's settings are unchanged.
+ */
+async function dismissOverlays(page) {
+    for (let pass = 0; pass < 4; pass++) {
+        let acted = false;
+        const tryClick = async (loc) => {
+            try {
+                if ((await loc.count()) && (await loc.first().isVisible().catch(() => false))) {
+                    await loc.first().click({ timeout: 2000 }); return true;
+                }
+            } catch {}
+            return false;
+        };
+        // react-joyride onboarding tour
+        for (const sel of ['button[data-action="skip"]', 'button[data-action="close"]', '.react-joyride__tooltip button']) {
+            if (await tryClick(page.locator(sel))) acted = true;
+        }
+        // modal dismiss buttons by label (safe choices only)
+        for (const txt of ['Cancel', 'Not now', 'Maybe later', 'Got it', 'Skip', 'Skip all', 'No thanks']) {
+            if (await tryClick(page.getByRole('button', { name: txt, exact: true }))) acted = true;
+        }
+        // generic close (X) controls
+        for (const sel of ['[data-e2e="modal-close-inner-button"]', 'button[aria-label="Close"]', '.TUXModal button[aria-label="Close"]']) {
+            if (await tryClick(page.locator(sel))) acted = true;
+        }
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(600);
+        if (!acted) break;
+    }
+}
+
 (async () => {
     mkdirSync(OUTDIR, { recursive: true });
     if (!existsSync(SESSION)) throw new Error(`no session file at ${SESSION} — run tt-capture.mjs first`);
@@ -114,6 +149,11 @@ async function firstVisible(scope, selectors, timeout = 8000) {
     await page.waitForTimeout(12000);
     await shot(page, '2-after-file');
 
+    // 2b) Clear TikTok Studio's onboarding tour + the "automatic content checks"
+    //     modal, which sit over the caption box and intercept clicks.
+    await dismissOverlays(page);
+    await shot(page, '2b-after-dismiss');
+
     // 3) Caption. TikTok uses a DraftJS contenteditable. Clear + type.
     if (caption) {
         const cap = await firstVisible(page, [
@@ -134,7 +174,8 @@ async function firstVisible(scope, selectors, timeout = 8000) {
     await page.waitForTimeout(2000);
     await shot(page, '3-caption');
 
-    // 4) Post. Wait until the Post button is enabled (video finished processing).
+    // 4) Post. Clear any overlay that reappeared, then wait for the Post button.
+    await dismissOverlays(page);
     const postBtn = await firstVisible(page, [
         'button[data-e2e="post_video_button"]',
         'button:has-text("Post")',
