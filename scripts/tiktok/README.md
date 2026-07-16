@@ -19,9 +19,9 @@ npx playwright install chromium
 ```bash
 node scripts/tiktok/tt-capture.mjs
 ```
-A Chromium window opens on tiktok.com. **Log in as @kumolabanime** (do the SMS/2FA),
-land on your logged-in home/profile, then return to the terminal and press **Enter**.
-It writes `.credentials/tiktok-session.json`.
+A Chromium window opens on tiktok.com. **Log in as @kumolabanime** (do the SMS/2FA).
+The script auto-detects the login and writes `.credentials/tiktok-session.json` the
+moment you're in (no Enter needed) — then closes itself.
 
 ## Step 2 — test an upload WITHOUT posting (safe)
 ```bash

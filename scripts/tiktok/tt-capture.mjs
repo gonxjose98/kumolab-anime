@@ -22,14 +22,15 @@ import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import readline from 'node:readline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, '../../.credentials/tiktok-session.json');
+const TIMEOUT_MIN = 8;
 
-function waitForEnter(prompt) {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    return new Promise((res) => rl.question(prompt, () => { rl.close(); res(); }));
+// TikTok sets these cookies once you're logged in.
+function isLoggedIn(cookies) {
+    return cookies.some((c) => c.name === 'sessionid' && c.value) ||
+           cookies.some((c) => c.name === 'sid_tt' && c.value);
 }
 
 (async () => {
@@ -45,18 +46,29 @@ function waitForEnter(prompt) {
     const page = await context.newPage();
 
     console.log('\nOpening TikTok. Log in as @kumolabanime in the browser window (do the SMS/2FA).');
+    console.log(`Waiting up to ${TIMEOUT_MIN} min for login — it saves automatically the moment you're in.\n`);
     await page.goto('https://www.tiktok.com/login', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
-    await waitForEnter(
-        '\n>>> After you are fully logged in (you can see your profile/home feed), press Enter here to save the session... ',
-    );
-
-    await context.storageState({ path: OUT });
-    console.log(`\n✅ Session saved to ${OUT}`);
-    console.log('   Keep it secret (it is gitignored). Next: node scripts/tiktok/tt-upload.mjs <video> "<caption>"\n');
+    // Auto-detect login by polling for the session cookies (no Enter needed, so
+    // this also works when launched via `! node ...`). Saves + exits on success.
+    const deadline = Date.now() + TIMEOUT_MIN * 60_000;
+    let saved = false;
+    while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const cookies = await context.cookies().catch(() => []);
+        if (isLoggedIn(cookies)) {
+            await new Promise((r) => setTimeout(r, 2500)); // let the rest settle
+            await context.storageState({ path: OUT });
+            console.log(`\n✅ Logged-in session saved to ${OUT}`);
+            console.log('   Keep it secret (gitignored). Next: node scripts/tiktok/tt-upload.mjs <video> "<caption>" --dry\n');
+            saved = true;
+            break;
+        }
+    }
+    if (!saved) console.log('\n⏱  Timed out without detecting a login. Re-run and finish the login within the window.\n');
 
     await browser.close();
-    process.exit(0);
+    process.exit(saved ? 0 : 1);
 })().catch((e) => {
     console.error('capture failed:', e);
     process.exit(1);
