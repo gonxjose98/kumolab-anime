@@ -13,9 +13,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, Folder, FolderPlus, Image as ImageIcon, Loader2, Play, Plus, Trash2, Upload,
+    ArrowLeft, Folder, FolderPlus, Images, Loader2, Play, Plus, Trash2, Upload,
 } from 'lucide-react';
+import MediaPickerModal from './MediaPickerModal';
 
 interface FolderRow {
     id: string;
@@ -51,6 +53,7 @@ async function api(path: string, init?: RequestInit) {
 }
 
 export default function MediaFolders() {
+    const router = useRouter();
     const [folders, setFolders] = useState<FolderRow[]>([]);
     const [actor, setActor] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -71,6 +74,9 @@ export default function MediaFolders() {
     const [uploadTotal, setUploadTotal] = useState(0);
     const fileRef = useRef<HTMLInputElement | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
+
+    // "Build carousel": picker over this folder's images → new draft post.
+    const [pickerOpen, setPickerOpen] = useState(false);
 
     const loadFolders = useCallback(async () => {
         try {
@@ -212,6 +218,22 @@ export default function MediaFolders() {
         }
     }
 
+    // Turn the picked library images into ONE draft post and open its editor.
+    // Same endpoint + shape ImageHub's multi-upload uses: 2+ urls → a draft
+    // whose image_settings.slides has one slide per picture (a carousel);
+    // a single url stays the classic single-image draft. Thrown errors are
+    // shown inside the picker (it stays open for a retry).
+    async function buildCarousel(urls: string[]) {
+        const json = await api('/api/admin/studio/new-image-post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls }),
+        });
+        if (!json.id) throw new Error('Draft was created without an id');
+        router.push(`/admin/post/${json.id}`);
+        router.refresh();
+    }
+
     const uploading = uploadTotal > 0;
 
     // ---------- Folder detail ----------
@@ -235,11 +257,31 @@ export default function MediaFolders() {
                         style={{ display: 'none' }}
                         onChange={(e) => { uploadFiles(e.target.files); e.target.value = ''; }}
                     />
+                    <button
+                        className="ak-btn ak-btn--secondary ak-btn--sm"
+                        onClick={() => setPickerOpen(true)}
+                        disabled={uploading || mediaLoading || media.every((m) => m.kind !== 'image')}
+                        title={media.some((m) => m.kind === 'image')
+                            ? 'Pick pictures from this folder and open them as a carousel draft'
+                            : 'Upload pictures first — carousels are built from images'}
+                    >
+                        <Images size={14} /> Build carousel
+                    </button>
                     <button className="ak-btn ak-btn--primary ak-btn--sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                         {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                         {uploading ? `Uploading ${uploadNow}/${uploadTotal}…` : 'Upload'}
                     </button>
                 </div>
+
+                {pickerOpen && (
+                    <MediaPickerModal
+                        title="Build a carousel"
+                        initialFolder={{ id: open.id, name: open.name }}
+                        confirmLabel={(n) => (n <= 1 ? `Create post (${n})` : `Build carousel (${n})`)}
+                        onClose={() => setPickerOpen(false)}
+                        onConfirm={buildCarousel}
+                    />
+                )}
 
                 {actor && <p className="ak-caption" style={{ marginBottom: 14 }}>Uploading as {actor}</p>}
                 {error && <div className="ak-auth__err" style={{ marginBottom: 14 }}>{error}</div>}

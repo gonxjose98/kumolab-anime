@@ -4,6 +4,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
 import { pickLayoutSettings } from '@/lib/studio/slides';
+import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
+import { Images } from 'lucide-react';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
 // sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
@@ -217,6 +219,9 @@ export default function PostEditor() {
     // (one past the last slide). The active slide stays the last real slide.
     const [addPane, setAddPane] = useState(false);
     const addFilesRef = useRef<HTMLInputElement>(null);
+    // "Add from library" picker (Studio > Media folders) — selected images
+    // are appended as new slides via the same path device uploads take.
+    const [libraryPicker, setLibraryPicker] = useState(false);
     // Monotonic token so a slow preview render for a previous slide can never
     // overwrite the preview of the slide the operator has since switched to.
     const previewToken = useRef(0);
@@ -684,10 +689,33 @@ export default function PostEditor() {
         return json.url;
     }
 
-    // Append one slide per uploaded image (each starts with the all-OFF
-    // default settings and empty overlay text) and select the first new one.
-    // This is how a single picture becomes a carousel from inside the editor
-    // — via the "+" tile in the strip or the add-slide pane in the preview.
+    // Append one slide per image URL (each starts with the all-OFF default
+    // settings and empty overlay text) and select the first new one. Shared
+    // by BOTH slide-adding paths — device uploads (handleAddSlides) and the
+    // media-library picker (handleAddFromLibrary) — so state, autosave, and
+    // the >=2-slide carousel promotion behave identically for each.
+    async function appendSlideUrls(urls: string[]) {
+        if (!urls.length) return;
+        const cur = syncedSlides();
+        const added: SlideState[] = urls.map(u => ({
+            sourceUrl: u,
+            settings: makeDefaultSettings(),
+            title: '',
+            excerpt: '',
+        }));
+        const next = [...cur, ...added];
+        const idx = cur.length; // first newly-added slide
+        setSlides(next);
+        setActiveSlide(idx);
+        loadSlideIntoEditor(next[idx]);
+        setAddPane(false);
+        await kickPreview(next[idx]);
+    }
+
+    // Device-upload path: upload each picked file to the editor-uploads
+    // staging area, then append the returned URLs as slides. This is how a
+    // single picture becomes a carousel from inside the editor — via the "+"
+    // tile in the strip or the add-slide pane in the preview.
     async function handleAddSlides(files: File[]) {
         const imgs = files.filter(f => f.type.startsWith('image/'));
         if (!imgs.length) return;
@@ -697,22 +725,27 @@ export default function PostEditor() {
         try {
             const urls: string[] = [];
             for (const f of imgs) urls.push(await uploadFile(f));
-            const cur = syncedSlides();
-            const added: SlideState[] = urls.map(u => ({
-                sourceUrl: u,
-                settings: makeDefaultSettings(),
-                title: '',
-                excerpt: '',
-            }));
-            const next = [...cur, ...added];
-            const idx = cur.length; // first newly-added slide
-            setSlides(next);
-            setActiveSlide(idx);
-            loadSlideIntoEditor(next[idx]);
-            setAddPane(false);
-            await kickPreview(next[idx]);
+            await appendSlideUrls(urls);
         } catch (e: any) {
             setError(e?.message || 'Upload failed');
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    // Media-library path: the picker already hands us hosted URLs (the raw
+    // assets from Studio > Media), so there is nothing to upload — append
+    // them straight through the same path device uploads use.
+    async function handleAddFromLibrary(urls: string[]) {
+        setLibraryPicker(false);
+        if (!urls.length) return;
+        setBusy('render');
+        setError(null);
+        setImageError(null);
+        try {
+            await appendSlideUrls(urls);
+        } catch (e: any) {
+            setError(e?.message || 'Could not add the library pictures');
         } finally {
             setBusy(null);
         }
@@ -1482,7 +1515,10 @@ export default function PostEditor() {
                                 /* "+" add-slide pane — the position one past the
                                    last slide. A slide-shaped upload/drop target:
                                    uploading here appends new slides, turning a
-                                   single picture into a carousel. */
+                                   single picture into a carousel. The pane itself
+                                   uploads from this device; the overlaid sibling
+                                   button pulls from the Studio media library. */
+                                <>
                                 <button
                                     type="button"
                                     onClick={() => addFilesRef.current?.click()}
@@ -1512,7 +1548,21 @@ export default function PostEditor() {
                                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                                         Drop photos here or tap to upload — each picture becomes its own slide.
                                     </span>
+                                    {/* Spacer so the pane's copy clears the overlaid
+                                        "Add from library" button below. */}
+                                    <span aria-hidden style={{ height: 34 }} />
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setLibraryPicker(true)}
+                                    disabled={!!busy}
+                                    className="ak-btn ak-btn--secondary ak-btn--sm"
+                                    style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}
+                                    title="Pick pictures from the Studio media folders — each becomes a slide"
+                                >
+                                    Add from library
+                                </button>
+                                </>
                             ) : imageUrl && !imageError ? (
                                 <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1733,6 +1783,25 @@ export default function PostEditor() {
                                 >
                                     +
                                 </button>
+                                {/* Library tile — same slide-shaped target, but the
+                                    pictures come from the Studio > Media folders. */}
+                                <button
+                                    type="button"
+                                    onClick={() => setLibraryPicker(true)}
+                                    disabled={!!busy}
+                                    title="Add slides from the media library (Studio > Media folders)"
+                                    aria-label="Add slides from the media library"
+                                    className="shrink-0 rounded-md flex items-center justify-center transition-all hover:bg-black/[0.03]"
+                                    style={{
+                                        width: 52,
+                                        height: 65,
+                                        border: '1px dashed var(--line-2)',
+                                        color: 'var(--ink-3)',
+                                        background: 'var(--surface-2)',
+                                    }}
+                                >
+                                    <Images size={18} strokeWidth={1.9} />
+                                </button>
                             </div>
                             {!addPane && (
                                 <div className="flex items-center gap-1.5 mt-1.5">
@@ -1821,6 +1890,17 @@ export default function PostEditor() {
                             </p>
                         )}
                     </Card>
+
+                    {/* "Add from library" picker — appends the chosen media-library
+                        pictures as new slides via the same path uploads use. */}
+                    {libraryPicker && (
+                        <MediaPickerModal
+                            title="Add slides from library"
+                            confirmLabel={(n) => `Add ${n} slide${n === 1 ? '' : 's'}`}
+                            onClose={() => setLibraryPicker(false)}
+                            onConfirm={handleAddFromLibrary}
+                        />
+                    )}
 
                     {/* ── Title — prominent, magazine-style ───────────
                         For a carousel this edits the ACTIVE slide's overlay
