@@ -49,3 +49,6 @@ next-env.d.ts
 .playwright-mcp/
 /*.png
 /public/ffmpeg/
+
+# TikTok Playwright automation artifacts (screenshots may show the logged-in account)
+scripts/tiktok/out/
