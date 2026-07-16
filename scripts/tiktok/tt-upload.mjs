@@ -199,8 +199,19 @@ async function dismissOverlays(page) {
     }
 
     await postBtn.click();
-    log('clicked Post, waiting for confirmation…');
-    await page.waitForTimeout(8000);
+    log('clicked Post…');
+    await page.waitForTimeout(2500);
+
+    // TikTok often shows a second confirmation ("Continue to post? … Post now")
+    // when its content check is still running. Confirm it to actually publish.
+    const postNow = await firstVisible(page, [
+        'button:has-text("Post now")',
+        'div[role="dialog"] button:has-text("Post now")',
+    ], 6000);
+    if (postNow) { await postNow.click().catch(() => {}); log('confirmed "Post now"'); }
+
+    log('waiting for publish to finish…');
+    await page.waitForTimeout(9000);
     await shot(page, '5-after-post');
     // TikTok usually shows a success toast / redirects to the content manager.
     log('done — verify on the TikTok profile that the post went live (screenshots in out/).');
