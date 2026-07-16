@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Clapperboard, Image as ImageIcon } from 'lucide-react';
+import { Clapperboard, Folder, Image as ImageIcon } from 'lucide-react';
 
 const SECTIONS = [
     { href: '/admin/studio/videos', label: 'Videos', jp: '動画', icon: Clapperboard },
     { href: '/admin/studio/images', label: 'Images', jp: '画像', icon: ImageIcon },
+    // Raw-asset folders (loose pictures/videos) — distinct from the post Library.
+    { href: '/admin/studio/media', label: 'Media', jp: '素材', icon: Folder },
 ];
 
 export default function StudioTabs() {
