@@ -710,6 +710,36 @@ export default function PostEditor() {
         loadSlideIntoEditor(next[idx]);
         setAddPane(false);
         await kickPreview(next[idx]);
+
+        // Persist the new slides NOW. Both append paths run under busy='render',
+        // and the debounced autosave bails while busy is set (and no dependency
+        // changes after busy clears), so without this explicit write the added
+        // slides show in the UI but never survive a reload. Idempotent with the
+        // autosave; keeps its snapshot in sync so it doesn't redundantly re-save.
+        try {
+            const payloadSlides = next.map(toPersistSlide);
+            const res = await fetch('/api/admin/studio/autosave-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    postId: id,
+                    title: next[0].title,
+                    excerpt: next[0].excerpt,
+                    content,
+                    hashtags,
+                    settings: next[0].settings,
+                    sourceUrl: next[0].sourceUrl,
+                    slides: payloadSlides,
+                }),
+            });
+            if (res.ok) {
+                autosaveSnap.current = JSON.stringify({ content, hashtags, slides: payloadSlides });
+                setAutosave('saved');
+            }
+        } catch {
+            // Non-fatal: the next edit's autosave will pick the slides up.
+        }
     }
 
     // Device-upload path: upload each picked file to the editor-uploads
