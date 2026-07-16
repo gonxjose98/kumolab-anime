@@ -23,6 +23,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIGDashboardData } from '@/lib/social/ig-insights';
 import { fetchFacebookSnapshot, fetchThreadsSnapshot } from '@/lib/social/social-insights';
 import { fetchOrders } from '@/lib/orders';
+import { fetchGa4MonthMetrics, GA4_MIN_MONTH } from '@/lib/analytics/ga4';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_IG_ID = process.env.META_IG_ID;
@@ -342,8 +343,17 @@ function buildAnalysis(
         const reel = ig.avg_reel_views != null ? `, avg reel ${fmt(ig.avg_reel_views)} views` : '';
         parts.push(`${fmt(biz.posts_published)} posts published${reel}.`);
     }
+    if (web.users != null || web.sessions != null) {
+        const bits: string[] = [];
+        if (web.users != null) bits.push(`${fmt(web.users)} users${mom(web.users, prev?.website?.users)}`);
+        if (web.sessions != null) bits.push(`${fmt(web.sessions)} sessions${mom(web.sessions, prev?.website?.sessions)}`);
+        if (web.returning_users != null) bits.push(`${fmt(web.returning_users)} returning`);
+        if (web.organic_sessions != null) bits.push(`${fmt(web.organic_sessions)} organic`);
+        if (web.avg_session_sec != null) bits.push(`${fmt(web.avg_session_sec)}s avg session`);
+        parts.push(`GA4 ${bits.join(', ')}.`);
+    }
     if (web.pageviews != null) {
-        const org = web.google_referrals != null ? ` (${fmt(web.google_referrals)} via Google)` : '';
+        const org = web.google_referrals != null ? ` (${fmt(web.google_referrals)} via Google referrer)` : '';
         parts.push(`Site ${fmt(web.pageviews)} pageviews${mom(web.pageviews, prev?.website?.pageviews)}${org}.`);
     }
     if (web.email_signups != null) parts.push(`${fmt(web.email_signups)} email signups.`);
@@ -394,8 +404,13 @@ export async function captureMonthlySnapshot(monthDate?: Date | string): Promise
         meta[`${section}.${key}`] = prov;
     };
 
+    // GA4 date range is inclusive on both ends ('YYYY-MM-DD'), so endDate is the
+    // LAST day of the month (our `end` is exclusive = first of next month).
+    const ga4Start = monthKey(start);
+    const ga4End = new Date(end.getTime() - 86_400_000).toISOString().slice(0, 10);
+
     // Fire everything in parallel.
-    const [pageviews, googleReferrals, emailSignups, signupEvents, postAggs, igRange, igTrailing, fbSnap, thSnap, revenue] =
+    const [pageviews, googleReferrals, emailSignups, signupEvents, postAggs, igRange, igTrailing, fbSnap, thSnap, revenue, ga4] =
         await Promise.all([
             countPageViews(startIso, endIso),
             countPageViews(startIso, endIso, true),
@@ -407,24 +422,43 @@ export async function captureMonthlySnapshot(monthDate?: Date | string): Promise
             fresh ? fetchFacebookSnapshot(30).catch(() => null) : Promise.resolve(null),
             fresh ? fetchThreadsSnapshot(30).catch(() => null) : Promise.resolve(null),
             monthRevenue(startIso, endIso),
+            fetchGa4MonthMetrics(ga4Start, ga4End).catch(() => null),
         ]);
 
     // ── website ──
+    // First-party pageviews (from our page_views table) stay canonical; GA4
+    // fills the metrics that table can't produce (users/sessions/returning/
+    // duration/organic). GA4 only has data from mid-July 2026 on, so pre-launch
+    // months come back null → tagged unavailable:pre_ga4 rather than fake zeros.
     const website: Record<string, unknown> = {
         pageviews,
         google_referrals: googleReferrals,
         email_signups: emailSignups,
         email_signup_events: signupEvents,
-        users: null,
-        sessions: null,
-        returning_users: null,
-        avg_session_sec: null,
+        users: ga4?.users ?? null,
+        new_users: ga4?.new_users ?? null,
+        sessions: ga4?.sessions ?? null,
+        returning_users: ga4?.returning_users ?? null,
+        avg_session_sec: ga4?.avg_session_sec ?? null,
+        organic_sessions: ga4?.organic_google_sessions ?? null,
+        ga4_pageviews: ga4?.pageviews ?? null,
     };
     put('website', 'pageviews', pageviews != null ? 'exact' : 'unavailable:query_failed');
     put('website', 'google_referrals', googleReferrals != null ? 'exact' : 'unavailable:query_failed');
     put('website', 'email_signups', emailSignups != null ? 'exact' : 'unavailable:query_failed');
     put('website', 'email_signup_events', signupEvents != null ? 'exact' : 'unavailable:query_failed');
-    for (const k of ['users', 'sessions', 'returning_users', 'avg_session_sec']) put('website', k, 'pending_ga4');
+    // GA4-sourced metrics: 'exact' when returned, 'unavailable:pre_ga4' for
+    // months before the tag went live, else 'pending_ga4' (transient API miss —
+    // a later re-capture of this month will fill it).
+    const ga4Prov = (v: number | null | undefined): Provenance =>
+        v != null ? 'exact' : ga4End < GA4_MIN_MONTH ? 'unavailable:pre_ga4' : 'pending_ga4';
+    put('website', 'users', ga4Prov(ga4?.users));
+    put('website', 'new_users', ga4Prov(ga4?.new_users));
+    put('website', 'sessions', ga4Prov(ga4?.sessions));
+    put('website', 'returning_users', ga4Prov(ga4?.returning_users));
+    put('website', 'avg_session_sec', ga4Prov(ga4?.avg_session_sec));
+    put('website', 'organic_sessions', ga4Prov(ga4?.organic_google_sessions));
+    put('website', 'ga4_pageviews', ga4Prov(ga4?.pageviews));
 
     // ── instagram ──
     // Ranged month numbers when Meta still has them; degrade per-metric to the
