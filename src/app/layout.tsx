@@ -5,6 +5,7 @@ import Navigation from '@/components/layout/Navigation';
 import Footer from '@/components/layout/Footer';
 import ConditionalLayout from '@/components/shared/ConditionalLayout';
 import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { OrganizationJsonLd, WebSiteJsonLd } from '@/components/seo/JsonLd';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -96,6 +97,8 @@ export default function RootLayout({
             persists normally under the new key. */}
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="kumolab-theme-sky">
           <AnalyticsTracker />
+          {/* GA4 — dark unless NEXT_PUBLIC_GA_ID is set; skips /admin routes. */}
+          <GoogleAnalytics />
           <ConditionalLayout nav={<Navigation />} footer={<Footer />}>
             <main style={{ position: 'relative', zIndex: 1 }}>{children}</main>
           </ConditionalLayout>

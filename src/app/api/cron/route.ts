@@ -245,6 +245,32 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: result.ok, worker: 'metrics-sync', ...result });
         }
 
+        // Monthly analytics snapshot → monthly_metrics. Scheduled for 00:30 UTC
+        // on the 1st (see vercel.json), capturing the month that just ended
+        // while Meta's ~30-day account-insight retention still covers it. Runs
+        // a best-effort per-post metrics-sync pass first so the month's post
+        // aggregates are as fresh as possible (the intent of "after
+        // metrics-sync" — the regular sync cron fires at :40, after this).
+        // Optional ?month=YYYY-MM to (re)capture a specific past month.
+        if (worker === 'monthly-snapshot') {
+            console.log('[Cron] Capturing monthly metrics snapshot...');
+            try {
+                await syncSocialMetrics(100);
+            } catch (e) {
+                console.error('[Cron] monthly-snapshot: pre-sync failed (continuing):', e);
+            }
+            const { captureMonthlySnapshot } = await import('@/lib/analytics/monthly-snapshot');
+            const month = searchParams.get('month'); // YYYY-MM or YYYY-MM-DD, optional
+            const result = await captureMonthlySnapshot(month ? `${month.slice(0, 7)}-01` : undefined);
+            return NextResponse.json({
+                success: result.ok,
+                worker: 'monthly-snapshot',
+                month: result.month,
+                reason: result.reason,
+                analysis: result.row?.analysis,
+            });
+        }
+
         // Weekly Forecast newsletter (B5). Composes the last 7 days of
         // confirmed news and, by default, sends a PREVIEW to the owner only.
         // The real list only receives it when NEWSLETTER_AUTO_SEND=true is
@@ -458,7 +484,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'health-monitor', 'newsletter']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter']
         }, { status: 400 });
 
     } catch (error: any) {

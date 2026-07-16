@@ -25,6 +25,7 @@ const ADMIN_PUBLIC_API: ReadonlySet<string> = new Set();
 const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? 'gonxjose98@gmail.com').toLowerCase();
 const OWNER_ONLY_PREFIXES = ['/api/admin/team', '/api/admin/email'];
 const ROUTE_PERMS: { prefix: string; perm: string }[] = [
+    { prefix: '/api/admin/analytics', perm: 'analytics' },
     { prefix: '/api/admin/orders', perm: 'store' },
     { prefix: '/api/admin/merch-settings', perm: 'store' },
     { prefix: '/api/admin/store', perm: 'store' },

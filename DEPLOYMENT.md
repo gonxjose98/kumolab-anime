@@ -29,6 +29,10 @@ git push origin main
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `NEXT_PUBLIC_USE_SUPABASE=true`
    - `PRINTFUL_ACCESS_TOKEN`
+   - `NEXT_PUBLIC_GA_ID` — Google Analytics 4 measurement id (`G-XXXXXXXXXX`).
+     Optional: when unset, GA stays fully dark (no gtag.js, no cookies, no events).
+     When set, the public site loads GA4 (never `/admin`) and mirrors email-signup
+     (`sign_up`) and purchase (`purchase`) conversions into GA4.
 
 ### 3. Verify Cron Jobs
 After deployment, Vercel will automatically:

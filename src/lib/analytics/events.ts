@@ -102,23 +102,64 @@ export function getUtm(): Utm {
     }
 }
 
+export type FunnelEventType =
+    | 'email_signup'
+    | 'add_to_cart'
+    | 'checkout_start'
+    | 'purchase'
+    | 'cta_click'
+    | 'related_click'
+    | 'merch_click';
+
+/**
+ * Mirror a conversion into Google Analytics 4. No-ops unless NEXT_PUBLIC_GA_ID
+ * is set AND the gtag snippet is loaded (see components/analytics/
+ * GoogleAnalytics.tsx) — so with GA dark this is a guaranteed no-op, no cookies,
+ * no network. Never throws: GA must never break a user flow.
+ */
+function gaEvent(name: string, params: Record<string, unknown>): void {
+    if (!hasWindow() || !process.env.NEXT_PUBLIC_GA_ID) return;
+    try {
+        const w = window as unknown as { gtag?: (...args: unknown[]) => void };
+        w.gtag?.('event', name, params);
+    } catch {
+        // ignore — analytics must never break the page
+    }
+}
+
+// Funnel events that also count as GA4 conversions, mapped to GA4's
+// recommended event names. Only signups + purchases for now; clicks and cart
+// steps stay first-party-only until there's a reason to mirror them.
+const GA_CONVERSIONS: Partial<Record<FunnelEventType, string>> = {
+    email_signup: 'sign_up',
+    purchase: 'purchase',
+};
+
 /**
  * Record a funnel event. Fire-and-forget: never awaits, never throws, never
  * blocks. `keepalive` lets it survive a fast navigation (e.g. add-to-cart then
  * route change, or the redirect into Stripe).
+ *
+ * Conversions (email_signup, purchase) are additionally mirrored to GA4 when
+ * NEXT_PUBLIC_GA_ID is set. This is THE single place GA conversion events fire
+ * from — call sites (Forecast, ArticleCTA, LinkHub, merch success) each call
+ * trackEvent exactly once on success, so GA can never double-count.
  */
 export function trackEvent(
-    type:
-        | 'email_signup'
-        | 'add_to_cart'
-        | 'checkout_start'
-        | 'purchase'
-        | 'cta_click'
-        | 'related_click'
-        | 'merch_click',
+    type: FunnelEventType,
     opts: { value?: number; meta?: Record<string, unknown> } = {},
 ): void {
     if (!hasWindow()) return;
+    const gaName = GA_CONVERSIONS[type];
+    if (gaName) {
+        const source = typeof opts.meta?.source === 'string' ? opts.meta.source : undefined;
+        gaEvent(
+            gaName,
+            type === 'purchase'
+                ? { currency: 'USD', ...(opts.value != null ? { value: opts.value } : {}) }
+                : { ...(source ? { method: source } : {}) },
+        );
+    }
     try {
         const payload = {
             type,

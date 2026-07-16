@@ -8,6 +8,7 @@ import {
 import { ChevronDown } from 'lucide-react';
 import type { AnalyticsData, TopPost } from '@/lib/analytics/dashboard';
 import SyncMetricsButton from './SyncMetricsButton';
+import SnapshotButton from './SnapshotButton';
 
 const GOLD = '#d9a441';
 const BLUE = '#3a8be0';
@@ -88,6 +89,7 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                         ))}
                     </div>
                     <SyncMetricsButton />
+                    <SnapshotButton />
                 </div>
             </div>
 
