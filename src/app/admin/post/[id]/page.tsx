@@ -155,6 +155,10 @@ export default function PostEditor() {
     const [post, setPost] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState<null | 'save' | 'render' | 'approve' | 'decline' | 'delete'>(null);
+    // Download-to-device in flight: 'one' = the active slide, 'all' = every
+    // slide sequentially. Separate from `busy` so a download never dims the
+    // whole editor — it only debounces the download buttons themselves.
+    const [downloadBusy, setDownloadBusy] = useState<null | 'one' | 'all'>(null);
     const [error, setError] = useState<string | null>(null);
     const [imageError, setImageError] = useState<string | null>(null);
     // Autosave: persists edits (settings + title/caption/hashtags) after every
@@ -972,6 +976,124 @@ export default function PostEditor() {
         goBackToList();
     }
 
+    // ── Download to device ────────────────────────────────────
+    // Saves the rendered overlay picture(s) straight to the operator's
+    // desktop/phone via <a download> + object URL. Purely client-side:
+    // nothing is persisted, uploaded, or written to the post.
+
+    // Filesystem-safe slug from the post headline for download filenames.
+    function slugifyForFile(s: string): string {
+        const slug = (s || '')
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 60)
+            .replace(/-+$/g, '');
+        return slug || 'post';
+    }
+
+    function extForMime(mime: string): string {
+        if (mime.includes('png')) return 'png';
+        if (mime.includes('webp')) return 'webp';
+        return 'jpg';
+    }
+
+    // data: URL or public https URL → Blob. fetch() handles both, and a Blob
+    // object URL downloads reliably on desktop AND mobile (huge data: hrefs
+    // get truncated or blocked by some mobile browsers).
+    async function imageToBlob(src: string): Promise<Blob> {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`Could not fetch the image (HTTP ${res.status})`);
+        return res.blob();
+    }
+
+    // Real browser download: temporary <a download> click on an object URL,
+    // revoked after the browser has picked the blob up (mobile Safari needs
+    // the URL alive briefly after the click).
+    function saveBlobToDevice(blob: Blob, filename: string) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
+
+    // Freshest available bytes for a slide, cheapest first:
+    // the active slide's last preview render → the exact-snapshot preview
+    // cache → the slide's last-baked renderedUrl (from Save) → a fresh
+    // preview-only render (persist:false — no Storage/DB writes).
+    async function slideImageBlob(sl: SlideState, isActive: boolean): Promise<Blob> {
+        if (isActive && lastPreviewBytes.current?.startsWith('data:image/')) {
+            return imageToBlob(lastPreviewBytes.current);
+        }
+        const cached = slidePreviewCache.current.get(slideRenderKey(sl));
+        if (cached) return imageToBlob(cached);
+        if (sl.renderedUrl) return imageToBlob(sl.renderedUrl);
+        const json = await callJson('/api/admin/render-post-image', {
+            postId: id,
+            sourceUrl: sl.sourceUrl || undefined,
+            title: sl.title,
+            excerpt: sl.excerpt,
+            settings: sl.settings,
+            persist: false,
+        });
+        if (typeof json.image !== 'string' || !json.image.startsWith('data:image/')) {
+            throw new Error('Render did not return an image');
+        }
+        cacheSlidePreview(sl, json.image);
+        if (isActive) lastPreviewBytes.current = json.image;
+        return imageToBlob(json.image);
+    }
+
+    // Download the ACTIVE slide's rendered overlay. Single photo:
+    // kumolab-<slug>.<ext>; carousel: kumolab-<slug>-slide-<n>.<ext>
+    // (slug = the post headline, i.e. slide 1's title).
+    async function handleDownloadActive() {
+        if (downloadBusy) return;
+        setDownloadBusy('one');
+        setError(null);
+        try {
+            const cur = syncedSlides();
+            const idx = Math.min(activeSlide, cur.length - 1);
+            const blob = await slideImageBlob(cur[idx], idx === activeSlide);
+            const slug = slugifyForFile(cur[0]?.title || post?.title || '');
+            const ext = extForMime(blob.type);
+            const name = cur.length >= 2 ? `kumolab-${slug}-slide-${idx + 1}.${ext}` : `kumolab-${slug}.${ext}`;
+            saveBlobToDevice(blob, name);
+        } catch (e: any) {
+            setError(e?.message || 'Download failed');
+        } finally {
+            setDownloadBusy(null);
+        }
+    }
+
+    // Download every slide, sequentially, with a small gap between anchor
+    // clicks so browsers don't swallow back-to-back downloads. No zip — just
+    // N straight files: kumolab-<slug>-slide-1..N.<ext>.
+    async function handleDownloadAll() {
+        if (downloadBusy) return;
+        setDownloadBusy('all');
+        setError(null);
+        try {
+            const cur = syncedSlides();
+            const slug = slugifyForFile(cur[0]?.title || post?.title || '');
+            for (let i = 0; i < cur.length; i++) {
+                const blob = await slideImageBlob(cur[i], i === activeSlide);
+                saveBlobToDevice(blob, `kumolab-${slug}-slide-${i + 1}.${extForMime(blob.type)}`);
+                if (i < cur.length - 1) await new Promise(r => setTimeout(r, 400));
+            }
+        } catch (e: any) {
+            setError(e?.message || 'Download failed');
+        } finally {
+            setDownloadBusy(null);
+        }
+    }
+
     async function handleRegenerate(opts: { silent?: boolean } = {}) {
         // Video posts have no image to render — the VideoEditor owns their
         // preview. Bail before hitting the image endpoint, otherwise a mere
@@ -1642,6 +1764,44 @@ export default function PostEditor() {
                                 </div>
                             )}
                         </div>
+                        {/* ── Download to device ─────────────────────
+                            Saves the rendered overlay picture(s) to this
+                            desktop/phone. Client-side only: uses the freshest
+                            preview bytes (or renders persist:false first) and
+                            never writes to the post. */}
+                        {!addPane && (
+                            <div className="px-3 py-2.5 border-t flex items-center flex-wrap gap-2" style={{ borderColor: 'var(--line)' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadActive}
+                                    disabled={!!busy || !!downloadBusy || (!sourceUrl && !imageUrl)}
+                                    title={(!sourceUrl && !imageUrl)
+                                        ? 'Add a photo first: there is nothing to download yet'
+                                        : slides.length >= 2
+                                            ? `Save slide ${activeSlide + 1}'s rendered picture to this device`
+                                            : 'Save the rendered picture to this device'}
+                                    className="ak-btn ak-btn--secondary ak-btn--sm"
+                                >
+                                    {downloadBusy === 'one'
+                                        ? 'Preparing…'
+                                        : slides.length >= 2 ? `Download slide ${activeSlide + 1}` : 'Download'}
+                                </button>
+                                {slides.length >= 2 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadAll}
+                                        disabled={!!busy || !!downloadBusy}
+                                        title={`Save all ${slides.length} rendered slides to this device, one file each`}
+                                        className="ak-btn ak-btn--secondary ak-btn--sm"
+                                    >
+                                        {downloadBusy === 'all' ? 'Downloading…' : `Download all ${slides.length} slides`}
+                                    </button>
+                                )}
+                                <span className="text-[9px] ml-auto" style={{ color: 'var(--text-muted)' }}>
+                                    Saves to this device. The post is untouched.
+                                </span>
+                            </div>
+                        )}
                         <input
                             ref={addFilesRef}
                             type="file"

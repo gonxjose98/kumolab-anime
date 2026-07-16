@@ -22,6 +22,13 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
     const [stage, setStage] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [resultUrl, setResultUrl] = useState<string | null>(null);
+    // Which flow is running/ran: the full export (upload + attach) or the
+    // standalone "download to device" render. Lets the progress UI label the
+    // work and lets a finished download show its confirmation note without
+    // ever touching the export's phase='done' → schedule-sheet handoff.
+    const [mode, setMode] = useState<'export' | 'download'>('export');
+    // Filename of the last successful device download (confirmation note).
+    const [downloadedAs, setDownloadedAs] = useState<string | null>(null);
     const abortRef = useRef<AbortController | null>(null);
 
     const project = useProjectStore.getState().project;
@@ -30,11 +37,52 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
     const overCap = dur > CAPS.maxDurationSec;
     const busy = phase === 'rendering' || phase === 'uploading';
 
+    // Standalone "just give me the file" path: same in-browser render the
+    // export uses, but the MP4 goes straight to the device via an <a download>
+    // object URL. No upload, no finalize, nothing attached to the post.
+    async function downloadToDevice() {
+        if (!project) return;
+        const p = PRESETS.find((x) => x.key === preset)!;
+        setMode('download');
+        setPhase('rendering');
+        setError(null);
+        setDownloadedAs(null);
+        setProgress(0);
+        const ac = new AbortController();
+        abortRef.current = ac;
+        try {
+            const blob = await renderProject(project, {
+                width: p.w, height: p.h, fps: project.meta.fps || 30,
+                onProgress: (r, s) => { setProgress(r); setStage(s); },
+                signal: ac.signal,
+            });
+            const filename = `kumolab-studio-${postId}.mp4`;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            // Revoke after the browser has had time to hand the blob to its
+            // download pipeline (mobile Safari needs the URL alive briefly).
+            setTimeout(() => URL.revokeObjectURL(url), 10_000);
+            setDownloadedAs(filename);
+            setPhase('idle');
+        } catch (e: any) {
+            if (e?.message === 'Export cancelled') { setPhase('idle'); return; }
+            setError(e?.message || 'Download failed');
+            setPhase('error');
+        }
+    }
+
     async function run() {
         if (!project) return;
         const p = PRESETS.find((x) => x.key === preset)!;
+        setMode('export');
         setPhase('rendering');
         setError(null);
+        setDownloadedAs(null);
         setProgress(0);
         const ac = new AbortController();
         abortRef.current = ac;
@@ -115,10 +163,15 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
 
                     {busy && (
                         <div className="flex flex-col gap-2">
-                            <div className="ak-caption">{stage}… {Math.round(progress * 100)}%</div>
+                            <div className="ak-caption">{mode === 'download' && phase === 'rendering' ? 'Preparing download · ' : ''}{stage}… {Math.round(progress * 100)}%</div>
                             <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: 'var(--gold-grad)', transition: 'width 0.2s' }} />
                             </div>
+                        </div>
+                    )}
+                    {!busy && downloadedAs && (
+                        <div className="ak-body-sm" style={{ color: 'var(--text-secondary)' }}>
+                            Saved to your device as <strong>{downloadedAs}</strong>. Nothing was uploaded or attached to the post.
                         </div>
                     )}
                     {error && <div className="ak-auth__err" style={{ textAlign: 'left' }}>{error}</div>}
@@ -129,6 +182,14 @@ export default function ExportDialog({ postId, onClose, onDone }: { postId: stri
                     ) : (
                         <>
                             <button className="ak-btn ak-btn--secondary" onClick={onClose}>Close</button>
+                            <button
+                                className="ak-btn ak-btn--secondary"
+                                onClick={downloadToDevice}
+                                disabled={overCap || !project?.durationSec}
+                                title="Render the reel and save the MP4 straight to this device. No upload, nothing attached to the post"
+                            >
+                                Download to device
+                            </button>
                             <button className="ak-btn ak-btn--primary" onClick={run} disabled={overCap || !project?.durationSec}>Export</button>
                         </>
                     )}
