@@ -17,7 +17,13 @@ import { usePathname } from 'next/navigation';
  * /admin, the already-loaded tag persists for that session — acceptable, since
  * admin entry is normally a direct /admin visit.)
  */
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+// The KumoLab GA4 web-stream Measurement ID. A GA4 Measurement ID is NOT a
+// secret (it ships in the client tag of every GA-tagged site), so it's a safe
+// committed default. NEXT_PUBLIC_GA_ID can still override it. In non-production
+// (localhost dev) it stays off so we never pollute analytics with dev traffic.
+const DEFAULT_GA_ID = 'G-J27E3B1KWL';
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID
+    || (process.env.NODE_ENV === 'production' ? DEFAULT_GA_ID : undefined);
 
 export function GoogleAnalytics() {
     const pathname = usePathname();

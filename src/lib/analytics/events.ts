@@ -118,10 +118,14 @@ export type FunnelEventType =
  * no network. Never throws: GA must never break a user flow.
  */
 function gaEvent(name: string, params: Record<string, unknown>): void {
-    if (!hasWindow() || !process.env.NEXT_PUBLIC_GA_ID) return;
+    if (!hasWindow()) return;
     try {
+        // Fire only when the GA tag is actually loaded (gtag present). This
+        // works whether GA_ID came from NEXT_PUBLIC_GA_ID or the committed
+        // production default, and no-ops on dev/preview where the tag is off.
         const w = window as unknown as { gtag?: (...args: unknown[]) => void };
-        w.gtag?.('event', name, params);
+        if (typeof w.gtag !== 'function') return;
+        w.gtag('event', name, params);
     } catch {
         // ignore — analytics must never break the page
     }
