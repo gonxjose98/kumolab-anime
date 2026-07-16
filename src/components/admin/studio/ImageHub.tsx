@@ -14,6 +14,8 @@ export interface ImageRow {
     timestamp?: string | null;
     editedAt?: string | null;
     edited: boolean;
+    /** Internal label: who last edited/saved this in the Studio (image_settings.edited_by). */
+    editedBy?: string | null;
 }
 
 const STATUS_CLASS: Record<string, string> = {
@@ -210,7 +212,10 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
                                 <div className="ak-vhub-meta">
                                     <div className="ak-vhub-title">{v.title}</div>
                                     <div className="ak-vhub-row">
-                                        {v.status && <span className={`ak-badge ${STATUS_CLASS[v.status] || 'ak-badge--draft'}`}>{STATUS_LABEL[v.status] || v.status}</span>}
+                                        <span className="ak-vhub-row__badges">
+                                            {v.status && <span className={`ak-badge ${STATUS_CLASS[v.status] || 'ak-badge--draft'}`}>{STATUS_LABEL[v.status] || v.status}</span>}
+                                            {v.editedBy && <span className="ak-vhub-editor" title={`Edited by ${v.editedBy} (internal)`}>{v.editedBy}</span>}
+                                        </span>
                                         <span className="ak-caption">{v.editedAt ? `edited ${timeAgo(v.editedAt)}` : timeAgo(v.timestamp)}</span>
                                     </div>
                                 </div>

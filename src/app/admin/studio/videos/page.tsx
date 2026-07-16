@@ -32,6 +32,7 @@ export default async function StudioVideosPage() {
             timestamp: p.published_at || p.timestamp,
             editedAt: p.image_settings?.studio_edited_at || null,
             edited: !!p.image_settings?.video_project,
+            editedBy: p.image_settings?.edited_by || null,
         }))
         .sort((a, b) => new Date(b.editedAt || b.timestamp || 0).getTime() - new Date(a.editedAt || a.timestamp || 0).getTime());
 

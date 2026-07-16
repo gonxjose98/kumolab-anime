@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { SETTING_KEYS, applySlides } from '@/lib/studio/slides';
+import { getStudioActor } from '@/lib/auth/studio-actor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
@@ -41,6 +42,16 @@ export async function POST(req: NextRequest) {
         // single-image shape (key removed); no field at all = untouched.
         applySlides(image_settings, body?.slides);
         image_settings.studio_edited_at = new Date().toISOString();
+
+        // Keep the internal "who edited this" label fresh on every autosave.
+        // Deliberately NO studio_activity insert here — autosaves fire on
+        // every debounced edit and would inflate the per-user counts; only
+        // the explicit Save (render-post-image persist) logs activity.
+        const actor = await getStudioActor();
+        if (actor) {
+            image_settings.edited_by = actor.name;
+            image_settings.edited_by_email = actor.email;
+        }
 
         const update: Record<string, any> = { image_settings };
         if (typeof body?.title === 'string') update.title = body.title;

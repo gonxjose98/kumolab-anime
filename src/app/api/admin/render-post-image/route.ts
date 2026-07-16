@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateIntelImage } from '@/lib/engine/image-processor';
 import { applySlides } from '@/lib/studio/slides';
+import { getStudioActor, recordStudioActivity, type StudioActor } from '@/lib/auth/studio-actor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -25,6 +26,11 @@ export const maxDuration = 60;
  *
  * Settings + source URL get snapshotted into posts.image_settings so any
  * later re-render reproduces the user's approved choices.
+ *
+ * Attribution: both persist paths stamp image_settings.edited_by (+ email)
+ * with the signed-in editor (INTERNAL label — nothing published reads it)
+ * and log one studio_activity row (kind='photo', action='save') per Save.
+ * Preview renders (persist=false) never touch either.
  */
 
 // ── Carousel slide bake ────────────────────────────────────────
@@ -164,6 +170,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: fetchError?.message || 'Post not found' }, { status: 404 });
         }
 
+        // Internal attribution — only the persist (Save) paths use it, so
+        // preview renders never pay for the session read. Null for cookie-less
+        // server/cron callers, which then simply skip the stamp + count.
+        const actor: StudioActor | null = persist ? await getStudioActor() : null;
+
         // Promote-bytes path. When the editor cached the most recent
         // preview's base64 and sent it back on Save, we upload those
         // exact bytes — no second render. The image the user saw in the
@@ -217,6 +228,10 @@ export async function POST(req: NextRequest) {
                 ...settingsSnapshot,
             };
             applySlides(mergedSettings, slidesPayload);
+            if (actor) {
+                mergedSettings.edited_by = actor.name;
+                mergedSettings.edited_by_email = actor.email;
+            }
 
             // Carousel (2+ slides): bake every slide to a JPEG and stamp
             // renderedUrl per slide. Slide 1's JPEG becomes post.image (the
@@ -231,6 +246,9 @@ export async function POST(req: NextRequest) {
             if (updateError) {
                 return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
             }
+            // One explicit photo Save = one produced photo (autosaves hit a
+            // different route and never insert activity rows).
+            if (actor) await recordStudioActivity(actor, postId, 'photo', 'save');
             return NextResponse.json({ success: true, image: carouselCoverUrl || publicUrl, persisted: true, mode: 'promoted' });
         }
 
@@ -360,6 +378,10 @@ export async function POST(req: NextRequest) {
             ...settingsSnapshot,
         };
         applySlides(mergedSettings, slidesPayload);
+        if (actor) {
+            mergedSettings.edited_by = actor.name;
+            mergedSettings.edited_by_email = actor.email;
+        }
 
         // Same carousel bake as the promote-bytes path: on a 2+ slide save,
         // every slide gets a JPEG render + renderedUrl, and slide 1's JPEG
@@ -377,6 +399,10 @@ export async function POST(req: NextRequest) {
         if (updateError) {
             return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
         }
+
+        // Same rule as the promote-bytes branch: an explicit Save persist
+        // counts as one produced photo.
+        if (actor) await recordStudioActivity(actor, postId, 'photo', 'save');
 
         return NextResponse.json({
             success: true,
