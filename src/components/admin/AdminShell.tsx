@@ -12,6 +12,7 @@ import {
     Users,
     Mail,
     Menu,
+    Cpu,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
 import ThemeToggle from './ThemeToggle';
@@ -30,6 +31,7 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
         label: 'Publishing', jp: '発信', items: [
             { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText, perm: 'content' },
             { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard, perm: 'studio' },
+            { href: '/admin/engine', label: 'Engine', jp: '頭脳', icon: Cpu, perm: 'content' },
         ],
     },
     { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' }] },

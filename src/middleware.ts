@@ -35,6 +35,7 @@ const ROUTE_PERMS: { prefix: string; perm: string }[] = [
     { prefix: '/api/admin/bulk-delete', perm: 'content' },
     { prefix: '/api/admin/custom-post', perm: 'content' },
     { prefix: '/api/admin/import-from-url', perm: 'content' },
+    { prefix: '/api/admin/engine', perm: 'content' },
 ];
 
 function unauthorized(message: string) {
