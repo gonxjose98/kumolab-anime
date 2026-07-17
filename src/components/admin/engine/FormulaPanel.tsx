@@ -1,4 +1,5 @@
 import type { FormulaElement } from '@/lib/engine/engine-config';
+import ScoreLegend from './ScoreLegend';
 
 /**
  * The posting formula, rendered as a canonical, numbered checklist. This is the
@@ -8,7 +9,10 @@ import type { FormulaElement } from '@/lib/engine/engine-config';
 export default function FormulaPanel({ formula }: { formula: FormulaElement[] }) {
     return (
         <div className="ak-card">
-            <div className="ak-overline" style={{ color: 'var(--gold)', marginBottom: 4 }}>The posting formula</div>
+            <div className="flex items-baseline justify-between" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                <span className="ak-overline" style={{ color: 'var(--gold)' }}>The posting formula</span>
+                <ScoreLegend />
+            </div>
             <div className="ak-caption" style={{ marginBottom: 12 }}>
                 The rules a winning post follows. Any agent acting on KumoLab should check its work against these.
             </div>
