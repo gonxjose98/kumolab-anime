@@ -186,6 +186,17 @@ export const YOUTUBE_STUDIO_CHANNELS = {
         { name: 'Viz Media', channelId: 'UCV1da9peoqEwqr45bpTJsbQ', tier: 1 },
         { name: 'CloverWorks', channelId: 'UCCT6fRG8poit5j_GOE4Hrhw', tier: 1 },
         { name: 'Pony Canyon', channelId: 'UCk0IUODXaAFr5gEFlZDbzmw', tier: 1 },
+        // Added 2026-07-17 for watchlist coverage (Fable source-coverage audit).
+        // IDs verified live against their RSS feeds before adding:
+        //   Science SARU  → closes the only true gap (Ghost in the Shell, Prime-
+        //                   exclusive) + first-party Jaadugar.
+        //   Toei Animation→ first-party One Piece (biggest franchise).
+        //   Kyoto Animation → first-party Sparks of Tomorrow + all future KyoAni.
+        // (WIT Studio's proposed ID 404'd on verification, so it was NOT added;
+        //  no current watchlist show needs it. Re-resolve when a WIT show lands.)
+        { name: 'Science SARU', channelId: 'UCDGIcJaK4s-hPTcXy1yZ7qA', tier: 1 },
+        { name: 'Toei Animation', channelId: 'UCTTv0NxWnJsNzAY3Ivj61zg', tier: 1 },
+        { name: 'Kyoto Animation', channelId: 'UCpGY2vcoKXf7K6tFzsbSv7w', tier: 1 },
     ],
     TIER_2: [] as { name: string; channelId: string; tier: number }[],
     TIER_3: [] as { name: string; channelId: string; tier: number }[],
