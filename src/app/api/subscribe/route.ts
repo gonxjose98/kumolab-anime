@@ -23,6 +23,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Please enter a valid email' }, { status: 400 });
         }
 
+        // Was this address already on the list? Decides whether the welcome
+        // email fires (only for genuinely new signups). Best-effort: if the
+        // check fails we treat them as existing so nobody gets a duplicate.
+        let isNew = false;
+        try {
+            const { data: existing } = await supabaseAdmin
+                .from('email_subscribers')
+                .select('id')
+                .eq('email', email)
+                .maybeSingle();
+            isNew = !existing;
+        } catch {
+            isNew = false;
+        }
+
         // Upsert on email: signing up again (even after unsubscribing) simply
         // re-subscribes; it never errors and never creates a duplicate row.
         const { error } = await supabaseAdmin
@@ -35,6 +50,25 @@ export async function POST(request: Request) {
         if (error) {
             console.error('Subscribe insert failed:', error.message);
             return NextResponse.json({ error: 'Could not subscribe right now, please try again' }, { status: 500 });
+        }
+
+        // Welcome email for new signups. Gated by WELCOME_EMAIL_ENABLED=true so
+        // nothing sends until the owner turns it on; sendWelcomeEmail itself is
+        // best-effort and never throws, so signup can never fail because of it.
+        if (isNew && process.env.WELCOME_EMAIL_ENABLED === 'true') {
+            let token: string | null = null;
+            try {
+                const { data: row } = await supabaseAdmin
+                    .from('email_subscribers')
+                    .select('unsubscribe_token')
+                    .eq('email', email)
+                    .maybeSingle();
+                token = (row?.unsubscribe_token as string) ?? null;
+            } catch {
+                token = null;
+            }
+            const { sendWelcomeEmail } = await import('@/lib/email/welcome');
+            await sendWelcomeEmail(email, token);
         }
 
         return NextResponse.json({ success: true });

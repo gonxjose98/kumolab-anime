@@ -316,7 +316,7 @@ export async function GET(req: NextRequest) {
                     const { sendBroadcast } = await import('@/lib/email/send');
                     let result;
                     try {
-                        result = await sendBroadcast({ subject, html, text });
+                        result = await sendBroadcast({ subject, html, text, kind: 'forecast' });
                     } catch (sendErr) {
                         if (broadcastId) {
                             await supabaseAdmin.from('email_broadcasts').update({ status: 'failed' }).eq('id', broadcastId);

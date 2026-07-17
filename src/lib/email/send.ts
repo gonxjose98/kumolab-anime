@@ -45,15 +45,23 @@ async function loadSubscribed(): Promise<Recipient[]> {
  * Send a broadcast to every subscribed member of the list.
  * Throws if RESEND_API_KEY is missing or the list can't be loaded;
  * individual recipient failures do not abort the run.
+ *
+ * Every completed run is recorded (best-effort) in email_sends so the admin
+ * Email tab can show a compact sent history. `kind` labels the row
+ * ('broadcast' for admin sends, 'forecast' for the weekly newsletter).
  */
 export async function sendBroadcast({
     subject,
     html,
     text,
+    kind = 'broadcast',
+    sentBy = null,
 }: {
     subject: string;
     html: string;
     text?: string;
+    kind?: 'broadcast' | 'forecast' | 'system';
+    sentBy?: string | null;
 }): Promise<BroadcastResult> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
@@ -99,6 +107,19 @@ export async function sendBroadcast({
         } catch (e) {
             console.error('Resend batch threw:', e);
             failed += chunk.length;
+        }
+    }
+
+    // Best-effort history row: bookkeeping must never fail a send that
+    // already went out (and must survive the table not existing yet).
+    if (sent > 0) {
+        try {
+            const { error } = await supabaseAdmin
+                .from('email_sends')
+                .insert({ kind, subject, recipient_count: sent, sent_by: sentBy });
+            if (error) console.error('[email] could not record email_sends row:', error.message);
+        } catch (e) {
+            console.error('[email] could not record email_sends row:', e);
         }
     }
 

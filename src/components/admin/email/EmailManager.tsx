@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, UserPlus, Upload, UserX } from 'lucide-react';
+import type { SystemEmailTemplate } from '@/lib/email/templates';
+import SystemEmails from './SystemEmails';
+import SentHistory, { type SentEmail } from './SentHistory';
 
 export type Subscriber = {
     id: string;
@@ -37,11 +40,15 @@ export default function EmailManager({
     total,
     subscribed,
     resendConnected,
+    systemTemplates,
+    sends,
 }: {
     subscribers: Subscriber[];
     total: number;
     subscribed: number;
     resendConnected: boolean;
+    systemTemplates: SystemEmailTemplate[];
+    sends: SentEmail[];
 }) {
     return (
         <div className="flex flex-col gap-6" style={{ maxWidth: '760px' }}>
@@ -60,7 +67,8 @@ export default function EmailManager({
                 </div>
             </div>
 
-            <BroadcastCard subscribed={subscribed} resendConnected={resendConnected} />
+            <BroadcastCard subscribed={subscribed} resendConnected={resendConnected} sends={sends} />
+            <SystemEmails templates={systemTemplates} />
             <AddSubscriberCard />
             <ImportCard />
             <SubscriberList subscribers={subscribers} total={total} />
@@ -68,7 +76,7 @@ export default function EmailManager({
     );
 }
 
-function BroadcastCard({ subscribed, resendConnected }: { subscribed: number; resendConnected: boolean }) {
+function BroadcastCard({ subscribed, resendConnected, sends }: { subscribed: number; resendConnected: boolean; sends: SentEmail[] }) {
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [confirming, setConfirming] = useState(false);
@@ -106,11 +114,14 @@ function BroadcastCard({ subscribed, resendConnected }: { subscribed: number; re
         <div className="ak-card flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <span className="ak-title">Send a broadcast</span>
-                {!resendConnected && (
-                    <span className="ak-caption" style={{ color: 'var(--gold-text)' }}>
-                        Connect Resend (set RESEND_API_KEY) to send. You can still manage subscribers.
-                    </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                    {!resendConnected && (
+                        <span className="ak-caption" style={{ color: 'var(--gold-text)' }}>
+                            Connect Resend (set RESEND_API_KEY) to send. You can still manage subscribers.
+                        </span>
+                    )}
+                    <SentHistory sends={sends} />
+                </div>
             </div>
 
             <div className="ak-field">

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getEmailCopy, renderOrderConfirmation, renderCartRecovery } from '@/lib/email/templates';
 
 /**
  * Transactional order emails + buyer capture (Q6).
@@ -10,6 +11,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
  *   - sendOrderConfirmation() sends the on-brand confirmation via Resend.
  * Both are best-effort and NEVER throw: a failure here must not break the
  * Stripe webhook (the customer has already paid).
+ *
+ * Wording comes from getEmailCopy() (admin-editable on /admin/email) which
+ * itself never throws and falls back to the hardcoded defaults, so the
+ * webhook-safety contract holds. Layout lives in templates.ts.
  */
 
 const FROM = process.env.ORDER_EMAIL_FROM || 'KumoLab <shop@kumolabanime.com>';
@@ -38,10 +43,6 @@ export async function recordBuyer(email?: string | null, name?: string | null): 
     }
 }
 
-const money = (n: number): string => `$${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
-const esc = (s: string): string =>
-    (s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-
 /** Send the branded order-confirmation email. Best-effort, never throws. */
 export async function sendOrderConfirmation(input: {
     to?: string | null;
@@ -62,56 +63,24 @@ export async function sendOrderConfirmation(input: {
             return false;
         }
         const resend = new Resend(apiKey);
-        const firstName = esc((input.name || '').trim().split(/\s+/)[0] || 'there');
+        const firstName = (input.name || '').trim().split(/\s+/)[0] || 'there';
 
-        const rows = input.lines
-            .map(
-                (l) =>
-                    `<tr><td style="padding:7px 0;color:#28374a;">${esc(String(l.quantity))}&times; ${esc(l.name)}</td>` +
-                    `<td align="right" style="padding:7px 0;color:#28374a;">${money(l.amount)}</td></tr>`,
-            )
-            .join('');
-
-        const html = `
-<div style="background:#eef5fc;padding:32px 12px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(24,70,120,.12);">
-    <div style="background:linear-gradient(135deg,#8fc2f1 0%,#c3e0fb 55%,#fff5e2 100%);padding:26px 32px;text-align:center;">
-      <img src="https://kumolabanime.com/kumolab-cloud-mark-gold.png" width="58" height="auto" alt="" style="display:inline-block;margin-bottom:4px;" />
-      <div style="font-size:24px;font-weight:800;color:#16324f;letter-spacing:-.02em;">KumoLab</div>
-    </div>
-    <div style="padding:28px 32px;">
-      <h1 style="font-size:20px;margin:0 0 8px;color:#16324f;">Thanks for your order, ${firstName}.</h1>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#46688c;">
-        Your order is confirmed and we are getting it ready. Order <b>#${esc(input.orderNumber)}</b>.
-      </p>
-      <table style="width:100%;border-collapse:collapse;font-size:14px;">
-        ${rows}
-        <tr><td style="padding:9px 0 6px;border-top:1px solid #e6eef7;color:#46688c;">Subtotal</td><td align="right" style="padding:9px 0 6px;border-top:1px solid #e6eef7;color:#46688c;">${money(input.subtotal)}</td></tr>
-        <tr><td style="padding:2px 0;color:#46688c;">Shipping</td><td align="right" style="padding:2px 0;color:#46688c;">${money(input.shipping)}</td></tr>
-        <tr><td style="padding:8px 0;font-weight:800;color:#16324f;font-size:15px;">Total</td><td align="right" style="padding:8px 0;font-weight:800;color:#16324f;font-size:15px;">${money(input.total)}</td></tr>
-      </table>
-      <p style="margin:22px 0 0;font-size:14px;line-height:1.6;color:#46688c;">
-        We will email you tracking as soon as it ships. Questions about your order? Just reply to this email.
-      </p>
-    </div>
-    <div style="padding:16px 32px;text-align:center;font-size:12px;color:#8aa3bd;background:#f6fafe;">
-      KumoLab &middot; the cloud sees everything first
-    </div>
-  </div>
-</div>`.trim();
-
-        const text =
-            `Thanks for your order, ${(input.name || 'there').split(/\s+/)[0]}.\n\n` +
-            `Your order is confirmed. Order #${input.orderNumber}.\n\n` +
-            input.lines.map((l) => `  ${l.quantity}x ${l.name}  ${money(l.amount)}`).join('\n') +
-            `\n\n  Subtotal  ${money(input.subtotal)}\n  Shipping  ${money(input.shipping)}\n  Total     ${money(input.total)}\n\n` +
-            `We will email you tracking as soon as it ships. Questions? Just reply to this email.\n\nKumoLab`;
+        // Admin-editable wording; getEmailCopy never throws (defaults win on any failure).
+        const copy = await getEmailCopy('order_confirmation');
+        const { subject, html, text } = renderOrderConfirmation(copy, {
+            firstName,
+            orderNumber: input.orderNumber,
+            lines: input.lines,
+            subtotal: input.subtotal,
+            shipping: input.shipping,
+            total: input.total,
+        });
 
         const { error } = await resend.emails.send({
             from: FROM,
             to,
             replyTo: REPLY_TO,
-            subject: `Your KumoLab order is confirmed (#${input.orderNumber})`,
+            subject,
             html,
             text,
         });
@@ -151,54 +120,15 @@ export async function sendCartRecoveryEmail(
         }
         const resend = new Resend(apiKey);
 
-        const names = (items || [])
-            .map((i) => `${i.quantity && i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name || ''}`.trim())
-            .filter(Boolean);
-        const itemRows = names
-            .map((n) => `<li style="padding:3px 0;color:#28374a;">${esc(n)}</li>`)
-            .join('');
-        const itemsBlock = itemRows
-            ? `<ul style="margin:0 0 20px;padding-left:20px;font-size:15px;line-height:1.6;">${itemRows}</ul>`
-            : '';
-
-        const html = `
-<div style="background:#eef5fc;padding:32px 12px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(24,70,120,.12);">
-    <div style="background:linear-gradient(135deg,#8fc2f1 0%,#c3e0fb 55%,#fff5e2 100%);padding:26px 32px;text-align:center;">
-      <img src="https://kumolabanime.com/kumolab-cloud-mark-gold.png" width="58" height="auto" alt="" style="display:inline-block;margin-bottom:4px;" />
-      <div style="font-size:24px;font-weight:800;color:#16324f;letter-spacing:-.02em;">KumoLab</div>
-    </div>
-    <div style="padding:28px 32px;">
-      <h1 style="font-size:20px;margin:0 0 8px;color:#16324f;">Your cart is still up here in the clouds.</h1>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#46688c;">
-        You were this close. We kept everything exactly where you left it:
-      </p>
-      ${itemsBlock}
-      <div style="text-align:center;margin:6px 0 4px;">
-        <a href="https://kumolabanime.com/merch" style="display:inline-block;background:#16324f;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 28px;border-radius:999px;">Finish checking out</a>
-      </div>
-      <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#46688c;">
-        Questions? Just reply to this email.
-      </p>
-    </div>
-    <div style="padding:16px 32px;text-align:center;font-size:12px;color:#8aa3bd;background:#f6fafe;">
-      KumoLab &middot; the cloud sees everything first
-    </div>
-  </div>
-</div>`.trim();
-
-        const text =
-            `Your cart is still up here in the clouds.\n\n` +
-            `You were this close. We kept everything exactly where you left it:\n\n` +
-            (names.length ? names.map((n) => `  - ${n}`).join('\n') + '\n\n' : '') +
-            `Finish checking out: https://kumolabanime.com/merch\n\n` +
-            `Questions? Just reply to this email.\n\nKumoLab`;
+        // Admin-editable wording; getEmailCopy never throws (defaults win on any failure).
+        const copy = await getEmailCopy('cart_recovery');
+        const { subject, html, text } = renderCartRecovery(copy, items || []);
 
         const { error } = await resend.emails.send({
             from: 'KumoLab <news@kumolabanime.com>',
             to,
             replyTo: REPLY_TO,
-            subject: 'You left something in your cart',
+            subject,
             html,
             text,
         });

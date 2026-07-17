@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-            const { sent, failed } = await sendBroadcast({ subject, html, text });
+            const { sent, failed } = await sendBroadcast({ subject, html, text, sentBy: access.email });
             await supabaseAdmin
                 .from('email_broadcasts')
                 .update({ status: failed > 0 && sent === 0 ? 'failed' : 'sent', sent_count: sent, sent_at: new Date().toISOString() })
