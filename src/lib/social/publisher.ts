@@ -360,6 +360,30 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         if (staged) {
             stagedVideoUrl = staged.bucket_url;
             result.staged_video_url = staged.bucket_url;
+
+            // Persist the MEASURED video quality on the post row and swap the
+            // provisional Video Quality score component for the real one, so
+            // the Engine tab's breakdown reflects what actually shipped.
+            // Best-effort bookkeeping — never blocks the publish.
+            if (staged.quality && (post as any).id) {
+                try {
+                    const { applyMeasuredVideoQuality } = await import('../engine/scoring');
+                    const { supabaseAdmin } = await import('../supabase/admin');
+                    const update: Record<string, any> = {
+                        video_height: staged.quality.height,
+                        video_bitrate: staged.quality.bitrate,
+                        quality_tier: staged.quality.quality_tier,
+                    };
+                    const rescored = applyMeasuredVideoQuality((post as any).score_breakdown, staged.quality);
+                    if (rescored) {
+                        update.post_score = rescored.total;
+                        update.score_breakdown = rescored;
+                    }
+                    await supabaseAdmin.from('posts').update(update).eq('id', (post as any).id);
+                } catch (e: any) {
+                    console.warn('[Publisher] quality persist failed (non-fatal):', e?.message || e);
+                }
+            }
         } else {
             // Per Jose's directive (2026-05-05): when a post is sourced
             // from a YouTube video and the video fetch fails, do NOT

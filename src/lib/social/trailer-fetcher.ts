@@ -19,12 +19,27 @@
  *     has its own kill timer.
  */
 
+import { spawn } from 'child_process';
+import { writeFile, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import path from 'path';
+import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '../supabase/admin';
 import { processForSocial } from './video-processor';
 import { logError, logAction } from '../logging/structured-logger';
+import {
+    QUALITY_MIN_HEIGHT,
+    QUALITY_MIN_BITRATE,
+    QUALITY_FULL_HEIGHT,
+    QUALITY_FULL_BITRATE,
+    type VideoQuality,
+} from '../engine/scoring';
 
 const BUCKET = 'blog-videos';
-const MAX_BYTES = 80 * 1024 * 1024;
+// Raised 80 → 120 MB (Jose 2026-07-17): once the Render worker serves 1080p
+// (bestvideo[height>=1080]+bestaudio), a ~3-min trailer can exceed 80 MB and
+// would otherwise be dropped before the quality gate ever ran.
+const MAX_BYTES = 120 * 1024 * 1024;
 
 export interface TrailerStaged {
     bucket_url: string;
@@ -33,6 +48,9 @@ export interface TrailerStaged {
     duration_seconds: number;
     bytes: number;
     title?: string;
+    /** ffprobe result for the RAW downloaded MP4 (pre-watermark re-encode).
+     *  null when the probe itself failed (gate fails open — see below). */
+    quality: VideoQuality | null;
 }
 
 export interface FetchYouTubeOptions {
@@ -89,6 +107,129 @@ function workerEnv(): { url: string; secret: string } | null {
     const secret = process.env.YT_WORKER_SECRET;
     if (!url || !secret) return null;
     return { url: url.replace(/\/$/, ''), secret };
+}
+
+// ── Video-quality probe (ffprobe) ──────────────────────────────
+// ENGINE-AUDIT-2026-07.md section 4: measure the RAW fetched MP4 before the
+// watermark re-encode. Floor: >=720p AND >=1.2 Mbps (below → the auto path
+// rejects, no screenshot fallback). FULL bar: >=1080p AND >=2.5 Mbps with real
+// motion. Also detects slideshow/near-static sources (a "trailer" that is one
+// still + music) via inter-frame packet sizes — no decode pass needed.
+
+const ffprobePath: string = (() => {
+    try {
+        // ffprobe-static exports { path } — Linux x64 binary on Vercel,
+        // ffprobe.exe locally on Windows (same pattern as ffmpeg-static).
+        return (require('ffprobe-static') as { path: string }).path || '';
+    } catch {
+        return '';
+    }
+})();
+
+function runFfprobe(args: string[], timeoutMs = 20_000): Promise<{ code: number | null; stdout: string; stderr: string }> {
+    return new Promise((resolve) => {
+        let proc;
+        try {
+            proc = spawn(ffprobePath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        } catch (e: any) {
+            return resolve({ code: null, stdout: '', stderr: e?.message || 'spawn failed' });
+        }
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (c: Buffer) => { stdout += c.toString(); });
+        proc.stderr.on('data', (c: Buffer) => { stderr = (stderr + c.toString()).slice(-2000); });
+        const timer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* noop */ } }, timeoutMs);
+        proc.on('error', (e: Error) => { clearTimeout(timer); resolve({ code: null, stdout, stderr: e.message }); });
+        proc.on('close', (code: number | null) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
+    });
+}
+
+/**
+ * ffprobe the MP4 buffer: height, bitrate, fps, FULL/OK/REJECT tier, and a
+ * real-motion flag. Returns null when the probe itself fails (missing binary,
+ * corrupt container) — the caller FAILS OPEN in that case, matching the
+ * pipeline's philosophy that a gate bug must never halt publishing.
+ */
+export async function probeVideoQuality(video: Buffer): Promise<VideoQuality | null> {
+    if (!ffprobePath) return null;
+    const tmpPath = path.join(tmpdir(), `kumolab-probe-${randomBytes(6).toString('hex')}.mp4`);
+    try {
+        await writeFile(tmpPath, video);
+
+        // Pass 1: stream + container metadata.
+        const meta = await runFfprobe([
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=width,height,avg_frame_rate,bit_rate,nb_frames',
+            '-show_entries', 'format=bit_rate,duration',
+            '-of', 'json',
+            tmpPath,
+        ]);
+        if (meta.code !== 0) return null;
+        const parsed = JSON.parse(meta.stdout || '{}');
+        const stream = parsed?.streams?.[0] || {};
+        const format = parsed?.format || {};
+
+        const height = parseInt(String(stream.height ?? 0), 10) || 0;
+        if (!height) return null;
+
+        const duration = parseFloat(String(format.duration ?? 0)) || 0;
+        // Prefer the video stream's own bitrate; fall back to the container's,
+        // then to bytes*8/duration (some muxes omit bit_rate entirely).
+        const bitrate =
+            (parseInt(String(stream.bit_rate ?? 0), 10) || 0) ||
+            (parseInt(String(format.bit_rate ?? 0), 10) || 0) ||
+            (duration > 0 ? Math.round((video.length * 8) / duration) : 0);
+
+        let fps = 0;
+        const fr = String(stream.avg_frame_rate || '');
+        const frMatch = /^(\d+)\/(\d+)$/.exec(fr);
+        if (frMatch && parseInt(frMatch[2], 10) > 0) fps = parseInt(frMatch[1], 10) / parseInt(frMatch[2], 10);
+        else fps = parseFloat(fr) || 0;
+
+        // Pass 2: real-motion heuristic. A slideshow/near-static source encodes
+        // its inter (non-key) frames as near-empty packets — real footage never
+        // does. Sample the first 30s of video packets; if we have a meaningful
+        // sample and the median non-keyframe packet is tiny, it's not real
+        // motion. Conservative threshold so real low-action shots never trip it.
+        let real_motion = true;
+        const pk = await runFfprobe([
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-read_intervals', '%+30',
+            '-show_entries', 'packet=size,flags',
+            '-of', 'csv=p=0',
+            tmpPath,
+        ]);
+        if (pk.code === 0) {
+            const interSizes: number[] = [];
+            for (const line of pk.stdout.split('\n')) {
+                const parts = line.trim().split(',');
+                if (parts.length < 2) continue;
+                const size = parseInt(parts[0], 10);
+                const flags = parts[1] || '';
+                if (!Number.isFinite(size)) continue;
+                if (!flags.includes('K')) interSizes.push(size);
+            }
+            if (interSizes.length >= 30) {
+                interSizes.sort((a, b) => a - b);
+                const median = interSizes[Math.floor(interSizes.length / 2)];
+                if (median < 250) real_motion = false;
+            }
+        }
+
+        const quality_tier: VideoQuality['quality_tier'] =
+            height < QUALITY_MIN_HEIGHT || bitrate < QUALITY_MIN_BITRATE ? 'REJECT'
+            : height >= QUALITY_FULL_HEIGHT && bitrate >= QUALITY_FULL_BITRATE && real_motion ? 'FULL'
+            : 'OK';
+
+        return { height, bitrate, fps: Math.round(fps * 100) / 100, quality_tier, real_motion };
+    } catch (e: any) {
+        console.warn('[TrailerFetcher] ffprobe failed (gate fails open):', e?.message || e);
+        return null;
+    } finally {
+        await unlink(tmpPath).catch(() => {});
+    }
 }
 
 export async function fetchYouTubeToBucket(
@@ -235,6 +376,42 @@ export async function fetchYouTubeToBucket(
     }
     console.log(`[TrailerFetcher] Worker delivered ${downloaded.length} bytes for ${videoId}`);
 
+    // 2b. Video-quality gate (ENGINE-AUDIT section 4). Probe the RAW download
+    // (pre-watermark re-encode, so the numbers reflect the source). On the
+    // auto path we enforce the floor: <720p or <1.2 Mbps → 'low_quality';
+    // slideshow/near-static → 'not_real_motion'. Both are operational skips
+    // (action_logs) — the publisher's existing null-return path takes over
+    // (no screenshot fallback, retryable). The operator-curated scrape path
+    // (skipSocialProcessing) is NOT gated: the operator judges quality in the
+    // editor. A failed probe fails OPEN — a gate bug must never halt publishes.
+    const quality = await probeVideoQuality(downloaded);
+    if (quality) {
+        console.log(`[TrailerFetcher] Probe ${videoId}: ${quality.height}p @ ${(quality.bitrate / 1e6).toFixed(2)} Mbps, ${quality.fps} fps, tier ${quality.quality_tier}, motion=${quality.real_motion}`);
+    }
+    if (quality && !options.skipSocialProcessing) {
+        const rejectReason = quality.quality_tier === 'REJECT'
+            ? 'low_quality'
+            : !quality.real_motion ? 'not_real_motion' : null;
+        if (rejectReason) {
+            await logAction({
+                action: 'video_quality_rejected',
+                entityType: 'post',
+                entityTitle: slug,
+                reason: rejectReason === 'low_quality'
+                    ? `low_quality: ${quality.height}p @ ${(quality.bitrate / 1e6).toFixed(2)} Mbps (floor ${QUALITY_MIN_HEIGHT}p / ${QUALITY_MIN_BITRATE / 1e6} Mbps)`
+                    : 'not_real_motion: slideshow / near-static source',
+                details: {
+                    videoId, sourceUrl, slug,
+                    height: quality.height,
+                    bitrate: quality.bitrate,
+                    fps: quality.fps,
+                    real_motion: quality.real_motion,
+                },
+            }).catch(() => {});
+            return null;
+        }
+    }
+
     // 3. FFmpeg pass — 9:16 letterbox, KumoLab watermark, 60s trim. Skipped
     // when the caller is the operator-curated scrape path (they trim/crop
     // in the editor).
@@ -276,5 +453,6 @@ export async function fetchYouTubeToBucket(
         duration_seconds: options.skipSocialProcessing ? duration : Math.min(duration, 60),
         bytes: finalBuffer.length,
         title,
+        quality,
     };
 }

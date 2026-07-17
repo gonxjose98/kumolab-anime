@@ -20,7 +20,9 @@ import { detectDuplicate } from './duplicate-prevention';
 import { gradeContent } from './content-grader';
 import { AntigravityAI } from './ai';
 import { decideAutoApproval } from './auto-approval';
-import { assignScheduledSlot } from './scheduler';
+import { runSlotSelection, assignFbOnlySlot } from './scheduler';
+import { scorePost } from './scoring';
+import { getAnimeTierForTitle } from './anime-tiers';
 import { evaluateCircuitBreaker } from './circuit-breaker';
 import { extractYouTubeVideo } from './video-extractor';
 import { isTrailerTrustedSource } from './automation-config';
@@ -365,6 +367,25 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       }
     }
 
+    // ── /100 scoring (ENGINE-SCORING-MODEL.md) ──────────────
+    // Franchise demand comes from anime_tiers (title match first, tracked-
+    // studio fallback second). Video quality is provisional here — the ffprobe
+    // gate runs at publish-time fetch (trailer-fetcher) and hard-rejects
+    // anything below 720p / 1.2 Mbps. The full breakdown is persisted on the
+    // post row so the Engine tab popup renders it with no recompute, and the
+    // standby selection re-scores recency from breakdown.meta.detected_at.
+    const tierMatch = await getAnimeTierForTitle(post.title, enrichedData.studio || candidate.source_name || undefined);
+    const postScore = scorePost({
+      tier: tierMatch ? (tierMatch.tier as 1 | 2 | 3) : null,
+      tierMatchedBy: tierMatch?.matchedBy ?? null,
+      claimType: post.claim_type,
+      format: hasVideo ? 'real_video' : 'static_image',
+      detectedAt: candidate.original_timestamp || candidate.detected_at,
+      videoQuality: null, // probe pending — measured in trailer-fetcher at publish
+    });
+    post.post_score = postScore.total;
+    post.score_breakdown = postScore;
+
     // ── v2 decision pipeline ────────────────────────────────
     const decision = await decideAutoApproval({
       title: post.title,
@@ -373,7 +394,7 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       claim_type: post.claim_type,
       source_tier: candidate.source_tier,
       source_name: candidate.source_name,
-      score: score.total,
+      postScore,
       hasImage,
       hasVideo,
       isT1YouTube,
@@ -393,34 +414,58 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     }
 
     if (decision.verdict === 'AUTO_APPROVE') {
-      const slot = await assignScheduledSlot({
-        detected_at: candidate.detected_at,
-        claim_type: post.claim_type,
-        source_tier: candidate.source_tier,
-        source: candidate.source_name,
-        anime_id: candidate.metadata?.anime_id ?? null,
-        isT1YouTube,
-      });
       post.status = 'approved';
       post.is_published = false;
       post.approved_at = now;
       post.approved_by = 'system';
-      post.scheduled_post_time = slot.scheduled_at;
-      await logScraperDecision({
-        candidateTitle: candidate.title,
-        sourceName: candidate.source_name,
-        sourceTier: candidate.source_tier,
-        decision: 'accepted_auto',
-        reason: `${slot.lane} | ${decision.reason}`.substring(0, 200),
-        score: score.total,
-        scoreBreakdown: { ...score.breakdown, signals: decision.signals, scheduler: slot },
-      });
-      await logAction({
-        action: 'auto_approved',
-        entityTitle: candidate.title,
-        actor: 'Scraper',
-        reason: `${slot.lane} lane, scheduled ${slot.scheduled_at}, ${slot.platforms.length} platform(s)`,
-      });
+
+      if (decision.fbOnly) {
+        // Facebook-only key visual: a SEPARATE product from the IG video reels.
+        // It gets its own off-peak schedule (assignFbOnlySlot) and never enters
+        // the IG peak-slot pool or counts toward the 3/day IG cap. The publisher
+        // routes it to Facebook only (video-only-policy exception). Tag the
+        // breakdown so the intent is legible in the Engine tab.
+        postScore.meta.fb_only = true;
+        post.score_breakdown = postScore;
+        post.scheduled_post_time = await assignFbOnlySlot();
+        await logScraperDecision({
+          candidateTitle: candidate.title,
+          sourceName: candidate.source_name,
+          sourceTier: candidate.source_tier,
+          decision: 'accepted_auto',
+          reason: `FB-ONLY key visual (${postScore.total}/100, off-peak) | ${decision.reason}`.substring(0, 200),
+          score: postScore.total,
+          scoreBreakdown: { ...score.breakdown, post_score: postScore.total, fb_only: true, signals: decision.signals },
+        });
+        await logAction({
+          action: 'auto_approved',
+          entityTitle: candidate.title,
+          actor: 'Scraper',
+          reason: `Facebook-only key visual scheduled off-peak ${post.scheduled_post_time} (score ${postScore.total}/100)`,
+        });
+      } else {
+        // Pool model (Jose 2026-07-17): auto-approved reels no longer claim a
+        // slot on arrival. They join the scored pool (scheduled_post_time NULL);
+        // runSlotSelection() — called at the end of this cycle and before every
+        // publish tick — fills each of the 3 daily peak slots with the highest
+        // CURRENT-scoring candidate, keeps 3 on standby, drops the aged/decayed.
+        post.scheduled_post_time = null;
+        await logScraperDecision({
+          candidateTitle: candidate.title,
+          sourceName: candidate.source_name,
+          sourceTier: candidate.source_tier,
+          decision: 'accepted_auto',
+          reason: `POOLED (${postScore.total}/100) | ${decision.reason}`.substring(0, 200),
+          score: postScore.total,
+          scoreBreakdown: { ...score.breakdown, post_score: postScore.total, signals: decision.signals },
+        });
+        await logAction({
+          action: 'auto_approved',
+          entityTitle: candidate.title,
+          actor: 'Scraper',
+          reason: `pooled for peak-slot selection (score ${postScore.total}/100)`,
+        });
+      }
     } else {
       // QUEUE_FOR_REVIEW
       post.status = 'pending';
@@ -733,6 +778,19 @@ export async function runProcessingWorker(): Promise<{ processed: number; accept
         await logError({ source: 'processing-worker', errorMessage: error.message, context: { candidateId: candidate.id } });
         await finishCandidate(candidate, 'rejected');
       }
+    }
+
+    // ── Peak-slot selection (standby-backfill) ─────────────────
+    // Fresh auto-approvals just joined the pool; let them compete for the
+    // upcoming peak slots right away (highest CURRENT score wins). Also runs
+    // on every publish tick, so this is belt-and-braces, never load-bearing.
+    try {
+      const selection = await runSlotSelection();
+      if (selection.filled || selection.dropped) {
+        console.log(`[ProcessingWorker] Slot selection: ${selection.filled} filled, ${selection.standby} standby, ${selection.dropped} dropped`);
+      }
+    } catch (e: any) {
+      console.warn('[ProcessingWorker] slot selection failed (non-fatal):', e?.message || e);
     }
 
     const duration = Date.now() - startTime;

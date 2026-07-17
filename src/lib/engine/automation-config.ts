@@ -71,14 +71,14 @@ export type Platform = 'website' | 'x' | 'instagram' | 'tiktok' | 'youtube_short
 
 export type Lane = 'BREAKING' | 'STANDARD' | 'FILL';
 
-// Per-platform daily caps were removed — Jose's ask. Trailers are meant to be
-// uncapped, Meta is one pipe (not three), and spacing via MIN_GAP_MINUTES is
-// what actually protects algorithm health. Kept the export signature in case
-// a future cap needs to come back.
+// Instagram (the whole Meta surface — one pipe) is capped at EXACTLY 3/day
+// per Jose's selection model (2026-07-17, ENGINE-SCORING-MODEL.md): one post
+// per peak slot, standby pool backfills, highest CURRENT score wins. The
+// scheduler's runSlotSelection() enforces this cap when filling slots.
 export const PLATFORM_DAILY_CAP: Record<Platform, number> = {
     website:        Infinity,
     x:              Infinity,
-    instagram:      Infinity,
+    instagram:      3,
     tiktok:         Infinity,
     youtube_shorts: Infinity,
 };

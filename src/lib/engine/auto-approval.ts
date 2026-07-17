@@ -2,11 +2,16 @@
  * auto-approval.ts
  *
  * Decision pipeline for each processed candidate:
- *   1. Claim-type risk gate (rejects OTHER/junk; fast-tracks AUTO; corroborates CORROBORATE; always-queues REVIEW)
- *   2. AniList validation (if we have an anime_id, it must resolve)
- *   3. Multi-source corroboration (for CORROBORATE claims)
- *   4. Tone + safety AI pass (brand-voice guardrail)
- *   5. Final verdict + human-readable reason
+ *   1. Visual artifact gate (trailer needs a video; everything else needs an image)
+ *   2. The /100 score verdict (ENGINE-SCORING-MODEL.md) — AUTHORITATIVE:
+ *      REJECT (<55 or a reject hard gate) drops the post; anything under the
+ *      75 auto bar (or review-capped by a gate) queues for human review.
+ *   3. Claim-type risk matrix — kept as a safety layer on top of the score
+ *      (a brand-risky claim can still demote an auto verdict to review/reject).
+ *   4. T1-YouTube real-video shortcut: an official channel uploading a video
+ *      is evidence by existence — once the /100 verdict is AUTO, skip the AI
+ *      checks so a Tier-1 trailer always flows.
+ *   5. AniList validation / corroboration / tone+safety for everything else.
  *
  * Returns a decision the processing-worker translates into post.status.
  */
@@ -15,6 +20,7 @@ import { claimRisk } from './automation-config';
 import { validateAnime } from './anilist-validator';
 import { hasCorroboration } from './corroboration';
 import { AntigravityAI } from './ai';
+import { PostScore, SCORE_AUTO_PUBLISH_MIN } from './scoring';
 
 export interface AutoApprovalInput {
     title: string;
@@ -23,7 +29,8 @@ export interface AutoApprovalInput {
     claim_type?: string | null;
     source_tier?: number;
     source_name?: string;
-    score: number;
+    /** The /100 score from scorePost() — the authoritative publish gate. */
+    postScore: PostScore;
     hasImage: boolean;
     hasVideo: boolean;       // youtube_video_id (or other embeddable video) is set on the post
     isT1YouTube: boolean;
@@ -33,15 +40,21 @@ export interface AutoApprovalDecision {
     verdict: 'AUTO_APPROVE' | 'QUEUE_FOR_REVIEW' | 'REJECT';
     reason: string;
     signals: Record<string, any>;
+    /** true for a Facebook-only key-visual image: a separate product from the
+     *  IG video reels. The processing worker schedules these on their own
+     *  off-peak grid (assignFbOnlySlot) instead of the IG peak-slot pool. */
+    fbOnly?: boolean;
 }
-
-const SCORE_AUTO_MIN = 6;              // Below this we never auto-publish
-const SCORE_AUTO_HIGH = 7;              // T1-YouTube shortcut kicks in at this score (matches SCORING_THRESHOLDS.HIGH_CONFIDENCE)
 
 export async function decideAutoApproval(input: AutoApprovalInput): Promise<AutoApprovalDecision> {
     const signals: Record<string, any> = {};
 
     const claim = (input.claim_type || '').toUpperCase();
+    const ps = input.postScore;
+    signals.post_score = ps.total;
+    signals.score_verdict = ps.verdict;
+    const failedGates = ps.hard_gates.filter(g => !g.passed).map(g => g.gate);
+    if (failedGates.length) signals.failed_gates = failedGates;
 
     // ── Visual artifact gate ─────────────────────────────────────
     // TRAILER_DROP MUST have a video — a trailer post with no embed is broken.
@@ -63,12 +76,43 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
         signals.artifact = 'image';
     }
 
-    if (input.score < SCORE_AUTO_MIN) {
-        return { verdict: 'QUEUE_FOR_REVIEW', reason: `score ${input.score} below auto threshold ${SCORE_AUTO_MIN}`, signals };
+    // ── Key visuals are a SEPARATE Facebook-only product ─────────
+    // A key visual is a still image, so it can NEVER clear the /100 video-reel
+    // bar (max ~54 → REJECT). But Jose keeps them as a Facebook-only image
+    // trickle (publisher's video-only-policy exception, ≤3/day) that must not
+    // touch or consume any of the 3 IG peak slots. So key visuals bypass the
+    // /100 reject cutoff AND the IG peak-slot pool entirely. Eligibility reuses
+    // the claim-risk matrix (NEW_KEY_VISUAL is AUTO at T1/T2, REVIEW at T3).
+    // The artifact gate above already guaranteed hasImage.
+    if (claim === 'NEW_KEY_VISUAL') {
+        const kvRisk = claimRisk(input.claim_type ?? undefined, input.source_tier);
+        signals.risk = kvRisk;
+        signals.fb_only = true;
+        if (kvRisk === 'REJECT') {
+            return { verdict: 'REJECT', reason: `key visual at tier ${input.source_tier} is not publishable`, signals };
+        }
+        if (kvRisk !== 'AUTO') {
+            return { verdict: 'QUEUE_FOR_REVIEW', reason: `key visual at tier ${input.source_tier} requires human review`, signals, fbOnly: true };
+        }
+        return {
+            verdict: 'AUTO_APPROVE',
+            reason: `key visual → Facebook-only image (score ${ps.total}/100, IG-reel gate bypassed)`,
+            signals,
+            fbOnly: true,
+        };
     }
 
-    // Claim-type + tier risk matrix
-    const risk = claimRisk(input.claim_type, input.source_tier);
+    // ── /100 verdict (authoritative) ─────────────────────────────
+    if (ps.verdict === 'REJECT') {
+        return {
+            verdict: 'REJECT',
+            reason: `score ${ps.total}/100 REJECT${failedGates.length ? ` (gates: ${failedGates.join(', ')})` : ' (below 55)'}`,
+            signals,
+        };
+    }
+
+    // Claim-type + tier risk matrix — safety layer on top of the score.
+    const risk = claimRisk(input.claim_type ?? undefined, input.source_tier);
     signals.risk = risk;
 
     if (risk === 'REJECT') {
@@ -78,11 +122,20 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
         return { verdict: 'QUEUE_FOR_REVIEW', reason: `claim ${input.claim_type} at tier ${input.source_tier} requires human review`, signals };
     }
 
-    // ── T1 YouTube high-confidence shortcut — self-verifying, skip extra checks ──
-    // An official channel uploading a trailer is evidence by existence.
-    if (input.isT1YouTube && input.score >= SCORE_AUTO_HIGH) {
-        signals.shortcut = 't1_youtube_high_confidence';
-        return { verdict: 'AUTO_APPROVE', reason: `T1 YouTube + score ${input.score}`, signals };
+    if (ps.verdict !== 'AUTO_PUBLISH') {
+        return {
+            verdict: 'QUEUE_FOR_REVIEW',
+            reason: `score ${ps.total}/100 below auto bar ${SCORE_AUTO_PUBLISH_MIN}${failedGates.length ? ` (gates: ${failedGates.join(', ')})` : ''}`,
+            signals,
+        };
+    }
+
+    // ── T1 YouTube real-video shortcut — self-verifying, skip AI checks ──
+    // An official channel uploading its own trailer is evidence by existence.
+    // The /100 verdict already cleared the tier + category + quality bars.
+    if (input.isT1YouTube && input.hasVideo) {
+        signals.shortcut = 't1_youtube_real_video';
+        return { verdict: 'AUTO_APPROVE', reason: `T1 YouTube video + score ${ps.total}/100`, signals };
     }
 
     // AniList validation (only if we have an anime_id)
@@ -128,7 +181,7 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
 
     return {
         verdict: 'AUTO_APPROVE',
-        reason: `risk=${risk} score=${input.score} corroborated + safe`,
+        reason: `risk=${risk} score=${ps.total}/100 corroborated + safe`,
         signals,
     };
 }

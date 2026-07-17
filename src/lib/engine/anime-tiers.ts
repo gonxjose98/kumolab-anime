@@ -107,6 +107,11 @@ export interface TierMatch {
     tier: number;
     anime: string;
     studio: string | null;
+    /** 'anime' = the title matched a tracked show; 'studio' = only the studio
+     *  fallback hit (a new original from a winner studio). The /100 scorer
+     *  awards full tier points for 'anime' and the 12-pt studio bucket for
+     *  'studio' (ENGINE-SCORING-MODEL.md). */
+    matchedBy: 'anime' | 'studio';
 }
 
 /**
@@ -128,7 +133,7 @@ export async function getAnimeTierForTitle(title: string, studioHint?: string | 
         const core = name.replace(/\s+(s\d+|season\s+\d+|part\s+\d+|cour\s+\d+).*$/i, '').trim();
         const needle = core.length >= 3 ? core : name;
         if (t.includes(needle) && needle.length > bestLen) {
-            best = { tier: r.tier, anime: r.anime, studio: r.studio };
+            best = { tier: r.tier, anime: r.anime, studio: r.studio, matchedBy: 'anime' };
             bestLen = needle.length;
         }
     }
@@ -142,7 +147,7 @@ export async function getAnimeTierForTitle(title: string, studioHint?: string | 
         if (studioTiers.length) {
             const tier = Math.min(...studioTiers);
             const row = rows.find((r) => r.tier === tier && r.studio && s.includes(r.studio.toLowerCase()));
-            best = { tier, anime: `(studio: ${row?.studio || studioHint})`, studio: row?.studio || studioHint };
+            best = { tier, anime: `(studio: ${row?.studio || studioHint})`, studio: row?.studio || studioHint, matchedBy: 'studio' };
         }
     }
     return best;

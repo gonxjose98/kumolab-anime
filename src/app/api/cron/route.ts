@@ -88,8 +88,18 @@ export async function GET(req: NextRequest) {
             // (flips status='published' up-front + per-post publisher lock), so
             // overlapping ticks can't double-publish.
             console.log('[Cron] Running Scheduled Publisher...');
+            // Fill any open peak slots from the standby pool FIRST, so a slot
+            // coming due this hour gets its highest-current-scoring candidate
+            // before the publisher drains due posts. Never blocks publishing.
+            let selection = null;
+            try {
+                const { runSlotSelection } = await import('@/lib/engine/scheduler');
+                selection = await runSlotSelection();
+            } catch (e: any) {
+                console.warn('[Cron] slot selection failed (non-fatal):', e?.message || e);
+            }
             await publishScheduledPosts();
-            return NextResponse.json({ success: true, worker: 'publish' });
+            return NextResponse.json({ success: true, worker: 'publish', selection });
         }
 
         if (worker === 'dailydrops') {

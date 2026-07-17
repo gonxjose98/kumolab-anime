@@ -7,6 +7,7 @@
 // Schedule holds, read-only). All server-side via supabaseAdmin.
 
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import type { PostScore } from './scoring';
 
 export interface FormulaElement {
     title: string;
@@ -76,19 +77,27 @@ export interface ScheduledItem {
     id: string;
     title: string;
     claim_type: string | null;
-    scheduled_post_time: string; // ISO
+    /** ISO slot time, or null for a STANDBY pool candidate awaiting selection. */
+    scheduled_post_time: string | null;
+    post_score: number | null;
+    score_breakdown: PostScore | null;
 }
 
-/** Upcoming approved posts with a scheduled time, soonest first. */
+/**
+ * Upcoming approved posts, soonest first: slot-booked posts by time, then the
+ * standby pool (scheduled_post_time NULL — waiting for a peak slot) sorted by
+ * current score. Each row carries post_score + score_breakdown for the Engine
+ * tab's SCORE column and click-to-see popup.
+ */
 export async function getScheduledQueue(limit = 40): Promise<ScheduledItem[]> {
     try {
+        const nowIso = new Date().toISOString();
         const { data, error } = await supabaseAdmin
             .from('posts')
-            .select('id, title, claim_type, scheduled_post_time')
+            .select('id, title, claim_type, scheduled_post_time, post_score, score_breakdown')
             .eq('status', 'approved')
-            .not('scheduled_post_time', 'is', null)
-            .gte('scheduled_post_time', new Date().toISOString())
-            .order('scheduled_post_time', { ascending: true })
+            .or(`scheduled_post_time.gte.${nowIso},scheduled_post_time.is.null`)
+            .order('scheduled_post_time', { ascending: true, nullsFirst: false })
             .limit(limit);
         if (error || !data) return [];
         return data as ScheduledItem[];

@@ -22,7 +22,11 @@ export type ActionType =
     // they don't pollute the dashboard's "Errors 24h" counter for routine
     // transient blips. Promote to error_logs only when persistent
     // (e.g. consecutive_failures crosses a threshold).
-    | 'source_fetch_failed' | 'social_publish_skipped';
+    | 'source_fetch_failed' | 'social_publish_skipped'
+    // Scoring/selection pipeline (2026-07-17): a standby-pool post dropped
+    // back to review (aged out / decayed / overflow), and a fetched video
+    // rejected by the ffprobe quality gate (low_quality / not_real_motion).
+    | 'standby_dropped' | 'video_quality_rejected';
 
 export async function logAction(params: {
     action: ActionType;
@@ -54,7 +58,10 @@ export async function logAction(params: {
 export type ScraperDecision =
     | 'accepted_pending' | 'accepted_auto'
     | 'rejected_duplicate' | 'rejected_score'
-    | 'rejected_no_image' | 'rejected_error' | 'retry';
+    | 'rejected_no_image' | 'rejected_error' | 'retry'
+    // Decision-engine policy rejection (hard gates / risk matrix) — the
+    // processing worker has logged this string all along; now typed.
+    | 'rejected_policy';
 
 export async function logScraperDecision(params: {
     candidateTitle: string;
