@@ -59,21 +59,44 @@ export interface ScheduledAssignment {
     reason: string;
 }
 
-// ── ET-clock helpers (DST-safe via Intl, never a fixed offset) ──
+// ── ET-clock helpers (deterministic US-Eastern offset, NOT the runtime tz) ──
+// The production runtime was returning EST (UTC-5) for America/New_York even in
+// summer via Intl, so peak slots fired an hour late (13:00→14:00, 21:30→22:30
+// ET). We compute the US-Eastern offset from the DST rules directly (DST = 2nd
+// Sunday of March 07:00 UTC through 1st Sunday of November 06:00 UTC), so slot
+// timing is correct regardless of the runtime's timezone database. Our slots
+// (07:30/13:00/21:30) never sit in the 2am transition window, so the fall-back
+// double hour / spring-forward gap don't affect them.
+
+/** UTC ms of the nth Sunday of a month at a given UTC hour. */
+function nthSundayUtcMs(year: number, monthIdx: number, n: number, hourUtc: number): number {
+    const firstDow = new Date(Date.UTC(year, monthIdx, 1)).getUTCDay(); // 0 = Sunday
+    const day = 1 + ((7 - firstDow) % 7) + (n - 1) * 7;
+    return Date.UTC(year, monthIdx, day, hourUtc);
+}
+
+/** US-Eastern UTC offset in hours for an instant: 4 during EDT, 5 during EST. */
+export function easternOffsetHours(utc: Date): number {
+    const y = utc.getUTCFullYear();
+    const dstStart = nthSundayUtcMs(y, 2, 2, 7); // 2nd Sun March, 07:00 UTC (2am EST)
+    const dstEnd = nthSundayUtcMs(y, 10, 1, 6);  // 1st Sun November, 06:00 UTC (2am EDT)
+    const t = utc.getTime();
+    return t >= dstStart && t < dstEnd ? 4 : 5;
+}
+
+/** A Date whose UTC fields read the Eastern wall clock for `utc`. */
+function etWall(utc: Date): Date {
+    return new Date(utc.getTime() - easternOffsetHours(utc) * 3_600_000);
+}
+
 function etHour(date: Date): number {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York', hour: 'numeric', hour12: false,
-    }).formatToParts(date);
-    return parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    return etWall(date).getUTCHours();
 }
 
 /** The ET calendar day of an instant, e.g. "2026-07-17". */
 function etDayKey(d: Date): string {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).formatToParts(d);
-    const get = (t: string) => parts.find(p => p.type === t)?.value || '';
-    return `${get('year')}-${get('month')}-${get('day')}`;
+    const w = etWall(d);
+    return `${w.getUTCFullYear()}-${String(w.getUTCMonth() + 1).padStart(2, '0')}-${String(w.getUTCDate()).padStart(2, '0')}`;
 }
 
 /**
