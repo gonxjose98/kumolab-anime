@@ -229,7 +229,14 @@
     max-width: 100%;
     overflow: hidden;
 }
-.admin-root .st-stage canvas { display: block; max-height: 100%; max-width: 100%; }
+.admin-root .st-stage canvas { display: block; max-height: 100%; max-width: 100%; position: relative; z-index: 1; }
+/* The decode pool sits full-size BEHIND the opaque canvas. iOS Safari throttles
+   a hidden/zero-size video's audio + decode after ~1s, so the source videos
+   must be genuinely on-screen (being occluded by the canvas does not throttle
+   them). The canvas repaints an opaque frame every tick, so the user only ever
+   sees the composite, never the raw pooled videos underneath. */
+.admin-root .st-stage .st-pool { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: 10px; pointer-events: none; }
+.admin-root .st-stage .st-pool video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .admin-root .st-transport {
     display: flex;
     align-items: center;

@@ -296,9 +296,11 @@ export default function PreviewCanvas() {
 
     return (
         <div className="st-stage" style={{ aspectRatio: `${cw} / ${ch}` }}>
+            {/* Decode pool: full-size, BEHIND the opaque canvas (see studio.css).
+                On-screen (not zero-size/opacity:0) so iOS Safari keeps decoding
+                audio+video past ~1s; the canvas paints over it every frame. */}
+            <div ref={poolRef} aria-hidden className="st-pool" />
             <canvas ref={canvasRef} width={cw} height={ch} />
-            {/* Hidden decode pool — video sources must live in the DOM to paint. */}
-            <div ref={poolRef} aria-hidden style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }} />
         </div>
     );
 }
