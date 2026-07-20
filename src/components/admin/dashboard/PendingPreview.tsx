@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Clickable review thumbnail + watch modal for a pending candidate.
@@ -27,6 +28,10 @@ export default function PendingPreview({
     title: string;
 }) {
     const [open, setOpen] = useState(false);
+    // Portal target only exists on the client; gate the portal on mount so
+    // SSR/first paint never touches document.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
 
     const thumbUrl =
         image && !image.includes('placeholder')
@@ -86,7 +91,7 @@ export default function PendingPreview({
                 )}
             </button>
 
-            {open && (
+            {open && mounted && createPortal(
                 <div
                     role="dialog"
                     aria-modal="true"
@@ -164,7 +169,8 @@ export default function PendingPreview({
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
