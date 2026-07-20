@@ -40,7 +40,7 @@ export default function VideoHub({ rows }: { rows: VideoRow[]; kind?: 'videos' |
         <div className="max-w-6xl mx-auto">
             <div className="ak-studio-head">
                 <p className="ak-caption">
-                    {rows.length === 0 ? 'Nothing in progress' : `${rows.length} in progress · drafts + recently edited`}
+                    {rows.length === 0 ? 'Nothing in progress' : `${rows.length} in progress · not yet published`}
                 </p>
                 <div className="flex items-center gap-2">
                     <ImportFromUrlButton />

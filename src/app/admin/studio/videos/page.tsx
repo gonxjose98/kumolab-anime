@@ -3,12 +3,13 @@ import VideoHub, { type VideoRow } from '@/components/admin/studio/VideoHub';
 
 export const dynamic = 'force-dynamic';
 
-// Studio is your workbench: drafts + anything edited recently (last 60 days),
-// even if it later got scheduled or published. Everything else lives in the
-// Library (button in the hub). Mirrors the Images page filter.
-const RECENT_MS = 60 * 86_400_000;
+// Studio is your workbench: ONLY work that hasn't posted yet — drafts, pending,
+// and scheduled video. Once a post publishes it leaves the Studio and lives in
+// the Library (button in the hub), which opens it as a fresh draft copy so the
+// live post is never touched. Declined pieces are hidden too.
+const HIDDEN_STATUSES = new Set(['published', 'declined']);
 
-/** Studio > Videos — video work in progress (drafts + recently edited). */
+/** Studio > Videos — editable video work that hasn't been posted yet. */
 export default async function StudioVideosPage() {
     const { data, error } = await supabaseAdmin
         .from('posts')
@@ -17,13 +18,8 @@ export default async function StudioVideosPage() {
         .order('timestamp', { ascending: false })
         .limit(400);
 
-    const now = Date.now();
     const rows: VideoRow[] = (data || [])
-        .filter((p: any) => {
-            if (p.status === 'draft') return true;
-            const t = p.image_settings?.studio_edited_at;
-            return t && now - new Date(t).getTime() < RECENT_MS;
-        })
+        .filter((p: any) => !HIDDEN_STATUSES.has(p.status))
         .map((p: any) => ({
             id: p.id,
             title: p.title,
