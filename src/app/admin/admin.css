@@ -478,6 +478,18 @@
     outline: 3px solid rgba(36, 114, 220, 0.35);
     outline-offset: 1px;
 }
+/* Fallback ring for the many raw <button>, role="button", and native inputs
+   (Engine icon buttons, score buttons, folder cards, color/range/time inputs)
+   that had no visible keyboard focus. Theme-aware via --blue. The class rules
+   above are more specific, so styled controls keep their softer ring. */
+.admin-root button:focus-visible,
+.admin-root [role="button"]:focus-visible,
+.admin-root input:focus-visible,
+.admin-root select:focus-visible,
+.admin-root textarea:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+}
 
 /* ══ Auth / login — full-screen calm sky ══════════════════════════════════ */
 .admin-root.ak-auth {
@@ -1749,7 +1761,7 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 .admin-root .ak-ord-chip--received { color: var(--blue); }
 .admin-root .ak-ord-chip--production { color: #d9a441; }
 .admin-root .ak-ord-chip--shipped { color: #4c9be0; }
-.admin-root .ak-ord-chip--delivered { color: #35a877; }
+.admin-root .ak-ord-chip--delivered { color: var(--ok); }
 .admin-root .ak-ord-summary__spacer { flex: 1 1 auto; min-width: 0; }
 .admin-root .ak-ord-rev {
     display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
@@ -1949,7 +1961,7 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 12px; font-weight: 600;
 }
-.admin-root .ak-syncm__msg--ok { color: #35a877; }
+.admin-root .ak-syncm__msg--ok { color: var(--ok); }
 .admin-root .ak-syncm__msg--warn { color: var(--gold-text); }
 
 /* ── In-page section tabs (Store, and future multi-section tabs) ──────────── */
@@ -2024,7 +2036,7 @@ html[data-admin-theme='dark'] .admin-root .ak-auth__card { background: rgba(19, 
 .admin-root .ak-sched__title:hover { text-decoration: underline; }
 .admin-root .ak-sched__claim { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
 .admin-root .ak-sched__status { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
-.admin-root .ak-sched__status--published { background: rgba(53,168,119,0.16); color: #35a877; }
+.admin-root .ak-sched__status--published { background: rgba(29,122,79,0.15); color: var(--ok); }
 .admin-root .ak-sched__status--approved { background: var(--blue-soft); color: var(--blue); }
 .admin-root .ak-sched__status--pending { background: rgba(217,164,65,0.18); color: var(--gold-text); }
 .admin-root .ak-sched__status--draft { background: var(--surface-2); color: var(--ink-3); }

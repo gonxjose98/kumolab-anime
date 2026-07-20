@@ -14,7 +14,7 @@
 
     --ink: #123a6b;
     --ink-2: rgba(18, 58, 107, 0.78);
-    --ink-3: rgba(18, 58, 107, 0.55);
+    --ink-3: rgba(18, 58, 107, 0.66);        /* muted, but AA-legible on glass */
     --rail-text: rgba(242, 249, 255, 0.8);
     --rail-text-active: #ffd76e;
 
@@ -29,6 +29,11 @@
     --gold-grad: linear-gradient(180deg, #e9c87e 0%, #c49a52 55%, #a97f3a 100%);
     --gold-ink: #3a2a08;
     --sun: #d64545;                           /* danger / red */
+    /* Semantic status colors — theme-aware, so every "success/caution/info"
+       surface renders from one source instead of scattered one-off hexes. */
+    --ok: #1d7a4f;                            /* success / green (matches badges) */
+    --warn: #8a6420;                          /* caution / amber */
+    --info: var(--blue);                      /* informational / blue */
 
     --glass-border: rgba(196, 146, 44, 0.42);
     --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.65);
@@ -71,7 +76,7 @@ html[data-admin-theme='dark'] .admin-root {
 
     --ink: #f2f9ff;
     --ink-2: rgba(242, 249, 255, 0.75);
-    --ink-3: rgba(242, 249, 255, 0.52);
+    --ink-3: rgba(242, 249, 255, 0.64);      /* muted, but AA-legible on night glass */
     --rail-text: rgba(242, 249, 255, 0.8);
     --rail-text-active: #ffd76e;
 
@@ -86,6 +91,9 @@ html[data-admin-theme='dark'] .admin-root {
     --gold-grad: linear-gradient(180deg, #ffe2a8 0%, #e6c489 55%, #b98f4e 100%);
     --gold-ink: #241703;
     --sun: #ff7a6b;
+    --ok: #35c88a;                            /* success / green (night) */
+    --warn: #f0c674;                          /* caution / amber (night) */
+    --info: var(--blue);                      /* informational / blue (night) */
 
     --glass-border: rgba(226, 176, 90, 0.3);
     --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);

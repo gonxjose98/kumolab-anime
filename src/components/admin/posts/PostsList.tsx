@@ -130,7 +130,7 @@ export default function PostsList({ initialPosts }: { initialPosts: Post[] }) {
     );
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
             {/* Header strip */}
             <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
                 <p className="ak-caption">Click any post to edit · {initialPosts.length} total</p>

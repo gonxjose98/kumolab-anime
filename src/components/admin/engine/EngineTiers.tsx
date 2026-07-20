@@ -143,7 +143,7 @@ export default function EngineTiers({ initialTiers }: { initialTiers: AnimeTier[
                         <div style={{ height: 4, borderRadius: 3, background: meta.accent, marginBottom: 12 }} />
                         <div className="flex items-baseline justify-between" style={{ gap: 8, flexWrap: 'wrap' }}>
                             <span className="ak-overline" style={{ color: meta.accent, fontWeight: 800 }}>{meta.label}</span>
-                            <span className="ak-caption">{rows.length} {rows.length === 1 ? 'anime' : 'anime'}</span>
+                            <span className="ak-caption">{rows.length} anime</span>
                         </div>
                         <div className="ak-caption" style={{ marginBottom: 12 }}>{meta.blurb}</div>
 

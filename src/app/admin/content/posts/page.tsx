@@ -12,8 +12,8 @@ export default async function ContentPostsPage() {
 
     if (error) {
         return (
-            <div className="max-w-3xl mx-auto py-12 text-center">
-                <p className="text-sm" style={{ color: '#ff7777' }}>
+            <div className="max-w-6xl mx-auto py-12 text-center">
+                <p className="text-sm" style={{ color: 'var(--sun)' }}>
                     Failed to load posts: {error.message}
                 </p>
             </div>
