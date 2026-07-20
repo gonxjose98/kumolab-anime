@@ -207,7 +207,20 @@ export default function PreviewCanvas() {
             if (p.meta.watermark) drawWatermark();
         };
 
-        const syncVideos = (t: number, playing: boolean) => {
+        // The frontmost ready video clip active at time t — its <video> element
+        // is the playback MASTER: while playing we read the timeline clock from
+        // its currentTime (see tick) instead of seeking it to a wall-clock
+        // target every frame. Continuous native playback = smooth audio.
+        const pickMaster = (p: VideoProject, t: number): { v: HTMLVideoElement; clip: Clip } | null => {
+            const act = activeClipsAt(p, t).filter((x) => x.track.kind === 'video' && x.clip.mediaId);
+            for (let i = act.length - 1; i >= 0; i--) {           // last painted = frontmost
+                const v = videoPool.current.get(act[i].clip.mediaId!);
+                if (v && v.readyState >= 2) return { v, clip: act[i].clip };
+            }
+            return null;
+        };
+
+        const syncVideos = (t: number, playing: boolean, masterId: string | null) => {
             const p = useProjectStore.getState().project;
             if (!p) return;
             const active = new Set<string>();
@@ -221,7 +234,14 @@ export default function PreviewCanvas() {
                 v.muted = clip.muted || track.muted;
                 v.volume = clip.volume ?? 1;
                 if (playing) {
-                    if (Math.abs(v.currentTime - local) > 0.25) v.currentTime = local;
+                    // The master drives the clock, so NEVER seek it for routine
+                    // drift — a seek mid-play stutters video and cuts audio. Only
+                    // correct a big gap (playhead jumped / clip just became
+                    // active); otherwise let it free-run. Non-master videos get a
+                    // looser follow so parallel clips stay roughly aligned.
+                    const isMaster = clip.mediaId === masterId;
+                    const tol = isMaster ? 0.75 : 0.34;
+                    if (Math.abs(v.currentTime - local) > tol) v.currentTime = local;
                     if (v.paused) v.play().catch(() => {});
                 } else {
                     if (Math.abs(v.currentTime - local) > 0.04) v.currentTime = local;
@@ -238,15 +258,29 @@ export default function PreviewCanvas() {
             const dt = (now - lastWall) / 1000;
             lastWall = now;
             let t = pb.currentTime;
+            let masterId: string | null = null;
             if (pb.isPlaying) {
-                t += dt;
+                const p = useProjectStore.getState().project;
+                const master = p ? pickMaster(p, t) : null;
+                // Prefer the master video's OWN clock so audio + video play
+                // continuously (no per-frame seeking). Fall back to wall-clock
+                // when there's no playing master (images/text only, or a clip
+                // that just became active and hasn't caught up — guarded by the
+                // proximity check so the playhead can't jump at a boundary).
+                if (master && !master.v.paused && master.v.readyState >= 2) {
+                    masterId = master.clip.mediaId ?? null;
+                    const vt = master.clip.timelineStart + (master.v.currentTime - master.clip.srcStart) / (master.clip.speed || 1);
+                    t = Math.abs(vt - (t + dt)) < 0.5 ? vt : t + dt;
+                } else {
+                    t += dt;
+                }
                 const dur = useProjectStore.getState().project?.durationSec ?? 0;
                 if (t >= dur) { t = dur; usePlaybackStore.getState().pause(); }
                 usePlaybackStore.getState().setCurrentTime(t);
             }
             // Never let one bad frame kill the loop — a thrown error here would
             // silently freeze the whole preview (and make scrubbing look broken).
-            try { syncVideos(t, pb.isPlaying); renderFrame(t); } catch { /* skip this frame */ }
+            try { syncVideos(t, pb.isPlaying, masterId); renderFrame(t); } catch { /* skip this frame */ }
             rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
