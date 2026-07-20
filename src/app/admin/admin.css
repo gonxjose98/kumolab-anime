@@ -491,6 +491,35 @@
     outline-offset: 2px;
 }
 
+/* ── Alert / banner (shared, theme-aware) ─────────────────────────────────
+   One inline-status surface for the app. Replaces reusing the login-screen
+   error box (.ak-auth__err) as a general alert. Colours come from the
+   semantic tokens, so error/warn/ok adapt to light + dark automatically. */
+.admin-root .ak-alert {
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 9px 12px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink-2);
+}
+.admin-root .ak-alert--error {
+    color: var(--sun);
+    background: color-mix(in srgb, var(--sun) 12%, transparent);
+    border-color: color-mix(in srgb, var(--sun) 32%, transparent);
+}
+.admin-root .ak-alert--warn {
+    color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 32%, transparent);
+}
+.admin-root .ak-alert--ok {
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 14%, transparent);
+    border-color: color-mix(in srgb, var(--ok) 32%, transparent);
+}
+
 /* ══ Auth / login — full-screen calm sky ══════════════════════════════════ */
 .admin-root.ak-auth {
     position: fixed;
@@ -553,14 +582,16 @@
     letter-spacing: 0.18em;
     color: var(--ink-3);
 }
+/* Legacy error box, still used in many spots. Kept but made theme-aware (was a
+   hardcoded light-mode red that broke in dark). New code should use .ak-alert. */
 .admin-root .ak-auth__err {
     font-size: 13px;
     text-align: center;
     padding: 8px 12px;
     border-radius: var(--r-sm);
     color: var(--sun);
-    background: #fbe9e7;
-    border: 1px solid #f0c4be;
+    background: color-mix(in srgb, var(--sun) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sun) 32%, transparent);
 }
 
 /* ══ Shell — sidebar rail + frosted top bar (used from the next pass) ═════ */

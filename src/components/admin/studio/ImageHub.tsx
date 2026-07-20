@@ -159,7 +159,7 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
                 </div>
             </div>
 
-            {uploadError && <div className="ak-auth__err" style={{ textAlign: 'left', marginBottom: 12 }}>{uploadError}</div>}
+            {uploadError && <div className="ak-alert ak-alert--error" style={{ marginBottom: 12 }}>{uploadError}</div>}
 
             {rows.length === 0 ? (
                 <div

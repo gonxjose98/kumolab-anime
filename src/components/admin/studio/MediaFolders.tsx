@@ -284,7 +284,7 @@ export default function MediaFolders() {
                 )}
 
                 {actor && <p className="ak-caption" style={{ marginBottom: 14 }}>Uploading as {actor}</p>}
-                {error && <div className="ak-auth__err" style={{ marginBottom: 14 }}>{error}</div>}
+                {error && <div className="ak-alert ak-alert--error" style={{ marginBottom: 14 }}>{error}</div>}
 
                 {mediaLoading ? (
                     <div className="ak-empty"><p className="ak-body-sm">Loading…</p></div>
@@ -366,7 +366,7 @@ export default function MediaFolders() {
                 )}
             </div>
 
-            {error && <div className="ak-auth__err" style={{ marginBottom: 14 }}>{error}</div>}
+            {error && <div className="ak-alert ak-alert--error" style={{ marginBottom: 14 }}>{error}</div>}
 
             {loading ? (
                 <div className="ak-empty"><p className="ak-body-sm">Loading…</p></div>

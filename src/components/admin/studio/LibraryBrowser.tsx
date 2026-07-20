@@ -116,7 +116,7 @@ export default function LibraryBrowser({ items }: { items: LibraryItem[] }) {
                 ))}
             </div>
 
-            {error && <div className="ak-auth__err" style={{ marginBottom: 14 }}>{error}</div>}
+            {error && <div className="ak-alert ak-alert--error" style={{ marginBottom: 14 }}>{error}</div>}
 
             {visible.length === 0 ? (
                 <div className="ak-empty">
