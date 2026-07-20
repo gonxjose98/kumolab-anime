@@ -6,20 +6,32 @@
    .admin-root so nothing leaks to the light admin. */
 
 .admin-root .st-root {
-    /* Dark palette (token overrides — cascade to .ak-* + .st-*) */
+    /* Dark palette (token overrides — cascade to .ak-* + .st-*).
+       gold / blue / ink are aligned to the admin DARK theme values so accents
+       and text read identically across the hub and the editor (design audit
+       #7). Surfaces stay opaque (the editor floats over no sky) and the cool
+       structural hairlines stay editor-specific. Semantic tokens are pinned to
+       night values so the always-dark editor never inherits the light theme's
+       when the admin is in light mode. */
     --bg: #0a1220;
     --surface: #141f38;
     --surface-2: #0e1830;
-    --ink: #eaf1fb;
-    --ink-2: #a6b6d0;
-    --ink-3: #6f819e;
+    --ink: #f2f9ff;
+    --ink-2: rgba(242, 249, 255, 0.75);
+    --ink-3: rgba(242, 249, 255, 0.64);
     --line: rgba(150, 180, 226, 0.12);
     --line-2: rgba(150, 180, 226, 0.22);
-    --blue: #4a9eff;
-    --blue-soft: rgba(74, 158, 255, 0.16);
-    --gold: #e3b25a;
-    --gold-grad: linear-gradient(180deg, #f4c869, #d99b26);
-    --gold-ink: #241803;
+    --blue: #6fb2ff;
+    --blue-soft: rgba(111, 178, 255, 0.16);
+    --gold: #e6c489;
+    --gold-hover: #ffca66;
+    --gold-text: #ffd88a;
+    --gold-grad: linear-gradient(180deg, #ffe2a8 0%, #e6c489 55%, #b98f4e 100%);
+    --gold-ink: #241703;
+    --sun: #ff7a6b;
+    --ok: #35c88a;
+    --warn: #f0c674;
+    --info: var(--blue);
     --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.45);
     --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.55);

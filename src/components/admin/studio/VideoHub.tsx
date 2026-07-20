@@ -52,7 +52,7 @@ export default function VideoHub({ rows }: { rows: VideoRow[]; kind?: 'videos' |
 
             {rows.length === 0 ? (
                 <div className="ak-empty">
-                    <span className="ak-empty__glyph" aria-hidden="true"><Clapperboard size={34} /></span>
+                    <span className="ak-empty__glyph" aria-hidden="true">雲</span>
                     <p className="ak-body-sm">No video work in progress. Open a piece from the <strong>Library</strong>, or find a video on a Pending post and it lands here as a draft.</p>
                     <Link href="/admin/studio/library" className="ak-btn ak-btn--primary ak-btn--sm" style={{ marginTop: 14 }}>
                         <Library size={14} /> Browse Library

@@ -166,7 +166,7 @@ export default function ImageHub({ rows }: { rows: ImageRow[]; kind?: 'videos' |
                     className="ak-empty"
                     style={dragOver ? { outline: '2px dashed #9D7BFF', outlineOffset: -2, background: 'rgba(157,123,255,0.06)' } : undefined}
                 >
-                    <span className="ak-empty__glyph" aria-hidden="true"><ImageIcon size={34} /></span>
+                    <span className="ak-empty__glyph" aria-hidden="true">雲</span>
                     <p className="ak-body-sm">
                         {dragOver
                             ? <strong>Drop your photo(s) to start editing</strong>
