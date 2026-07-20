@@ -113,7 +113,7 @@ export default function PreviewCanvas() {
         };
 
         const drawTransformed = (
-            src: CanvasImageSource, sw: number, sh: number, tr: Transform | undefined, filter: string = 'none',
+            src: CanvasImageSource, sw: number, sh: number, tr: Transform | undefined, alphaMul = 1,
         ) => {
             const transform: Transform = tr ?? { xPct: 0.5, yPct: 0.5, scale: 1, rotationDeg: 0, opacity: 1, fit: 'contain' };
             const targetAspect = cw / ch;
@@ -132,35 +132,51 @@ export default function PreviewCanvas() {
             if (transform.fit === 'contain' && (dw < cw || dh < ch)) {
                 if (transform.fillStyle === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
                 else if (transform.fillStyle === 'blur') {
-                    // Blur a heavily downscaled copy, then upscale it. A full-res
-                    // blur(120px) on 1080x1920 EVERY frame stalls phones so hard the
-                    // preview appears frozen while scrubbing; blurring a 1/6-size
-                    // copy is ~36x cheaper and looks identical once scaled back up.
-                    const DS = 6;
-                    const lw = Math.max(2, Math.round(cw / DS));
-                    const lh = Math.max(2, Math.round(ch / DS));
+                    // Downscale-then-upscale blur. iOS Safari's canvas `ctx.filter`
+                    // is a no-op, so a `blur()` filter did nothing there (the bars
+                    // showed a sharp, un-blurred copy and the intensity slider was
+                    // dead). Shrinking the frame to a tiny canvas and scaling it
+                    // back up with smoothing gives a real Gaussian-like blur that
+                    // works everywhere; a smaller intermediate = a stronger blur,
+                    // so the intensity slider now actually drives it.
+                    const intensity = Math.max(0, Math.min(160, transform.blurIntensity ?? 60));
+                    const lh = Math.max(8, Math.round(96 - intensity * 0.5));   // 0→96px … 160→16px tall
+                    const lw = Math.max(8, Math.round(lh * targetAspect));
                     const bc = blurCanvasRef.current ?? (blurCanvasRef.current = document.createElement('canvas'));
                     if (bc.width !== lw || bc.height !== lh) { bc.width = lw; bc.height = lh; }
                     const bctx = bc.getContext('2d');
                     if (bctx) {
+                        bctx.imageSmoothingEnabled = true;
                         bctx.clearRect(0, 0, lw, lh);
-                        let bw: number, bh: number;
+                        let bw: number, bh: number;                              // cover-fit into the small canvas
                         if (srcAspect > targetAspect) { bh = lh; bw = lh * srcAspect; } else { bw = lw; bh = lw / srcAspect; }
-                        bctx.filter = `blur(${(transform.blurIntensity ?? 60) / DS}px)`;
                         bctx.drawImage(src, (lw - bw) / 2, (lh - bh) / 2, bw, bh);
-                        bctx.filter = 'none';
+                        ctx.imageSmoothingEnabled = true;
                         ctx.drawImage(bc, 0, 0, cw, ch);
                     } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
                 } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
             }
 
             ctx.save();
-            ctx.globalAlpha = transform.opacity ?? 1;
-            ctx.filter = filter; // brightness/contrast/saturation/grayscale/blur
+            ctx.globalAlpha = (transform.opacity ?? 1) * alphaMul;
             ctx.translate(cx, cy);
             if (transform.rotationDeg) ctx.rotate((transform.rotationDeg * Math.PI) / 180);
+            ctx.imageSmoothingEnabled = true;
             ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
             ctx.restore();
+        };
+
+        // Fade in/out multiplier for a clip at time t (0..1). Applied to the
+        // draw alpha so fades are visible in the preview, not only after export.
+        const fadeAlpha = (clip: Clip, t: number): number => {
+            const localT = t - clip.timelineStart;
+            let a = 1;
+            if (clip.fadeIn && clip.fadeIn > 0 && localT < clip.fadeIn) a *= Math.max(0, localT / clip.fadeIn);
+            if (clip.fadeOut && clip.fadeOut > 0) {
+                const fromEnd = clip.duration - localT;
+                if (fromEnd < clip.fadeOut) a *= Math.max(0, fromEnd / clip.fadeOut);
+            }
+            return a;
         };
 
         // Burn the @kumolabanime handle bottom-right, matching the exporter, so
@@ -187,21 +203,46 @@ export default function PreviewCanvas() {
             paintText(ctx, ts, x, y, ch);
         };
 
+        // Remembered so the CSS filter is only written when it actually changes.
+        // Sentinel (not '') so the first frame always writes — otherwise a stale
+        // grade from a previous project could linger when the new one has none.
+        let lastGrade = ' ';
         const renderFrame = (t: number) => {
             const p = useProjectStore.getState().project;
             if (!p) return;
             ctx.fillStyle = p.meta.backgroundColor || '#000';
             ctx.fillRect(0, 0, cw, ch);
-            for (const { clip, track } of activeClipsAt(p, t)) {
-                if (track.kind === 'text') { drawText(clip); continue; }
+            const acts = activeClipsAt(p, t);
+
+            // Colour grade (brightness/contrast/saturation/grayscale/soften) is
+            // applied as a CSS filter on the <canvas> ELEMENT, not via ctx.filter
+            // — iOS Safari's canvas filter is a no-op, but CSS element filters
+            // work everywhere. The frontmost visual clip's grade wins: single-clip
+            // edits (the common case) are exact; a multi-clip project with
+            // different grades is approximate in preview, but export still bakes
+            // each clip's grade precisely.
+            let grade = 'none';
+            for (let i = acts.length - 1; i >= 0; i--) {
+                const a = acts[i];
+                if (a.track.kind === 'video' || a.track.kind === 'image') { grade = effectFilter(a.clip.effects); break; }
+            }
+            const gradeCss = grade === 'none' ? '' : grade;
+            if (gradeCss !== lastGrade) { canvas.style.filter = gradeCss; lastGrade = gradeCss; }
+
+            for (const { clip, track } of acts) {
                 if (track.kind === 'audio') continue;
-                const filter = effectFilter(clip.effects);
+                const fa = fadeAlpha(clip, t);
+                if (track.kind === 'text') {
+                    if (fa >= 1) { drawText(clip); }
+                    else { ctx.save(); ctx.globalAlpha = fa; drawText(clip); ctx.restore(); }
+                    continue;
+                }
                 if (clip.mediaId && track.kind === 'video') {
                     const v = videoPool.current.get(clip.mediaId);
-                    if (v && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform, filter);
+                    if (v && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform, fa);
                 } else if (clip.mediaId && track.kind === 'image') {
                     const img = imagePool.current.get(clip.mediaId);
-                    if (img && img.complete) drawTransformed(img, img.naturalWidth, img.naturalHeight, clip.transform, filter);
+                    if (img && img.complete) drawTransformed(img, img.naturalWidth, img.naturalHeight, clip.transform, fa);
                 }
             }
             if (p.meta.watermark) drawWatermark();
@@ -284,7 +325,10 @@ export default function PreviewCanvas() {
             rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(rafRef.current);
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            canvas.style.filter = ''; // don't leave a grade on the element between projects
+        };
     }, [project, cw, ch]);
 
     // Teardown media elements on unmount.
