@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
+import PendingPreview from '@/components/admin/dashboard/PendingPreview';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
@@ -68,7 +69,7 @@ async function fetchDashboardData() {
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()),
         supabaseAdmin.from('error_logs').select('*', { count: 'exact', head: true }).gte('created_at', last24h.toISOString()),
         supabaseAdmin.from('error_logs').select('id, source, error_message, context, created_at').gte('created_at', last24h.toISOString()).order('created_at', { ascending: false }).limit(20),
-        supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, youtube_video_id, timestamp').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
+        supabaseAdmin.from('posts').select('id, title, slug, image, source, source_url, claim_type, youtube_video_id, timestamp').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
@@ -204,20 +205,6 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
     );
 }
 
-function Thumbnail({ src, youtube_id }: { src?: string | null; youtube_id?: string | null }) {
-    const url = (src && !src.includes('placeholder')) ? src
-        : (youtube_id ? `https://img.youtube.com/vi/${youtube_id}/mqdefault.jpg` : null);
-    if (!url || url.includes('placeholder')) {
-        return (
-            <div className="w-12 h-12 rounded-lg shrink-0 flex items-center justify-center" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
-                <span className="ak-caption">—</span>
-            </div>
-        );
-    }
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" style={{ border: '1px solid var(--line)' }} />;
-}
-
 // ─── Page ─────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
@@ -316,7 +303,7 @@ export default async function DashboardPage() {
                                         {/* Thumb + title share the top line; on phones the actions
                                             wrap to their own full-width line beneath (see w-full below). */}
                                         <div className="flex items-center gap-3 flex-1 min-w-0" style={{ minWidth: '180px' }}>
-                                            <Thumbnail src={p.image} youtube_id={p.youtube_video_id} />
+                                            <PendingPreview image={p.image} youtubeId={p.youtube_video_id} sourceUrl={p.source_url} title={p.title} />
                                             <div className="flex-1 min-w-0">
                                                 <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
                                                     {p.title}
