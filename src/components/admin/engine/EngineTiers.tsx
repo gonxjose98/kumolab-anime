@@ -118,7 +118,7 @@ export default function EngineTiers({ initialTiers }: { initialTiers: AnimeTier[
                             <option value={3}>Tier 3</option>
                         </select>
                     </label>
-                    <button className="ak-syncm__btn" onClick={add} disabled={adding || !form.anime.trim()}>
+                    <button className="ak-btn ak-btn--primary ak-btn--sm" onClick={add} disabled={adding || !form.anime.trim()}>
                         {adding ? <Loader2 size={14} className="ak-spin" /> : <Plus size={14} />} Add
                     </button>
                 </div>

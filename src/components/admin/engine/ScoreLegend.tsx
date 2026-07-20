@@ -31,7 +31,7 @@ export default function ScoreLegend() {
         <>
             <button
                 onClick={() => setOpen(true)}
-                className="ak-syncm__btn"
+                className="ak-btn ak-btn--ghost ak-btn--sm"
                 style={{ gap: 6 }}
                 title="How the /100 score works"
             >
@@ -80,9 +80,9 @@ export default function ScoreLegend() {
                         <div style={{ borderTop: '1px solid var(--line)', margin: '14px 0 10px' }} />
                         <div className="ak-overline" style={{ marginBottom: 8 }}>Cutoffs</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginBottom: 12 }}>
-                            <span className="ak-body-sm"><strong style={{ color: '#35a877' }}>75+</strong> auto-publish</span>
-                            <span className="ak-body-sm"><strong style={{ color: '#d9a441' }}>55-74</strong> review</span>
-                            <span className="ak-body-sm"><strong style={{ color: '#d0605a' }}>under 55</strong> reject</span>
+                            <span className="ak-body-sm"><strong style={{ color: 'var(--ok)' }}>75+</strong> auto-publish</span>
+                            <span className="ak-body-sm"><strong style={{ color: 'var(--warn)' }}>55-74</strong> review</span>
+                            <span className="ak-body-sm"><strong style={{ color: 'var(--sun)' }}>under 55</strong> reject</span>
                         </div>
 
                         <div className="ak-overline" style={{ marginBottom: 8 }}>Hard gates (override the total)</div>

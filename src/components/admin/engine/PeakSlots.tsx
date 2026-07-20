@@ -71,9 +71,9 @@ export default function PeakSlots({ initial }: { initial: PeakSlot[] }) {
     return (
         <div className="ak-card">
             <div className="flex items-baseline justify-between" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                <span className="ak-overline" style={{ color: '#3a8be0' }}>Peak time slots</span>
+                <span className="ak-overline" style={{ color: 'var(--blue)' }}>Peak time slots</span>
                 <div className="ak-syncm">
-                    <button className="ak-syncm__btn" onClick={save} disabled={saving || !dirty}>
+                    <button className="ak-btn ak-btn--primary ak-btn--sm" onClick={save} disabled={saving || !dirty}>
                         <Save size={13} className={saving ? 'ak-spin' : ''} /> {saving ? 'Saving…' : 'Save'}
                     </button>
                     {msg && (

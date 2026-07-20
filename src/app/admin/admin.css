@@ -520,6 +520,22 @@
     border-color: color-mix(in srgb, var(--ok) 32%, transparent);
 }
 
+/* ── Skeleton (route-level loading placeholders) ──────────────────────────
+   Shown by loading.tsx while a force-dynamic page fetches, so navigation lands
+   on a shaped shimmer instead of a blank pane. Theme-aware; respects reduced
+   motion. */
+@keyframes ak-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.admin-root .ak-skel {
+    border-radius: var(--r-md);
+    background: linear-gradient(90deg,
+        var(--surface-2) 25%,
+        color-mix(in srgb, var(--ink-3) 16%, var(--surface-2)) 50%,
+        var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: ak-shimmer 1.3s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .admin-root .ak-skel { animation: none; } }
+
 /* ══ Auth / login — full-screen calm sky ══════════════════════════════════ */
 .admin-root.ak-auth {
     position: fixed;

@@ -21,9 +21,9 @@ const CLAIM_LABEL: Record<string, string> = {
 };
 
 const VERDICT_STYLE: Record<string, { color: string; label: string }> = {
-    AUTO_PUBLISH: { color: '#35a877', label: 'Auto-publish' },
-    REVIEW: { color: '#d99a2b', label: 'Review' },
-    REJECT: { color: '#d9534f', label: 'Reject' },
+    AUTO_PUBLISH: { color: 'var(--ok)', label: 'Auto-publish' },
+    REVIEW: { color: 'var(--warn)', label: 'Review' },
+    REJECT: { color: 'var(--sun)', label: 'Reject' },
 };
 
 const GATE_LABEL: Record<string, string> = {
@@ -70,9 +70,9 @@ function fmtET(iso: string): string {
 }
 
 function scoreColor(score: number): string {
-    if (score >= 75) return '#35a877';
-    if (score >= 55) return '#d99a2b';
-    return '#d9534f';
+    if (score >= 75) return 'var(--ok)';
+    if (score >= 55) return 'var(--warn)';
+    return 'var(--sun)';
 }
 
 // ── Score breakdown popup ───────────────────────────────────────
@@ -99,7 +99,7 @@ function ScorePopup({ item, onClose }: { item: ScheduledItem; onClose: () => voi
                         <span className="ak-overline">Score breakdown</span>
                         <div className="ak-body-sm" style={{ color: 'var(--ink)', fontWeight: 600, marginTop: 2 }}>{item.title}</div>
                     </div>
-                    <button className="ak-syncm__btn" onClick={onClose} aria-label="Close">
+                    <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={onClose} aria-label="Close">
                         <X size={13} />
                     </button>
                 </div>
@@ -153,9 +153,9 @@ function ScorePopup({ item, onClose }: { item: ScheduledItem; onClose: () => voi
                             {(bd.hard_gates || []).map((g) => (
                                 <div key={g.gate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     {g.passed
-                                        ? <Check size={13} style={{ color: '#35a877', flexShrink: 0 }} />
-                                        : <AlertTriangle size={13} style={{ color: '#d9534f', flexShrink: 0 }} />}
-                                    <span className="ak-caption" style={{ color: g.passed ? 'var(--ink-2)' : '#d9534f' }}>
+                                        ? <Check size={13} style={{ color: 'var(--ok)', flexShrink: 0 }} />
+                                        : <AlertTriangle size={13} style={{ color: 'var(--sun)', flexShrink: 0 }} />}
+                                    <span className="ak-caption" style={{ color: g.passed ? 'var(--ink-2)' : 'var(--sun)' }}>
                                         {GATE_LABEL[g.gate] || g.gate}
                                     </span>
                                 </div>
@@ -199,12 +199,12 @@ export default function ScheduledFeed({ initial, slots }: { initial: ScheduledIt
         <div className="ak-card ak-card--flush">
             <div className="flex items-center justify-between" style={{ gap: 8, padding: '16px 18px 10px' }}>
                 <div>
-                    <span className="ak-overline" style={{ color: '#35a877' }}>Scheduled · live</span>
+                    <span className="ak-overline" style={{ color: 'var(--ok)' }}>Scheduled · live</span>
                     <div className="ak-caption" style={{ marginTop: 2 }}>
                         Mirrors Content → Schedule. Standby rows wait in the pool for the next peak slot. Tap a score for the breakdown.
                     </div>
                 </div>
-                <button className="ak-syncm__btn" onClick={refresh} disabled={loading}>
+                <button className="ak-btn ak-btn--secondary ak-btn--sm" onClick={refresh} disabled={loading}>
                     <RefreshCw size={13} className={loading ? 'ak-spin' : ''} /> Refresh
                 </button>
             </div>
