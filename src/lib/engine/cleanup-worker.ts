@@ -202,6 +202,68 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         }
     }
 
+    // 3c. Slim the blog-videos bucket every run (not only on post expiry).
+    // A trailer for a YouTube-embed post is dead weight once published: the blog
+    // article plays the YouTube iframe (PostBody: hasUploadedVideo requires NO
+    // youtube_video_id), and the Reel already lives on social. Those + true
+    // orphans (no post references them) are removed here. We KEEP anything a
+    // post with youtube_video_id IS NULL references (the uploaded/edited videos
+    // the site plays natively) and anything on a not-yet-published post
+    // (in-flight drafts), and skip files staged in the last 24h as a safety
+    // margin against yanking a reel mid-publish. This is what stops the storage
+    // ratchet that pushed the org over its free quota (July 2026).
+    try {
+        const keep = new Set<string>();
+        const addKeep = (u: string | null | undefined) => {
+            const raw = extractBucketFile(u, VIDEO_BUCKET);
+            if (raw) { keep.add(raw); try { keep.add(decodeURIComponent(raw)); } catch { /* noop */ } }
+        };
+        // Posts whose staged/original video must survive: uploaded/edited
+        // (no youtube source) OR any post not yet published (still in flight).
+        const { data: served, error: serveErr } = await supabaseAdmin
+            .from('posts')
+            .select('social_ids')
+            .or('youtube_video_id.is.null,status.neq.published');
+        if (serveErr) throw serveErr;
+        for (const p of served || []) {
+            const sid: any = p.social_ids || {};
+            addKeep(sid.staged_video_url);
+            addKeep(sid.original_video_url);
+        }
+
+        // Defensive: never run a bucket-wide delete with an empty keep-set —
+        // a transient query hiccup must not wipe the site-served videos.
+        if (keep.size === 0) {
+            result.errors.push('video-slim-sweep: empty keep-set, skipped for safety');
+        } else {
+            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+            const vids: { name: string; created_at?: string }[] = [];
+            const PAGE = 1000;
+            for (let offset = 0; ; offset += PAGE) {
+                const { data: page, error: listErr } = await supabaseAdmin.storage
+                    .from(VIDEO_BUCKET)
+                    .list('', { limit: PAGE, offset, sortBy: { column: 'created_at', order: 'asc' } });
+                if (listErr) throw listErr;
+                if (!page || page.length === 0) break;
+                vids.push(...page.filter((f: any) => f.id).map((f: any) => ({ name: f.name, created_at: f.created_at })));
+                if (page.length < PAGE) break;
+            }
+            const stale = vids
+                .filter(v => !keep.has(v.name))
+                .filter(v => !v.created_at || new Date(v.created_at).getTime() < cutoff)
+                .map(v => v.name);
+            for (let i = 0; i < stale.length; i += 100) {
+                const { data: removed, error: rmErr } = await supabaseAdmin.storage
+                    .from(VIDEO_BUCKET)
+                    .remove(stale.slice(i, i + 100));
+                if (rmErr) { result.errors.push(`storage.remove(video-slim): ${rmErr.message}`); break; }
+                result.videoFilesDeleted += removed?.length || 0;
+            }
+        }
+    } catch (e: any) {
+        result.errors.push(`video-slim-sweep: ${e.message}`);
+    }
+
     // 4. Orphan sweep — files in bucket whose slug no longer has a post row.
     //
     // image-processor.ts uploads as `<slug>-social.png`. The previous regex
