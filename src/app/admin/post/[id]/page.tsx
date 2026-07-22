@@ -3,6 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
+import { buildSocialCaption } from '@/lib/social/caption';
 import { pickLayoutSettings } from '@/lib/studio/slides';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
 import { Images } from 'lucide-react';
@@ -180,6 +181,9 @@ export default function PostEditor() {
     // publishes (capped at 6).
     const [hashtags, setHashtags] = useState<string[]>([]);
     const [tagInput, setTagInput] = useState('');
+    // Optional per-post social caption override. Empty = auto-generate (hook +
+    // comment prompt); non-empty = publish this text verbatim.
+    const [captionOverride, setCaptionOverride] = useState('');
     const [imageDims, setImageDims] = useState<{ w: number; h: number } | null>(null);
 
     // Probe the current source image's natural dimensions whenever it
@@ -310,6 +314,7 @@ export default function PostEditor() {
                             anime_id: data.anime_id,
                         }),
                 );
+                setCaptionOverride(typeof data.caption_override === 'string' ? data.caption_override : '');
                 // DO NOT pre-fill sourceUrl from data.source_url — that field
                 // is the article/YouTube watch URL, NOT a renderable image.
                 // Pre-filling it caused the renderer to fetch youtube.com/
@@ -434,7 +439,7 @@ export default function PostEditor() {
         const all = syncedSlides();
         const cover = all[0];
         const payloadSlides = all.map(toPersistSlide);
-        const snap = JSON.stringify({ content, hashtags, slides: payloadSlides });
+        const snap = JSON.stringify({ content, hashtags, slides: payloadSlides, captionOverride });
         if (snap === autosaveSnap.current) return;
         if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         autosaveTimer.current = setTimeout(async () => {
@@ -451,6 +456,7 @@ export default function PostEditor() {
                         excerpt: cover.excerpt,
                         content,
                         hashtags,
+                        captionOverride,
                         settings: cover.settings,
                         sourceUrl: cover.sourceUrl,
                         slides: payloadSlides,
@@ -467,7 +473,7 @@ export default function PostEditor() {
         }, 1500);
         return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [title, excerpt, content, hashtags, JSON.stringify(settings), sourceUrl, JSON.stringify(slides), activeSlide]);
+    }, [title, excerpt, content, hashtags, captionOverride, JSON.stringify(settings), sourceUrl, JSON.stringify(slides), activeSlide]);
 
     // Preview-render helper that doesn't depend on the title/excerpt useState
     // values (avoids the "stale state" race when called from inside the
@@ -728,13 +734,14 @@ export default function PostEditor() {
                     excerpt: next[0].excerpt,
                     content,
                     hashtags,
+                    captionOverride,
                     settings: next[0].settings,
                     sourceUrl: next[0].sourceUrl,
                     slides: payloadSlides,
                 }),
             });
             if (res.ok) {
-                autosaveSnap.current = JSON.stringify({ content, hashtags, slides: payloadSlides });
+                autosaveSnap.current = JSON.stringify({ content, hashtags, slides: payloadSlides, captionOverride });
                 setAutosave('saved');
             }
         } catch {
@@ -985,7 +992,7 @@ export default function PostEditor() {
 
             // Post-level title/excerpt come from the cover slide (for a
             // single-image post that's exactly the title/excerpt states).
-            const putBody: Record<string, any> = { id, title: cover.title, excerpt: cover.excerpt, content, hashtags };
+            const putBody: Record<string, any> = { id, title: cover.title, excerpt: cover.excerpt, content, hashtags, caption_override: captionOverride.trim() || null };
             if (imageBytesForSave) putBody.image = imageBytesForSave;
             // "Save draft" parks the post in the Draft tab (out of Pending) so
             // the operator can come back to it. Only applied to a post that's
@@ -1433,6 +1440,50 @@ export default function PostEditor() {
                 </div>
                 <p className="mt-3 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {hashtags.length}/{MAX_HASHTAGS} tags · appended to Instagram, Facebook and Threads captions. Tap &times; to remove, type and press Enter to add.
+                </p>
+            </Card>
+
+            {/* ── Social caption (optional override) ─────────────────
+                What actually publishes to IG/FB. Auto = a hook + your headline
+                + a comment prompt + hashtags. Optionally hand-write this one. */}
+            <Card className="p-5">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-display)' }}>
+                        Social caption
+                    </label>
+                    {captionOverride.trim() && (
+                        <button type="button" onClick={() => setCaptionOverride('')} className="ak-btn ak-btn--ghost ak-btn--sm shrink-0">
+                            Reset to auto
+                        </button>
+                    )}
+                </div>
+                {captionOverride.trim() ? (
+                    <textarea
+                        value={captionOverride}
+                        onChange={(e) => setCaptionOverride(e.target.value)}
+                        rows={8}
+                        placeholder="Write the exact caption to publish…"
+                        className="w-full text-xs rounded-lg p-3 resize-y focus:outline-none"
+                        style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}
+                    />
+                ) : (
+                    <>
+                        <div className="text-xs rounded-lg p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+                            {buildSocialCaption({ id, title, excerpt, content, claim_type: post?.claim_type, anime_id: post?.anime_id, hashtags })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setCaptionOverride(buildSocialCaption({ id, title, excerpt, content, claim_type: post?.claim_type, anime_id: post?.anime_id, hashtags }))}
+                            className="ak-btn ak-btn--ghost ak-btn--sm mt-3"
+                        >
+                            Customize caption
+                        </button>
+                    </>
+                )}
+                <p className="mt-3 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    {captionOverride.trim()
+                        ? 'Custom caption — this exact text publishes to Instagram & Facebook. Clear it to go back to auto.'
+                        : 'Auto: hook + headline + comment prompt + hashtags. Tap Customize to hand-write this one.'}
                 </p>
             </Card>
 

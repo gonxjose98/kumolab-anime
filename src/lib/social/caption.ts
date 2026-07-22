@@ -107,10 +107,16 @@ export interface CaptionablePost {
     claimType?: string | null;
     anime_id?: string | number | null;
     hashtags?: string[] | null;
+    /** Operator's optional per-post override — when set, published verbatim. */
+    caption_override?: string | null;
 }
 
 /** Compose the full social caption: hook + headline + lead + prompt + hashtags. */
 export function buildSocialCaption(post: CaptionablePost): string {
+    // Optional per-post override wins — the operator hand-wrote this caption.
+    const override = (post.caption_override || '').trim();
+    if (override) return override.substring(0, 2200);
+
     const seed = String(post.id || post.slug || post.title || 'kumolab');
     const claim = String(post.claim_type || post.claimType || 'DEFAULT').toUpperCase();
     const animeId = post.anime_id != null ? String(post.anime_id) : null;

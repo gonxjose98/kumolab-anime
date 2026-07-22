@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
         if (typeof body?.excerpt === 'string') update.excerpt = body.excerpt;
         if (typeof body?.content === 'string') update.content = body.content;
         if (Array.isArray(body?.hashtags)) update.hashtags = body.hashtags;
+        // Optional per-post social caption override ('' clears it → back to auto).
+        if (typeof body?.captionOverride === 'string') update.caption_override = body.captionOverride.trim() || null;
         // Editing something makes it your draft — but only promote from pending,
         // never demote a live (approved/published) post.
         const status = existing?.status === 'pending' ? 'draft' : existing?.status;
