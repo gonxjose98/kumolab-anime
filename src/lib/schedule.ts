@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getPeakSlots } from '@/lib/engine/engine-config';
 
 /*
  * Posting schedule + peak-hour helpers.
@@ -67,6 +68,17 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
     const since = new Date(Date.now() - pastHours * 3600_000).toISOString();
     const until = new Date(Date.now() + futureHours * 3600_000).toISOString();
     try {
+        // Derive "peak" from the LIVE peak-slot config (7:30/13:00/21:30 ET by
+        // default), not the retired hourly-grid PREMIUM_HOURS_ET — otherwise the
+        // real slots render as "off-peak" in the schedule view.
+        const peakHours = new Set<number>();
+        try {
+            for (const s of await getPeakSlots()) {
+                const h = parseInt((s.time || '').slice(0, 2), 10);
+                if (Number.isFinite(h)) peakHours.add(h);
+            }
+        } catch { /* fall back to isPeakSlot below */ }
+
         const { data } = await supabaseAdmin
             .from('posts')
             .select('id, title, slug, status, claim_type, scheduled_post_time')
@@ -85,7 +97,7 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
             scheduledPostTime: p.scheduled_post_time,
             slotLabel: etSlotLabel(p.scheduled_post_time),
             dayLabel: etDayLabel(p.scheduled_post_time),
-            isPeak: isPeakSlot(p.scheduled_post_time),
+            isPeak: peakHours.size ? peakHours.has(etHour(p.scheduled_post_time)) : isPeakSlot(p.scheduled_post_time),
             isFuture: new Date(p.scheduled_post_time).getTime() > now,
         }));
     } catch {

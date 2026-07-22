@@ -536,6 +536,46 @@
 }
 @media (prefers-reduced-motion: reduce) { .admin-root .ak-skel { animation: none; } }
 
+/* ── Segmented toggle (pill group) ────────────────────────────────────── */
+.admin-root .ak-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+}
+.admin-root .ak-seg__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border: none;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+.admin-root .ak-seg__btn:hover { color: var(--ink-2); }
+.admin-root .ak-seg__btn--on {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-0);
+}
+.admin-root .ak-seg__count {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+.admin-root .ak-seg__btn--on .ak-seg__count { background: var(--blue-soft); color: var(--blue); }
+
 /* ══ Auth / login — full-screen calm sky ══════════════════════════════════ */
 .admin-root.ak-auth {
     position: fixed;
