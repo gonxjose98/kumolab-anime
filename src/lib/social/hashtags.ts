@@ -44,7 +44,7 @@ function toPascalCase(input: string): string {
         .join('');
 }
 
-function extractSeriesName(title: string, anime_id?: string | null): string | null {
+export function extractSeriesName(title: string, anime_id?: string | null): string | null {
     if (!title) return null;
 
     // 1. Quoted name (works for the formatKumoLabTitle single-line output):

@@ -3,7 +3,7 @@ import { fetchYouTubeToBucket } from './trailer-fetcher';
 import { publishToTikTok } from './tiktok-publisher';
 import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
-import { buildSocialHashtags } from './hashtags';
+import { buildSocialCaption } from './caption';
 import { logError } from '../logging/structured-logger';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -569,14 +569,7 @@ async function publishToInstagram(post: BlogPost, stagedVideoUrl: string | null 
     if (!IG_USER_ID || !META_ACCESS_TOKEN) return result;
 
     const isReels = !!stagedVideoUrl;
-    const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
-    const hashtags = buildSocialHashtags({
-        title: post.title,
-        claim_type: (post as any).claimType || (post as any).claim_type,
-        anime_id: post.anime_id,
-        override: (post as any).hashtags,
-    }).join(' ');
-    const caption = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 2200);
+    const caption = buildSocialCaption(post as any);
 
     try {
         const containerUrl = `https://graph.facebook.com/v18.0/${IG_USER_ID}/media`;
@@ -775,14 +768,7 @@ export async function publishToInstagramCarousel(
     }
 
     // Identical caption to the single-image/Reels flow (publishToInstagram).
-    const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
-    const hashtags = buildSocialHashtags({
-        title: post.title,
-        claim_type: (post as any).claimType || (post as any).claim_type,
-        anime_id: post.anime_id,
-        override: (post as any).hashtags,
-    }).join(' ');
-    const caption = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 2200);
+    const caption = buildSocialCaption(post as any);
 
     try {
         // Phase 1: one child container per slide.
@@ -973,18 +959,12 @@ async function publishToFacebookPage(post: BlogPost, stagedVideoUrl: string | nu
     const result: SocialPublishResult = {};
     if (!META_ACCESS_TOKEN) return result;
 
-    const lead = (post as any).excerpt || post.content?.substring(0, 300) || '';
-    const hashtags = buildSocialHashtags({
-        title: post.title,
-        claim_type: (post as any).claimType || (post as any).claim_type,
-        anime_id: post.anime_id,
-        override: (post as any).hashtags,
-    }).join(' ');
     // Per Jose's directive (2026-05-05): no URL in FB captions. FB
     // algorithmically downranks posts with external links, and the
     // Page's Website field surfaces as a clickable header anyway.
-    // Match IG's link-in-bio convention to maximize reach.
-    const message = `${post.title}\n\n${lead}\n\n${hashtags}`.substring(0, 8000);
+    // Match IG's link-in-bio convention to maximize reach. Same hook +
+    // comment-prompt caption as IG (buildSocialCaption adds no links).
+    const message = buildSocialCaption(post as any);
 
     if (stagedVideoUrl) {
         return await publishFacebookReel(post, stagedVideoUrl, message);
