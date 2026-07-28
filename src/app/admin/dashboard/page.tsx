@@ -3,6 +3,8 @@ import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import PendingPreview from '@/components/admin/dashboard/PendingPreview';
+import PendingScoreChip from '@/components/admin/dashboard/PendingScoreChip';
+import type { PostScore } from '@/lib/engine/scoring';
 import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
@@ -69,7 +71,7 @@ async function fetchDashboardData() {
         supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()),
         supabaseAdmin.from('error_logs').select('*', { count: 'exact', head: true }).gte('created_at', last24h.toISOString()),
         supabaseAdmin.from('error_logs').select('id, source, error_message, context, created_at').gte('created_at', last24h.toISOString()).order('created_at', { ascending: false }).limit(20),
-        supabaseAdmin.from('posts').select('id, title, slug, image, source, source_url, claim_type, youtube_video_id, timestamp').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
+        supabaseAdmin.from('posts').select('id, title, slug, image, source, source_url, claim_type, youtube_video_id, timestamp, post_score, score_breakdown').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
         supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
         supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
         supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
@@ -310,12 +312,18 @@ export default async function DashboardPage() {
                                                 </Link>
                                                 <div className="flex items-center gap-2 mt-1.5 min-w-0">
                                                     <ClaimPill claim={p.claim_type} />
+                                                    <PendingScoreChip
+                                                        postId={p.id}
+                                                        postTitle={p.title}
+                                                        postScore={typeof p.post_score === 'number' ? p.post_score : null}
+                                                        breakdown={(p.score_breakdown as PostScore | null) ?? null}
+                                                    />
                                                     <span className="ak-caption truncate">{p.source} · {timeAgo(p.timestamp)}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="w-full sm:w-auto shrink-0">
-                                            <PendingReviewActions postId={p.id} postTitle={p.title} />
+                                            <PendingReviewActions postId={p.id} />
                                         </div>
                                     </li>
                                 ))}

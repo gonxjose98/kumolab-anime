@@ -22,6 +22,7 @@ import { AntigravityAI } from './ai';
 import { decideAutoApproval } from './auto-approval';
 import { runSlotSelection, assignFbOnlySlot } from './scheduler';
 import { scorePost } from './scoring';
+import { matchOffTopic } from './sources-config';
 import { getAnimeTierForTitle } from './anime-tiers';
 import { evaluateCircuitBreaker } from './circuit-breaker';
 import { extractYouTubeVideo } from './video-extractor';
@@ -382,6 +383,10 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
       format: hasVideo ? 'real_video' : 'static_image',
       detectedAt: candidate.original_timestamp || candidate.detected_at,
       videoQuality: null, // probe pending — measured in trailer-fetcher at publish
+      // Last line of defense for the anime-only rule: the keyword lists reject
+      // live action / games at ingestion, but the AI title rewrite runs after
+      // that, so re-check the final title + body here too.
+      offTopicMatch: matchOffTopic(post.title, post.content),
     });
     post.post_score = postScore.total;
     post.score_breakdown = postScore;

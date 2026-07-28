@@ -16,9 +16,10 @@
  *   Recency            7   detected_at — RE-SCORED as a post ages on standby
  *
  * Cutoffs: >= 75 AUTO_PUBLISH · 55-74 REVIEW · < 55 REJECT.
- * Hard gates override the total (untracked → REVIEW max; <720p or <1.2 Mbps →
- * REJECT; category OTHER → REJECT; fake motion on a tiered franchise → REVIEW;
- * trailer without an embedded video → REVIEW).
+ * Hard gates override the total (off-topic — live action / games — → REJECT;
+ * untracked → REVIEW max; <720p or <1.2 Mbps → REJECT; category OTHER →
+ * REJECT; fake motion on a tiered franchise → REVIEW; trailer without an
+ * embedded video → REVIEW).
  */
 
 // ── Public types ───────────────────────────────────────────────
@@ -49,6 +50,10 @@ export interface ScorePostInput {
     /** ffprobe result when available. null/undefined = probe pending (it runs
      *  at publish-time fetch); real video scores provisionally then. */
     videoQuality?: VideoQuality | null;
+    /** Off-topic term the caller matched (live action / games) — see
+     *  sources-config.matchOffTopic(). Non-null → hard REJECT. Kept as an
+     *  input rather than an import so this module stays pure. */
+    offTopicMatch?: string | null;
     /** Injectable clock for tests + standby re-scoring. */
     now?: Date;
 }
@@ -103,6 +108,7 @@ export const GATES = {
     CATEGORY_ALLOWED: 'category_allowed',
     NO_FAKE_MOTION_ON_TIERED: 'no_fake_motion_on_tiered',
     TRAILER_HAS_VIDEO: 'trailer_has_video',
+    ANIME_ONLY: 'anime_only',
 } as const;
 
 // ── Component scorers ──────────────────────────────────────────
@@ -223,6 +229,10 @@ export function scorePost(input: ScorePostInput): PostScore {
     const trailerMissingVideo = claim === 'TRAILER_DROP' && effectiveFormat !== 'real_video';
     gates.push({ gate: GATES.TRAILER_HAS_VIDEO, passed: !trailerMissingVideo });
 
+    // Anime only — live action and games never publish, whatever they score.
+    const offTopic = input.offTopicMatch || null;
+    gates.push({ gate: GATES.ANIME_ONLY, passed: !offTopic });
+
     // ── Recency (0-7) ──────────────────────────────────────────
     components.push(scoreRecency(input.detectedAt, now));
 
@@ -247,6 +257,7 @@ export function scorePost(input: ScorePostInput): PostScore {
 function computeVerdict(total: number, gates: ScoreHardGate[]): ScoreVerdict {
     const failed = (gate: string) => gates.some(g => g.gate === gate && !g.passed);
     // REJECT gates override everything.
+    if (failed(GATES.ANIME_ONLY)) return 'REJECT';
     if (failed(GATES.MIN_VIDEO_QUALITY)) return 'REJECT';
     if (failed(GATES.CATEGORY_ALLOWED)) return 'REJECT';
     if (total < SCORE_REVIEW_MIN) return 'REJECT';

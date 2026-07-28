@@ -75,6 +75,66 @@ export const SOURCE_TIERS = {
 
 export const ANILIST_VALIDATION_ONLY = true;
 
+/**
+ * OFF-TOPIC BLOCKLISTS (Jose 2026-07-28) — KumoLab posts ANIME. Not live
+ * action, not reviews, not games. These used to reach the dashboard and get
+ * declined by hand every day; now they never become a candidate.
+ *
+ * Matching caveat that shaped these lists: the enforcement points are NOT
+ * consistent — fetchers.ts:387/962 use word-boundary regex, but
+ * detection-worker.ts:223/580, fetchers.ts:785 and processing-worker.ts:709
+ * use bare substring `includes`. Every entry must therefore be safe as a
+ * SUBSTRING of a longer word. That rules out:
+ *   • bare 'game'  → kills "No Game No Life"
+ *   • 'steam'      → kills "Steamboy" / "steampunk"
+ *   • 'rpg'/'mmorpg' → kills "RPG Real Estate", and SAO copy says "MMORPG"
+ *   • 'battle royale' → an actual (non-anime, but titled) film people cite
+ */
+export const LIVE_ACTION_KEYWORDS = [
+    'live action', 'live-action', 'liveaction',
+    'stage play', 'drama adaptation', 'tv drama', 'hollywood adaptation',
+];
+
+/**
+ * Tuned against the posts that actually leaked through (query of published
+ * rows, 2026-06→07: Tekken 8, Guilty Gear DLC, Monster Hunter Stories,
+ * Xenoblade/Switch 2, Kemuri, Atelier Kalia, Bananya pre-registration).
+ *
+ * Deliberately ABSENT, each for a real counter-example in that same data:
+ *   • 'gacha'  → "'Gacha Girls Corps' New ANIME Official Trailer" is anime
+ *   • 'switch' → "Ending Theme by Sukima Switch" (a band) on a real anime post
+ *   • 'game'   → "No Game No Life"; unusable even word-boundary
+ * Platform names carry most of the weight: a game post nearly always names
+ * the hardware it ships on.
+ */
+export const GAME_KEYWORDS = [
+    'video game', 'videogame', 'mobile game', 'in-game',
+    'game trailer', 'game teaser', 'game announcement', 'game announced',
+    'game reveal', 'game release', 'game demo', 'game update', 'game mode',
+    'game console', 'game vault', 'games trailer',
+    'gameplay', 'playable character',
+    // Platforms / storefronts
+    'switch 2', 'nintendo', 'playstation', 'ps5', 'ps4', 'xbox',
+    'epic games', 'steam release', 'on steam',
+    // Game-release vocabulary
+    'dlc', 'season pass', 'early access', 'open beta', 'closed beta', 'beta test',
+    'pre-registration', 'preregistration', 'pre-register', 'pre-order',
+];
+
+/** Everything KumoLab refuses on topic grounds. */
+export const OFF_TOPIC_KEYWORDS = [...LIVE_ACTION_KEYWORDS, ...GAME_KEYWORDS];
+
+/**
+ * First off-topic term found in a title (+ optional description), or null.
+ * Substring matching on purpose — see the caveat above; the lists are built
+ * so substring matching is safe.
+ */
+export function matchOffTopic(title: string | null | undefined, description?: string | null): string | null {
+    const hay = `${title || ''} ${description || ''}`.toLowerCase();
+    if (!hay.trim()) return null;
+    return OFF_TOPIC_KEYWORDS.find((k) => hay.includes(k)) ?? null;
+}
+
 export const CONTENT_RULES = {
     // Keywords that strongly suggest newsworthy anime content (case-insensitive matching)
     POSITIVE_KEYWORDS: [
@@ -115,12 +175,19 @@ export const CONTENT_RULES = {
         'set 1', 'set 2', 'set 3', 'set 4', 'set 5', 'set 6', 'set 7', 'set 8', 'set 9',
         'set 10', 'set 11', 'set 12', 'set 13', 'set 14', 'set 15', 'set 16', 'set 17',
         'set 18', 'set 19', 'set 20', 'set 21', 'set 22', 'set 23', 'set 24', 'set 25',
+        // Off topic entirely: live action + games. Folded in here so all seven
+        // ingestion checkpoints (RSS, YouTube, the global aggregator and the
+        // post-AI-rewrite recheck) reject them with no extra wiring.
+        ...OFF_TOPIC_KEYWORDS,
     ],
     // Content categories to exclude (for RSS filtering)
     EXCLUDE_CATEGORIES: [
         'manga', 'light novel', 'novel', 'live-action', 'live action',
         'webtoon', 'manhwa', 'comic', 'book', 'movie review',
         'cosplay', 'convention',
+        // Matched word-boundary against the RSS description only, so the bare
+        // forms are safe here (they would not be in NEGATIVE_KEYWORDS).
+        'game', 'games', 'gaming', 'video game', 'review',
     ],
     // Keyword filter for sources that need it (e.g., Viz Media)
     // Only accept content matching these terms from keyword-filtered sources

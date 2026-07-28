@@ -2,22 +2,21 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import FindVideoButton from './FindVideoButton';
 
 /**
  * Inline action cluster for a single pending post on the dashboard:
- *   • Find Video — search YouTube and attach the result as a draft video
- *   • Approve   — schedule the post into the next available slot
- *   • Decline   — write a declined fingerprint and remove the row
+ *   • Approve — schedule the post into the next available slot
+ *   • Decline — write a declined fingerprint and remove the row
+ *
+ * Find Video used to sit here too; it now lives inside the score-breakdown
+ * popup (see PendingScoreChip) to keep the rows uncluttered.
  *
  * All routes are admin-gated.
  */
 export default function PendingReviewActions({
     postId,
-    postTitle,
 }: {
     postId: string;
-    postTitle: string;
 }) {
     const [busy, setBusy] = useState<'approve' | 'decline' | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -47,7 +46,6 @@ export default function PendingReviewActions({
         <div className="flex flex-col gap-1.5 items-stretch sm:items-end">
             {/* Full-width, evenly-split on phones; natural-size, right-aligned on desktop. */}
             <div className="flex gap-2 justify-stretch sm:justify-end">
-                <FindVideoButton postId={postId} postTitle={postTitle} />
                 <button
                     onClick={() => call('/api/admin/approve', 'approve')}
                     disabled={!!busy}
