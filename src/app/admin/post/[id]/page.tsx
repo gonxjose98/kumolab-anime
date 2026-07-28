@@ -8,6 +8,7 @@ import { pickLayoutSettings } from '@/lib/studio/slides';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
 import { Images, ArrowLeft } from 'lucide-react';
 import { getReturnTo } from '@/lib/admin/returnTo';
+import PostVideoCard from '@/components/admin/PostVideoCard';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
 // sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
@@ -1382,6 +1383,19 @@ export default function PostEditor() {
 
             {error && <div className="ak-auth__err" style={{ textAlign: 'left' }}>{error}</div>}
 
+
+            {/* Watchable video, whatever the post's stage. Deliberately OUTSIDE
+                the isVideoPost branch: that flag only covers a staged MP4, so
+                approved/published posts (which often carry just a
+                youtube_video_id) rendered as an image-only editor and looked
+                like picture posts with no way to play them. */}
+            <PostVideoCard
+                stagedUrl={post.social_ids?.staged_video_url || post.social_ids?.original_video_url}
+                youtubeId={post.youtube_video_id}
+                sourceUrl={post.source_url}
+                image={post.image}
+                title={post.title}
+            />
             {/* ── Social hashtags ───────────────────────────────────
                 Editable chips, auto-filled from the anime name + claim type
                 (plus a fan abbreviation when one exists). Visible and editable
@@ -1503,6 +1517,7 @@ export default function PostEditor() {
                         : 'Auto: hook + headline + comment prompt + hashtags. Tap Customize to hand-write this one.'}
                 </p>
             </Card>
+
 
             {/* ── Title + Caption ──────────────────────────────────
                 For video posts these live in a SINGLE bubble at the very
