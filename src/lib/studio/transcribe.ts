@@ -73,7 +73,14 @@ export function normalizeWords(raw: TranscriptWord[]): TranscriptWord[] {
 
 async function transcribeOpenAI(audio: Blob, filename: string, language?: string): Promise<TranscriptResult> {
     const key = process.env.OPENAI_API_KEY;
-    if (!key) throw new TranscribeError('OPENAI_API_KEY is not configured', 500);
+    if (!key) {
+        // Names the environment, because the usual cause is a key that exists
+        // in .env.local but was never added to the deployment.
+        throw new TranscribeError(
+            'Transcription is not configured on the server. Add OPENAI_API_KEY in Vercel → Settings → Environment Variables, then redeploy.',
+            500,
+        );
+    }
 
     const form = new FormData();
     form.append('file', audio, filename);
