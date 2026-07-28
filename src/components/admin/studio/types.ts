@@ -60,6 +60,18 @@ export interface TextStyle {
     strokePx?: number;
     strokeColor?: string;
     wordColors?: (string | null)[];       // per-word colour overrides (parallel to space-split words)
+    /**
+     * Karaoke timings, parallel to the space-split words, in seconds RELATIVE
+     * to the clip's own start. Present only on auto-caption clips. When set,
+     * the word being spoken is painted in `highlightColor` (optionally on a
+     * `highlightBg` pill) instead of the base colour.
+     *
+     * Stored on the clip rather than fetched, so restyling captions never
+     * re-transcribes and export needs no network.
+     */
+    words?: { text: string; start: number; end: number }[];
+    highlightColor?: string;              // colour of the word currently spoken
+    highlightBg?: string | null;          // optional pill behind the spoken word
 }
 
 export type TransitionKind = 'none' | 'fade' | 'crossfade' | 'slide';

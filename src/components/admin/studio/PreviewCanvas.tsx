@@ -195,12 +195,16 @@ export default function PreviewCanvas() {
             ctx.restore();
         };
 
-        const drawText = (clip: Clip) => {
+        const drawText = (clip: Clip, t: number) => {
             const ts = clip.text;
             if (!ts) return;
             const x = (clip.transform?.xPct ?? 0.5) * cw;
             const y = (clip.transform?.yPct ?? 0.5) * ch;
-            paintText(ctx, ts, x, y, ch);
+            // Caption clips carry word timings and wrap; plain text clips stay
+            // single-line exactly as before.
+            paintText(ctx, ts, x, y, ch, ts.words?.length
+                ? { localT: t - clip.timelineStart, maxWidth: cw * 0.86 }
+                : undefined);
         };
 
         // Remembered so the CSS filter is only written when it actually changes.
@@ -233,8 +237,8 @@ export default function PreviewCanvas() {
                 if (track.kind === 'audio') continue;
                 const fa = fadeAlpha(clip, t);
                 if (track.kind === 'text') {
-                    if (fa >= 1) { drawText(clip); }
-                    else { ctx.save(); ctx.globalAlpha = fa; drawText(clip); ctx.restore(); }
+                    if (fa >= 1) { drawText(clip, t); }
+                    else { ctx.save(); ctx.globalAlpha = fa; drawText(clip, t); ctx.restore(); }
                     continue;
                 }
                 if (clip.mediaId && track.kind === 'video') {

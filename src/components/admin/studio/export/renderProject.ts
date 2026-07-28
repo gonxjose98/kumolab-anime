@@ -111,6 +111,92 @@ function textPng(clip: Clip, W: number, H: number): Promise<Uint8Array> {
     });
 }
 
+/**
+ * Caption clips are rendered as ONE image sequence, not one PNG each.
+ *
+ * A karaoke caption changes every time a new word is spoken, so the static
+ * "one PNG per clip + overlay enable=between(...)" approach used for ordinary
+ * text would need a separate input and filter stage per word — roughly 150 of
+ * them for a minute of speech, all in a single ffmpeg.exec. That graph does not
+ * survive contact with the wasm build.
+ *
+ * Instead: rasterise the caption layer on a timed grid into a single sequence
+ * and composite it with one overlay. Two things keep it cheap:
+ *   • Only the horizontal BAND the captions occupy is drawn, not the full
+ *     frame, which is roughly a 4x pixel saving at 1080x1920.
+ *   • CAPTION_FPS is capped well below video fps. Word transitions land within
+ *     ~1/15s of true time, which is imperceptible, and it quarters the frames.
+ * Frames before the first caption are fully transparent and compress to almost
+ * nothing, so the sequence starts at t=0 and needs no input offset.
+ */
+const CAPTION_FPS = 15;
+
+interface CaptionLayer {
+    count: number;
+    bandY: number;
+    bandH: number;
+    start: number;
+    end: number;
+}
+
+/** Vertical band the caption clips occupy, padded and clamped to the frame. */
+function captionBand(clips: Clip[], W: number, H: number): { bandY: number; bandH: number } {
+    let top = H;
+    let bottom = 0;
+    for (const c of clips) {
+        const ts = c.text as TextStyle;
+        const fontPx = ts.sizePct * H;
+        const y = (c.transform?.yPct ?? 0.5) * H;
+        // Allow for wrapping onto a few lines plus the highlight pill.
+        const half = fontPx * 2.4;
+        top = Math.min(top, y - half);
+        bottom = Math.max(bottom, y + half);
+    }
+    const bandY = Math.max(0, Math.floor(top));
+    const bandH = Math.min(H - bandY, Math.ceil(bottom - bandY));
+    // Even height keeps yuv420p happy downstream.
+    return { bandY, bandH: Math.max(2, bandH % 2 === 0 ? bandH : bandH + 1) };
+}
+
+/** Rasterise the caption layer to cap_%05d.png in the ffmpeg FS. */
+async function writeCaptionSequence(
+    ffmpeg: Awaited<ReturnType<typeof getFFmpeg>>,
+    clips: Clip[],
+    W: number,
+    H: number,
+    signal?: AbortSignal,
+): Promise<CaptionLayer> {
+    const start = Math.min(...clips.map((c) => c.timelineStart));
+    const end = Math.max(...clips.map((c) => c.timelineStart + c.duration));
+    const { bandY, bandH } = captionBand(clips, W, H);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = bandH;
+    const ctx = canvas.getContext('2d')!;
+
+    const count = Math.max(1, Math.ceil(end * CAPTION_FPS));
+    for (let i = 0; i < count; i++) {
+        throwIfAborted(signal);
+        const t = i / CAPTION_FPS;
+        ctx.clearRect(0, 0, W, bandH);
+        for (const c of clips) {
+            if (t < c.timelineStart || t >= c.timelineStart + c.duration) continue;
+            const ts = c.text as TextStyle;
+            const x = (c.transform?.xPct ?? 0.5) * W;
+            const y = (c.transform?.yPct ?? 0.5) * H - bandY;
+            // Same painter as the live preview, so what you saw is what burns in.
+            paintText(ctx, ts, x, y, H, { localT: t - c.timelineStart, maxWidth: W * 0.86 });
+        }
+        const blob: Blob = await new Promise((resolve, reject) =>
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('caption frame failed'))), 'image/png'));
+        const name = `cap_${String(i).padStart(5, '0')}.png`;
+        await ffmpeg.writeFile(name, new Uint8Array(await blob.arrayBuffer()));
+    }
+
+    return { count, bandY, bandH, start, end };
+}
+
 function throwIfAborted(signal?: AbortSignal) {
     if (signal?.aborted) throw new Error('Export cancelled');
 }
@@ -130,7 +216,11 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
 
     const mediaById = new Map(project.media.map((m) => [m.id, m]));
     const videoTracks = project.tracks.filter((t) => t.kind === 'video' || t.kind === 'image').sort((a, b) => a.order - b.order);
-    const textClips: Clip[] = project.tracks.filter((t) => t.kind === 'text' && !t.hidden).flatMap((t) => t.clips);
+    const allTextClips: Clip[] = project.tracks.filter((t) => t.kind === 'text' && !t.hidden).flatMap((t) => t.clips);
+    // Static overlays stay one-PNG-each (cheap, unchanged). Karaoke captions go
+    // through the single-sequence path — see writeCaptionSequence.
+    const textClips = allTextClips.filter((c) => !c.text?.words?.length);
+    const captionClips = allTextClips.filter((c) => !!c.text?.words?.length);
     const audioTrack = project.tracks.find((t) => t.kind === 'audio' && !t.muted);
 
     // For M3 the base sequence is the primary (top) video/image track.
@@ -233,6 +323,30 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
         baseName = outName;
     }
 
+    // ── Stage 3b: karaoke captions (single sequence, one overlay) ───────────
+    if (captionClips.length) {
+        throwIfAborted(signal);
+        report(0.75, 'Rendering captions');
+        const layer = await writeCaptionSequence(ffmpeg, captionClips, W, H, signal);
+        throwIfAborted(signal);
+        report(0.8, 'Burning in captions');
+        const a = layer.start.toFixed(3);
+        const b = layer.end.toFixed(3);
+        const outName = 'base_cap.mp4';
+        await ffmpeg.exec([
+            '-i', baseName,
+            '-framerate', String(CAPTION_FPS), '-start_number', '0', '-i', 'cap_%05d.png',
+            '-filter_complex',
+            `[0:v][1:v]overlay=0:${layer.bandY}:enable='between(t,${a},${b})'[vc]`,
+            '-map', '[vc]', '-map', '0:a?', ...VCODEC, '-c:a', 'copy', outName,
+        ]);
+        baseName = outName;
+        // Reclaim the frames before the remaining stages allocate.
+        for (let i = 0; i < layer.count; i++) {
+            await ffmpeg.deleteFile(`cap_${String(i).padStart(5, '0')}.png`).catch(() => {});
+        }
+    }
+
     // ── Stage 4: audio track mix ────────────────────────────────────────────
     if (audioTrack && audioTrack.clips.length) {
         throwIfAborted(signal);
@@ -284,8 +398,10 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
 
     const data = await ffmpeg.readFile('final.mp4');
     report(1, 'Done');
+    // .slice() copies into a plain ArrayBuffer. ffmpeg.wasm can hand back a
+    // SharedArrayBuffer-backed view, which is not a valid BlobPart.
     const uint = data as Uint8Array;
-    return new Blob([uint], { type: 'video/mp4' });
+    return new Blob([uint.slice().buffer], { type: 'video/mp4' });
 }
 
 function clampTempo(speed: number): string {

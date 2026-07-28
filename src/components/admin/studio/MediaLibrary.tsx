@@ -11,6 +11,7 @@ import { uid, type MediaAsset } from './types';
 import MediaPickerModal, { type PickedMedia } from './MediaPickerModal';
 import SaveToLibrarySheet from './SaveToLibrarySheet';
 import { archiveToLibrary, canArchive, type LibraryKind } from './libraryUpload';
+import AutoCaptionsButton from './AutoCaptionsButton';
 
 /** KumoLab-branded assets available in every project by default. They are NOT
  *  auto-placed; tapping one adds it to the timeline on demand. Bytes are pulled
@@ -169,10 +170,14 @@ export default function MediaLibrary() {
             <div className="st-panel__body">
                 {err && <div className="ak-auth__err" style={{ marginBottom: 10, textAlign: 'left' }}>{err}</div>}
 
-                <button className="ak-btn ak-btn--ghost ak-btn--sm ak-btn--block" style={{ marginBottom: 12 }}
+                <button className="ak-btn ak-btn--ghost ak-btn--sm ak-btn--block" style={{ marginBottom: 8 }}
                     onClick={() => addTextClip(usePlaybackStore.getState().currentTime)}>
                     <Type size={13} /> Add text
                 </button>
+
+                <div style={{ marginBottom: 12 }}>
+                    <AutoCaptionsButton />
+                </div>
 
                 {/* KumoLab presets — always available, added on tap (never auto-placed). */}
                 <div className="st-preset-label">Presets</div>

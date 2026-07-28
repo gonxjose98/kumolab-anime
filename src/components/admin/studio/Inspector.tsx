@@ -5,6 +5,7 @@ import { Scissors, Trash2 } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { saveTextTemplate } from './textTemplate';
+import { retimeWords } from './autoCaptions';
 import type { Clip, Track, ClipEffect, ClipEffectType, TextStyle } from './types';
 
 /** Tap a word to give it its own colour (highlight key words). Only shown for
@@ -149,7 +150,15 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                         <div className="st-field">
                             <span className="st-field__label">Content</span>
                             <textarea className="ak-field__input" style={{ height: 'auto', padding: 10, resize: 'vertical' }} rows={2}
-                                value={clip.text.text} onChange={(e) => setText({ text: e.target.value })} />
+                                value={clip.text.text}
+                                onChange={(e) => {
+                                    const next = e.target.value;
+                                    // On a caption clip the word timings must follow the
+                                    // edit, or fixing one misheard word desyncs the line.
+                                    setText(clip.text?.words?.length
+                                        ? { text: next, words: retimeWords(clip.text.words, next) }
+                                        : { text: next });
+                                }} />
                         </div>
                         <div className="st-field">
                             <span className="st-field__label">Color &amp; align</span>
@@ -170,6 +179,37 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                         <WordColors clipId={clip.id} text={clip.text.text} wordColors={clip.text.wordColors}
                             baseColor={clip.text.color} onChange={(wc) => setText({ wordColors: wc })} />
                     </div>
+
+                    {/* Karaoke controls, only meaningful once a clip carries word timings. */}
+                    {!!clip.text.words?.length && (
+                        <div className="st-section">
+                            <span className="st-section__title">Karaoke</span>
+                            <div className="st-field">
+                                <span className="st-field__label">Spoken word</span>
+                                <div className="st-row" style={{ gap: 10 }}>
+                                    <input type="color" value={clip.text.highlightColor || '#ffd76e'}
+                                        onChange={(e) => setText({ highlightColor: e.target.value })}
+                                        style={{ width: 40, height: 34, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                                    <button
+                                        className={`ak-btn ak-btn--sm ${clip.text.highlightBg ? 'ak-btn--primary' : 'ak-btn--secondary'}`}
+                                        style={{ flex: 1 }}
+                                        onClick={() => setText({ highlightBg: clip.text?.highlightBg ? null : '#1d4ed8' })}
+                                    >
+                                        {clip.text.highlightBg ? 'Pill on' : 'Pill off'}
+                                    </button>
+                                    {clip.text.highlightBg && (
+                                        <input type="color" value={clip.text.highlightBg}
+                                            onChange={(e) => setText({ highlightBg: e.target.value })}
+                                            style={{ width: 40, height: 34, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                                    )}
+                                </div>
+                            </div>
+                            <span className="st-hint">
+                                {clip.text.words.length} timed word{clip.text.words.length === 1 ? '' : 's'}. Editing the
+                                text above keeps them in sync.
+                            </span>
+                        </div>
+                    )}
 
                     <div className="st-section">
                         <span className="st-section__title">Position</span>
