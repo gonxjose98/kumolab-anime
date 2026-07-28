@@ -51,6 +51,9 @@ interface ProjectStore {
     removeClip: (clipId: string) => void;
 
     select: (ids: string[]) => void;
+    /** Add/remove one clip from the selection (ctrl/cmd-click, or a tap in
+     *  multi-select mode). Keeps selection order, which range-select relies on. */
+    toggleSelect: (clipId: string) => void;
     clearSelection: () => void;
 
     undo: () => void;
@@ -220,6 +223,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         },
 
         select: (ids) => set({ selectedClipIds: ids }),
+        toggleSelect: (clipId) => set((s) => ({
+            selectedClipIds: s.selectedClipIds.includes(clipId)
+                ? s.selectedClipIds.filter((id) => id !== clipId)
+                : [...s.selectedClipIds, clipId],
+        })),
         clearSelection: () => set({ selectedClipIds: [] }),
 
         undo: () => set((s) => {

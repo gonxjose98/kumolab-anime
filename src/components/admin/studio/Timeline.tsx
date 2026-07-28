@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Type, Droplet } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Type, Droplet, CheckSquare } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { addTextClip } from './clipFactory';
@@ -17,6 +17,8 @@ export default function Timeline() {
     const currentTime = usePlaybackStore((s) => s.currentTime);
     const isPlaying = usePlaybackStore((s) => s.isPlaying);
     const scrollRef = useRef<HTMLDivElement | null>(null);
+    // Touch has no ctrl/shift, so multi-select is an explicit mode there.
+    const [multiSelect, setMultiSelect] = useState(false);
 
     // While playing, keep the timeline scrolled so the playhead stays put —
     // the video scrubs the strip past the head instead of the head running off
@@ -85,6 +87,25 @@ export default function Timeline() {
                 </button>
                 <AutoCaptionsButton />
                 <VoiceoverPanel />
+                {/* Deliberately understated: a phone has no ctrl/shift, so this is
+                    the only way to pick several clips there. Off by default so it
+                    never gets in the way of a single-clip edit. */}
+                <button
+                    className={`ak-btn ak-btn--sm ${multiSelect ? 'ak-btn--secondary' : 'ak-btn--ghost'}`}
+                    onClick={() => {
+                        setMultiSelect((v) => {
+                            if (v) useProjectStore.getState().clearSelection();
+                            return !v;
+                        });
+                    }}
+                    aria-pressed={multiSelect}
+                    title="Tap several clips to edit them together"
+                >
+                    <CheckSquare size={13} />
+                    {multiSelect
+                        ? (selectedClipIds.length ? `${selectedClipIds.length} selected` : 'Tap clips')
+                        : 'Select'}
+                </button>
                 <div className="st-spacer" />
                 <button
                     className={`ak-btn ak-btn--sm ${project.meta.watermark ? 'ak-btn--secondary' : 'ak-btn--ghost'}`}
@@ -104,12 +125,29 @@ export default function Timeline() {
                     {/* Sticky track-header rail */}
                     <div className="st-thead">
                         <div style={{ height: 22 }} />
-                        {project.tracks.map((t) => (
-                            <div key={t.id} className="st-thead__row">
-                                <span className="st-thead__dot" style={{ background: TRACK_DOT[t.kind] }} />
-                                <span>{t.kind}</span>
-                            </div>
-                        ))}
+                        {project.tracks.map((t) => {
+                            const ids = t.clips.map((c) => c.id);
+                            const allSelected = ids.length > 0 && ids.every((id) => selectedClipIds.includes(id));
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    className={`st-thead__row ${allSelected ? 'st-thead__row--on' : ''}`}
+                                    // Tapping the track name selects everything on it — the
+                                    // fast path for restyling a whole caption track at once.
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!ids.length) return;
+                                        useProjectStore.getState().select(allSelected ? [] : ids);
+                                    }}
+                                    title={ids.length ? `Select all ${ids.length} on this track` : 'No clips on this track'}
+                                >
+                                    <span className="st-thead__dot" style={{ background: TRACK_DOT[t.kind] }} />
+                                    <span>{t.kind}</span>
+                                    {ids.length > 1 && <span className="st-thead__n">{ids.length}</span>}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Lanes */}
@@ -131,6 +169,7 @@ export default function Timeline() {
                                         track={track}
                                         pxPerSec={pxPerSec}
                                         selected={selectedClipIds.includes(clip.id)}
+                                        multi={multiSelect}
                                     />
                                 ))}
                             </div>
@@ -157,7 +196,7 @@ const TRACK_DOT: Record<string, string> = {
     image: '#a78bfa',
 };
 
-function ClipView({ clip, track, pxPerSec, selected }: { clip: Clip; track: Track; pxPerSec: number; selected: boolean }) {
+function ClipView({ clip, track, pxPerSec, selected, multi }: { clip: Clip; track: Track; pxPerSec: number; selected: boolean; multi: boolean }) {
     const left = clip.timelineStart * pxPerSec;
     const w = Math.max(6, clip.duration * pxPerSec);
 
@@ -166,7 +205,13 @@ function ClipView({ clip, track, pxPerSec, selected }: { clip: Clip; track: Trac
         if (track.locked) return;
         e.stopPropagation();
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        useProjectStore.getState().select([clip.id]);
+        // Pointerdown runs BEFORE click, so selecting unconditionally here would
+        // wipe the selection and make the click handler's ctrl-toggle undo
+        // itself. Leave it alone when the gesture is additive, or when this clip
+        // is already part of the selection (so a group survives a drag).
+        const store = useProjectStore.getState();
+        const additive = multi || e.ctrlKey || e.metaKey || e.shiftKey;
+        if (!additive && !store.selectedClipIds.includes(clip.id)) store.select([clip.id]);
         const startX = e.clientX;
         const origStart = clip.timelineStart;
         const move = (ev: PointerEvent) => {
@@ -209,7 +254,25 @@ function ClipView({ clip, track, pxPerSec, selected }: { clip: Clip; track: Trac
             className={`st-clip st-clip--${track.kind} ${selected ? 'st-clip--selected' : ''}`}
             style={{ left, width: w }}
             onPointerDown={startBodyDrag}
-            onClick={(e) => { e.stopPropagation(); useProjectStore.getState().select([clip.id]); }}
+            onClick={(e) => {
+                e.stopPropagation();
+                const store = useProjectStore.getState();
+                // Ctrl/Cmd-click (or any tap while multi-select is on) toggles.
+                if (multi || e.ctrlKey || e.metaKey) { store.toggleSelect(clip.id); return; }
+                // Shift-click extends from the last pick to here, within this track.
+                if (e.shiftKey && store.selectedClipIds.length) {
+                    const ids = track.clips.map((c) => c.id);
+                    const anchor = [...store.selectedClipIds].reverse().find((id) => ids.includes(id));
+                    const from = anchor ? ids.indexOf(anchor) : -1;
+                    const to = ids.indexOf(clip.id);
+                    if (from >= 0 && to >= 0) {
+                        const [a, b] = from <= to ? [from, to] : [to, from];
+                        store.select(ids.slice(a, b + 1));
+                        return;
+                    }
+                }
+                store.select([clip.id]);
+            }}
         >
             <div className="st-clip__handle st-clip__handle--l" onPointerDown={startTrim('start')} />
             <span className="st-clip__label">{label}</span>

@@ -92,11 +92,12 @@ function Check({ label, on, onToggle }: { label: string; on: boolean; onToggle: 
     );
 }
 
-/** Right rail: properties of the selected clip. */
+/** Right rail: properties of the selected clip, or of a whole selection. */
 export default function Inspector() {
     const selected = useProjectStore((s) => s.selectedClipIds);
     const project = useProjectStore((s) => s.project);
     const found = project && selected[0] ? findClip(project, selected[0]) : null;
+    const many = selected.length > 1;
 
     return (
         <div className="st-panel st-inspector">
@@ -104,12 +105,21 @@ export default function Inspector() {
                 <span className="ak-overline">Inspector</span>
                 {found && (
                     <div className="flex items-center gap-1">
-                        <button className="ak-btn ak-btn--ghost ak-btn--sm" title="Split at playhead"
-                            onClick={() => useProjectStore.getState().splitClip(found.clip.id, usePlaybackStore.getState().currentTime)}>
-                            <Scissors size={14} />
-                        </button>
-                        <button className="ak-btn ak-btn--danger ak-btn--sm" title="Delete clip"
-                            onClick={() => useProjectStore.getState().removeClip(found.clip.id)}>
+                        {!many && (
+                            <button className="ak-btn ak-btn--ghost ak-btn--sm" title="Split at playhead"
+                                onClick={() => useProjectStore.getState().splitClip(found.clip.id, usePlaybackStore.getState().currentTime)}>
+                                <Scissors size={14} />
+                            </button>
+                        )}
+                        <button
+                            className="ak-btn ak-btn--danger ak-btn--sm"
+                            title={many ? `Delete ${selected.length} clips` : 'Delete clip'}
+                            onClick={() => {
+                                const store = useProjectStore.getState();
+                                // Snapshot the ids: removeClip mutates the selection.
+                                for (const id of [...selected]) store.removeClip(id);
+                            }}
+                        >
                             <Trash2 size={14} />
                         </button>
                     </div>
@@ -118,11 +128,113 @@ export default function Inspector() {
             <div className="st-panel__body">
                 {!found ? (
                     <div className="st-empty-hint">Select a clip to edit its properties.</div>
+                ) : many ? (
+                    <MultiInspector ids={selected} />
                 ) : (
                     <ClipInspector clip={found.clip} track={found.track} />
                 )}
             </div>
         </div>
+    );
+}
+
+/**
+ * Editing several clips at once.
+ *
+ * The point of multi-select is restyling a whole caption track without opening
+ * 30 clips one at a time, so this exposes the properties that are worth
+ * changing in bulk and applies each edit to every selected clip. Text patches
+ * are merged per clip, so each keeps its own words and karaoke timings.
+ *
+ * Values shown are the first selected clip's. Editing one pushes it to all,
+ * which is the behaviour people expect from a bulk edit.
+ */
+function MultiInspector({ ids }: { ids: string[] }) {
+    const project = useProjectStore((s) => s.project);
+    const clips = (project ? ids.map((id) => findClip(project, id)?.clip).filter(Boolean) : []) as Clip[];
+    if (!clips.length) return null;
+
+    const textClips = clips.filter((c) => !!c.text);
+    const allText = textClips.length === clips.length;
+    const first = textClips[0];
+
+    const setTextAll = (patch: Partial<TextStyle>) => {
+        const store = useProjectStore.getState();
+        for (const c of textClips) {
+            store.updateClip(c.id, { text: { ...(c.text as TextStyle), ...patch } });
+        }
+    };
+    const setTransformAll = (patch: Partial<NonNullable<Clip['transform']>>) => {
+        const store = useProjectStore.getState();
+        for (const c of clips) {
+            store.updateClip(c.id, { transform: { ...(c.transform ?? ({} as any)), ...patch } });
+        }
+    };
+
+    return (
+        <>
+            <div className="st-field">
+                <span className="st-field__label">Selection</span>
+                <div className="ak-caption">
+                    {clips.length} clips selected{allText ? '' : ' (mixed kinds)'}. Changes apply to all of them.
+                </div>
+            </div>
+
+            {allText && first?.text && (
+                <>
+                    <div className="st-section">
+                        <span className="st-section__title">Text style</span>
+                        <div className="st-field">
+                            <span className="st-field__label">Color &amp; align</span>
+                            <div className="st-row" style={{ gap: 10 }}>
+                                <input type="color" value={first.text.color}
+                                    onChange={(e) => setTextAll({ color: e.target.value })}
+                                    style={{ width: 40, height: 34, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                                <div style={{ flex: 1 }}>
+                                    <Seg
+                                        value={first.text.align ?? 'center'}
+                                        options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]}
+                                        onChange={(v) => setTextAll({ align: v })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <RangeRow label="Size" min={0.02} max={0.2} step={0.005} value={first.text.sizePct}
+                            fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTextAll({ sizePct: v })} />
+                    </div>
+
+                    {textClips.some((c) => c.text?.words?.length) && (
+                        <div className="st-section">
+                            <span className="st-section__title">Karaoke</span>
+                            <div className="st-field">
+                                <span className="st-field__label">Spoken word</span>
+                                <div className="st-row" style={{ gap: 10 }}>
+                                    <input type="color" value={first.text.highlightColor || '#ffd76e'}
+                                        onChange={(e) => setTextAll({ highlightColor: e.target.value })}
+                                        style={{ width: 40, height: 34, padding: 0, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', flex: 'none' }} />
+                                    <button
+                                        className={`ak-btn ak-btn--sm ${first.text.highlightBg ? 'ak-btn--primary' : 'ak-btn--secondary'}`}
+                                        style={{ flex: 1 }}
+                                        onClick={() => setTextAll({ highlightBg: first.text?.highlightBg ? null : '#1d4ed8' })}
+                                    >
+                                        {first.text.highlightBg ? 'Pill on' : 'Pill off'}
+                                    </button>
+                                </div>
+                            </div>
+                            <span className="st-hint">Restyle every caption at once.</span>
+                        </div>
+                    )}
+                </>
+            )}
+
+            <div className="st-section">
+                <span className="st-section__title">Position</span>
+                <RangeRow label="Position Y" min={0} max={1} step={0.01} value={clips[0].transform?.yPct ?? 0.8}
+                    fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransformAll({ yPct: v })} />
+                <RangeRow label="Position X" min={0} max={1} step={0.01} value={clips[0].transform?.xPct ?? 0.5}
+                    fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTransformAll({ xPct: v })} />
+            </div>
+        </>
     );
 }
 
