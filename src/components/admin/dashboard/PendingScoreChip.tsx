@@ -55,9 +55,7 @@ export default function PendingScoreChip({
                     onClose={() => setOpen(false)}
                     actions={
                         <div className="flex items-center justify-between gap-3">
-                            <span className="ak-caption">
-                                Still image? Pull the video version in.
-                            </span>
+                            <span className="ak-caption">Still an image?</span>
                             <FindVideoButton postId={postId} postTitle={postTitle} />
                         </div>
                     }

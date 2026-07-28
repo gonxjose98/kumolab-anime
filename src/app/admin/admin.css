@@ -139,6 +139,29 @@
 .admin-root .ak-btn--block {
     width: 100%;
 }
+/* Compact pill actions — used where a row carries its own controls (pending
+   review) and full-size buttons would shout. Smaller, rounded, restrained. */
+.admin-root .ak-btn--xs {
+    height: 28px;
+    padding: 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.01em;
+}
+.admin-root .ak-btn--pill {
+    border-radius: 999px;
+}
+/* Quiet companion to a primary pill: reads as a link until you approach it. */
+.admin-root .ak-btn--quiet {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-3);
+    font-weight: 600;
+}
+.admin-root .ak-btn--quiet:hover {
+    background: var(--surface-2);
+    border-color: var(--line-2);
+    color: var(--ink-2);
+}
 
 /* ── Form field ───────────────────────────────────────────────────────── */
 .admin-root .ak-field {
@@ -453,6 +476,85 @@
     box-shadow: var(--shadow-2);
     overflow: hidden;
 }
+/* Scrim variant that respects the iOS safe area and never traps the modal's
+   top edge above the viewport. `dvh` tracks the collapsing URL bar; `svh` is
+   the fallback. Anything using this MUST be portalled to document.body —
+   .ak-card sets backdrop-filter, which makes it a containing block for
+   position:fixed children (and --flush adds overflow:hidden, clipping them). */
+.admin-root .ak-modal__scrim--safe {
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+    align-items: center;
+    /* Same night-sky hue as the base scrim, a touch deeper so the panel reads
+       as lifted off the dashboard rather than floating in it. */
+    background: rgba(10, 23, 48, 0.58);
+}
+
+/* ── Score breakdown modal ────────────────────────────────────────────── */
+/* .ak-modal.ak-score, not .ak-score: the frosted-glass section further down
+   re-declares `.admin-root .ak-modal { background: var(--surface) }`, which at
+   equal specificity would win on source order and leave this panel 62%
+   transparent over the dashboard. */
+.admin-root .ak-modal.ak-score {
+    width: 100%;
+    max-width: 420px;
+    max-height: min(86svh, 86dvh);
+    display: flex;
+    flex-direction: column;
+    /* Near-solid, not frosted: this panel sits over the dashboard, not the sky.
+       The blur stays as an enhancement where it actually paints. */
+    background: var(--surface-solid);
+    backdrop-filter: blur(26px) saturate(1.6);
+    -webkit-backdrop-filter: blur(26px) saturate(1.6);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-2);
+}
+.admin-root .ak-score__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+}
+.admin-root .ak-score__body {
+    padding: 14px 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0;
+}
+.admin-root .ak-score__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+}
+.admin-root .ak-score__total {
+    font-family: var(--ak-display);
+    font-weight: 800;
+    font-size: 2rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+/* Rows, not a table: a table forces horizontal scroll on a phone. */
+.admin-root .ak-score__row {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-2);
+}
+.admin-root .ak-score__row:last-child {
+    border-bottom: 0;
+}
+.admin-root .ak-score__pts {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
 .admin-root .ak-modal__head {
     display: flex;
     align-items: center;

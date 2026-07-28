@@ -9,6 +9,11 @@
     --bg: transparent;                       /* the sky backdrop shows through */
     --surface: rgba(240, 248, 255, 0.62);    /* frosted glass card */
     --surface-2: rgba(255, 255, 255, 0.5);   /* wells, inputs, hovers */
+    /* Near-solid sibling of --surface. Frosted glass reads beautifully over the
+       sky, but a modal floats over a DENSE dashboard — at 0.62 alpha the page
+       behind bleeds through and the panel becomes unreadable (worse where
+       backdrop-filter doesn't paint). Modals use this instead. */
+    --surface-solid: rgba(243, 249, 255, 0.985);
     --rail: #123a80;                          /* sidebar deep-sky (glass over it) */
     --rail-2: rgba(255, 215, 110, 0.13);      /* active nav chip */
 
@@ -71,6 +76,7 @@ html[data-admin-theme='dark'] .admin-root {
     --bg: transparent;
     --surface: rgba(12, 18, 44, 0.55);
     --surface-2: rgba(20, 30, 64, 0.5);
+    --surface-solid: rgba(13, 20, 48, 0.985);   /* see light-theme note */
     --rail: #070b1c;
     --rail-2: rgba(255, 215, 110, 0.13);
 

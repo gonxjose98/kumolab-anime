@@ -322,7 +322,7 @@ export default async function DashboardPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="w-full sm:w-auto shrink-0">
+                                        <div className="ml-auto shrink-0">
                                             <PendingReviewActions postId={p.id} />
                                         </div>
                                     </li>
