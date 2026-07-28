@@ -73,7 +73,13 @@ Consequence to accept explicitly: `studio-library` is permanent by design and wi
 
 That makes deletion the *only* way to reclaim bytes, and today deletion does not reclaim any: `DELETE /api/admin/studio/media` removes the bookkeeping row and leaves the storage object behind (`src/app/api/admin/studio/media/route.ts:92`), and folder deletion cascades the rows the same way. With no sweep touching this bucket, that combination would make every deleted clip a permanently unreachable, unbillable-to-nobody orphan.
 
-So this work extends that DELETE path: when the row's `url` points at `studio-library`, also `storage.remove()` the object. Row deletion remains the source of truth and still succeeds if the object is already gone. Scoped to `studio-library` URLs so existing `blog-*` behaviour is untouched.
+So this work extends **both** delete paths. Row deletion remains the source of truth in each, and both still succeed if the object is already gone. Both are scoped to `studio-library` URLs, so existing `blog-*` behaviour is untouched.
+
+**Single item** — `DELETE /api/admin/studio/media` (`media/route.ts:86-100`) currently deletes blind from `?id=` alone. It must `select url` for that id *before* deleting the row, then `storage.remove()` the object when the URL is a `studio-library` one.
+
+**Whole folder** — `DELETE /api/admin/studio/folders` (`folders/route.ts:93-105`) leans on the `studio_media` FK cascade, so the rows disappear without anyone ever reading their URLs. That is the larger leak of the two: deleting one folder orphans every object it held. It must `select url from studio_media where folder_id = :id` first, `storage.remove()` the `studio-library` objects, and only then delete the folder (letting the cascade clear the rows).
+
+Deleting many objects should be chunked, matching the existing `remove()` batching in `cleanup-worker.ts:255`.
 
 ### 2. Write path — device → folder
 
@@ -145,6 +151,12 @@ Ordering note: `addAssetToTimeline` is synchronous and returns a clip id. The or
 
 These are small but load-bearing: without them the feature appears broken on the exact screen it was built for.
 
+Adding `crossOrigin="anonymous"` also affects the two existing carousel call sites, which are not isolated. That is safe — storage sends `ACAO: *`, and `VideoEditor.tsx:247` already loads storage media this way — but the manual checklist includes one carousel-route render so a silent regression there would be caught.
+
+**HEIC probing:** the bucket accepts `image/heic`, but `probeMedia`'s image branch cannot decode a true `.heic` on Chrome or Firefox. iOS Safari normally transcodes on pick, so the real path is fine; where it isn't, a probe failure falls back to zero dimensions exactly as `importFiles` already tolerates, rather than failing the import.
+
+Update `MediaPickerModal`'s file docblock (L4-17), which currently states image-only and "Videos can't be carousel slides."
+
 ## Testing
 
 Unit tests:
@@ -155,12 +167,14 @@ Unit tests:
 - The audio-exclusion rule: a mixed batch offers only its image/video files; an all-audio batch shows no sheet.
 - `onConfirmDetailed` takes precedence over `onConfirm` when both are supplied.
 - Tap order survives navigating between folders with mixed kinds selected.
-- The `studio-library`-scoped storage delete: a `studio-library` URL removes the object, a `blog-*` URL does not, and row deletion still succeeds when the object is already missing.
+- The `studio-library`-scoped storage delete, for both paths: a `studio-library` URL removes the object, a `blog-*` URL does not, and row deletion still succeeds when the object is already missing.
+- Folder delete collects every child URL *before* the cascade removes the rows.
 
-Manual checks that unit tests cannot cover, both on the isolated Studio route:
+Manual checks that unit tests cannot cover:
 
-- Picker thumbnails (image, video, folder cover) actually render — the COEP regression is invisible to jsdom.
-- Export still succeeds with a library-sourced clip on the timeline.
+- On the isolated Studio route: picker thumbnails (image, video, folder cover) actually render. The COEP regression is invisible to jsdom.
+- On the isolated Studio route: export still succeeds with a library-sourced clip on the timeline.
+- On a carousel (non-isolated) route: thumbnails still render after the `crossOrigin` change.
 
 Manual verification in a real browser at 390px width, since Studio-on-phone is the actual use case. Per the existing Studio testing notes: grant the dev user the temp `studio` permission and revert it afterwards, and never export-test against a live post.
 
@@ -171,7 +185,7 @@ Manual verification in a real browser at 390px width, since Studio-on-phone is t
 | A future recursive cleanup sweep deletes the library | Separate bucket the sweep never touches, rather than relying on the accidental `manual-uploads/` prefix exemption |
 | Picker thumbnails blank / image probe fails under Studio's COEP | `crossOrigin="anonymous"` on the picker's img/video elements and on `probeMedia`'s image branch; verified manually on the isolated route |
 | HEIC phone photos rejected by the bucket | MIME allowlist is the union of the live `blog-images` / `blog-videos` lists |
-| Deleted library media leaks storage forever | DELETE also removes the object for `studio-library` URLs |
+| Deleted library media leaks storage forever | Both the item and folder DELETE paths remove `studio-library` objects; the folder path reads child URLs before the cascade |
 | Project unopenable on another device | `remoteUrl` recorded on the asset after a successful save |
 | Background upload fails silently | Per-item save state + retry; edit is never blocked |
 | Carousel flow regresses | `kinds` defaults to `['image']`; carousel call site unchanged |
