@@ -6,7 +6,7 @@ import { defaultSocialHashtags, sanitizeTag } from '@/lib/social/hashtags';
 import { buildSocialCaption } from '@/lib/social/caption';
 import { pickLayoutSettings } from '@/lib/studio/slides';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
-import { Images } from 'lucide-react';
+import { Images, ArrowLeft } from 'lucide-react';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
 // sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
@@ -1315,18 +1315,34 @@ export default function PostEditor() {
         <div className="max-w-3xl mx-auto space-y-4 pb-12">
             {/* Header strip — Cancel / (Save+Approve if pending) / Save */}
             <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h1 className="ak-display" style={{ fontSize: '20px' }}>Edit Post</h1>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <StatusPill status={post.status} />
-                        <span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            {claimLabel} · {post.source}
-                        </span>
-                        {autosave !== 'idle' && (
-                            <span className="ak-caption" style={{ color: autosave === 'error' ? 'var(--sun)' : 'var(--ink-3)' }}>
-                                {autosave === 'saving' ? '· Saving…' : autosave === 'saved' ? '· Saved' : '· Autosave failed'}
+                <div className="flex items-center gap-3 min-w-0">
+                    {/* Deliberately a PUSH to the list, not router.back(). Studio's
+                        own Back pushes the editor onto the history stack, so
+                        popping from here can drop the operator straight back into
+                        Studio instead of out of the editor. PostsList restores its
+                        active tab from sessionStorage, so a push still lands on
+                        the tab they came from. */}
+                    <button
+                        onClick={() => router.push('/admin/content/posts')}
+                        className="ak-btn ak-btn--ghost ak-btn--sm shrink-0"
+                        title="Back to posts"
+                        aria-label="Back to posts"
+                    >
+                        <ArrowLeft size={15} /> Back
+                    </button>
+                    <div className="min-w-0">
+                        <h1 className="ak-display" style={{ fontSize: '20px' }}>Edit Post</h1>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <StatusPill status={post.status} />
+                            <span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                {claimLabel} · {post.source}
                             </span>
-                        )}
+                            {autosave !== 'idle' && (
+                                <span className="ak-caption" style={{ color: autosave === 'error' ? 'var(--sun)' : 'var(--ink-3)' }}>
+                                    {autosave === 'saving' ? '· Saving…' : autosave === 'saved' ? '· Saved' : '· Autosave failed'}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 {/* Cancel · Save draft · Save. Save draft keeps the post
