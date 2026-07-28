@@ -1,13 +1,16 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Upload, Plus, Type, ChevronDown } from 'lucide-react';
+import { Upload, Plus, Type, ChevronDown, FolderOpen, CloudUpload, CloudOff, Check } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { useMediaStore } from './store/mediaStore';
 import { probeMedia } from './store/blobStore';
 import { addAssetToTimeline, addTextClip } from './clipFactory';
 import { uid, type MediaAsset } from './types';
+import MediaPickerModal, { type PickedMedia } from './MediaPickerModal';
+import SaveToLibrarySheet from './SaveToLibrarySheet';
+import { archiveToLibrary, canArchive, type LibraryKind } from './libraryUpload';
 
 /** KumoLab-branded assets available in every project by default. They are NOT
  *  auto-placed; tapping one adds it to the timeline on demand. Bytes are pulled
@@ -36,6 +39,12 @@ function addPreset(p: { name: string; url: string }) {
     store.select([clipId]);
 }
 
+/** One imported file still holding its File, so it can be archived after the fact. */
+interface Archivable { assetId: string; file: File; kind: LibraryKind }
+
+/** Per-asset archive status, surfaced on the tile. */
+type SaveState = 'saving' | 'saved' | 'error';
+
 /** Left rail: the project's media assets + import (post original is added by the app). */
 export default function MediaLibrary() {
     const project = useProjectStore((s) => s.project);
@@ -44,6 +53,15 @@ export default function MediaLibrary() {
     const [err, setErr] = useState<string | null>(null);
     // Collapsible on mobile (a dropdown); always expanded on desktop via CSS.
     const [open, setOpen] = useState(false);
+    // Library picker (read side).
+    const [pickerOpen, setPickerOpen] = useState(false);
+    // Archive prompt (write side). Holds the File objects because importFiles
+    // clears the input's value, so they can't be re-read from the element.
+    const [pendingSave, setPendingSave] = useState<Archivable[]>([]);
+    const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
+    // Kept so a failed upload can be retried against the same folder.
+    const [lastFolder, setLastFolder] = useState<{ id: string; name: string } | null>(null);
+    const [retryable, setRetryable] = useState<Record<string, Archivable>>({});
 
     if (!project) return null;
 
@@ -51,6 +69,7 @@ export default function MediaLibrary() {
         if (!files || !files.length) return;
         setBusy(true);
         setErr(null);
+        const archivable: Archivable[] = [];
         try {
             for (const file of Array.from(files)) {
                 const kind: MediaAsset['kind'] = file.type.startsWith('audio/') ? 'audio' : file.type.startsWith('image/') ? 'image' : 'video';
@@ -64,6 +83,8 @@ export default function MediaLibrary() {
                     hasAudio: probe.hasAudio, createdAt: Date.now(),
                 };
                 useProjectStore.getState().addMedia(asset);
+                // Audio can't live in the library, so it is never offered.
+                if (canArchive(kind)) archivable.push({ assetId: id, file, kind });
             }
         } catch (e: any) {
             setErr(e?.message || 'Import failed');
@@ -71,13 +92,73 @@ export default function MediaLibrary() {
             setBusy(false);
             if (fileRef.current) fileRef.current.value = '';
         }
+        // Offer archiving only after the media is already usable, so the
+        // decision never sits between the operator and their edit.
+        if (archivable.length) setPendingSave(archivable);
+    }
+
+    /** Upload the pending batch into a folder, in the background. */
+    function startArchive(folder: { id: string; name: string }) {
+        const batch = pendingSave;
+        setPendingSave([]);
+        setLastFolder(folder);
+        for (const item of batch) void archiveOne(item, folder.id);
+    }
+
+    async function archiveOne(item: Archivable, folderId: string) {
+        setSaveState((s) => ({ ...s, [item.assetId]: 'saving' }));
+        try {
+            const publicUrl = await archiveToLibrary(item.file, item.kind, folderId);
+            // Record where it landed WITHOUT touching what the timeline plays:
+            // the local OPFS copy stays the source. This is purely so the
+            // project still opens on another device.
+            useProjectStore.getState().setMediaRemoteUrl(item.assetId, publicUrl);
+            setSaveState((s) => ({ ...s, [item.assetId]: 'saved' }));
+            setRetryable((r) => { const n = { ...r }; delete n[item.assetId]; return n; });
+        } catch (e: any) {
+            console.error('[library] archive failed', e?.message || e);
+            setSaveState((s) => ({ ...s, [item.assetId]: 'error' }));
+            setRetryable((r) => ({ ...r, [item.assetId]: item }));
+        }
+    }
+
+    /** Bring library picks in as project media, optionally onto the timeline. */
+    async function addFromLibrary(picked: PickedMedia[], toTimeline: boolean) {
+        // Sequential on purpose: tap order must become clip order, and
+        // addAssetToTimeline appends at the track end.
+        for (const p of picked) {
+            let probe = { durationSec: 0, width: 0, height: 0, hasAudio: p.kind !== 'image' };
+            try { probe = await probeMedia(p.url, p.kind); } catch { /* keep defaults */ }
+            const asset: MediaAsset = {
+                id: uid(),
+                kind: p.kind,
+                name: p.filename || 'Library item',
+                origin: 'upload',
+                remoteUrl: p.url,
+                durationSec: probe.durationSec,
+                width: probe.width,
+                height: probe.height,
+                hasAudio: probe.hasAudio,
+                createdAt: Date.now(),
+            };
+            useProjectStore.getState().addMedia(asset);
+            if (toTimeline) addAssetToTimeline(asset);
+        }
+        setPickerOpen(false);
     }
 
     return (
         <div className={`st-panel st-library ${open ? 'st-library--open' : ''}`}>
             <div className="st-panel__head st-library__head" onClick={() => setOpen((o) => !o)}>
                 <span className="ak-overline">Media</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                        className="ak-btn ak-btn--secondary ak-btn--sm"
+                        onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
+                        title="Pick from your media-library folders"
+                    >
+                        <FolderOpen size={13} /> Library
+                    </button>
                     <button className="ak-btn ak-btn--secondary ak-btn--sm" disabled={busy} onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}>
                         <Upload size={13} /> {busy ? '…' : 'Import'}
                     </button>
@@ -113,16 +194,43 @@ export default function MediaLibrary() {
                 ) : (
                     <div className="st-media-grid">
                         {project.media.map((asset) => (
-                            <AssetTile key={asset.id} asset={asset} />
+                            <AssetTile
+                                key={asset.id}
+                                asset={asset}
+                                save={saveState[asset.id]}
+                                onRetry={retryable[asset.id] && lastFolder
+                                    ? () => archiveOne(retryable[asset.id], lastFolder.id)
+                                    : undefined}
+                            />
                         ))}
                     </div>
                 )}
             </div>
+
+            {pickerOpen && (
+                <MediaPickerModal
+                    title="Add from library"
+                    kinds={['image', 'video']}
+                    confirmLabel={(n) => (n ? `Add ${n} to timeline` : 'Add to timeline')}
+                    onConfirmDetailed={(picked) => addFromLibrary(picked, true)}
+                    secondaryLabel={() => 'Add to pool'}
+                    onConfirmSecondary={(picked) => addFromLibrary(picked, false)}
+                    onClose={() => setPickerOpen(false)}
+                />
+            )}
+
+            {pendingSave.length > 0 && (
+                <SaveToLibrarySheet
+                    fileCount={pendingSave.length}
+                    onPick={startArchive}
+                    onSkip={() => setPendingSave([])}
+                />
+            )}
         </div>
     );
 }
 
-function AssetTile({ asset }: { asset: MediaAsset }) {
+function AssetTile({ asset, save, onRetry }: { asset: MediaAsset; save?: SaveState; onRetry?: () => void }) {
     const url = useMediaStore((s) => s.entries[asset.id]?.url);
     return (
         <div className="st-asset" title={asset.name} onDoubleClick={() => addAssetToTimeline(asset)}>
@@ -133,6 +241,26 @@ function AssetTile({ asset }: { asset: MediaAsset }) {
                 <video src={url} muted preload="metadata" />
             ) : (
                 <span className="ak-caption">{asset.kind}</span>
+            )}
+            {/* Archive status — per item, so one failure is visible and
+                retryable without implying anything about the others. */}
+            {save && (
+                <span
+                    onClick={(e) => { if (save === 'error' && onRetry) { e.stopPropagation(); onRetry(); } }}
+                    title={save === 'saving' ? 'Saving to library…'
+                        : save === 'saved' ? 'Saved to library'
+                        : 'Save failed — tap to retry'}
+                    style={{
+                        position: 'absolute', top: 4, left: 4, width: 20, height: 20,
+                        borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(10,23,48,0.72)', color: '#fff',
+                        cursor: save === 'error' && onRetry ? 'pointer' : 'default',
+                    }}
+                >
+                    {save === 'saving' ? <CloudUpload size={11} />
+                        : save === 'saved' ? <Check size={11} strokeWidth={3} />
+                        : <CloudOff size={11} />}
+                </span>
             )}
             <span className="st-asset__badge">{asset.kind}</span>
             <span className="st-asset__name">{asset.name}</span>

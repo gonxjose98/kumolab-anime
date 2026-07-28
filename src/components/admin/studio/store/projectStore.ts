@@ -30,6 +30,14 @@ interface ProjectStore {
     setMeta: (patch: Partial<ProjectMeta>) => void;
     addMedia: (asset: MediaAsset) => void;
     removeMedia: (mediaId: string) => void;
+    /**
+     * Record where an OPFS asset was archived in the media library, WITHOUT
+     * changing what the timeline is playing (that stays the local object URL —
+     * no hot-swap mid-edit). Purely a durability fix: an origin:'opfs' asset has
+     * bytes in one browser only, so reopening the project elsewhere would throw
+     * "no local bytes and no remoteUrl".
+     */
+    setMediaRemoteUrl: (mediaId: string, remoteUrl: string) => void;
 
     addTrack: (kind: TrackKind, name?: string) => string;
     reorderTracks: (orderedIds: string[]) => void;
@@ -116,6 +124,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         removeMedia: (mediaId) => commit((p) => {
             p.media = p.media.filter((m) => m.id !== mediaId);
             for (const t of p.tracks) t.clips = t.clips.filter((c) => c.mediaId !== mediaId);
+        }),
+        setMediaRemoteUrl: (mediaId, remoteUrl) => commit((p) => {
+            const m = p.media.find((x) => x.id === mediaId);
+            if (m) m.remoteUrl = remoteUrl;
         }),
 
         addTrack: (kind, name) => {

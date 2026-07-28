@@ -135,7 +135,9 @@ export default function MediaFolders() {
 
     async function deleteFolder(f: FolderRow) {
         const what = f.count > 0 ? `"${f.name}" and its ${f.count} item${f.count === 1 ? '' : 's'}` : `"${f.name}"`;
-        if (!window.confirm(`Delete ${what} from the library? Uploaded files stay in storage.`)) return;
+        // Deletion now reclaims the bytes too, so the old "files stay in
+        // storage" reassurance would be a lie — this is permanent.
+        if (!window.confirm(`Delete ${what} from the library? The files are permanently removed.`)) return;
         setBusyId(f.id);
         try {
             await api(`/api/admin/studio/folders?id=${encodeURIComponent(f.id)}`, { method: 'DELETE' });

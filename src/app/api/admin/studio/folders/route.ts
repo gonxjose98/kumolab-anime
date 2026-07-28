@@ -7,7 +7,7 @@
  *                        actor = the caller's Studio display name (for the UI label).
  *   POST { name }     → { success, folder }   (created_by from getStudioActor)
  *   DELETE ?id=<uuid> → { success }           (studio_media rows cascade with the
- *                        folder; storage files intentionally remain — see migration)
+ *                        folder; their studio-library objects are removed first)
  *
  * Storage: studio_folders / studio_media (RLS enabled, no policies —
  * service-role only, same convention as studio_templates).
@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getStudioActor } from '@/lib/auth/studio-actor';
+import { removeLibraryObjects } from '@/lib/supabase/library-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,12 +97,23 @@ export async function DELETE(req: NextRequest) {
         if (!id) {
             return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
         }
-        // studio_media rows cascade with the folder (FK on delete cascade).
-        // Storage files are intentionally NOT removed — see the migration note.
+        // studio_media rows cascade with the folder (FK on delete cascade), which
+        // means their URLs are unrecoverable the moment the folder goes. Collect
+        // them FIRST — nothing sweeps studio-library, so skipping this would
+        // orphan every object in the folder permanently.
+        const { data: children } = await supabaseAdmin
+            .from('studio_media')
+            .select('url')
+            .eq('folder_id', id);
+
         const { error } = await supabaseAdmin.from('studio_folders').delete().eq('id', id);
         if (error) {
             return NextResponse.json({ success: false, error: `Delete failed: ${error.message}` }, { status: 500 });
         }
+
+        // Best-effort, after the rows are gone: the DB is the source of truth.
+        await removeLibraryObjects((children || []).map((c) => c.url));
+
         return NextResponse.json({ success: true });
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e?.message || 'Internal error' }, { status: 500 });

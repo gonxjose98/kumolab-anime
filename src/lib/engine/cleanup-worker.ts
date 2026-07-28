@@ -10,19 +10,11 @@
 import { supabaseAdmin } from '../supabase/admin';
 import { logSchedulerRun } from '../logging/scheduler';
 import { createFingerprint } from './utils';
+import { extractBucketFile, bucketFileVariants } from '../supabase/storage-url';
 
 const STORAGE_BUCKET = 'blog-images';
 const VIDEO_BUCKET = 'blog-videos';
 const STORAGE_ALERT_BYTES = 400 * 1024 * 1024; // 400 MB
-
-/** Pull the object key out of a Supabase public URL for a given bucket, or null. */
-function extractBucketFile(url: string | null | undefined, bucket: string): string | null {
-    if (!url) return null;
-    const marker = `/storage/v1/object/public/${bucket}/`;
-    const idx = url.indexOf(marker);
-    if (idx === -1) return null;
-    return url.substring(idx + marker.length);
-}
 
 export interface CleanupResult {
     expiredPostsDeleted: number;
@@ -215,8 +207,7 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
     try {
         const keep = new Set<string>();
         const addKeep = (u: string | null | undefined) => {
-            const raw = extractBucketFile(u, VIDEO_BUCKET);
-            if (raw) { keep.add(raw); try { keep.add(decodeURIComponent(raw)); } catch { /* noop */ } }
+            for (const v of bucketFileVariants(u, VIDEO_BUCKET)) keep.add(v);
         };
         // Posts whose staged/original video must survive: uploaded/edited
         // (no youtube source) OR any post not yet published (still in flight).

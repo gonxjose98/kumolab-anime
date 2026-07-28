@@ -11,7 +11,7 @@
  *                             uploaded_by, created_at }] }  (newest-first)
  *   POST { folderId, url, kind, filename?, mime? }
  *                        → { success, media }  (uploaded_by from getStudioActor)
- *   DELETE ?id=<uuid>    → { success }  (row only; the storage file remains)
+ *   DELETE ?id=<uuid>    → { success }  (row + the studio-library object)
  *
  * Storage: studio_media (RLS enabled, no policies — service-role only).
  * Auth: middleware gates /api/admin/studio/* by Supabase session + the
@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getStudioActor } from '@/lib/auth/studio-actor';
+import { removeLibraryObjects } from '@/lib/supabase/library-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,10 +90,23 @@ export async function DELETE(req: NextRequest) {
         if (!id) {
             return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
         }
+        // Read the URL BEFORE the row goes: afterwards there is no way back to
+        // the object, and nothing sweeps studio-library, so it would leak.
+        const { data: row } = await supabaseAdmin
+            .from('studio_media')
+            .select('url')
+            .eq('id', id)
+            .maybeSingle();
+
         const { error } = await supabaseAdmin.from('studio_media').delete().eq('id', id);
         if (error) {
             return NextResponse.json({ success: false, error: `Delete failed: ${error.message}` }, { status: 500 });
         }
+
+        // Best-effort: the row is the source of truth, so a storage failure
+        // must not fail the caller's delete.
+        await removeLibraryObjects([row?.url]);
+
         return NextResponse.json({ success: true });
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e?.message || 'Internal error' }, { status: 500 });

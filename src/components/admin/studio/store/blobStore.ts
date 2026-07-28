@@ -74,10 +74,18 @@ export interface MediaProbe {
  */
 export function probeMedia(url: string, kind: 'video' | 'audio' | 'image'): Promise<MediaProbe> {
     if (kind === 'image') {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const img = new Image();
+            // Required for remote (library) images: Studio runs under COEP
+            // require-corp, where a no-cors image load is blocked. Matches what
+            // the video branch below already does.
+            img.crossOrigin = 'anonymous';
             img.onload = () => resolve({ durationSec: 0, width: img.naturalWidth, height: img.naturalHeight, hasAudio: false });
-            img.onerror = () => reject(new Error('Failed to probe image'));
+            // Resolve at 0x0 rather than reject. A probe failure must not fail
+            // the import — importFiles already tolerates unknown dimensions, and
+            // a real .heic (allowed by the bucket) can't be decoded by Chrome or
+            // Firefox at all, though iOS Safari normally transcodes on pick.
+            img.onerror = () => resolve({ durationSec: 0, width: 0, height: 0, hasAudio: false });
             img.src = url;
         });
     }
