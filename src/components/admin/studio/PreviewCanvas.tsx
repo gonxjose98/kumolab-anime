@@ -8,6 +8,35 @@ import type { Clip, ClipEffectType, Track, Transform, VideoProject } from './typ
 import { paintText } from './paintText';
 
 /**
+ * Does `ctx.filter` actually blur, or is it silently ignored?
+ *
+ * Tested FUNCTIONALLY (blur one pixel, check the light spread to a neighbour)
+ * rather than by sniffing the browser or reading the property back: Safari has
+ * historically parsed `filter` and then ignored it, so both of those lie.
+ * Result is cached — this runs once, not per frame.
+ */
+let canvasBlurSupport: boolean | null = null;
+function canvasBlurWorks(): boolean {
+    if (canvasBlurSupport !== null) return canvasBlurSupport;
+    try {
+        const c = document.createElement('canvas');
+        c.width = 9; c.height = 9;
+        const x = c.getContext('2d', { willReadFrequently: true });
+        if (!x) { canvasBlurSupport = false; return false; }
+        x.filter = 'blur(2px)';
+        x.fillStyle = '#fff';
+        x.fillRect(4, 4, 1, 1);
+        x.filter = 'none';
+        // Two pixels away should have picked up light if the blur ran.
+        const alpha = x.getImageData(6, 4, 1, 1).data[3];
+        canvasBlurSupport = alpha > 0;
+    } catch {
+        canvasBlurSupport = false;
+    }
+    return canvasBlurSupport;
+}
+
+/**
  * Live compositor. Draws the frame at the current playhead by stacking each
  * track's active clip onto a canvas (no re-encoding — that's Export's job).
  *
@@ -23,7 +52,9 @@ export default function PreviewCanvas() {
     const poolRef = useRef<HTMLDivElement | null>(null);
     const videoPool = useRef<Map<string, HTMLVideoElement>>(new Map());
     const imagePool = useRef<Map<string, HTMLImageElement>>(new Map());
-    const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    // Three reusable scratch canvases for the blur ping-pong (see blurredCover).
+    // Reused across frames so a 30fps preview doesn't allocate per frame.
+    const blurScratchRef = useRef<(HTMLCanvasElement | null)[]>([null, null, null]);
     const rafRef = useRef<number>(0);
 
     const cw = project?.meta.canvasWidth ?? 1080;
@@ -112,6 +143,90 @@ export default function PreviewCanvas() {
             return parts.length ? parts.join(' ') : 'none';
         };
 
+        /**
+         * Blurred cover-fit backdrop for the contain bars.
+         *
+         * The original did one extreme downscale (to ~66px tall at the default
+         * intensity) and one ~30x upscale, because `ctx.filter` is a no-op on
+         * older iOS Safari. It worked everywhere but looked PIXELATED: rebuilding
+         * a 1920px frame from 66 samples is blocks, not blur, and iOS resamples
+         * harder than Chrome so it shows up worst on a phone.
+         *
+         * Two paths now, picked by an actual runtime test rather than an
+         * assumption about the browser:
+         *   • ctx.filter works → a true Gaussian at quarter resolution, which is
+         *     what the exporter does (gblur), so preview matches output.
+         *   • it doesn't → progressive halving/doubling. Each halving averages
+         *     4 pixels into 1 (a real box-blur pass) and each doubling rebuilds
+         *     from twice as many samples, so there is never a big blocky jump.
+         */
+        const scratch = (i: number, w: number, h: number) => {
+            const refs = blurScratchRef.current;
+            const c = refs[i] ?? (refs[i] = document.createElement('canvas'));
+            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            return c;
+        };
+
+        const blurredCover = (
+            src: CanvasImageSource, srcAspect: number, intensityRaw: number,
+        ): HTMLCanvasElement | null => {
+            const intensity = Math.max(0, Math.min(160, intensityRaw));
+
+            // Quarter resolution: enough detail to upscale cleanly, cheap to blur.
+            const qw = Math.max(2, Math.round(cw / 4));
+            const qh = Math.max(2, Math.round(ch / 4));
+            const base = scratch(0, qw, qh);
+            const bctx = base.getContext('2d');
+            if (!bctx) return null;
+            bctx.imageSmoothingEnabled = true;
+            bctx.clearRect(0, 0, qw, qh);
+            let bw: number, bh: number;
+            if (srcAspect > qw / qh) { bh = qh; bw = qh * srcAspect; } else { bw = qw; bh = qw / srcAspect; }
+            bctx.drawImage(src, (qw - bw) / 2, (qh - bh) / 2, bw, bh);
+
+            if (canvasBlurWorks()) {
+                // Match the exporter's sigma, scaled to this resolution.
+                const sigma = Math.max(1, (intensity / 4) * 0.6);
+                const out = scratch(1, qw, qh);
+                const octx = out.getContext('2d');
+                if (octx) {
+                    octx.filter = `blur(${sigma.toFixed(2)}px)`;
+                    octx.clearRect(0, 0, qw, qh);
+                    octx.drawImage(base, 0, 0);
+                    octx.filter = 'none';
+                    return out;
+                }
+            }
+
+            // Fallback: progressive halving, then doubling back up.
+            const passes = Math.max(1, Math.min(5, Math.round(intensity / 30) + 1));
+            let cur = base;
+            let w = qw, h = qh, slot = 1;
+            for (let i = 0; i < passes; i++) {
+                const nw = Math.max(2, Math.round(w / 2));
+                const nh = Math.max(2, Math.round(h / 2));
+                const next = scratch(slot, nw, nh);
+                const nctx = next.getContext('2d');
+                if (!nctx) break;
+                nctx.imageSmoothingEnabled = true;
+                nctx.clearRect(0, 0, nw, nh);
+                nctx.drawImage(cur, 0, 0, nw, nh);
+                cur = next; w = nw; h = nh; slot = slot === 1 ? 2 : 1;
+            }
+            while (w * 2 <= qw || h * 2 <= qh) {
+                const nw = Math.min(qw, w * 2);
+                const nh = Math.min(qh, h * 2);
+                const next = scratch(slot, nw, nh);
+                const nctx = next.getContext('2d');
+                if (!nctx) break;
+                nctx.imageSmoothingEnabled = true;
+                nctx.clearRect(0, 0, nw, nh);
+                nctx.drawImage(cur, 0, 0, nw, nh);
+                cur = next; w = nw; h = nh; slot = slot === 1 ? 2 : 1;
+            }
+            return cur;
+        };
+
         const drawTransformed = (
             src: CanvasImageSource, sw: number, sh: number, tr: Transform | undefined, alphaMul = 1,
         ) => {
@@ -132,27 +247,10 @@ export default function PreviewCanvas() {
             if (transform.fit === 'contain' && (dw < cw || dh < ch)) {
                 if (transform.fillStyle === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
                 else if (transform.fillStyle === 'blur') {
-                    // Downscale-then-upscale blur. iOS Safari's canvas `ctx.filter`
-                    // is a no-op, so a `blur()` filter did nothing there (the bars
-                    // showed a sharp, un-blurred copy and the intensity slider was
-                    // dead). Shrinking the frame to a tiny canvas and scaling it
-                    // back up with smoothing gives a real Gaussian-like blur that
-                    // works everywhere; a smaller intermediate = a stronger blur,
-                    // so the intensity slider now actually drives it.
-                    const intensity = Math.max(0, Math.min(160, transform.blurIntensity ?? 60));
-                    const lh = Math.max(8, Math.round(96 - intensity * 0.5));   // 0→96px … 160→16px tall
-                    const lw = Math.max(8, Math.round(lh * targetAspect));
-                    const bc = blurCanvasRef.current ?? (blurCanvasRef.current = document.createElement('canvas'));
-                    if (bc.width !== lw || bc.height !== lh) { bc.width = lw; bc.height = lh; }
-                    const bctx = bc.getContext('2d');
-                    if (bctx) {
-                        bctx.imageSmoothingEnabled = true;
-                        bctx.clearRect(0, 0, lw, lh);
-                        let bw: number, bh: number;                              // cover-fit into the small canvas
-                        if (srcAspect > targetAspect) { bh = lh; bw = lh * srcAspect; } else { bw = lw; bh = lw / srcAspect; }
-                        bctx.drawImage(src, (lw - bw) / 2, (lh - bh) / 2, bw, bh);
+                    const blurred = blurredCover(src, srcAspect, transform.blurIntensity ?? 60);
+                    if (blurred) {
                         ctx.imageSmoothingEnabled = true;
-                        ctx.drawImage(bc, 0, 0, cw, ch);
+                        ctx.drawImage(blurred, 0, 0, cw, ch);
                     } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
                 } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
             }
