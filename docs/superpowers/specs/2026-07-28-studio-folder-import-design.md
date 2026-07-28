@@ -81,6 +81,12 @@ So this work extends **both** delete paths. Row deletion remains the source of t
 
 Deleting many objects should be chunked, matching the existing `remove()` batching in `cleanup-worker.ts:255`.
 
+Three details so this isn't re-derived:
+
+- **URL → storage path.** `cleanup-worker.ts:19-25` already has `extractBucketFile(url, bucket)`, which splits on `/storage/v1/object/public/<bucket>/`. It is module-private; lift it to a shared helper rather than writing a second copy. Keep its `decodeURIComponent` handling (L219) — filenames are sanitized, but timestamps and extensions can still encode.
+- **A failed `storage.remove()` is swallowed, not surfaced.** Row deletion is the source of truth; a user deleting a clip should not see an error because an object was already gone. Log it and continue.
+- **Update the two route docblocks that will become false:** `folders/route.ts:9-10` ("Storage files are intentionally NOT removed") and `media/route.ts:14` ("the storage file remains").
+
 ### 2. Write path — device → folder
 
 Ordering matters for perceived speed:
