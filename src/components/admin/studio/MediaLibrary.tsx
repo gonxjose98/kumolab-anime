@@ -12,6 +12,7 @@ import MediaPickerModal, { type PickedMedia } from './MediaPickerModal';
 import SaveToLibrarySheet from './SaveToLibrarySheet';
 import { archiveToLibrary, canArchive, type LibraryKind } from './libraryUpload';
 import AutoCaptionsButton from './AutoCaptionsButton';
+import VoiceoverPanel from './VoiceoverPanel';
 
 /** KumoLab-branded assets available in every project by default. They are NOT
  *  auto-placed; tapping one adds it to the timeline on demand. Bytes are pulled
@@ -175,9 +176,11 @@ export default function MediaLibrary() {
                     <Type size={13} /> Add text
                 </button>
 
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 8 }}>
                     <AutoCaptionsButton />
                 </div>
+
+                <VoiceoverPanel />
 
                 {/* KumoLab presets — always available, added on tap (never auto-placed). */}
                 <div className="st-preset-label">Presets</div>
