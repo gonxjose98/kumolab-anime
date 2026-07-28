@@ -5,7 +5,11 @@
    every .st-* part picks up the dark theme automatically. Scoped under
    .admin-root so nothing leaks to the light admin. */
 
-.admin-root .st-root {
+.admin-root .st-root,
+.admin-root .st-theme,
+/* Also match when the class sits ON the admin-root element itself, which is how
+   a portalled modal wrapper carries the palette. */
+.admin-root.st-theme {
     /* Dark palette (token overrides — cascade to .ak-* + .st-*).
        gold / blue / ink are aligned to the admin DARK theme values so accents
        and text read identically across the hub and the editor (design audit
@@ -35,7 +39,16 @@
     --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.45);
     --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.55);
+    /* Modals are already opaque here (the editor floats over no sky), so the
+       solid surface is simply the panel colour. Without this, a modal PORTALLED
+       out of .st-root falls back to the light admin token and renders white in
+       the dark editor. */
+    --surface-solid: #141f38;
+}
 
+/* Layout is .st-root only — .st-theme exists purely to carry the palette to
+   portalled modals, which render outside the editor root. */
+.admin-root .st-root {
     position: fixed;
     inset: 0;
     z-index: 120;

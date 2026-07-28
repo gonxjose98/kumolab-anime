@@ -10,10 +10,15 @@
  * The generated clip lands on an audio track, which the exporter MIXES with the
  * video's own audio rather than replacing it, so narration sits over the
  * original sound.
+ *
+ * Presented as a MODAL rather than an inline panel so it can live in the
+ * always-visible timeline bar. Anything parked in the Media panel body is
+ * invisible on a phone, where that panel is collapsed by default.
  */
 
-import { useState } from 'react';
-import { Mic, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Mic, Loader2, X } from 'lucide-react';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { useMediaStore } from './store/mediaStore';
@@ -28,26 +33,32 @@ export default function VoiceoverPanel() {
     const [voice, setVoice] = useState('af_heart');
     const [status, setStatus] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [loadedVoices, setLoadedVoices] = useState(false);
 
-    async function openPanel() {
-        setOpen((o) => !o);
-        if (loadedVoices || voices.length) return;
-        // Loading the voice list warms the model, so do it only once the
-        // operator has actually opened the panel.
-        setStatus('Loading voices (first time downloads the model)');
+    // Load voices when the modal first opens — this also warms the model, so
+    // it must not happen on mount for every Studio visit.
+    useEffect(() => {
+        if (!open || voices.length) return;
+        let cancelled = false;
+        setStatus('Loading voices (first run downloads the model)');
         setError(null);
-        try {
-            const list = await listVoices();
-            setVoices(list);
-            setLoadedVoices(true);
-            if (list.length && !list.some((v) => v.id === voice)) setVoice(list[0].id);
-        } catch (e: any) {
-            setError(e?.message || 'Could not load the speech model');
-        } finally {
-            setStatus(null);
-        }
-    }
+        listVoices()
+            .then((list) => {
+                if (cancelled) return;
+                setVoices(list);
+                if (list.length && !list.some((v) => v.id === voice)) setVoice(list[0].id);
+            })
+            .catch((e) => { if (!cancelled) setError(e?.message || 'Could not load the speech model'); })
+            .finally(() => { if (!cancelled) setStatus(null); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !status) setOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open, status]);
 
     async function generate() {
         if (!text.trim() || status) return;
@@ -61,7 +72,7 @@ export default function VoiceoverPanel() {
             const asset: MediaAsset = {
                 id,
                 kind: 'audio',
-                name: `Voiceover — ${text.trim().slice(0, 28)}${text.trim().length > 28 ? '…' : ''}`,
+                name: `Voiceover: ${text.trim().slice(0, 28)}${text.trim().length > 28 ? '…' : ''}`,
                 origin: 'opfs',
                 opfsKey: id,
                 durationSec,
@@ -70,9 +81,9 @@ export default function VoiceoverPanel() {
             };
             useProjectStore.getState().addMedia(asset);
             addAssetToTimeline(asset);
-            // Park the playhead at the start so it can be auditioned immediately.
             usePlaybackStore.getState().setCurrentTime(0);
             setText('');
+            setOpen(false);
         } catch (e: any) {
             setError(e?.message || 'Speech generation failed');
         } finally {
@@ -80,57 +91,86 @@ export default function VoiceoverPanel() {
         }
     }
 
+    const busy = !!status;
+
     return (
-        <div style={{ marginBottom: 12 }}>
+        <>
             <button
-                className="ak-btn ak-btn--ghost ak-btn--sm ak-btn--block"
-                onClick={openPanel}
-                title="Generate a voiceover locally — free, no account"
+                className="ak-btn ak-btn--secondary ak-btn--sm"
+                onClick={() => setOpen(true)}
+                title="Generate a voiceover on your device, free"
             >
                 <Mic size={13} /> Voiceover
             </button>
 
-            {open && (
-                <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line-2)' }}>
-                    <textarea
-                        className="ak-field__input"
-                        style={{ height: 'auto', padding: 8, resize: 'vertical', width: '100%' }}
-                        rows={3}
-                        placeholder="What should the voice say?"
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        disabled={!!status}
-                    />
-
-                    <select
-                        className="ak-field__input"
-                        style={{ marginTop: 8, width: '100%' }}
-                        value={voice}
-                        onChange={(e) => setVoice(e.target.value)}
-                        disabled={!!status || !voices.length}
+            {/* `st-theme` carries the editor's dark palette to the portal, which
+                renders outside .st-root and would otherwise inherit the light
+                admin theme and show up white inside the dark editor. */}
+            {open && typeof document !== 'undefined' && createPortal(
+                <div className="admin-root st-theme">
+                    <div
+                        className="ak-modal__scrim ak-modal__scrim--safe"
+                        onClick={(e) => { if (e.target === e.currentTarget && !busy) setOpen(false); }}
                     >
-                        {voices.length === 0 && <option>Loading voices…</option>}
-                        {voices.map((v) => (
-                            <option key={v.id} value={v.id}>{v.label}</option>
-                        ))}
-                    </select>
+                        <div className="ak-modal" style={{ maxWidth: 460, display: 'flex', flexDirection: 'column', maxHeight: 'min(86svh, 86dvh)' }}>
+                            <div className="ak-modal__head" style={{ gap: 10 }}>
+                                <span className="ak-vhub-title" style={{ fontSize: 15 }}>Voiceover</span>
+                                <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => setOpen(false)} disabled={busy} aria-label="Close">
+                                    <X size={15} />
+                                </button>
+                            </div>
 
-                    <button
-                        className="ak-btn ak-btn--primary ak-btn--sm ak-btn--block"
-                        style={{ marginTop: 8 }}
-                        onClick={generate}
-                        disabled={!text.trim() || !!status || !voices.length}
-                    >
-                        {status ? <Loader2 size={13} className="animate-spin" /> : <Mic size={13} />}
-                        {status || 'Generate voiceover'}
-                    </button>
+                            <div className="ak-modal__body" style={{ overflowY: 'auto', flex: 1 }}>
+                                <textarea
+                                    className="ak-field__input"
+                                    style={{ height: 'auto', padding: 10, resize: 'vertical', width: '100%' }}
+                                    rows={4}
+                                    placeholder="What should the voice say?"
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                    disabled={busy}
+                                    autoFocus
+                                />
 
-                    {error && <div className="ak-caption" style={{ color: 'var(--sun)', marginTop: 6 }}>{error}</div>}
-                    <span className="st-hint" style={{ display: 'block', marginTop: 6 }}>
-                        Runs on your device. English voices only, and no emotion controls — pick the voice that fits.
-                    </span>
-                </div>
+                                <select
+                                    className="ak-field__input"
+                                    style={{ marginTop: 10, width: '100%' }}
+                                    value={voice}
+                                    onChange={(e) => setVoice(e.target.value)}
+                                    disabled={busy || !voices.length}
+                                >
+                                    {voices.length === 0 && <option>Loading voices…</option>}
+                                    {voices.map((v) => (
+                                        <option key={v.id} value={v.id}>{v.label}</option>
+                                    ))}
+                                </select>
+
+                                {error && <div className="ak-auth__err" style={{ marginTop: 10, textAlign: 'left' }}>{error}</div>}
+
+                                <span className="st-hint" style={{ display: 'block', marginTop: 10 }}>
+                                    Runs on your device, free. English voices only. Kokoro has no emotion
+                                    controls, so pick the voice that fits. Voices are sorted best first.
+                                </span>
+                            </div>
+
+                            <div className="ak-modal__foot">
+                                <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={() => setOpen(false)} disabled={busy}>
+                                    Cancel
+                                </button>
+                                <button
+                                    className="ak-btn ak-btn--primary ak-btn--sm"
+                                    onClick={generate}
+                                    disabled={!text.trim() || busy || !voices.length}
+                                >
+                                    {busy ? <Loader2 size={13} className="animate-spin" /> : <Mic size={13} />}
+                                    {status || 'Generate'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body,
             )}
-        </div>
+        </>
     );
 }

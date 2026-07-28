@@ -201,7 +201,7 @@ export default function MediaFolders() {
         }
         setUploadTotal(0);
         setUploadNow(0);
-        setError(failures.length ? `Some uploads failed — ${failures.join('; ')}` : null);
+        setError(failures.length ? `Some uploads failed: ${failures.join('; ')}` : null);
     }
 
     async function deleteMedia(m: MediaRow) {
@@ -265,7 +265,7 @@ export default function MediaFolders() {
                         disabled={uploading || mediaLoading || media.every((m) => m.kind !== 'image')}
                         title={media.some((m) => m.kind === 'image')
                             ? 'Pick pictures from this folder and open them as a carousel draft'
-                            : 'Upload pictures first — carousels are built from images'}
+                            : 'Upload pictures first. Carousels are built from images'}
                     >
                         <Images size={14} /> Build carousel
                     </button>

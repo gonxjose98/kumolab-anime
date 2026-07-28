@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         }
         if (file.size > MAX_BYTES) {
             return NextResponse.json(
-                { success: false, error: 'Audio too large — extract 16kHz mono before uploading' },
+                { success: false, error: 'Audio too large. Extract 16kHz mono before uploading.' },
                 { status: 413 },
             );
         }

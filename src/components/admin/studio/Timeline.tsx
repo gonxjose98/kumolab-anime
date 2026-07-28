@@ -6,6 +6,8 @@ import { useProjectStore } from './store/projectStore';
 import { usePlaybackStore } from './store/playbackStore';
 import { addTextClip } from './clipFactory';
 import type { Clip, Track } from './types';
+import AutoCaptionsButton from './AutoCaptionsButton';
+import VoiceoverPanel from './VoiceoverPanel';
 
 /** Whole-timeline view: ruler + one row per track + clips + playhead. */
 export default function Timeline() {
@@ -81,6 +83,8 @@ export default function Timeline() {
                     onClick={() => addTextClip(usePlaybackStore.getState().currentTime)}>
                     <Type size={13} /> Add text
                 </button>
+                <AutoCaptionsButton />
+                <VoiceoverPanel />
                 <div className="st-spacer" />
                 <button
                     className={`ak-btn ak-btn--sm ${project.meta.watermark ? 'ak-btn--secondary' : 'ak-btn--ghost'}`}

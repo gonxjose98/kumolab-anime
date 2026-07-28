@@ -319,7 +319,7 @@ export default function MediaPickerModal({
                                 <p className="ak-caption" style={{ marginBottom: 10 }}>
                                     {kinds.includes('video')
                                         ? 'Nothing selectable in this folder.'
-                                        : 'Only videos here — carousel slides need pictures, so nothing is selectable.'}
+                                        : 'Only videos here. Carousel slides need pictures, so nothing is selectable.'}
                                 </p>
                             )}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
@@ -336,7 +336,7 @@ export default function MediaPickerModal({
                                             disabled={!selectable || confirming}
                                             aria-pressed={picked}
                                             title={selectable
-                                                ? (picked ? `Selected #${pos + 1} — tap to unselect` : (m.filename || `Select ${kindNoun(kinds, false)}`))
+                                                ? (picked ? `Selected #${pos + 1}, tap to unselect` : (m.filename || `Select ${kindNoun(kinds, false)}`))
                                                 : 'Videos can’t be carousel slides'}
                                             style={{
                                                 position: 'relative',
@@ -420,9 +420,9 @@ export default function MediaPickerModal({
 
                 {/* ── Footer: running count + confirm ── */}
                 <div className="ak-modal__foot" style={{ alignItems: 'center' }}>
-                    <span className="ak-caption" style={{ marginRight: 'auto' }}>
+                    <span className="ak-caption ak-modal__hint">
                         {selected.length === 0
-                            ? `Tap ${kindNoun(kinds, true)} to select — the order you pick is the order they're added.`
+                            ? `Tap to select. Pick order is add order.`
                             : `${selected.length} ${kindNoun(kinds, selected.length !== 1)} selected`}
                     </span>
                     <button className="ak-btn ak-btn--ghost ak-btn--sm" onClick={onClose} disabled={confirming} type="button">

@@ -103,7 +103,7 @@ export interface GeneratedVoice {
 /** Generate speech as a WAV blob. */
 export async function generateVoice(text: string, voice: string): Promise<GeneratedVoice> {
     const clean = text.trim();
-    if (!clean) throw new Error('Nothing to say — write a script first.');
+    if (!clean) throw new Error('Nothing to say. Write a script first.');
 
     const tts = await getTTS();
     const audio = await tts.generate(clean, { voice });

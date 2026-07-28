@@ -11,8 +11,6 @@ import { uid, type MediaAsset } from './types';
 import MediaPickerModal, { type PickedMedia } from './MediaPickerModal';
 import SaveToLibrarySheet from './SaveToLibrarySheet';
 import { archiveToLibrary, canArchive, type LibraryKind } from './libraryUpload';
-import AutoCaptionsButton from './AutoCaptionsButton';
-import VoiceoverPanel from './VoiceoverPanel';
 
 /** KumoLab-branded assets available in every project by default. They are NOT
  *  auto-placed; tapping one adds it to the timeline on demand. Bytes are pulled
@@ -176,11 +174,6 @@ export default function MediaLibrary() {
                     <Type size={13} /> Add text
                 </button>
 
-                <div style={{ marginBottom: 8 }}>
-                    <AutoCaptionsButton />
-                </div>
-
-                <VoiceoverPanel />
 
                 {/* KumoLab presets — always available, added on tap (never auto-placed). */}
                 <div className="st-preset-label">Presets</div>
@@ -257,7 +250,7 @@ function AssetTile({ asset, save, onRetry }: { asset: MediaAsset; save?: SaveSta
                     onClick={(e) => { if (save === 'error' && onRetry) { e.stopPropagation(); onRetry(); } }}
                     title={save === 'saving' ? 'Saving to library…'
                         : save === 'saved' ? 'Saved to library'
-                        : 'Save failed — tap to retry'}
+                        : 'Save failed. Tap to retry'}
                     style={{
                         position: 'absolute', top: 4, left: 4, width: 20, height: 20,
                         borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',

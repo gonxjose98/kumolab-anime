@@ -94,7 +94,7 @@ export default function SaveToLibrarySheet({
                         <span className="ak-vhub-title" style={{ fontSize: 15 }}>Save to library?</span>
                         <div className="ak-caption" style={{ marginTop: 2 }}>
                             File {fileCount === 1 ? 'this clip' : `these ${fileCount} clips`} in a folder so you can reuse
-                            {fileCount === 1 ? ' it' : ' them'} later. Uploads in the background — keep editing.
+                            {fileCount === 1 ? ' it' : ' them'} later. Uploads in the background, keep editing.
                         </div>
                     </div>
                     <button

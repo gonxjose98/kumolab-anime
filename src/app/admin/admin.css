@@ -471,7 +471,10 @@
 .admin-root .ak-modal {
     width: 100%;
     max-width: 560px;
-    background: var(--surface);
+    /* Near-solid, not frosted: a modal floats over dense UI (timeline,
+       dashboard), where 0.62 alpha lets the content behind bleed through and
+       become unreadable. Frosted glass is right over the sky, not over this. */
+    background: var(--surface-solid);
     border-radius: var(--r-xl);
     box-shadow: var(--shadow-2);
     overflow: hidden;
@@ -567,10 +570,34 @@
 }
 .admin-root .ak-modal__foot {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
     border-top: 1px solid var(--line);
+    /* Without wrapping, a footer carrying a hint AND several buttons squeezes
+       the hint into a one-word-wide column that overflows the modal (observed
+       on iPhone in the library picker). */
+    flex-wrap: wrap;
+}
+/* A hint sharing the footer with buttons gets its own full-width row instead
+   of competing for horizontal space. */
+.admin-root .ak-modal__hint {
+    flex: 1 1 100%;
+    order: -1;
+    margin: 0 0 2px;
+}
+@media (max-width: 560px) {
+    .admin-root .ak-modal__foot {
+        padding: 12px 14px;
+        gap: 8px;
+        justify-content: stretch;
+    }
+    /* Full-width, evenly split so the actions stay tappable at 44px-ish. */
+    .admin-root .ak-modal__foot > .ak-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
 }
 
 /* ── Focus ring (applied broadly) ─────────────────────────────────────── */
@@ -1491,7 +1518,7 @@ html[data-admin-theme='dark'] .admin-root .ak-sky__veil { opacity: 1; }
     box-shadow: var(--shadow-1), var(--glass-inset);
 }
 .admin-root .ak-modal {
-    background: var(--surface);
+    background: var(--surface-solid);
     backdrop-filter: blur(26px) saturate(1.6);
     -webkit-backdrop-filter: blur(26px) saturate(1.6);
     border: 1px solid var(--glass-border);
