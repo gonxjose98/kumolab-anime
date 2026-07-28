@@ -7,6 +7,7 @@ import { buildSocialCaption } from '@/lib/social/caption';
 import { pickLayoutSettings } from '@/lib/studio/slides';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
 import { Images, ArrowLeft } from 'lucide-react';
+import { getReturnTo } from '@/lib/admin/returnTo';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
 // sees here is exactly what publishes. Lean 4-6 is the proven sweet spot.
@@ -1033,11 +1034,12 @@ export default function PostEditor() {
     // posts list when the editor was opened via a direct link / refresh (no
     // in-app history). Used by Cancel, Save, and Save draft alike.
     function goBackToList() {
-        if (typeof window !== 'undefined' && window.history.length > 1) {
-            router.back();
-        } else {
-            router.push('/admin/posts');
-        }
+        // Was router.back(), which is wrong once Studio is in the picture:
+        // Studio's Back PUSHES the editor, so popping from here returns to
+        // Studio instead of to the list. RouteMemory records the last real
+        // destination, so this lands on the tab the operator came from
+        // (Studio, the dashboard, Content…) whichever way they got here.
+        router.push(getReturnTo());
     }
 
     function handleCancel() {
@@ -1316,17 +1318,16 @@ export default function PostEditor() {
             {/* Header strip — Cancel / (Save+Approve if pending) / Save */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                    {/* Deliberately a PUSH to the list, not router.back(). Studio's
-                        own Back pushes the editor onto the history stack, so
-                        popping from here can drop the operator straight back into
-                        Studio instead of out of the editor. PostsList restores its
-                        active tab from sessionStorage, so a push still lands on
-                        the tab they came from. */}
+                    {/* Returns to the tab the operator actually came from (Studio,
+                        the dashboard, Content…), remembered by RouteMemory.
+                        Deliberately a PUSH, not router.back(): Studio's own Back
+                        pushes the editor onto the history stack, so popping from
+                        here lands back in Studio rather than out of it. */}
                     <button
-                        onClick={() => router.push('/admin/content/posts')}
+                        onClick={() => router.push(getReturnTo())}
                         className="ak-btn ak-btn--ghost ak-btn--sm shrink-0"
-                        title="Back to posts"
-                        aria-label="Back to posts"
+                        title="Back"
+                        aria-label="Back"
                     >
                         <ArrowLeft size={15} /> Back
                     </button>

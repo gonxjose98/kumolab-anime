@@ -19,6 +19,29 @@ export default function Timeline() {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     // Touch has no ctrl/shift, so multi-select is an explicit mode there.
     const [multiSelect, setMultiSelect] = useState(false);
+    // Whether the opening zoom has been fitted to this project yet.
+    const fittedRef = useRef(false);
+
+    /**
+     * Fit the whole clip on screen when the editor opens.
+     *
+     * The default zoom is a fixed 40px/sec, which on a phone shows about six
+     * seconds — you land in the middle of a condensed strip with no sense of
+     * the whole video, which makes trimming guesswork. Fit once per project so
+     * the first view shows everything, then never fight the operator's own
+     * zooming afterwards.
+     */
+    useEffect(() => {
+        if (fittedRef.current) return;
+        const el = scrollRef.current;
+        const dur = project?.durationSec ?? 0;
+        if (!el || dur <= 0) return;
+        const lane = el.clientWidth - TRACK_HEADER_W - 16;   // 16 = breathing room
+        if (lane <= 0) return;
+        usePlaybackStore.getState().setPxPerSec(lane / dur);
+        el.scrollLeft = 0;
+        fittedRef.current = true;
+    }, [project?.durationSec]);
 
     // While playing, keep the timeline scrolled so the playhead stays put —
     // the video scrubs the strip past the head instead of the head running off
@@ -69,7 +92,9 @@ export default function Timeline() {
     };
 
     // Ruler ticks — every 1s, labeled every 5s (adapt when zoomed out).
-    const step = pxPerSec < 20 ? 5 : 1;
+    // Widen the tick spacing when zoomed right out, or a fitted 2min project
+    // draws a tick every few pixels.
+    const step = pxPerSec < 6 ? 15 : pxPerSec < 20 ? 5 : 1;
     const ticks: number[] = [];
     for (let s = 0; s <= dur + 2; s += step) ticks.push(s);
 

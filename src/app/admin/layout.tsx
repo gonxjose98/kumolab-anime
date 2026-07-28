@@ -4,6 +4,7 @@
    keep their old styling until they adopt the shell. */
 import './tokens.css';
 import './admin.css';
+import RouteMemory from '@/components/admin/RouteMemory';
 
 // Set the light/dark attribute BEFORE paint so there's no flash of the wrong
 // theme. Reads the operator's saved choice; defaults to light (Clear Skies).
@@ -14,6 +15,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
         <>
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+            {/* Remembers the last list/tab route so the post editor's Back can
+                return there instead of a hardcoded page. */}
+            <RouteMemory />
             {children}
         </>
     );

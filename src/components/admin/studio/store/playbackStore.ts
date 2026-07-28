@@ -19,7 +19,12 @@ interface PlaybackStore {
     zoomBy: (factor: number) => void;
 }
 
-const MIN_PX = 8;
+// 2px/sec looks extreme, but it is what lets a full-length project (CAPS
+// .maxDurationSec = 120s) fit a phone's ~260px timeline lane. At the old floor
+// of 8 the editor opened part-way into a condensed strip with no view of the
+// whole clip, which makes trimming guesswork. Nothing forces this zoom; it is
+// the fit-on-open and the zoom-out button that reach for it.
+const MIN_PX = 2;
 const MAX_PX = 240;
 
 export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
