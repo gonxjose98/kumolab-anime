@@ -25,7 +25,6 @@ import { tmpdir } from 'os';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '../supabase/admin';
-import { processForSocial } from './video-processor';
 import { logError, logAction } from '../logging/structured-logger';
 import {
     QUALITY_MIN_HEIGHT,
@@ -54,9 +53,10 @@ export interface TrailerStaged {
 }
 
 export interface FetchYouTubeOptions {
-    // Skip the 9:16 letterbox + 60s trim FFmpeg pass. Used by operator-
-    // curated scrapes where the operator will trim/crop in the editor.
-    skipSocialProcessing?: boolean;
+    // Skip the min-resolution/bitrate gate. Used by operator-curated scrapes:
+    // the operator picked this video deliberately, so it is not for the
+    // pipeline to reject it.
+    skipQualityGate?: boolean;
     // Override the default 180s hard cap. Auto-publish keeps 180s; the
     // scrape path allows up to 300s (5min) to fit longer OPs/trailers.
     maxDurationSeconds?: number;
@@ -382,13 +382,13 @@ export async function fetchYouTubeToBucket(
     // slideshow/near-static → 'not_real_motion'. Both are operational skips
     // (action_logs) — the publisher's existing null-return path takes over
     // (no screenshot fallback, retryable). The operator-curated scrape path
-    // (skipSocialProcessing) is NOT gated: the operator judges quality in the
+    // (skipQualityGate) is NOT gated: the operator judges quality in the
     // editor. A failed probe fails OPEN — a gate bug must never halt publishes.
     const quality = await probeVideoQuality(downloaded);
     if (quality) {
         console.log(`[TrailerFetcher] Probe ${videoId}: ${quality.height}p @ ${(quality.bitrate / 1e6).toFixed(2)} Mbps, ${quality.fps} fps, tier ${quality.quality_tier}, motion=${quality.real_motion}`);
     }
-    if (quality && !options.skipSocialProcessing) {
+    if (quality && !options.skipQualityGate) {
         const rejectReason = quality.quality_tier === 'REJECT'
             ? 'low_quality'
             : !quality.real_motion ? 'not_real_motion' : null;
@@ -412,21 +412,16 @@ export async function fetchYouTubeToBucket(
         }
     }
 
-    // 3. FFmpeg pass — 9:16 letterbox, KumoLab watermark, 60s trim. Skipped
-    // when the caller is the operator-curated scrape path (they trim/crop
-    // in the editor).
-    let finalBuffer = downloaded;
-    if (!options.skipSocialProcessing) {
-        try {
-            const processed = await processForSocial(downloaded, { aspect: '9:16', maxSeconds: 60 });
-            if (processed && processed.length > 0) {
-                console.log(`[TrailerFetcher] FFmpeg pass: ${downloaded.length} → ${processed.length} bytes`);
-                finalBuffer = processed;
-            }
-        } catch (e: any) {
-            console.warn('[TrailerFetcher] FFmpeg pass threw, uploading raw:', e?.message || e);
-        }
-    }
+    // 3. Upload the source as-is. There used to be a 9:16 letterbox + 60s trim
+    // pass here. It had been failing on every publish ("Nothing was written
+    // into output file") and silently falling through to the raw download, so
+    // every post has in fact gone out in its native aspect for a long time.
+    //
+    // Removed rather than repaired, deliberately (Jose 2026-07-29): posts go up
+    // as they arrive unless the operator reframes them in Studio. The pass also
+    // re-encoded with no quality setting (x264 default CRF, veryfast), which
+    // would have thrown away much of the 1080p the downloader now fetches.
+    const finalBuffer = downloaded;
 
     // 4. Upload to bucket.
     const bucketPath = `${slug}-${videoId}.mp4`;
@@ -447,10 +442,11 @@ export async function fetchYouTubeToBucket(
         bucket_url: pub.publicUrl,
         bucket_path: bucketPath,
         video_id: videoId,
-        // When the social-processing pass runs, the video gets trimmed to 60s.
-        // When it's skipped (scrape path), report the original duration so
-        // the editor's trim timeline shows the full clip.
-        duration_seconds: options.skipSocialProcessing ? duration : Math.min(duration, 60),
+        // Always the true source duration. This used to be clamped to 60s on
+        // the auto path to match the trim in the old processing pass; with that
+        // pass gone the clamp just under-reported the file (an 82s trailer was
+        // being recorded as 60s).
+        duration_seconds: duration,
         bytes: finalBuffer.length,
         title,
         quality,

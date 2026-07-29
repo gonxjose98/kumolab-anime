@@ -8,7 +8,7 @@
  * later finds the staged video.
  *
  * Key differences vs auto-publish trailer fetch:
- *   - skipSocialProcessing: no 9:16 letterbox / 60s trim — operator
+ *   - skipQualityGate: the operator chose this video, so the
  *     trims in the editor.
  *   - maxDurationSeconds: 300 (vs 180) — fits longer OPs/trailers.
  *
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         const slugBase = post.slug || `scrape-${postId.split('-')[0]}`;
 
         const staged = await fetchYouTubeToBucket(youtubeUrl, slugBase, {
-            skipSocialProcessing: true,
+            skipQualityGate: true,
             maxDurationSeconds: 300,
         });
 
