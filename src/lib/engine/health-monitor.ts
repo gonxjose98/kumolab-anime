@@ -5,7 +5,7 @@
 
 import { supabaseAdmin } from '../supabase/admin';
 import { checkMetaTokenHealth } from './token-health';
-import { PLATFORM_KEYS } from './engine';
+import { PLATFORM_KEYS, retryCapFor } from './engine';
 
 export type HealthLevel = 'ok' | 'warn' | 'crit';
 
@@ -110,11 +110,15 @@ async function checkCronFreshness(): Promise<HealthCheck> {
 }
 
 async function checkStuckPosts(): Promise<HealthCheck> {
-    // Posts that hit auto-retry exhaustion (5 attempts, still no socials).
-    // Matches the publisher's generic retry: any recent non-DROP published
-    // post that never got a platform ID and has burned its attempts. (The old
-    // check only counted `skipped_reason='video_fetch_failed'`, so any other
+    // Posts that hit auto-retry exhaustion (still no socials). Matches the
+    // publisher's generic retry: any recent non-DROP published post that never
+    // got a platform ID and has burned its attempts. (The old check only
+    // counted `skipped_reason='video_fetch_failed'`, so any other
     // orphaned-post failure class was invisible here.)
+    //
+    // The cap is per-cause and comes from `retryCapFor` rather than a literal,
+    // because video-fetch failures stop at 2 to conserve proxy bandwidth. A
+    // hardcoded `>= 5` here would silently never flag them.
     const { data } = await supabaseAdmin
         .from('posts')
         .select('id, title, social_ids')
@@ -127,7 +131,7 @@ async function checkStuckPosts(): Promise<HealthCheck> {
         const sid: any = p.social_ids || {};
         const hasPlatform = PLATFORM_KEYS.some((k) => !!sid[k]);
         const attempts = (sid.publish_attempts as number) || 0;
-        return !hasPlatform && attempts >= 5;
+        return !hasPlatform && attempts >= retryCapFor(sid);
     });
     const n = stuck.length;
     if (n > 0) {

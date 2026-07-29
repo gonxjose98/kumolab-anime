@@ -49,6 +49,34 @@ function hasAnyPlatformId(socialIds: any): boolean {
     return PLATFORM_KEYS.some((k) => !!socialIds[k]);
 }
 
+/**
+ * How many publish attempts a post gets before it's declared stuck.
+ *
+ * The cap depends on what a retry COSTS, not only on how likely it is to work.
+ * A video-fetch retry re-runs the whole trailer-fetcher path: one /info plus a
+ * /download that itself burns up to 3 proxy attempts, each able to pull tens of
+ * MB before its 55s kill. That metered Webshare bandwidth (3 GB/mo) is the
+ * binding constraint, and a video failing twice running is usually permanently
+ * broken rather than transiently unlucky. Measured over 30 days: 11 posts
+ * burned all 5 attempts and still never published, so attempts 3-5 bought
+ * nothing but proxy bytes.
+ *
+ * Every OTHER failure class (expired Meta token, provider 5xx, broadcast threw)
+ * costs no proxy bandwidth and often IS transient, so it keeps the full 5.
+ *
+ * Shared with the health monitor so "exhausted its retries" means the same
+ * thing in both places. Hardcoding 5 there would have hidden every stuck video
+ * post, since those now top out at 2.
+ */
+export const RETRY_CAP_VIDEO_FETCH = 2;
+export const RETRY_CAP_DEFAULT = 5;
+
+export function retryCapFor(socialIds: any): number {
+    return socialIds?.skipped_reason === 'video_fetch_failed'
+        ? RETRY_CAP_VIDEO_FETCH
+        : RETRY_CAP_DEFAULT;
+}
+
 async function recordPublishedFingerprint(post: { id?: string; title: string; source_url?: string | null; anime_id?: string | null; claim_type?: string | null; }) {
     if (!post.title) return;
     const fp = createFingerprint(post.title, post.source_url || '');
@@ -311,11 +339,11 @@ export async function publishScheduledPosts() {
         .order('published_at', { ascending: true })
         .limit(20);
 
-    const retryPosts = (recentPublished || []).filter((rp) =>
-        !hasAnyPlatformId(rp.social_ids) &&
-        // Cap at 5 attempts to avoid infinite loops on permanently-broken posts
-        (((rp.social_ids?.publish_attempts as number) || 0) < 5)
-    );
+    const retryPosts = (recentPublished || []).filter((rp) => {
+        if (hasAnyPlatformId(rp.social_ids)) return false;
+        const attempts = (rp.social_ids?.publish_attempts as number) || 0;
+        return attempts < retryCapFor(rp.social_ids);
+    });
 
     const allPosts = [...(scheduledPosts || []), ...retryPosts];
 
