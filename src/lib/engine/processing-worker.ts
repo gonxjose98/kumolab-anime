@@ -24,6 +24,7 @@ import { runSlotSelection, assignFbOnlySlot } from './scheduler';
 import { scorePost } from './scoring';
 import { matchOffTopic } from './sources-config';
 import { getAnimeTierForTitle } from './anime-tiers';
+import { validateAnime } from './anilist-validator';
 import { evaluateCircuitBreaker } from './circuit-breaker';
 import { extractYouTubeVideo } from './video-extractor';
 import { isTrailerTrustedSource } from './automation-config';
@@ -376,9 +377,27 @@ async function createPendingPost(candidate: ProcessingCandidate, score: ContentS
     // post row so the Engine tab popup renders it with no recompute, and the
     // standby selection re-scores recency from breakdown.meta.detected_at.
     const tierMatch = await getAnimeTierForTitle(post.title, enrichedData.studio || candidate.source_name || undefined);
+
+    // Popularity fallback for titles the manual tier list doesn't know. Only
+    // looked up when there's no tier match, so the curated list still short-
+    // circuits the common case. This is the SAME validateAnime call
+    // decideAutoApproval makes a few lines below, and it caches for 10 minutes
+    // in-process, so the second call is a cache hit and AniList sees no extra
+    // traffic. Failures return undefined popularity, which scoreFranchise
+    // treats as "unknown" rather than "unpopular".
+    let anilistPopularity: number | null = null;
+    if (!tierMatch) {
+      const anilist = await validateAnime({
+        anime_id: candidate.metadata?.anime_id ?? null,
+        title: post.title,
+      });
+      anilistPopularity = typeof anilist.popularity === 'number' ? anilist.popularity : null;
+    }
+
     const postScore = scorePost({
       tier: tierMatch ? (tierMatch.tier as 1 | 2 | 3) : null,
       tierMatchedBy: tierMatch?.matchedBy ?? null,
+      anilistPopularity,
       claimType: post.claim_type,
       format: hasVideo ? 'real_video' : 'static_image',
       detectedAt: candidate.original_timestamp || candidate.detected_at,

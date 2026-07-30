@@ -10,11 +10,21 @@
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 
-interface AniListResult {
+export interface AniListResult {
     exists: boolean;
     canonicalTitle?: string;
     status?: string;       // FINISHED, RELEASING, NOT_YET_RELEASED, CANCELLED, HIATUS
     format?: string;       // TV, MOVIE, OVA, ONA, SPECIAL
+    /**
+     * AniList's user count for the series — how many people have it on a list.
+     * A stable proxy for franchise size that AniList maintains for us, which is
+     * exactly what the hand-curated `anime_tiers` table cannot do. The scorer
+     * uses it as the fallback when a title isn't in the manual tiers, so a
+     * Naruto or Fate post is no longer treated as an unknown franchise.
+     * Undefined when AniList had no answer (never coerce that to 0 — "unknown"
+     * and "nobody watches it" must stay distinguishable).
+     */
+    popularity?: number;
     reason?: string;
 }
 
@@ -83,7 +93,7 @@ export async function validateAnime(input: { anime_id?: string | number | null; 
 
     if (input.anime_id) {
         const data = await queryAniList(
-            `query ($id: Int) { Media(id: $id, type: ANIME) { id title { romaji english } status format } }`,
+            `query ($id: Int) { Media(id: $id, type: ANIME) { id title { romaji english } status format popularity } }`,
             { id: Number(input.anime_id) }
         );
         if (data?.Media) {
@@ -92,6 +102,7 @@ export async function validateAnime(input: { anime_id?: string | number | null; 
                 canonicalTitle: data.Media.title?.english || data.Media.title?.romaji,
                 status: data.Media.status,
                 format: data.Media.format,
+                popularity: typeof data.Media.popularity === 'number' ? data.Media.popularity : undefined,
             };
         } else {
             result = { exists: false, reason: 'anilist_id_not_found' };
@@ -102,7 +113,7 @@ export async function validateAnime(input: { anime_id?: string | number | null; 
 
     if (input.title && input.title.trim().length >= 2) {
         const data = await queryAniList(
-            `query ($q: String) { Media(search: $q, type: ANIME) { id title { romaji english } status format } }`,
+            `query ($q: String) { Media(search: $q, type: ANIME) { id title { romaji english } status format popularity } }`,
             { q: input.title.trim() }
         );
         if (data?.Media) {
@@ -111,6 +122,7 @@ export async function validateAnime(input: { anime_id?: string | number | null; 
                 canonicalTitle: data.Media.title?.english || data.Media.title?.romaji,
                 status: data.Media.status,
                 format: data.Media.format,
+                popularity: typeof data.Media.popularity === 'number' ? data.Media.popularity : undefined,
             };
         } else {
             result = { exists: false, reason: 'anilist_title_not_found' };

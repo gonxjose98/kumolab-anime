@@ -167,3 +167,79 @@ describe('applyMeasuredVideoQuality — publish-time probe', () => {
         expect(measured?.hard_gates.find(g => g.gate === 'min_video_quality')?.passed).toBe(false);
     });
 });
+
+// ── Untracked-franchise popularity fallback ────────────────────
+//
+// Regression cover for the 2026-07-30 stall: `anime_tiers` had gone 13 days
+// without a refresh, so every incoming post scored 0/40 on Franchise, capped at
+// 60 against the 75 bar, and auto-publishing silently dropped to zero. These
+// pin BOTH halves of the fix — the points AND the review-cap gate — because
+// awarding points alone still leaves the verdict at REVIEW forever.
+describe('scorePost — untracked franchise falls back to AniList popularity', () => {
+    const base = {
+        tier: null, tierMatchedBy: null, claimType: 'TRAILER_DROP',
+        format: 'real_video' as const, detectedAt: hoursAgo(1),
+        videoQuality: FULL_Q, now: NOW,
+    };
+
+    it('reproduces the stall: untracked with no popularity caps at 60 REVIEW', () => {
+        // 0 + 25 + 20 + 8 + 7 = 60. Exactly what every pending post showed.
+        const s = scorePost({ ...base, anilistPopularity: null });
+        expect(s.total).toBe(60);
+        expect(s.verdict).toBe('REVIEW');
+        expect(s.hard_gates.find(g => g.gate === 'tracked_franchise')?.passed).toBe(false);
+    });
+
+    it('major untracked franchise (200k+) now reaches AUTO_PUBLISH', () => {
+        // 30 + 25 + 20 + 8 + 7 = 90, and the gate opens. This is the Naruto /
+        // your name. case that was stuck in review.
+        const s = scorePost({ ...base, anilistPopularity: 350_000 });
+        expect(s.total).toBe(90);
+        expect(s.hard_gates.find(g => g.gate === 'tracked_franchise')?.passed).toBe(true);
+        expect(s.verdict).toBe('AUTO_PUBLISH');
+    });
+
+    it('large untracked franchise (100k) clears the bar at 82', () => {
+        const s = scorePost({ ...base, anilistPopularity: 100_000 });
+        expect(s.total).toBe(82);
+        expect(s.verdict).toBe('AUTO_PUBLISH');
+    });
+
+    it('mid-size (40k-99k) earns points but STAYS in review', () => {
+        // 14 + 25 + 20 + 8 + 7 = 74, one under the bar by construction, and the
+        // gate stays shut. Guards against the fallback quietly auto-publishing
+        // mid-tier shows on crowd data alone.
+        const s = scorePost({ ...base, anilistPopularity: 60_000 });
+        expect(s.total).toBe(74);
+        expect(s.hard_gates.find(g => g.gate === 'tracked_franchise')?.passed).toBe(false);
+        expect(s.verdict).toBe('REVIEW');
+    });
+
+    it('a tiny franchise scores low but is not rejected outright', () => {
+        // 8 + 25 + 20 + 8 + 7 = 68 — above the 55 reject floor, still REVIEW.
+        const s = scorePost({ ...base, anilistPopularity: 12_000 });
+        expect(s.total).toBe(68);
+        expect(s.verdict).toBe('REVIEW');
+    });
+
+    it('an unreachable AniList must not look like an unpopular show', () => {
+        // undefined = "no answer". If that were coerced to 0 it would land in
+        // the same bucket as a genuinely obscure title, so an AniList outage
+        // would silently downrank the whole queue. Both are 0 points here, but
+        // the REASON must say so, which is what makes the failure visible.
+        const s = scorePost({ ...base, anilistPopularity: undefined });
+        const f = s.components.find(c => c.label === 'Franchise / Tier')!;
+        expect(f.earned).toBe(0);
+        expect(f.reason).toContain('no AniList popularity');
+    });
+
+    it('a manual tier still outranks a huge popularity score', () => {
+        // Tier 3 = 20 pts beats the 30 a 200k+ show would get? No — and that is
+        // deliberate: curation wins on GATE and intent, not on raw points. What
+        // must hold is that the manual path is used and labelled as such.
+        const s = scorePost({ ...base, tier: 3, tierMatchedBy: 'anime', anilistPopularity: 900_000 });
+        const f = s.components.find(c => c.label === 'Franchise / Tier')!;
+        expect(f.earned).toBe(20);
+        expect(f.reason).toBe('Tier 3 franchise');
+    });
+});

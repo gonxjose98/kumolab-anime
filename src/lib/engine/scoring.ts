@@ -43,6 +43,9 @@ export interface ScorePostInput {
     /** 'anime' = matched by title; 'studio' = studio-fallback only (new original
      *  from a tracked/winner studio → 12 pts, not the full tier points). */
     tierMatchedBy?: 'anime' | 'studio' | null;
+    /** AniList user count, used ONLY when `tier` is null. See scoreFranchise.
+     *  undefined/null = AniList had no answer, which is NOT the same as 0. */
+    anilistPopularity?: number | null;
     claimType: string | null | undefined;
     format: PostFormat;
     /** When the news was detected (original_timestamp preferred). */
@@ -124,6 +127,93 @@ const CATEGORY_POINTS: Record<string, { pts: number; label: string }> = {
     STAFF_UPDATE:         { pts: 3,  label: 'cast / staff' },
 };
 
+/**
+ * AniList popularity bands used when a title is NOT in `anime_tiers`.
+ *
+ * WHY THIS EXISTS: `anime_tiers` is hand-curated and nothing refreshes it. The
+ * list built on 2026-07-17 held 24 currently-airing shows; by 2026-07-30 the
+ * news cycle had moved on and EVERY new post was scoring 0/40 here, capping at
+ * 60 against a 75 auto-publish bar. Auto-publishing silently fell to zero with
+ * no error logged, because "no tier match" is a legitimate answer, not a fault.
+ * Posts like Naruto and Fate/Grand Order were being treated as unknown
+ * franchises. AniList maintains popularity for us, so it degrades gracefully as
+ * the manual list ages instead of falling off a cliff.
+ *
+ * Bands sit BELOW the manual tiers on purpose (T1=40, T2=30, T3=20). Jose's
+ * curation always outranks a crowd metric; this is a floor, not a replacement.
+ */
+const POPULARITY_BANDS: { min: number; pts: number; label: string }[] = [
+    { min: 200_000, pts: 30, label: 'major franchise' },
+    { min: 100_000, pts: 22, label: 'large franchise' },
+    { min: 40_000, pts: 14, label: 'mid-size franchise' },
+    { min: 10_000, pts: 8, label: 'small franchise' },
+];
+
+/**
+ * Popularity at or above this ALSO clears the tracked_franchise review-cap gate.
+ *
+ * The gate matters as much as the points: it's a review-cap in computeVerdict,
+ * so a post failing it can never auto-publish no matter how high the total.
+ * Awarding points without opening the gate would have left auto-publish at zero
+ * and looked like the fix didn't work.
+ *
+ * 100k is deliberately conservative. Below it a post still earns points but
+ * stays in REVIEW, so the pipeline never starts auto-publishing obscure shows
+ * on crowd data alone. Check the arithmetic before lowering this: at 14 pts a
+ * post tops out at 14+25+20+8+7 = 74, one point under the bar, so the 40k band
+ * stays in review by construction.
+ */
+const POPULARITY_GATE_MIN = 100_000;
+
+function scoreFranchise(input: ScorePostInput): { component: ScoreComponent; gatePassed: boolean } {
+    const max = 40;
+    const tracked = input.tier !== null && input.tier !== undefined;
+
+    if (tracked) {
+        if (input.tierMatchedBy === 'studio') {
+            return {
+                component: { label: 'Franchise / Tier', earned: 12, max, reason: `tracked-studio fallback (tier ${input.tier} studio, title not in tiers)` },
+                gatePassed: true,
+            };
+        }
+        const pts = input.tier === 1 ? 40 : input.tier === 2 ? 30 : 20;
+        return {
+            component: { label: 'Franchise / Tier', earned: pts, max, reason: `Tier ${input.tier} franchise` },
+            gatePassed: true,
+        };
+    }
+
+    // Untracked. Fall back to AniList popularity when we actually have a number.
+    // `null`/`undefined` means AniList gave no answer, which must NOT be read as
+    // "unpopular" — an unreachable API would otherwise silently downrank
+    // everything, which is the same class of quiet failure this fallback exists
+    // to prevent.
+    const pop = input.anilistPopularity;
+    if (typeof pop !== 'number' || !Number.isFinite(pop)) {
+        return {
+            component: { label: 'Franchise / Tier', earned: 0, max, reason: 'untracked franchise (not in anime_tiers, no AniList popularity)' },
+            gatePassed: false,
+        };
+    }
+
+    const band = POPULARITY_BANDS.find((b) => pop >= b.min);
+    if (!band) {
+        return {
+            component: { label: 'Franchise / Tier', earned: 0, max, reason: `untracked franchise (AniList popularity ${pop.toLocaleString()}, below all bands)` },
+            gatePassed: false,
+        };
+    }
+    return {
+        component: {
+            label: 'Franchise / Tier',
+            earned: band.pts,
+            max,
+            reason: `untracked, AniList ${band.label} (popularity ${pop.toLocaleString()})`,
+        },
+        gatePassed: pop >= POPULARITY_GATE_MIN,
+    };
+}
+
 function scoreRecency(detectedAt: string | Date | null | undefined, now: Date): ScoreComponent {
     const max = 7;
     const ts = detectedAt ? new Date(detectedAt).getTime() : NaN;
@@ -154,18 +244,9 @@ export function scorePost(input: ScorePostInput): PostScore {
     const gates: ScoreHardGate[] = [];
 
     // ── Franchise / Tier (0-40) ────────────────────────────────
-    const tracked = input.tier !== null && input.tier !== undefined;
-    let franchise: ScoreComponent;
-    if (!tracked) {
-        franchise = { label: 'Franchise / Tier', earned: 0, max: 40, reason: 'untracked franchise (not in anime_tiers)' };
-    } else if (input.tierMatchedBy === 'studio') {
-        franchise = { label: 'Franchise / Tier', earned: 12, max: 40, reason: `tracked-studio fallback (tier ${input.tier} studio, title not in tiers)` };
-    } else {
-        const pts = input.tier === 1 ? 40 : input.tier === 2 ? 30 : 20;
-        franchise = { label: 'Franchise / Tier', earned: pts, max: 40, reason: `Tier ${input.tier} franchise` };
-    }
-    components.push(franchise);
-    gates.push({ gate: GATES.TRACKED_FRANCHISE, passed: tracked });
+    const franchise = scoreFranchise(input);
+    components.push(franchise.component);
+    gates.push({ gate: GATES.TRACKED_FRANCHISE, passed: franchise.gatePassed });
 
     // ── Video Quality (0-25) ───────────────────────────────────
     // Fake motion detected by the probe (real_motion=false) demotes a "real
@@ -221,8 +302,12 @@ export function scorePost(input: ScorePostInput): PostScore {
             : 'static image',
     });
 
-    // Fake motion on a tiered franchise never auto-publishes.
-    const fakeOnTiered = effectiveFormat === 'fake_motion' && tracked;
+    // Fake motion on a franchise we care about never auto-publishes. "Care
+    // about" now means the franchise gate opened, which covers a manual tier
+    // OR a high-popularity untracked show — reading the raw tier here would
+    // have let a slideshow for a 350k-popularity series auto-publish, since
+    // those newly clear 75 on points alone.
+    const fakeOnTiered = effectiveFormat === 'fake_motion' && franchise.gatePassed;
     gates.push({ gate: GATES.NO_FAKE_MOTION_ON_TIERED, passed: !fakeOnTiered });
 
     // Trailer claims must carry an embedded video (existing artifact rule).
