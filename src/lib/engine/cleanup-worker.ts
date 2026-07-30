@@ -14,7 +14,21 @@ import { extractBucketFile, bucketFileVariants } from '../supabase/storage-url';
 
 const STORAGE_BUCKET = 'blog-images';
 const VIDEO_BUCKET = 'blog-videos';
-const STORAGE_ALERT_BYTES = 400 * 1024 * 1024; // 400 MB
+// DB-size alert. 400 MB was chosen against the 500 MB free-tier DB limit; the
+// org is on Pro (8 GB) now, so this fires far too early to mean anything. Kept
+// as a coarse growth signal only.
+const DB_ALERT_BYTES = 400 * 1024 * 1024; // 400 MB
+
+// OBJECT-STORAGE alert. This is the one that matters: the July 2026 outage that
+// restricted the whole project API was the blog-videos BUCKET filling up, not
+// the database, and nothing measured buckets at all. Pro includes 100 GB, but
+// the practical concern is runaway growth, so alert well below that.
+//
+// Sized against real throughput: ~107 video downloads/month at ~25 MB each
+// (1080p) is ~2.7 GB/month of inflow that the sweep has to keep up with. 8 GB
+// means the sweep has fallen roughly three months behind, which is a real
+// problem long before it is a billing one.
+const BUCKET_ALERT_BYTES = 8 * 1024 * 1024 * 1024; // 8 GB
 
 export interface CleanupResult {
     expiredPostsDeleted: number;
@@ -32,6 +46,10 @@ export interface CleanupResult {
     logSweep: Record<string, number>;
     dbSizeBytes: number;
     storageAlert: boolean;
+    /** Total object-storage bytes across all buckets (0 if the probe failed). */
+    bucketBytes: number;
+    /** Per-bucket breakdown, so a runaway bucket is identifiable at a glance. */
+    bucketBytesByBucket: Record<string, number>;
     durationMs: number;
     errors: string[];
 }
@@ -68,6 +86,8 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         logSweep: {},
         dbSizeBytes: 0,
         storageAlert: false,
+        bucketBytes: 0,
+        bucketBytesByBucket: {},
         durationMs: 0,
         errors: [],
     };
@@ -379,20 +399,47 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         result.errors.push(`cleanup_stale_locks: ${e.message}`);
     }
 
-    // 12. DB size probe — alert if approaching the 500MB free-tier limit
+    // 12. DB size probe — coarse growth signal (see DB_ALERT_BYTES).
     try {
         const { data } = await supabaseAdmin.rpc('database_size_bytes');
         result.dbSizeBytes = typeof data === 'number' ? data : Number(data) || 0;
-        result.storageAlert = result.dbSizeBytes > STORAGE_ALERT_BYTES;
+        result.storageAlert = result.dbSizeBytes > DB_ALERT_BYTES;
         if (result.storageAlert) {
             await supabaseAdmin.from('error_logs').insert({
                 source: 'cleanup-worker',
-                error_message: `DB size ${(result.dbSizeBytes / 1024 / 1024).toFixed(1)} MB exceeds ${STORAGE_ALERT_BYTES / 1024 / 1024} MB alert threshold`,
+                error_message: `DB size ${(result.dbSizeBytes / 1024 / 1024).toFixed(1)} MB exceeds ${DB_ALERT_BYTES / 1024 / 1024} MB alert threshold`,
                 context: { dbSizeBytes: result.dbSizeBytes },
             });
         }
     } catch (e: any) {
         result.errors.push(`database_size_bytes: ${e.message}`);
+    }
+
+    // 12b. OBJECT-STORAGE probe. The July 2026 incident was bucket bytes, and
+    // nothing measured them. Sums metadata->>'size' across every bucket, so
+    // buckets the sweep deliberately never touches (studio-library) are counted
+    // too — those are exactly the ones that can grow without bound.
+    try {
+        const { data, error } = await supabaseAdmin.rpc('storage_bytes_by_bucket');
+        if (error) throw new Error(error.message);
+        const rows = (data as { bucket_id: string; bytes: number }[] | null) || [];
+        const total = rows.reduce((s, r) => s + (Number(r.bytes) || 0), 0);
+        result.bucketBytes = total;
+        result.bucketBytesByBucket = Object.fromEntries(rows.map(r => [r.bucket_id, Number(r.bytes) || 0]));
+        if (total > BUCKET_ALERT_BYTES) {
+            const gb = (total / 1024 ** 3).toFixed(2);
+            const breakdown = rows
+                .sort((a, b) => Number(b.bytes) - Number(a.bytes))
+                .map(r => `${r.bucket_id}=${(Number(r.bytes) / 1024 ** 3).toFixed(2)}GB`)
+                .join(', ');
+            await supabaseAdmin.from('error_logs').insert({
+                source: 'cleanup-worker.storage',
+                error_message: `Object storage ${gb} GB exceeds ${BUCKET_ALERT_BYTES / 1024 ** 3} GB alert threshold (${breakdown})`,
+                context: { totalBytes: total, byBucket: result.bucketBytesByBucket },
+            });
+        }
+    } catch (e: any) {
+        result.errors.push(`storage_bytes_by_bucket: ${e.message}`);
     }
 
     result.durationMs = Date.now() - start;

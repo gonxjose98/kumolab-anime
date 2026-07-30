@@ -548,7 +548,20 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             if (yt.youtube_video_id) result.youtube_video_id = yt.youtube_video_id;
             if (yt.youtube_url) result.youtube_url = yt.youtube_url;
             if (yt.skipped) console.log('[Social] YT Shorts:', yt.skipped);
-            if (yt.error) console.error('[Social] YT Shorts error:', yt.error);
+            if (yt.error) {
+                console.error('[Social] YT Shorts error:', yt.error);
+                // console.error alone reaches nobody: Vercel function logs are
+                // not monitored, so a dead YOUTUBE_REFRESH_TOKEN looked exactly
+                // like "feature intentionally off" and uploads could stop for
+                // weeks unnoticed. This is especially live while the Google
+                // OAuth app is unverified, since refresh tokens then expire
+                // after 7 days.
+                await logError({
+                    source: 'publisher.youtube',
+                    errorMessage: `YouTube Shorts upload failed: ${String(yt.error).slice(0, 250)}`,
+                    context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                }).catch(() => {});
+            }
         } else {
             console.log('[Social] YT Shorts: skipped (not a Studio-edited video)');
         }

@@ -98,6 +98,23 @@ export interface RefreshResult {
     daysUntilDataAccessExpiry?: number | null;
 }
 
+/**
+ * Record a rotation failure somewhere a human will actually see it.
+ *
+ * The cron hands its JSON to Vercel, which discards it, so a bad result there
+ * reaches nobody. error_logs is what health-monitor reads, so writing here is
+ * what converts silent decay into a visible fault.
+ */
+async function failRotation(reason: string, days?: number | null): Promise<RefreshResult> {
+    const { logError } = await import('../logging/structured-logger');
+    await logError({
+        source: 'token-health.refresh-meta',
+        errorMessage: reason,
+        context: { days_until_data_access_expiry: days ?? null },
+    }).catch(() => {});
+    return { ok: false, rotated: false, reason, daysUntilDataAccessExpiry: days };
+}
+
 export async function refreshMetaToken(): Promise<RefreshResult> {
     const currentToken = process.env.META_ACCESS_TOKEN;
     const appId = process.env.META_APP_ID;
@@ -154,13 +171,16 @@ export async function refreshMetaToken(): Promise<RefreshResult> {
     const vercelProjectId = process.env.VERCEL_PROJECT_ID;
     const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
+    // Same rule as the Threads refresh: a token we cannot PERSIST is a failed
+    // rotation, not a warning. Meta issues the extended token once; discarding
+    // it leaves the old one counting down while the cron reports success. This
+    // returned ok:true before, which is why rotation could stop for weeks with
+    // nothing in error_logs.
     if (!vercelToken || !vercelProjectId) {
-        return {
-            ok: true,
-            rotated: false,
-            reason: 'token refresh succeeded at Meta but VERCEL_TOKEN / VERCEL_PROJECT_ID not set — value not persisted',
+        return await failRotation(
+            'refreshed at Meta but VERCEL_TOKEN / VERCEL_PROJECT_ID not set — new token discarded, old one still expiring',
             daysUntilDataAccessExpiry,
-        };
+        );
     }
 
     const teamQuery = vercelTeamId ? `?teamId=${vercelTeamId}` : '';
@@ -179,24 +199,49 @@ export async function refreshMetaToken(): Promise<RefreshResult> {
     // Vercel stores prod and preview as separate entries — update each. If
     // any is type=sensitive, replace via DELETE+POST since sensitive vars
     // can't be PATCHed in place.
+    // These writes are the ONLY thing that makes the rotation durable, so their
+    // status has to be checked. Previously the responses were discarded and the
+    // function returned rotated:true unconditionally — an expired VERCEL_TOKEN
+    // would 401 on every call and still report a clean rotation, which is the
+    // most misleading version of this failure.
+    let allWritesOk = true;
     for (const e of existing) {
         if (e.type === 'sensitive') {
-            await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env/${e.id}${teamQuery}`, {
+            // Sensitive vars can't be PATCHed in place, so replace them.
+            const del = await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env/${e.id}${teamQuery}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${vercelToken}` },
             });
-            await fetch(`https://api.vercel.com/v10/projects/${vercelProjectId}/env${teamQuery}`, {
+            const post = await fetch(`https://api.vercel.com/v10/projects/${vercelProjectId}/env${teamQuery}`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${vercelToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: 'META_ACCESS_TOKEN', value: newToken, type: 'encrypted', target: e.target }),
             });
+            // A DELETE that succeeded followed by a POST that failed leaves the
+            // var MISSING entirely, which breaks publishing outright rather
+            // than merely failing to rotate. Call it out specifically.
+            if (del.ok && !post.ok) {
+                return await failRotation(
+                    `META_ACCESS_TOKEN was deleted but could not be recreated (POST ${post.status}) — the env var may now be MISSING`,
+                    daysUntilDataAccessExpiry,
+                );
+            }
+            if (!del.ok || !post.ok) allWritesOk = false;
         } else {
-            await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env/${e.id}${teamQuery}`, {
+            const patch = await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env/${e.id}${teamQuery}`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${vercelToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value: newToken }),
             });
+            if (!patch.ok) allWritesOk = false;
         }
+    }
+
+    if (!allWritesOk) {
+        return await failRotation(
+            'refreshed at Meta but writing the new token to the Vercel env failed (check VERCEL_TOKEN is not expired) — new token discarded, old one still expiring',
+            daysUntilDataAccessExpiry,
+        );
     }
 
     return { ok: true, rotated: true, daysUntilDataAccessExpiry };

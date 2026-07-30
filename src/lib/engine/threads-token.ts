@@ -9,7 +9,25 @@
 // On success, we hot-swap the new token into Vercel via the Vercel REST
 // API so the next cron tick picks it up without a full redeploy.
 
+import { logError } from '../logging/structured-logger';
+
 const REFRESH_URL = 'https://graph.threads.net/refresh_access_token';
+
+/**
+ * Record a rotation failure where it will actually be SEEN.
+ *
+ * The cron's JSON response is discarded by Vercel, so a bad result there
+ * reaches nobody. error_logs is what the health monitor reads, so writing here
+ * is what turns this from silent decay into something that surfaces.
+ */
+async function fail(reason: string, days?: number): Promise<ThreadsTokenRefreshResult> {
+    await logError({
+        source: 'threads-token.refresh',
+        errorMessage: reason,
+        context: { days_until_expiry: days ?? null },
+    }).catch(() => {});
+    return { ok: false, rotated: false, daysUntilExpiry: days, reason };
+}
 
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
@@ -46,22 +64,34 @@ export async function refreshThreadsToken(): Promise<ThreadsTokenRefreshResult> 
         const expiresIn = data.expires_in as number | undefined;
         const days = expiresIn ? Math.floor(expiresIn / 86400) : undefined;
 
-        // Hot-swap into Vercel env so the next cron tick uses the rotated token
+        // Hot-swap into Vercel env so the next cron tick uses the rotated token.
+        //
+        // A refresh we cannot PERSIST is a failure, not a success. Threads
+        // hands back a new 60-day token exactly once; if we don't store it,
+        // that token is gone and the OLD one keeps counting down to zero.
+        // Both branches below used to return ok:true, so the cron reported
+        // success while the account drifted toward a dead token with nothing
+        // logged. `ok` now means "the system is in a good state", not "the HTTP
+        // call worked" — that distinction is the whole bug.
         if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
-            return {
-                ok: true,
-                rotated: false,
-                daysUntilExpiry: days,
-                reason: 'refreshed but VERCEL_TOKEN/VERCEL_PROJECT_ID missing — token NOT pushed to env',
-            };
+            return await fail(
+                'refreshed at Threads but VERCEL_TOKEN/VERCEL_PROJECT_ID missing — new token discarded, old one still expiring',
+                days,
+            );
         }
 
         const updateOk = await updateVercelEnv('THREADS_ACCESS_TOKEN', newToken);
+        if (!updateOk) {
+            return await fail(
+                'refreshed at Threads but the Vercel env update failed — new token discarded, old one still expiring',
+                days,
+            );
+        }
         return {
             ok: true,
-            rotated: updateOk,
+            rotated: true,
             daysUntilExpiry: days,
-            reason: updateOk ? 'rotated and pushed to Vercel env' : 'refreshed but Vercel env update failed',
+            reason: 'rotated and pushed to Vercel env',
         };
     } catch (e: any) {
         return { ok: false, rotated: false, reason: `threw: ${e?.message || e}` };

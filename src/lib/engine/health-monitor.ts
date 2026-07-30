@@ -301,6 +301,126 @@ async function checkStore(): Promise<HealthCheck> {
     return { key: 'store', label: 'Store', level: 'ok', detail: 'Stripe + Printful configured' };
 }
 
+/**
+ * Threads token rotation. Nothing watched this before, so a failed rotation
+ * was invisible until posting simply stopped at day 60.
+ *
+ * There's no cheap Threads equivalent of Meta's debug_token, so instead of
+ * probing the token we watch whether ROTATION is succeeding: refreshThreadsToken
+ * now writes to error_logs when it can't persist a new token. A failure inside
+ * the last two cron cycles (weekly, so 15 days) means the clock is running down
+ * with no rotation happening.
+ */
+async function checkThreadsToken(): Promise<HealthCheck> {
+    if (!process.env.THREADS_ACCESS_TOKEN) {
+        return { key: 'threads_token', label: 'Threads Token', level: 'ok', detail: 'Not configured' };
+    }
+    const since = new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString();
+    const { data } = await supabaseAdmin
+        .from('error_logs')
+        .select('error_message, created_at')
+        .eq('source', 'threads-token.refresh')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    const latest = data?.[0];
+    if (latest) {
+        return {
+            key: 'threads_token',
+            label: 'Threads Token',
+            level: 'crit',
+            detail: `Rotation failing since ${new Date(latest.created_at).toISOString().slice(0, 10)}: ${String(latest.error_message).slice(0, 120)}`,
+            actionable: 'Threads tokens die 60 days after issue. Re-mint and set THREADS_ACCESS_TOKEN, and check VERCEL_TOKEN has not expired',
+        };
+    }
+    return { key: 'threads_token', label: 'Threads Token', level: 'ok', detail: 'Rotating cleanly' };
+}
+
+/**
+ * Staleness of the hand-curated `anime_tiers` list.
+ *
+ * This is the check that would have caught the 2026-07-30 stall. The list is
+ * edited by hand and nothing refreshes it; as it ages, more posts miss it and
+ * score 0/40 on Franchise. There is now an AniList popularity fallback so a
+ * stale list no longer drives auto-publishing to zero, but it still degrades
+ * targeting, and a curated list nobody has touched in weeks is worth surfacing.
+ *
+ * Thresholds come from the observed incident: the list went stale enough to
+ * stall the pipeline at 13 days, so warn before that and crit past it.
+ */
+async function checkTierListFreshness(): Promise<HealthCheck> {
+    const { data } = await supabaseAdmin
+        .from('anime_tiers')
+        .select('updated_at')
+        .eq('active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+    const newest = data?.[0]?.updated_at;
+    if (!newest) {
+        return {
+            key: 'tier_list',
+            label: 'Anime Tiers',
+            level: 'crit',
+            detail: 'No active tier entries',
+            actionable: 'Add current-season shows at /admin/engine — every post will fall back to AniList popularity',
+        };
+    }
+    const days = Math.floor((Date.now() - new Date(newest).getTime()) / 86_400_000);
+    if (days >= 21) {
+        return {
+            key: 'tier_list',
+            label: 'Anime Tiers',
+            level: 'crit',
+            detail: `Not updated in ${days} days`,
+            actionable: 'Refresh the current-season list at /admin/engine',
+        };
+    }
+    if (days >= 10) {
+        return {
+            key: 'tier_list',
+            label: 'Anime Tiers',
+            level: 'warn',
+            detail: `Not updated in ${days} days`,
+            actionable: 'Refresh the current-season list at /admin/engine',
+        };
+    }
+    return { key: 'tier_list', label: 'Anime Tiers', level: 'ok', detail: `Updated ${days}d ago` };
+}
+
+/**
+ * Object-storage usage. The July 2026 outage that restricted the whole project
+ * API was a bucket filling up, and nothing watched buckets.
+ *
+ * This lives here rather than relying on the cleanup worker's error_logs row
+ * because checkErrors() only crits at 10+ errors/hour — a single daily storage
+ * warning would never have tripped it, which is exactly how the last one went
+ * unnoticed.
+ */
+async function checkStorage(): Promise<HealthCheck> {
+    const { data, error } = await supabaseAdmin.rpc('storage_bytes_by_bucket');
+    if (error || !data) {
+        return { key: 'storage', label: 'Storage', level: 'warn', detail: 'Size probe unavailable' };
+    }
+    const rows = data as { bucket_id: string; bytes: number; objects: number }[];
+    const total = rows.reduce((s, r) => s + (Number(r.bytes) || 0), 0);
+    const gb = total / 1024 ** 3;
+    const biggest = [...rows].sort((a, b) => Number(b.bytes) - Number(a.bytes))[0];
+    const detail = `${gb.toFixed(2)} GB${biggest ? ` (largest: ${biggest.bucket_id})` : ''}`;
+
+    // Pro includes 100 GB. These fire on runaway growth, long before billing:
+    // ~2.7 GB/month flows in at current 1080p volume, so 8 GB means the sweep
+    // is roughly three months behind.
+    if (gb >= 12) {
+        return { key: 'storage', label: 'Storage', level: 'crit', detail, actionable: 'Purge old objects; check the cleanup worker is sweeping and that studio-library is not unbounded' };
+    }
+    if (gb >= 8) {
+        return { key: 'storage', label: 'Storage', level: 'warn', detail, actionable: 'Growth outpacing the cleanup sweep — review bucket retention' };
+    }
+    return { key: 'storage', label: 'Storage', level: 'ok', detail };
+}
+
 export async function getHealthSnapshot(): Promise<HealthSnapshot> {
     const checks = await Promise.all([
         checkWorker(),
@@ -309,6 +429,9 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
         checkStuckPosts(),
         checkPublishCadence(),
         checkMetaToken(),
+        checkThreadsToken(),
+        checkTierListFreshness(),
+        checkStorage(),
         checkErrors(),
         checkStore(),
     ]);
@@ -335,7 +458,32 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
 // is persisted in the worker_locks table under lock_key='health_state'.
 export async function fireHealthAlertsIfChanged(snap: HealthSnapshot): Promise<{ fired: number; skipped: number }> {
     const webhook = process.env.HEALTH_ALERT_WEBHOOK;
-    if (!webhook) return { fired: 0, skipped: snap.checks.length };
+    if (!webhook) {
+        // Without a webhook, every check above is decorative — the whole health
+        // system computes correctly and then tells nobody. That is how a stale
+        // tier list stalled publishing for two days unnoticed. An unconfigured
+        // alerter is itself a fault, so record it where the admin dashboard can
+        // show it instead of returning quietly.
+        //
+        // Deliberately rate-limited to once a day: this runs every 30 minutes,
+        // and flooding error_logs would trip the 10-errors/hour check and mask
+        // real faults with noise about the alerter.
+        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+        const { count } = await supabaseAdmin
+            .from('error_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('source', 'health-monitor.no-webhook')
+            .gte('created_at', since);
+        if (!count) {
+            const bad = snap.checks.filter(c => c.level !== 'ok');
+            await supabaseAdmin.from('error_logs').insert({
+                source: 'health-monitor.no-webhook',
+                error_message: `HEALTH_ALERT_WEBHOOK is not set — no health alert can reach anyone. ${bad.length} check(s) currently not OK.`,
+                context: { unhealthy: bad.map(c => ({ key: c.key, level: c.level, detail: c.detail })) },
+            }).then(() => {}, () => {});
+        }
+        return { fired: 0, skipped: snap.checks.length };
+    }
 
     // Load previous state
     const { data: prev } = await supabaseAdmin
