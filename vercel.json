@@ -47,6 +47,10 @@
     {
       "path": "/api/cron?worker=newsletter",
       "schedule": "0 14 * * 0"
+    },
+    {
+      "path": "/api/cron?worker=refresh-tiers",
+      "schedule": "0 6 * * 3"
     }
   ],
   "build": {

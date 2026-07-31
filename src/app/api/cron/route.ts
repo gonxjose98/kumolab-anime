@@ -392,6 +392,25 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        // Weekly anime_tiers top-up. The tier list used to be hand-maintained
+        // and nothing refreshed it, so it aged out and quietly took
+        // auto-publishing to zero (see tier-refresh.ts). This keeps it current
+        // without anyone remembering to. Manual entries are never touched.
+        if (worker === 'refresh-tiers') {
+            console.log('[Cron] Refreshing anime tiers...');
+            const { refreshAnimeTiers } = await import('@/lib/engine/tier-refresh');
+            const result = await refreshAnimeTiers();
+            return NextResponse.json({
+                success: result.ok,
+                worker: 'refresh-tiers',
+                added: result.added,
+                retiered: result.retiered,
+                considered: result.considered,
+                lookups: result.lookups,
+                reason: result.reason,
+            });
+        }
+
         if (worker === 'cleanup') {
             console.log('[Cron] Running Cleanup Worker...');
             const result = await runCleanupWorker();
@@ -494,7 +513,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             error: 'Invalid worker parameter.',
-            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter']
+            valid_workers: ['detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup', 'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social', 'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter', 'refresh-tiers']
         }, { status: 400 });
 
     } catch (error: any) {
