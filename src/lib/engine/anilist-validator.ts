@@ -84,6 +84,37 @@ async function queryAniList(query: string, variables: Record<string, any>): Prom
  *   - On network failure / timeout: returns { exists: false, reason: 'anilist_unreachable' }
  *     — caller decides whether to treat as hard-fail or soft-pass.
  */
+/**
+ * Search terms to try against AniList, best first.
+ *
+ * A KumoLab headline is NOT a searchable anime title. It reads like
+ * `'Be Forever Yamato: Rebel 3199' 7th Film Teaser Released • Premieres...`
+ * and AniList's fuzzy search returns nothing for the whole string, so the
+ * popularity fallback scored every post 0/40 even for well-known franchises.
+ * (The bug hid during testing because the tests passed clean names like
+ * "Naruto"; production titles never look like that.)
+ *
+ * The formatter always wraps the series name in quotes, so that is the primary
+ * candidate. Long official subtitles still miss — "Fate/Grand Order - Ordeal
+ * Call III: Bellum Novae Humanitatis" finds nothing while "Fate/Grand Order"
+ * matches — so progressively shorter prefixes are tried before giving up.
+ */
+export function animeSearchCandidates(title: string): string[] {
+    const out: string[] = [];
+    const push = (s?: string | null) => {
+        const v = (s || '').trim().replace(/\s+/g, ' ');
+        if (v.length >= 2 && !out.includes(v)) out.push(v);
+    };
+    const quoted = title.match(/['"‘’“”‚„′″❛❜]([^'"‘’“”‚„′″❛❜]{2,60}?)['"‘’“”‚„′″❛❜]/);
+    const base = quoted ? quoted[1] : title;
+    push(base);
+    // Trim official subtitles: "X - Sub: Sub2" → "X - Sub" → "X".
+    push(base.split(/\s+[-–—]\s+/)[0]);
+    push(base.split(/\s*:\s*/)[0]);
+    if (!quoted) push(title.split(/\s+/).slice(0, 4).join(' '));
+    return out;
+}
+
 export async function validateAnime(input: { anime_id?: string | number | null; title?: string | null }): Promise<AniListResult> {
     const key = cacheKey(input.anime_id, input.title ?? undefined);
     const cached = getCached(key);
@@ -112,20 +143,22 @@ export async function validateAnime(input: { anime_id?: string | number | null; 
     }
 
     if (input.title && input.title.trim().length >= 2) {
-        const data = await queryAniList(
-            `query ($q: String) { Media(search: $q, type: ANIME) { id title { romaji english } status format popularity } }`,
-            { q: input.title.trim() }
-        );
-        if (data?.Media) {
-            result = {
-                exists: true,
-                canonicalTitle: data.Media.title?.english || data.Media.title?.romaji,
-                status: data.Media.status,
-                format: data.Media.format,
-                popularity: typeof data.Media.popularity === 'number' ? data.Media.popularity : undefined,
-            };
-        } else {
-            result = { exists: false, reason: 'anilist_title_not_found' };
+        result = { exists: false, reason: 'anilist_title_not_found' };
+        for (const q of animeSearchCandidates(input.title)) {
+            const data = await queryAniList(
+                `query ($q: String) { Media(search: $q, type: ANIME) { id title { romaji english } status format popularity } }`,
+                { q }
+            );
+            if (data?.Media) {
+                result = {
+                    exists: true,
+                    canonicalTitle: data.Media.title?.english || data.Media.title?.romaji,
+                    status: data.Media.status,
+                    format: data.Media.format,
+                    popularity: typeof data.Media.popularity === 'number' ? data.Media.popularity : undefined,
+                };
+                break;
+            }
         }
         setCached(key, result);
         return result;
