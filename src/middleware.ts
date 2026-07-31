@@ -16,7 +16,47 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes inside /api/admin that must remain reachable without a session
 // (none today; reserved for any future "set-cookie" exchange route).
+//
+// DO NOT add the agent routes below to this set. It is an UNCONDITIONAL auth
+// bypass — membership here means no credential of any kind is checked. The
+// agent surface needs a key, so it gets its own branch instead.
 const ADMIN_PUBLIC_API: ReadonlySet<string> = new Set();
+
+// ── AI-agent API surface ────────────────────────────────────────
+//
+// These paths accept `Authorization: Bearer ${AGENT_API_KEY}` in ADDITION to a
+// normal admin cookie session, so an external agent Jose connects can read the
+// system state and report what it is working on.
+//
+// They live under /api/admin deliberately: the middleware matcher only covers
+// /api/cron, /api/admin and /api/posts, so a route at /api/agent/* would match
+// NOTHING and ship as a completely unauthenticated public endpoint — including
+// the heartbeat, which writes.
+//
+// The key is compared with a length-independent scan rather than === to avoid
+// leaking its length through response timing.
+const AGENT_BEARER_API: readonly string[] = [
+    '/api/admin/engine/state',
+    '/api/admin/agent/heartbeat',
+];
+
+function safeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+}
+
+/** True when this request carries a valid agent key for an agent-enabled path. */
+function hasAgentKey(req: NextRequest): boolean {
+    if (!AGENT_BEARER_API.some((p) => req.nextUrl.pathname === p)) return false;
+    const key = process.env.AGENT_API_KEY;
+    // Unset key = feature off. Never fall open.
+    if (!key || key.length < 16) return false;
+    const header = req.headers.get('authorization') ?? '';
+    if (!header.startsWith('Bearer ')) return false;
+    return safeEqual(header.slice(7), key);
+}
 
 // Per-permission gate for the JSON admin APIs. Being logged in is not enough:
 // a sub-user whose toggle is OFF for an area must not be able to call that
@@ -77,6 +117,11 @@ function checkCron(req: NextRequest): NextResponse | null {
 
 async function checkAdmin(req: NextRequest): Promise<NextResponse | null> {
     if (ADMIN_PUBLIC_API.has(req.nextUrl.pathname)) return null;
+
+    // A valid agent key stands in for a session on the agent surface only.
+    // Checked before the Supabase round-trip because an agent has no cookie and
+    // would otherwise be rejected at getUser().
+    if (hasAgentKey(req)) return null;
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

@@ -1,0 +1,330 @@
+/*
+ * jarvis.css — the Engine blueprint's scoped palette.
+ *
+ * This tab opts OUT of the admin light/dark toggle and is always a deep
+ * midnight field, because light beams travelling along edges only read against
+ * darkness. The glow is KumoLab gold and sea blue, never holographic cyan: this
+ * should look like KumoLab's own nervous system, not a costume.
+ *
+ * Scoped as `.admin-root .jarvis` and NOT `.jarvis` alone. studio.css does the
+ * same (`.admin-root .st-root`) — a bare single-class selector loses the
+ * specificity fight with the theme tokens on :root[data-theme].
+ */
+
+.admin-root .jarvis {
+    /* Field */
+    --j-void: #05070f;
+    --j-deep: #080d1c;
+    --j-grid: rgba(111, 178, 255, 0.055);
+
+    /* Inherited KumoLab hues, night values */
+    --gold: #e6c489;
+    --blue: #6fb2ff;
+    --ok: #35c88a;
+    --sun: #ff7a6b;
+
+    --ink: #f2f9ff;
+    --ink-2: rgba(226, 240, 255, 0.72);
+    --ink-3: rgba(200, 220, 245, 0.42);
+    --line: rgba(226, 176, 90, 0.26);
+    --surface: rgba(12, 18, 44, 0.62);
+    --surface-2: rgba(18, 26, 56, 0.72);
+
+    /* Node states. Named by MEANING, not colour, so a future palette change
+       doesn't require re-reading every component. */
+    --j-idle: rgba(140, 175, 225, 0.5);
+    --j-live: var(--gold);
+    --j-warn: #ffc46b;
+    --j-crit: var(--sun);
+    --j-good: var(--ok);
+
+    position: relative;
+    background:
+        radial-gradient(120% 90% at 50% 42%, rgba(36, 66, 132, 0.34) 0%, rgba(8, 13, 28, 0) 62%),
+        radial-gradient(70% 60% at 50% 50%, rgba(230, 196, 137, 0.07) 0%, rgba(5, 7, 15, 0) 70%),
+        var(--j-void);
+    color: var(--ink);
+    border-radius: 16px;
+    border: 1px solid rgba(111, 178, 255, 0.14);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Faint engineering grid. Pure decoration, sits under everything. */
+.admin-root .jarvis::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--j-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--j-grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at 50% 45%, #000 25%, transparent 78%);
+    -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 25%, transparent 78%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.admin-root .jarvis__stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: block;
+    touch-action: none; /* we handle pan/zoom ourselves via pointer events */
+}
+
+/* ── Nodes ──────────────────────────────────────────────────── */
+
+.admin-root .jarvis .j-node {
+    cursor: pointer;
+    transition: opacity 260ms ease;
+}
+
+.admin-root .jarvis .j-node__hit {
+    fill: transparent;
+    stroke: none;
+}
+
+.admin-root .jarvis .j-node__body {
+    transition: fill 400ms ease, stroke 400ms ease;
+}
+
+.admin-root .jarvis .j-node__label {
+    font-family: var(--ak-display, inherit);
+    font-size: 11.5px;
+    font-weight: 700;
+    fill: rgba(232, 244, 255, 0.88);
+    letter-spacing: 0.015em;
+    pointer-events: none;
+    transition: fill 260ms ease, opacity 260ms ease;
+    /* The labels sit over edges and glow; without a shadow they smear into
+       the field wherever a curve passes behind one. */
+    paint-order: stroke;
+    stroke: rgba(5, 7, 15, 0.85);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+
+.admin-root .jarvis .j-node--focused .j-node__label,
+.admin-root .jarvis .j-node:hover .j-node__label {
+    fill: var(--ink);
+}
+
+.admin-root .jarvis .j-node--dimmed {
+    opacity: 0.16;
+    pointer-events: none;
+}
+
+/* Keyboard focus has to be visible — the canvas is fully tab-navigable. */
+.admin-root .jarvis .j-node:focus-visible {
+    outline: none;
+}
+
+.admin-root .jarvis .j-node:focus-visible .j-node__body {
+    stroke: var(--gold);
+    stroke-width: 2.5;
+}
+
+/* ── Edges ──────────────────────────────────────────────────── */
+
+.admin-root .jarvis .j-edge {
+    fill: none;
+    stroke: rgba(111, 178, 255, 0.16);
+    stroke-width: 1;
+    transition: stroke 300ms ease, stroke-width 300ms ease;
+}
+
+.admin-root .jarvis .j-edge--active {
+    stroke: rgba(230, 196, 137, 0.5);
+    stroke-width: 1.6;
+}
+
+.admin-root .jarvis .j-edge--dimmed {
+    stroke: rgba(111, 178, 255, 0.05);
+}
+
+/* ── Breathing ──────────────────────────────────────────────── */
+/*
+ * Ambient life for healthy idle nodes. Deliberately CSS rather than the rAF
+ * loop: the compositor handles it off the main thread, so a hundred breathing
+ * nodes cost nothing measurable, and prefers-reduced-motion switches it off
+ * without any JS branching.
+ */
+@keyframes j-breathe {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 0.95; transform: scale(1.06); }
+}
+
+@keyframes j-flicker {
+    0%, 100%  { opacity: 0.85; }
+    42%       { opacity: 0.35; }
+    46%       { opacity: 0.95; }
+    58%       { opacity: 0.45; }
+}
+
+.admin-root .jarvis .j-halo {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: j-breathe var(--j-breathe-dur, 5.5s) ease-in-out infinite;
+    animation-delay: var(--j-breathe-delay, 0s);
+    pointer-events: none;
+}
+
+.admin-root .jarvis .j-halo--crit {
+    animation: j-flicker 1.8s steps(1, end) infinite;
+}
+
+/* Stalled: started and never finished. Rendered as a dashed, rotating ring so
+   it reads as "in progress but wrong" rather than simply failed. */
+@keyframes j-spin {
+    to { transform: rotate(360deg); }
+}
+
+.admin-root .jarvis .j-stalled {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: j-spin 9s linear infinite;
+    stroke-dasharray: 3 7;
+    fill: none;
+    pointer-events: none;
+}
+
+/* ── Agent presence ─────────────────────────────────────────── */
+
+@keyframes j-orbit {
+    to { transform: rotate(360deg); }
+}
+
+.admin-root .jarvis .j-agent {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: j-orbit 6s linear infinite;
+    pointer-events: none;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+/*
+ * Everything above is decoration. Turning it all off must leave the page
+ * equally INFORMATIVE, not merely usable — state still reads through colour,
+ * which is why node state is never conveyed by motion alone.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .admin-root .jarvis .j-halo,
+    .admin-root .jarvis .j-halo--crit,
+    .admin-root .jarvis .j-stalled,
+    .admin-root .jarvis .j-agent {
+        animation: none !important;
+    }
+}
+
+/* ── Chrome ─────────────────────────────────────────────────── */
+
+.admin-root .jarvis__hud {
+    position: absolute;
+    z-index: 3;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.admin-root .jarvis__hud--tl { top: 12px; left: 14px; }
+.admin-root .jarvis__hud--tr { top: 12px; right: 14px; }
+.admin-root .jarvis__hud--bl { bottom: 12px; left: 14px; }
+
+.admin-root .jarvis__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(111, 178, 255, 0.2);
+    background: rgba(8, 13, 28, 0.66);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.admin-root .jarvis__chip:hover { color: var(--ink); border-color: rgba(230, 196, 137, 0.42); }
+.admin-root .jarvis__chip[disabled] { opacity: 0.4; cursor: default; }
+
+/* ── Inspector ──────────────────────────────────────────────── */
+
+.admin-root .jarvis__inspector {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(360px, 82vw);
+    background: linear-gradient(180deg, rgba(10, 16, 36, 0.95), rgba(6, 10, 24, 0.97));
+    border-left: 1px solid rgba(111, 178, 255, 0.18);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px 16px 24px;
+    animation: j-slide-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes j-slide-in {
+    from { transform: translateX(16px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes j-sheet-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* On a phone the inspector becomes a bottom sheet. A 360px-wide side drawer
+   would leave no canvas at all. */
+@media (max-width: 720px) {
+    .admin-root .jarvis__inspector {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        max-height: 62%;
+        border-left: none;
+        border-top: 1px solid rgba(111, 178, 255, 0.18);
+        border-radius: 16px 16px 0 0;
+        animation: j-sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-root .jarvis__inspector { animation: none; }
+}
+
+.admin-root .jarvis__kv {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    gap: 4px 10px;
+    font-size: 0.8rem;
+}
+
+.admin-root .jarvis__kv dt {
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding-top: 2px;
+}
+
+.admin-root .jarvis__kv dd {
+    color: var(--ink-2);
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}

@@ -56,6 +56,57 @@ export async function getPeakSlots(): Promise<PeakSlot[]> {
     return readKey<PeakSlot[]>('peak_slots', DEFAULT_SLOTS);
 }
 
+/**
+ * KumoLab's PROJECT goals — deliberately distinct from the APEX global goals.
+ *
+ * An AI agent picking up work on KumoLab needs to know what this project is
+ * trying to do, which is not the same question as what the umbrella business is
+ * trying to do. Surfaced in the Engine brief popup alongside the posting
+ * formula.
+ *
+ * Read-only in the UI. Edit the `project_goals` row in engine_config to change
+ * them; no deploy needed. The defaults below are the fallback so the panel
+ * renders before anyone has written that row.
+ */
+export async function getProjectGoals(): Promise<FormulaElement[]> {
+    return readKey<FormulaElement[]>('project_goals', DEFAULT_GOALS);
+}
+
+const DEFAULT_GOALS: FormulaElement[] = [
+    {
+        title: 'Revenue before tooling',
+        detail: 'KumoLab has been at $0. Sponsorships and the merch drop are the priority; new work should '
+            + 'default to revenue, not more automation. AdSense is deferred — traffic is too low to justify it.',
+    },
+    {
+        title: 'Anime only',
+        detail: 'Not live action, not games, not reviews or reaction content. Off-topic candidates are '
+            + 'rejected at ingestion. Note the keyword lists cannot block "gacha", "switch" or "game" — '
+            + 'those appear in real anime titles.',
+    },
+    {
+        title: 'Quality over volume',
+        detail: 'Tripling post volume HALVED total views. The top 10% of posts earn 83.5% of them. '
+            + 'Hold 2-3 reels a day and protect the peak slots for the highest-ceiling content.',
+    },
+    {
+        title: 'The winning formula',
+        detail: 'Known franchise + trailer or season news + video + Friday-to-Monday, 7-8am ET. '
+            + 'Automate the formula rather than changing the output by hand.',
+    },
+    {
+        title: 'Fail loudly, not silently',
+        detail: 'KumoLab breaks by going stale, not by throwing. A tier list nobody updated stalled '
+            + 'publishing for two days with no error anywhere. Anything that can decay needs a freshness '
+            + 'check that reaches a human.',
+    },
+    {
+        title: 'The operator is one person',
+        detail: 'Every automation must degrade to something Jose can understand and correct in a few '
+            + 'minutes. A clever system nobody can debug at 2am is worse than a plain one.',
+    },
+];
+
 /** Persist the full peak-slot array (the admin edits one time, sends all three). */
 export async function savePeakSlots(slots: PeakSlot[]): Promise<{ ok: boolean; reason?: string }> {
     if (!Array.isArray(slots) || slots.length === 0) return { ok: false, reason: 'no slots' };

@@ -42,6 +42,7 @@ import {
     STANDBY_POOL_SIZE,
 } from './scoring';
 import { logAction } from '../logging/structured-logger';
+import { etHour, etDayKey, etSlotInstant } from './et-time';
 
 export interface SchedulerInput {
     detected_at?: string;
@@ -59,69 +60,14 @@ export interface ScheduledAssignment {
     reason: string;
 }
 
-// ── ET-clock helpers (deterministic US-Eastern offset, NOT the runtime tz) ──
-// The production runtime was returning EST (UTC-5) for America/New_York even in
-// summer via Intl, so peak slots fired an hour late (13:00→14:00, 21:30→22:30
-// ET). We compute the US-Eastern offset from the DST rules directly (DST = 2nd
-// Sunday of March 07:00 UTC through 1st Sunday of November 06:00 UTC), so slot
-// timing is correct regardless of the runtime's timezone database. Our slots
-// (07:30/13:00/21:30) never sit in the 2am transition window, so the fall-back
-// double hour / spring-forward gap don't affect them.
-
-/** UTC ms of the nth Sunday of a month at a given UTC hour. */
-function nthSundayUtcMs(year: number, monthIdx: number, n: number, hourUtc: number): number {
-    const firstDow = new Date(Date.UTC(year, monthIdx, 1)).getUTCDay(); // 0 = Sunday
-    const day = 1 + ((7 - firstDow) % 7) + (n - 1) * 7;
-    return Date.UTC(year, monthIdx, day, hourUtc);
-}
-
-/** US-Eastern UTC offset in hours for an instant: 4 during EDT, 5 during EST. */
-export function easternOffsetHours(utc: Date): number {
-    const y = utc.getUTCFullYear();
-    const dstStart = nthSundayUtcMs(y, 2, 2, 7); // 2nd Sun March, 07:00 UTC (2am EST)
-    const dstEnd = nthSundayUtcMs(y, 10, 1, 6);  // 1st Sun November, 06:00 UTC (2am EDT)
-    const t = utc.getTime();
-    return t >= dstStart && t < dstEnd ? 4 : 5;
-}
-
-/** A Date whose UTC fields read the Eastern wall clock for `utc`. */
-function etWall(utc: Date): Date {
-    return new Date(utc.getTime() - easternOffsetHours(utc) * 3_600_000);
-}
-
-function etHour(date: Date): number {
-    return etWall(date).getUTCHours();
-}
-
-/** The ET calendar day of an instant, e.g. "2026-07-17". */
-function etDayKey(d: Date): string {
-    const w = etWall(d);
-    return `${w.getUTCFullYear()}-${String(w.getUTCMonth() + 1).padStart(2, '0')}-${String(w.getUTCDate()).padStart(2, '0')}`;
-}
-
-/**
- * The UTC instant whose ET wall clock reads `hhmm` on (ET-today + dayOffset).
- * Walks UTC hours to find the matching ET hour (DST-safe), then adds the
- * minutes — the ET offset is always a whole number of hours, so the top of a
- * UTC hour is the top of an ET hour.
- */
-function etSlotInstant(refUtc: Date, hhmm: string, dayOffset: number): Date | null {
-    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm || '');
-    if (!m) return null;
-    const targetHour = parseInt(m[1], 10);
-    const targetMin = parseInt(m[2], 10);
-    const targetDay = etDayKey(new Date(refUtc.getTime() + dayOffset * 86_400_000));
-    const w = new Date(refUtc);
-    w.setUTCMinutes(0, 0, 0);
-    w.setUTCHours(w.getUTCHours() - 30); // start a day+ back so today's earlier slots resolve too
-    for (let i = 0; i < 72 + dayOffset * 24; i++) {
-        if (etDayKey(w) === targetDay && etHour(w) === targetHour) {
-            return new Date(w.getTime() + targetMin * 60_000);
-        }
-        w.setUTCHours(w.getUTCHours() + 1);
-    }
-    return null;
-}
+// ── ET-clock helpers ────────────────────────────────────────────
+// These moved to ./et-time so the Engine blueprint's clock (a client
+// component) can compute bead angles without importing this module — which
+// pulls in supabaseAdmin and throws at load in the browser.
+//
+// easternOffsetHours is RE-EXPORTED, not merely imported: it is part of this
+// module's public surface and scheduler-dst.test.ts imports it from here.
+export { easternOffsetHours } from './et-time';
 
 // ── Platform targeting ─────────────────────────────────────────
 // 'instagram' here represents the entire Meta surface (IG + FB + Threads) because
@@ -152,7 +98,12 @@ function classifyLane(input: SchedulerInput): Lane {
 
 // ── Concrete peak slots ────────────────────────────────────────
 
-interface ConcreteSlot {
+// Exported (with upcomingPeakSlots / loadSlotClaims / slotIsFree below) so the
+// Engine blueprint's drag endpoint enforces the SAME cap rules the automatic
+// selector does. Duplicating that logic in the route would let the two drift,
+// and a drag that quietly breaks the 3/day IG cap is exactly the failure the
+// blueprint is supposed to make visible.
+export interface ConcreteSlot {
     at: Date;
     label: string;   // e.g. "Slot 2"
     etDay: string;   // ET calendar day the slot belongs to
@@ -172,7 +123,7 @@ const SLOT_EXCLUSION_MS = 75 * 60 * 1000;
 const BOOKING_LOOKAHEAD_MS = 100 * 60 * 1000;
 
 /** All future peak-slot instants over the next `days` ET days, soonest first. */
-async function upcomingPeakSlots(nowUtc: Date, days: number): Promise<ConcreteSlot[]> {
+export async function upcomingPeakSlots(nowUtc: Date, days: number): Promise<ConcreteSlot[]> {
     const slots = await getPeakSlots();
     const out: ConcreteSlot[] = [];
     for (let d = 0; d < days; d++) {
@@ -192,7 +143,7 @@ async function upcomingPeakSlots(nowUtc: Date, days: number): Promise<ConcreteSl
  * already-scheduled AND already-published posts. Daily Drops (type='DROP')
  * are website-only and don't consume social slots.
  */
-async function loadSlotClaims(nowUtc: Date, horizon: Date): Promise<{ claims: Date[]; dayCounts: Map<string, number> }> {
+export async function loadSlotClaims(nowUtc: Date, horizon: Date): Promise<{ claims: Date[]; dayCounts: Map<string, number> }> {
     const claims: Date[] = [];
     const dayCounts = new Map<string, number>();
     const bump = (d: Date) => dayCounts.set(etDayKey(d), (dayCounts.get(etDayKey(d)) || 0) + 1);
@@ -231,10 +182,36 @@ async function loadSlotClaims(nowUtc: Date, horizon: Date): Promise<{ claims: Da
     return { claims, dayCounts };
 }
 
-function slotIsFree(slot: ConcreteSlot, claims: Date[], dayCounts: Map<string, number>, cap: number): boolean {
+export function slotIsFree(slot: ConcreteSlot, claims: Date[], dayCounts: Map<string, number>, cap: number): boolean {
     if ((dayCounts.get(slot.etDay) || 0) >= cap) return false;
     return !claims.some(c => Math.abs(c.getTime() - slot.at.getTime()) < SLOT_EXCLUSION_MS);
 }
+
+/**
+ * Slot-claim state with ONE post's own claim removed.
+ *
+ * For the manual drag path only. `dayCounts` counts the post being dragged, so
+ * a same-day move (slot 1 → slot 3 on a day already at the 3/3 cap — i.e. the
+ * normal healthy state) would be refused by slotIsFree even though it changes
+ * no count at all. Callers moving an already-scheduled post must subtract it
+ * first, or the feature appears broken most of the time.
+ */
+export function withoutOwnClaim(
+    state: { claims: Date[]; dayCounts: Map<string, number> },
+    ownTime: Date | null,
+): { claims: Date[]; dayCounts: Map<string, number> } {
+    if (!ownTime) return state;
+    const t = ownTime.getTime();
+    const claims = state.claims.filter(c => c.getTime() !== t);
+    const dayCounts = new Map(state.dayCounts);
+    const key = etDayKey(ownTime);
+    const n = (dayCounts.get(key) || 0) - 1;
+    if (n > 0) dayCounts.set(key, n); else dayCounts.delete(key);
+    return { claims, dayCounts };
+}
+
+/** Exposed for the drag endpoint's cascade step (next open slot for a bumped post). */
+export const SLOT_TIMING = { MIN_LEAD_MS, SLOT_EXCLUSION_MS, BOOKING_LOOKAHEAD_MS };
 
 // ── Manual-approve entry point ─────────────────────────────────
 /**
