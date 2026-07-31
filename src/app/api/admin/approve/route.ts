@@ -6,20 +6,29 @@ import { assignScheduledSlot } from '@/lib/engine/scheduler';
 
 export async function POST(req: NextRequest) {
     try {
-        const { postIds } = await req.json();
+        const { postIds, format } = await req.json();
 
         if (!postIds || !Array.isArray(postIds)) {
             return NextResponse.json({ success: false, error: 'Invalid postIds' }, { status: 400 });
         }
 
+        // Optional publish-format choice from the approve popup:
+        //   'reel'      → convert the still to a 1080×1920 vertical Reel and
+        //                 publish it to IG + FB + Threads (image_settings.convertToReel).
+        //   'landscape' → the default/original behavior (no conversion).
+        // Undefined leaves image_settings untouched (other callers, batch ops).
+        const wantsFormat = format === 'reel' || format === 'landscape';
+        const convertToReel = format === 'reel';
+
         const now = new Date();
         const results = [];
 
         // Pull the fields the scheduler needs (source drives premium-studio
-        // routing; claim_type feeds lane classification/logging).
+        // routing; claim_type feeds lane classification/logging) plus
+        // image_settings so a format choice merges instead of overwriting.
         const { data: postRows } = await supabaseAdmin
             .from('posts')
-            .select('id, source, claim_type')
+            .select('id, source, claim_type, image_settings')
             .in('id', postIds);
         const byId = new Map((postRows || []).map((p) => [p.id, p]));
 
@@ -38,15 +47,22 @@ export async function POST(req: NextRequest) {
             });
             const scheduledTime = slot.scheduled_at;
 
+            const update: Record<string, any> = {
+                status: 'approved',
+                is_published: false,
+                scheduled_post_time: scheduledTime,
+                approved_at: now.toISOString(),
+                approved_by: 'admin',
+            };
+            // Merge the format flag into existing image_settings (which may hold
+            // sourceUrl, overlay settings, a video_project, carousel slides, etc.).
+            if (wantsFormat) {
+                update.image_settings = { ...((p?.image_settings as any) || {}), convertToReel };
+            }
+
             const { error } = await supabaseAdmin
                 .from('posts')
-                .update({
-                    status: 'approved',
-                    is_published: false,
-                    scheduled_post_time: scheduledTime,
-                    approved_at: now.toISOString(),
-                    approved_by: 'admin',
-                })
+                .update(update)
                 .eq('id', postId)
                 .select();
 
@@ -54,7 +70,7 @@ export async function POST(req: NextRequest) {
                 results.push({ id: postId, success: false, error: error.message });
             } else {
                 results.push({ id: postId, success: true, scheduledTime });
-                await logAction({ action: 'approved', entityId: postId, actor: 'Admin', reason: `Scheduled for ${scheduledTime} (${slot.reason})` });
+                await logAction({ action: 'approved', entityId: postId, actor: 'Admin', reason: `Scheduled for ${scheduledTime} (${slot.reason})${wantsFormat ? ` · format=${convertToReel ? 'vertical reel' : 'landscape'}` : ''}` });
             }
         }
 

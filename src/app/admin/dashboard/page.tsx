@@ -323,7 +323,10 @@ export default async function DashboardPage() {
                                             </div>
                                         </div>
                                         <div className="ml-auto shrink-0">
-                                            <PendingReviewActions postId={p.id} />
+                                            <PendingReviewActions
+                                                postId={p.id}
+                                                originalFormat={(p.youtube_video_id || /youtube\.com|youtu\.be/.test(p.source_url || '')) ? 'reel' : 'landscape'}
+                                            />
                                         </div>
                                     </li>
                                 ))}
