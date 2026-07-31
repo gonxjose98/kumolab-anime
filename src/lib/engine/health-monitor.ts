@@ -25,6 +25,13 @@ export interface HealthSnapshot {
 
 const WORKER_URL = process.env.YT_WORKER_URL;
 
+// Where health alerts go when neither HEALTH_ALERT_WEBHOOK nor
+// HEALTH_ALERT_EMAIL is configured. Hardcoded on purpose: an alerting system
+// that needs configuration before it can warn you is one that stays silent
+// exactly when it matters, which is what happened here. Override with
+// HEALTH_ALERT_EMAIL.
+const HEALTH_ALERT_FALLBACK_EMAIL = 'gonxjose98@gmail.com';
+
 const minutesAgo = (iso: string | null | undefined): number => {
     if (!iso) return Infinity;
     return Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -457,35 +464,7 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
 // was crit last run and is still crit this run, we don't re-alert. State
 // is persisted in the worker_locks table under lock_key='health_state'.
 export async function fireHealthAlertsIfChanged(snap: HealthSnapshot): Promise<{ fired: number; skipped: number }> {
-    const webhook = process.env.HEALTH_ALERT_WEBHOOK;
-    if (!webhook) {
-        // Without a webhook, every check above is decorative — the whole health
-        // system computes correctly and then tells nobody. That is how a stale
-        // tier list stalled publishing for two days unnoticed. An unconfigured
-        // alerter is itself a fault, so record it where the admin dashboard can
-        // show it instead of returning quietly.
-        //
-        // Deliberately rate-limited to once a day: this runs every 30 minutes,
-        // and flooding error_logs would trip the 10-errors/hour check and mask
-        // real faults with noise about the alerter.
-        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-        const { count } = await supabaseAdmin
-            .from('error_logs')
-            .select('id', { count: 'exact', head: true })
-            .eq('source', 'health-monitor.no-webhook')
-            .gte('created_at', since);
-        if (!count) {
-            const bad = snap.checks.filter(c => c.level !== 'ok');
-            await supabaseAdmin.from('error_logs').insert({
-                source: 'health-monitor.no-webhook',
-                error_message: `HEALTH_ALERT_WEBHOOK is not set — no health alert can reach anyone. ${bad.length} check(s) currently not OK.`,
-                context: { unhealthy: bad.map(c => ({ key: c.key, level: c.level, detail: c.detail })) },
-            }).then(() => {}, () => {});
-        }
-        return { fired: 0, skipped: snap.checks.length };
-    }
-
-    // Load previous state
+    // ── What changed since last run ─────────────────────────────
     const { data: prev } = await supabaseAdmin
         .from('worker_locks')
         .select('locked_by')
@@ -495,36 +474,16 @@ export async function fireHealthAlertsIfChanged(snap: HealthSnapshot): Promise<{
 
     const newState: Record<string, HealthLevel> = {};
     const transitions: { check: HealthCheck; from: HealthLevel | null }[] = [];
-
     for (const c of snap.checks) {
         newState[c.key] = c.level;
         const prior = prevState[c.key] ?? null;
-        // Fire when we move INTO warn/crit, or recover OUT of warn/crit
+        // Fire when we move INTO warn/crit, or recover OUT of warn/crit.
         if (c.level !== prior && (c.level !== 'ok' || (prior && prior !== 'ok'))) {
             transitions.push({ check: c, from: prior });
         }
     }
 
-    let fired = 0;
-    for (const t of transitions) {
-        const c = t.check;
-        const emoji = c.level === 'crit' ? '🔴' : c.level === 'warn' ? '🟡' : '✅';
-        const verb = c.level === 'ok' ? 'recovered' : 'changed';
-        const text = `${emoji} *KumoLab — ${c.label}* ${verb}\n${c.detail}${c.actionable ? `\n→ ${c.actionable}` : ''}`;
-        try {
-            await fetch(webhook, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ text }),
-            });
-            fired++;
-        } catch (e) {
-            // Webhook itself failed — non-fatal, swallow
-        }
-    }
-
-    // Persist new state
-    await supabaseAdmin.from('worker_locks').upsert(
+    const persist = () => supabaseAdmin.from('worker_locks').upsert(
         {
             lock_key: 'health_state',
             locked_by: JSON.stringify(newState),
@@ -534,7 +493,115 @@ export async function fireHealthAlertsIfChanged(snap: HealthSnapshot): Promise<{
         { onConflict: 'lock_key' },
     );
 
+    if (transitions.length === 0) {
+        await persist();
+        return { fired: 0, skipped: snap.checks.length };
+    }
+
+    // ── Deliver ─────────────────────────────────────────────────
+    //
+    // Webhook when one is configured, otherwise EMAIL. Email is a first-class
+    // channel here, not a courtesy fallback: HEALTH_ALERT_WEBHOOK was never set
+    // in Vercel (confirmed 2026-07-31 — 58 env vars, not among them), so every
+    // check in this file computed correctly and then reached nobody. That is how
+    // a stale tier list stalled publishing for two days with no warning.
+    // Requiring a Slack or Discord account made the alerting path harder to set
+    // up than the system it watches. Resend is already configured with a
+    // verified domain, so email costs no new account and no new credential.
+    const webhook = process.env.HEALTH_ALERT_WEBHOOK;
+    let fired = 0;
+
+    if (webhook) {
+        for (const t of transitions) {
+            const c = t.check;
+            try {
+                const res = await fetch(webhook, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ text: alertText(c) }),
+                });
+                // A dead Slack/Discord URL returns 4xx rather than throwing, so
+                // catching only exceptions counted a rejected POST as delivered.
+                if (res.ok) fired++;
+                else await noteAlertFailure('webhook returned ' + res.status, c);
+            } catch (e: any) {
+                await noteAlertFailure('webhook threw: ' + (e?.message || e), c);
+            }
+        }
+    } else {
+        fired = await emailAlerts(transitions.map(t => t.check));
+    }
+
+    await persist();
     return { fired, skipped: snap.checks.length - transitions.length };
+}
+
+function alertText(c: HealthCheck): string {
+    const emoji = c.level === 'crit' ? '\u{1F534}' : c.level === 'warn' ? '\u{1F7E1}' : '✅';
+    const verb = c.level === 'ok' ? 'recovered' : 'changed';
+    return `${emoji} *KumoLab — ${c.label}* ${verb}\n${c.detail}${c.actionable ? `\n→ ${c.actionable}` : ''}`;
+}
+
+/**
+ * Record that an alert could not be delivered.
+ *
+ * Rate-limited to one row a day: this worker runs every 30 minutes, and
+ * flooding error_logs would trip checkErrors()'s 10-per-hour threshold, burying
+ * the real fault under noise about the alerter itself.
+ */
+async function noteAlertFailure(reason: string, c: HealthCheck): Promise<void> {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { count } = await supabaseAdmin
+        .from('error_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('source', 'health-monitor.alert-undelivered')
+        .gte('created_at', since);
+    if (count) return;
+    await supabaseAdmin.from('error_logs').insert({
+        source: 'health-monitor.alert-undelivered',
+        error_message: `Health alert could not be delivered (${reason}). Alerting is effectively off.`,
+        context: { check: c.key, level: c.level, detail: c.detail },
+    }).then(() => {}, () => {});
+}
+
+/**
+ * Email the transitions via Resend. Returns how many were actually accepted.
+ *
+ * Recipient: HEALTH_ALERT_EMAIL, falling back to the owner address. Routes
+ * through noteAlertFailure when Resend is unconfigured so that "nobody can be
+ * reached" is still recorded rather than silently swallowed.
+ */
+async function emailAlerts(checks: HealthCheck[]): Promise<number> {
+    const to = process.env.HEALTH_ALERT_EMAIL || HEALTH_ALERT_FALLBACK_EMAIL;
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey || !to) {
+        await noteAlertFailure(apiKey ? 'no alert recipient configured' : 'RESEND_API_KEY not set and no webhook configured', checks[0]);
+        return 0;
+    }
+    const worst = checks.some(c => c.level === 'crit') ? 'CRITICAL'
+        : checks.some(c => c.level === 'warn') ? 'Warning' : 'Recovered';
+    const subject = `KumoLab health: ${worst} — ${checks.map(c => c.label).join(', ')}`;
+    const body = checks.map(c => {
+        const tag = c.level === 'crit' ? '[CRIT]' : c.level === 'warn' ? '[WARN]' : '[OK]';
+        return `${tag} ${c.label}\n${c.detail}${c.actionable ? `\nAction: ${c.actionable}` : ''}`;
+    }).join('\n\n');
+    try {
+        const { Resend } = await import('resend');
+        const { error } = await new Resend(apiKey).emails.send({
+            from: 'KumoLab Health <news@kumolabanime.com>',
+            to,
+            subject,
+            text: `${body}\n\n---\nAdmin dashboard: https://kumolabanime.com/admin/dashboard`,
+        });
+        if (error) {
+            await noteAlertFailure(`Resend rejected: ${error.message}`, checks[0]);
+            return 0;
+        }
+        return checks.length;
+    } catch (e: any) {
+        await noteAlertFailure(`Resend threw: ${e?.message || e}`, checks[0]);
+        return 0;
+    }
 }
 
 function safeParse(s: string): Record<string, HealthLevel> {
