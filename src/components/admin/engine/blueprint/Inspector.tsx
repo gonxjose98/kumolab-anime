@@ -1,7 +1,8 @@
 'use client';
 
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, ArrowRight } from 'lucide-react';
 import type { BlueprintNode } from '@/lib/engine/blueprint';
+import { ORIENTATION, ENTRY_NODE_ID } from '@/lib/engine/blueprint';
 import type { WorkerRunLite } from './types';
 
 /**
@@ -42,13 +43,15 @@ function fmtDuration(ms: number | null | undefined): string {
 }
 
 export default function Inspector({
-    node, runs, onClose,
+    node, runs, onClose, onFocusNode,
 }: {
     node: BlueprintNode;
     runs: WorkerRunLite[];
     onClose: () => void;
+    onFocusNode?: (id: string) => void;
 }) {
     const mine = node.worker ? runs.filter((r) => r.worker === node.worker).slice(0, 8) : [];
+    const isEntry = node.id === ENTRY_NODE_ID;
 
     return (
         <aside className="jarvis__inspector" aria-label={`${node.label} details`}>
@@ -95,6 +98,72 @@ export default function Inspector({
             }}>
                 {node.doc}
             </p>
+
+            {/*
+             * The guided tour. Only the entry node carries it: a reading ORDER
+             * is the explanation of this system, and a pile of individually
+             * well-documented nodes is not. Each step names the node that
+             * embodies it and the contract path an agent should read, so the
+             * same tour works with or without this UI.
+             */}
+            {isEntry && (
+                <div style={{ marginBottom: 16 }}>
+                    <div style={{
+                        fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.1em',
+                        textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 8,
+                    }}>
+                        Read in this order
+                    </div>
+                    <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {ORIENTATION.map((s) => {
+                            const jumpable = !!(s.nodeId && onFocusNode);
+                            return (
+                                <li key={s.step}>
+                                    <div
+                                        role={jumpable ? 'button' : undefined}
+                                        tabIndex={jumpable ? 0 : undefined}
+                                        onClick={jumpable ? () => onFocusNode!(s.nodeId!) : undefined}
+                                        onKeyDown={jumpable ? (e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFocusNode!(s.nodeId!); }
+                                        } : undefined}
+                                        style={{
+                                            border: '1px solid var(--line)', borderRadius: 10,
+                                            padding: '8px 10px', background: 'var(--surface)',
+                                            cursor: jumpable ? 'pointer' : 'default',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                                            <span style={{
+                                                flexShrink: 0, fontFamily: 'var(--ak-display)', fontWeight: 800,
+                                                fontSize: '0.7rem', color: 'var(--gold)',
+                                            }}>
+                                                {s.step}
+                                            </span>
+                                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--ink)', minWidth: 0 }}>
+                                                {s.title}
+                                            </span>
+                                            {jumpable && (
+                                                <ArrowRight size={12} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--ink-3)' }} />
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', lineHeight: 1.5, color: 'var(--ink-2)', marginTop: 3 }}>
+                                            {s.what}
+                                        </div>
+                                        {s.contractPath && (
+                                            <div style={{
+                                                fontSize: '0.7rem', color: 'var(--ink-3)', marginTop: 4,
+                                                fontFamily: 'monospace', overflowWrap: 'anywhere',
+                                            }}>
+                                                {s.contractPath}
+                                            </div>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </div>
+            )}
 
             {node.worker && (
                 <>

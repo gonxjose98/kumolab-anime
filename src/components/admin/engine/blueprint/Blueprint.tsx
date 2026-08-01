@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Radio, Loader2 } from 'lucide-react';
-import { BLUEPRINT, NODES_BY_ID } from '@/lib/engine/blueprint';
+import { ChevronLeft, Radio, Loader2, BookOpen } from 'lucide-react';
+import { BLUEPRINT, NODES_BY_ID, ENTRY_NODE_ID } from '@/lib/engine/blueprint';
 import { layoutNodes, focusBox, focusSet, fieldDots, SCENE } from './layout';
 import { buildEdgeGeom, type EdgeGeom } from './geometry';
 import {
@@ -387,10 +387,22 @@ export default function Blueprint({
                         <ChevronLeft size={12} /> Overview
                     </button>
                 ) : (
-                    <span className="jarvis__chip" style={{ cursor: 'default' }}>
-                        <Radio size={12} style={{ color: 'var(--gold)' }} />
-                        {BLUEPRINT.nodes.length} nodes · {BLUEPRINT.edges.length} links
-                    </span>
+                    <>
+                        {/* Always-visible way in. The map is only legible in a
+                            particular reading order, so the first affordance on
+                            the page has to be the one that hands you that order. */}
+                        <button
+                            className="jarvis__chip"
+                            onClick={() => setFocusId(ENTRY_NODE_ID)}
+                            style={{ borderColor: 'var(--j-core-c)' }}
+                        >
+                            <BookOpen size={12} style={{ color: 'var(--j-core-c)' }} /> Start here
+                        </button>
+                        <span className="jarvis__chip" style={{ cursor: 'default' }}>
+                            <Radio size={12} style={{ color: 'var(--j-core-c)' }} />
+                            {BLUEPRINT.nodes.length} nodes · {BLUEPRINT.edges.length} links
+                        </span>
+                    </>
                 )}
             </div>
 
@@ -459,6 +471,7 @@ export default function Blueprint({
                     node={focusNode}
                     runs={live.runs}
                     onClose={() => setFocusId(null)}
+                    onFocusNode={setFocusId}
                 />
             )}
         </div>

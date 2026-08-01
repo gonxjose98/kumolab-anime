@@ -91,6 +91,40 @@ describe('agent state contract', () => {
         expect(content.counts).toBeTruthy();
     });
 
+    it('hands a new agent an ordered entry point that does not rot', async () => {
+        const { getAgentState } = await import('../agent-state');
+        const { NODES_BY_ID } = await import('../blueprint');
+        const s = await getAgentState();
+
+        expect(s.entrypoint.nodeId).toBe('core');
+        expect(NODES_BY_ID[s.entrypoint.nodeId]).toBeTruthy();
+        expect(s.entrypoint.steps.length).toBeGreaterThanOrEqual(5);
+
+        // Steps must be a genuine ORDER, not an unordered bag.
+        s.entrypoint.steps.forEach((step, i) => {
+            expect(step.step).toBe(i + 1);
+            expect(step.what.length).toBeGreaterThan(40);
+        });
+
+        // Every referenced node must exist, or the tour walks an agent into a
+        // dead end — the exact failure a trusted map must not have.
+        for (const step of s.entrypoint.steps) {
+            if (step.nodeId) {
+                expect(NODES_BY_ID[step.nodeId], `step ${step.step} points at missing node ${step.nodeId}`).toBeTruthy();
+            }
+        }
+
+        // Every contract path must actually resolve in this payload.
+        const resolve = (path: string) =>
+            path.split('.').reduce<unknown>((acc, k) => (acc as Record<string, unknown> | undefined)?.[k], s);
+        for (const step of s.entrypoint.steps) {
+            if (step.contractPath) {
+                expect(resolve(step.contractPath), `step ${step.step} points at missing path ${step.contractPath}`)
+                    .toBeDefined();
+            }
+        }
+    });
+
     it('warns about the NULL trap in the readme', async () => {
         // Writing NULL to scheduled_post_time can silently unapprove a post.
         // An agent that does not know this will eventually do it.

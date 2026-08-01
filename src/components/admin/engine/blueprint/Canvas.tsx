@@ -462,6 +462,12 @@ export const NodeLayer = memo(function NodeLayer({
 
                         {isCore ? (
                             <g className="j-node__scale">
+                                {/* Beacon: the core is the designated entry
+                                    point, so it advertises itself. Someone
+                                    landing here should never have to guess
+                                    where to start reading. */}
+                                <circle className="j-ping" cx={p.x} cy={p.y} r={p.r + 16}
+                                    fill="none" stroke="var(--j-core-c)" strokeWidth={1.6} />
                                 <circle cx={p.x} cy={p.y} r={p.r * 2.6} fill="url(#j-core)" pointerEvents="none" />
                                 <circle className="j-orbit j-orbit--slow" cx={p.x} cy={p.y} r={p.r + 14}
                                     fill="none" stroke="var(--j-core-c)" strokeWidth={1}
@@ -520,6 +526,14 @@ export const NodeLayer = memo(function NodeLayer({
                             >
                                 {n.label}
                             </text>
+                        )}
+
+                        {isCore && !hasFocus && (
+                            <Chip
+                                x={p.x} y={p.y + p.r + 44} angle={0}
+                                text="START HERE · read this first"
+                                tone="source"
+                            />
                         )}
                     </g>
                 );

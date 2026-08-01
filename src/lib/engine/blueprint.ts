@@ -71,6 +71,115 @@ export interface BlueprintEdge {
     to: string;
 }
 
+/**
+ * THE ENTRY POINT.
+ *
+ * An agent (or a person) landing on this system cold needs to be told where to
+ * start and in what order to read, or it will sample the map arbitrarily and
+ * build a wrong model. A pile of well-documented nodes is not an explanation —
+ * the ORDER is the explanation.
+ *
+ * This is the single ordered path through the system. It is rendered as the
+ * core node's inspector on the canvas, and served as `entrypoint` in the agent
+ * contract, so the human and the machine are handed the same tour.
+ *
+ * Each step names both the node to look at and the contract path to read, so an
+ * agent can follow it without the UI.
+ */
+export const ENTRY_NODE_ID = 'core';
+
+export interface OrientationStep {
+    step: number;
+    title: string;
+    /** What to understand at this step, in one or two sentences. */
+    what: string;
+    /** The node on the map that embodies it. */
+    nodeId?: string;
+    /** Where to read it in the agent contract. */
+    contractPath?: string;
+}
+
+export const ORIENTATION: OrientationStep[] = [
+    {
+        step: 1,
+        title: 'What KumoLab is',
+        what: 'An anime-news pipeline. It scrapes official sources, scores and de-duplicates what it finds, '
+            + 'auto-approves whatever clears the bar, books posts into 3 peak slots a day, and publishes to '
+            + 'social plus the website. Everything else on this map hangs off that loop.',
+        nodeId: 'core',
+        contractPath: 'readme',
+    },
+    {
+        step: 2,
+        title: 'What it is FOR',
+        what: 'The project goals — revenue first, anime only, quality over volume. These are KumoLab\'s own '
+            + 'goals and are deliberately different from the umbrella business goals. Read them before '
+            + 'proposing any change, because most bad suggestions are locally sensible and strategically wrong.',
+        contractPath: 'rules.goals',
+    },
+    {
+        step: 3,
+        title: 'What a good post looks like',
+        what: 'The posting formula: known franchise, trailer or season news, real video, one of the peak '
+            + 'slots, 2-3 a day. This is the spec any work on KumoLab should be checked against.',
+        contractPath: 'rules.formula',
+    },
+    {
+        step: 4,
+        title: 'Where content comes from',
+        what: '4 RSS feeds and 13 official YouTube channels, polled every 30 minutes. Off-topic material '
+            + '(live action, games, reviews) is rejected at ingestion and never becomes a candidate.',
+        nodeId: 'worker.detection',
+        contractPath: 'rules.contentPolicy',
+    },
+    {
+        step: 5,
+        title: 'How a candidate is judged',
+        what: 'Scored out of 100: franchise 40, video quality 25, category 20, format 8, recency 7. '
+            + '75+ can auto-publish, under 55 is dropped. Crucially the score is RE-COMPUTED at slot '
+            + 'selection, so it decays — a score only means something alongside its timestamp.',
+        nodeId: 'stage.scoring',
+        contractPath: 'rules.scoring',
+    },
+    {
+        step: 6,
+        title: 'What publishes without a human',
+        what: 'Claim type crossed with source tier. Trailers and key visuals from tier-1/2 sources go out '
+            + 'automatically; delays, cast and staff changes always need corroboration or a person, because '
+            + 'those are the ones that damage the brand when wrong.',
+        nodeId: 'stage.approval',
+        contractPath: 'rules.approval',
+    },
+    {
+        step: 7,
+        title: 'How posting is scheduled',
+        what: 'Exactly 3 Instagram posts a day, one per peak slot. Approved posts do NOT claim a slot on '
+            + 'arrival — they wait in the standby pool and the highest CURRENT scorer wins each slot as it '
+            + 'comes due. THE TRAP: scheduled_post_time = NULL is not "unscheduled", it IS pool membership, '
+            + 'and the pruner can demote a pooled post back to pending. Never write NULL to reschedule.',
+        nodeId: 'stage.standby',
+        contractPath: 'content.standby',
+    },
+    {
+        step: 8,
+        title: 'How it actually goes out',
+        what: 'The publisher fires twice an hour and selects purely on scheduled_post_time. Instagram '
+            + 'represents the whole Meta surface — Meta Suite cross-posts to Facebook and Threads on its '
+            + 'own, so publishing to those directly duplicates the post.',
+        nodeId: 'worker.publish',
+        contractPath: 'rules.platforms',
+    },
+    {
+        step: 9,
+        title: 'How to tell if it is broken',
+        what: 'This system fails by going STALE, not by throwing. A hand-curated list nobody refreshed once '
+            + 'took auto-publishing to zero for two days with no error anywhere. Read the faults — each one '
+            + 'names the node that produced it and what to do about it.',
+        nodeId: 'stage.faults',
+        contractPath: 'status.faults',
+    },
+];
+
 export interface Blueprint {
     nodes: BlueprintNode[];
     edges: BlueprintEdge[];
@@ -136,9 +245,12 @@ const CORE_AND_PIPELINE: BlueprintNode[] = [
         label: 'KumoLab',
         ring: 0,
         feeds: [],
-        doc: 'The anime-news pipeline. Scrapes official sources, scores and de-duplicates candidates, '
-            + 'auto-approves what clears the bar, books posts into 3 peak slots a day, and publishes to '
-            + 'social plus the website. Everything on this map hangs off that loop.',
+        doc: 'START HERE. This is the entry point to the whole system — if you are an agent picking up '
+            + 'KumoLab for the first time, read the 9-step orientation below IN ORDER before touching '
+            + 'anything else. The order is the explanation; the nodes on their own are just parts. '
+            + 'KumoLab is an anime-news pipeline: it scrapes official sources, scores and de-duplicates '
+            + 'candidates, auto-approves what clears the bar, books posts into 3 peak slots a day, and '
+            + 'publishes to social plus the website. Everything on this map hangs off that loop.',
     },
 
     // ── Workers (ring 1) ──

@@ -22,7 +22,7 @@
 // var NAMES on purpose (the name is documentation); values must never appear.
 
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { BLUEPRINT } from './blueprint';
+import { BLUEPRINT, ORIENTATION, ENTRY_NODE_ID } from './blueprint';
 import { getRecentRuns } from './worker-runs';
 import { getFaults, type Fault } from './faults';
 import {
@@ -61,6 +61,8 @@ export interface AgentState {
     generatedAt: string;
     /** Written for a newly-connected agent: read this first. */
     readme: string;
+    /** Where to start, and the order to read in. */
+    entrypoint: { nodeId: string; note: string; steps: typeof ORIENTATION };
     graph: typeof BLUEPRINT;
     rules: ReturnType<typeof buildRules> extends Promise<infer T> ? T : never;
     content: {
@@ -83,9 +85,10 @@ export interface AgentState {
 const README = [
     'KumoLab publishes anime news. This document is the whole system in one call.',
     '',
-    'READ IN THIS ORDER: rules.formula (what a good post is) → rules.scoring (how',
-    'it is graded out of 100) → rules.approval (what publishes automatically vs',
-    'needs a human) → content (what is moving right now) → status (what is broken).',
+    'START AT `entrypoint`. It is a 9-step ordered tour, and each step names both',
+    'the node on the map and the path in THIS document to read. Follow it in order',
+    'before acting — the order is the explanation. Reading the sections in an',
+    'arbitrary order produces a confident but wrong model of how this works.',
     '',
     'THE SELECTION MODEL: exactly 3 Instagram posts a day, one per peak slot.',
     'Approved posts do NOT claim a slot on arrival — they join a standby pool',
@@ -284,6 +287,15 @@ export async function getAgentState(): Promise<AgentState> {
         contract: CONTRACT_VERSION,
         generatedAt: new Date().toISOString(),
         readme: README,
+        /**
+         * Where to start and what order to read in. Deliberately the second key
+         * in the payload, right after the readme that points at it.
+         */
+        entrypoint: {
+            nodeId: ENTRY_NODE_ID,
+            note: 'Follow these in order before acting. Each step names the node on the map and the path in this document.',
+            steps: ORIENTATION,
+        },
         graph: BLUEPRINT,
         rules,
         content,
