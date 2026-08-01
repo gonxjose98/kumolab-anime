@@ -151,6 +151,24 @@ export default function Blueprint({
         [live.agents],
     );
 
+    /**
+     * Nodes that ran in the last 10 minutes. They emit a radar ping, so a
+     * glance at the map tells you what is warm right now — distinct from the
+     * node colour, which only says whether the last run passed.
+     *
+     * Gated on `mounted` because the window is measured from Date.now().
+     */
+    const pingIds = useMemo(() => {
+        if (!mounted) return new Set<string>();
+        const cutoff = Date.now() - 10 * 60_000;
+        const workers = new Set(
+            live.runs.filter((r) => new Date(r.started_at).getTime() >= cutoff).map((r) => r.worker),
+        );
+        return new Set(
+            placed.filter((p) => p.node.worker && workers.has(p.node.worker)).map((p) => p.node.id),
+        );
+    }, [live.runs, placed, mounted]);
+
     // ── Turn new runs into travelling light ──
     const emitPulses = useCallback((runs: WorkerRunLite[], replay: boolean) => {
         const now = performance.now();
@@ -395,6 +413,7 @@ export default function Blueprint({
                     focusId={focusId}
                     onFocus={setFocusId}
                     agentNodeIds={agentNodeIds}
+                    pingIds={pingIds}
                 />
             </svg>
 

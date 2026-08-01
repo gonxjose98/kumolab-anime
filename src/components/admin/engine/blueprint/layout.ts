@@ -57,12 +57,12 @@ function spread(n: number, from: number, to: number, full: boolean): number[] {
 
 const DOT: Record<BlueprintNode['kind'], number> = {
     core: 46,
-    stage: 15,
-    worker: 13,
-    source: 7,
-    surface: 13,
-    external: 9,
-    store: 11,
+    stage: 17,
+    worker: 15,
+    source: 8.5,
+    surface: 15,
+    external: 10.5,
+    store: 12,
 };
 
 /**

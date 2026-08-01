@@ -34,10 +34,38 @@ export function Defs() {
                     <feMergeNode in="SourceGraphic" />
                 </feMerge>
             </filter>
+
             <radialGradient id="j-core" cx="50%" cy="50%">
                 <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.9" />
                 <stop offset="70%" stopColor="var(--gold)" stopOpacity="0.16" />
                 <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
+            </radialGradient>
+
+            {/*
+             * Depth without a gradient per colour.
+             *
+             * Painting a white sheen and a dark shade OVER a flat fill gives
+             * every node a lit-sphere read using two shared gradients, instead
+             * of one bespoke gradient per kind and per state (which would be a
+             * dozen defs that all have to be kept in sync with the palette).
+             */}
+            <radialGradient id="j-sheen" cx="32%" cy="26%" r="76%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
+                <stop offset="42%" stopColor="#ffffff" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </radialGradient>
+
+            <linearGradient id="j-shade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#000814" stopOpacity="0" />
+                <stop offset="100%" stopColor="#000814" stopOpacity="0.42" />
+            </linearGradient>
+
+            {/* Hollow nodes get a faint interior so they read as glass rather
+                than as holes punched in the field. */}
+            <radialGradient id="j-hollow" cx="34%" cy="28%" r="80%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+                <stop offset="60%" stopColor="#0a1022" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#060a16" stopOpacity="0.95" />
             </radialGradient>
         </defs>
     );
@@ -242,7 +270,7 @@ function labelAnchor(angle: number): 'start' | 'middle' | 'end' {
 }
 
 export const NodeLayer = memo(function NodeLayer({
-    placed, states, litIds, hasFocus, focusId, onFocus, agentNodeIds,
+    placed, states, litIds, hasFocus, focusId, onFocus, agentNodeIds, pingIds,
 }: {
     placed: Placed[];
     states: Map<string, NodeState>;
@@ -251,6 +279,8 @@ export const NodeLayer = memo(function NodeLayer({
     focusId: string | null;
     onFocus: (id: string) => void;
     agentNodeIds: Set<string>;
+    /** Nodes whose worker ran in the last few minutes — they emit a radar ping. */
+    pingIds: Set<string>;
 }) {
     return (
         <g>
@@ -298,13 +328,17 @@ export const NodeLayer = memo(function NodeLayer({
                             small to tap reliably on a phone. */}
                         <circle className="j-node__hit" cx={p.x} cy={p.y} r={Math.max(p.r + 14, 22)} />
 
-                        {/* Breathing halo. CSS-animated so it runs on the
-                            compositor rather than through the frame loop. */}
+                        {/* Two halos at different periods. A single one reads as
+                            a mechanical throb; two drifting against each other
+                            never quite repeat, which is what makes it feel
+                            like breathing rather than blinking. Both are
+                            CSS-animated so they run on the compositor rather
+                            than through the frame loop. */}
                         <circle
                             className={`j-halo ${state === 'crit' ? 'j-halo--crit' : ''}`}
                             cx={p.x}
                             cy={p.y}
-                            r={p.r * (isCore ? 1.5 : 2.1)}
+                            r={p.r * (isCore ? 1.5 : 2.4)}
                             fill={stateColour}
                             opacity={STATE_HALO_OPACITY[state]}
                             style={{
@@ -312,6 +346,32 @@ export const NodeLayer = memo(function NodeLayer({
                                 ['--j-breathe-delay' as string]: `${(i % 11) * 0.29}s`,
                             }}
                         />
+                        <circle
+                            className="j-halo"
+                            cx={p.x}
+                            cy={p.y}
+                            r={p.r * (isCore ? 1.2 : 1.55)}
+                            fill={stateColour}
+                            opacity={STATE_HALO_OPACITY[state] * 0.85}
+                            style={{
+                                ['--j-breathe-dur' as string]: `${6.6 + (i % 5) * 0.7}s`,
+                                ['--j-breathe-delay' as string]: `${(i % 7) * 0.41}s`,
+                            }}
+                        />
+
+                        {/* Radar ping: this node's worker actually ran in the
+                            last few minutes. Data-driven, not decoration. */}
+                        {pingIds.has(n.id) && (
+                            <circle
+                                className="j-ping"
+                                cx={p.x}
+                                cy={p.y}
+                                r={p.r + 4}
+                                fill="none"
+                                stroke={colour}
+                                strokeWidth={1.4}
+                            />
+                        )}
 
                         {state === 'stalled' && (
                             <circle
@@ -331,33 +391,62 @@ export const NodeLayer = memo(function NodeLayer({
                         )}
 
                         {isCore ? (
-                            <>
+                            <g className="j-node__scale">
                                 <circle cx={p.x} cy={p.y} r={p.r * 2.4} fill="url(#j-core)" pointerEvents="none" />
+                                <circle className="j-orbit j-orbit--slow" cx={p.x} cy={p.y} r={p.r + 12}
+                                    fill="none" stroke="var(--gold)" strokeWidth={0.9} opacity={0.4} strokeDasharray="1 8" />
                                 <circle cx={p.x} cy={p.y} r={p.r} fill="none" stroke="var(--gold)" strokeWidth={1.2} opacity={0.7} />
                                 <circle cx={p.x} cy={p.y} r={p.r - 11} fill="none" stroke="var(--blue)" strokeWidth={0.8} opacity={0.45} />
-                                <circle
-                                    className="j-node__body"
-                                    cx={p.x} cy={p.y} r={p.r - 24}
-                                    fill={colour}
-                                    opacity={0.95}
-                                    filter="url(#j-glow)"
-                                />
-                            </>
+                                <circle className="j-node__body" cx={p.x} cy={p.y} r={p.r - 24}
+                                    fill={colour} opacity={0.95} filter="url(#j-glow)" />
+                                <circle cx={p.x} cy={p.y} r={p.r - 24} fill="url(#j-sheen)" pointerEvents="none" />
+                            </g>
                         ) : (
                             // Hollow for the things KumoLab does not own (sources,
                             // third parties); solid for the machinery it does. The
                             // distinction should be legible before any label is.
-                            <circle
-                                className="j-node__body"
-                                cx={p.x}
-                                cy={p.y}
-                                r={p.r}
-                                fill={hollow ? 'rgba(10,16,34,0.9)' : colour}
-                                stroke={colour}
-                                strokeWidth={hollow ? 2.2 : 0}
-                                opacity={hollow ? 1 : 0.92}
-                                filter={structural ? 'url(#j-glow)' : undefined}
-                            />
+                            <g className="j-node__scale">
+                                {/* Contact ring — a hairline of the node's own
+                                    colour just outside the body. Cheap, and it
+                                    stops the dots reading as flat stickers. */}
+                                <circle cx={p.x} cy={p.y} r={p.r + 3.5} fill="none"
+                                    stroke={colour} strokeWidth={1} opacity={0.32} />
+
+                                {/* Workers carry a slowly rotating dashed orbit,
+                                    because they are the things that fire on a
+                                    schedule and should look like it. */}
+                                {n.kind === 'worker' && (
+                                    <circle className="j-orbit" cx={p.x} cy={p.y} r={p.r + 8}
+                                        fill="none" stroke={colour} strokeWidth={1}
+                                        opacity={0.34} strokeDasharray="2 7"
+                                        style={{ ['--j-orbit-dur' as string]: `${16 + (i % 6) * 4}s` }} />
+                                )}
+
+                                <circle
+                                    className="j-node__body"
+                                    cx={p.x} cy={p.y} r={p.r}
+                                    fill={hollow ? 'url(#j-hollow)' : colour}
+                                    stroke={colour}
+                                    strokeWidth={hollow ? 2 : 0}
+                                    opacity={1}
+                                    filter={structural ? 'url(#j-glow)' : undefined}
+                                />
+
+                                {/* Lit-sphere pass: highlight above, shadow below. */}
+                                <circle cx={p.x} cy={p.y} r={p.r} fill="url(#j-sheen)"
+                                    opacity={hollow ? 0.5 : 1} pointerEvents="none" />
+                                {!hollow && (
+                                    <circle cx={p.x} cy={p.y} r={p.r} fill="url(#j-shade)" pointerEvents="none" />
+                                )}
+
+                                {/* A hollow node still needs a bright centre or
+                                    it disappears against the field at overview
+                                    zoom. */}
+                                {hollow && (
+                                    <circle cx={p.x} cy={p.y} r={Math.max(p.r * 0.34, 2.2)}
+                                        fill={colour} opacity={0.95} pointerEvents="none" />
+                                )}
+                            </g>
                         )}
 
                         {showLabel && (
