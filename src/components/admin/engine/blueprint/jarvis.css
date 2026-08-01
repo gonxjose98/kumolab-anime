@@ -1,68 +1,128 @@
 /*
- * jarvis.css — the Engine blueprint's scoped palette.
+ * jarvis.css — the Engine blueprint's palette and motion.
  *
- * This tab opts OUT of the admin light/dark toggle and is always a deep
- * midnight field, because light beams travelling along edges only read against
- * darkness. The glow is KumoLab gold and sea blue, never holographic cyan: this
- * should look like KumoLab's own nervous system, not a costume.
+ * TWO fully designed themes, following the admin toggle rather than opting out
+ * of it (the toggle is `html[data-admin-theme='dark']`, see admin/tokens.css):
  *
- * Scoped as `.admin-root .jarvis` and NOT `.jarvis` alone. studio.css does the
- * same (`.admin-root .st-root`) — a bare single-class selector loses the
- * specificity fight with the theme tokens on :root[data-theme].
+ *   DAY   — an airy editorial data-viz. Near-white lavender field, soft
+ *           concentric bands, saturated pastel marks. Light backgrounds cannot
+ *           carry a glow, so on this theme depth comes from overlap and
+ *           transparency, and the travelling pulses read as ink rather than
+ *           light.
+ *   NIGHT — the same structure on a deep midnight field, where the pulses
+ *           genuinely glow.
+ *
+ * Scoped as `.admin-root .jarvis`, not `.jarvis` alone: studio.css does the
+ * same (`.admin-root .st-root`), and a bare single-class selector loses the
+ * specificity fight with the theme tokens.
+ *
+ * Shapes are FLAT. No gloss, no fake light source. Depth is overlap, scale and
+ * transparency — the visual language of printed data-viz, not of glass buttons.
  */
+
+/* ── DAY ────────────────────────────────────────────────────── */
 
 .admin-root .jarvis {
     /* Field */
-    --j-void: #05070f;
-    --j-deep: #080d1c;
-    --j-grid: rgba(111, 178, 255, 0.055);
+    --j-field: #f7f5fb;
+    --j-band: rgba(139, 122, 214, 0.045);
+    --j-band-line: rgba(139, 122, 214, 0.09);
+    --j-fleck: #c9b8ee;
+    --j-cluster: rgba(139, 122, 214, 0.07);
+    --j-cluster-line: rgba(139, 122, 214, 0.28);
 
-    /* Inherited KumoLab hues, night values */
-    --gold: #e6c489;
-    --blue: #6fb2ff;
-    --ok: #35c88a;
-    --sun: #ff7a6b;
+    /* Marks — saturated pastels, the reference's register */
+    --j-core-c: #8b5cf6;
+    --j-core-ink: #ffffff;
+    --j-core-label: #6d43d4;
+    --j-stage-c: #35c5c0;
+    --j-worker-c: #f2a63b;
+    --j-surface-c: #ef7fa8;
+    --j-source-c: #35c5c0;
+    --j-external-c: #a78bfa;
+    --j-store-c: #4fb8e8;
 
-    --ink: #f2f9ff;
-    --ink-2: rgba(226, 240, 255, 0.72);
-    --ink-3: rgba(200, 220, 245, 0.42);
-    --line: rgba(226, 176, 90, 0.26);
-    --surface: rgba(12, 18, 44, 0.62);
-    --surface-2: rgba(18, 26, 56, 0.72);
+    /* State. Idle is TINTED lavender rather than neutral grey — grey behind a
+       coloured mark on a warm-white field reads as dirt, not as calm. */
+    --j-idle: #b9aee6;
+    --j-good: #2fae7d;
+    --j-warn: #e8a33d;
+    --j-crit: #e05a6b;
+    --j-pulse: #f2a63b;
+    --j-mote: #a78bfa;
+    --j-agent-c: #4fb8e8;
 
-    /* Node states. Named by MEANING, not colour, so a future palette change
-       doesn't require re-reading every component. */
-    --j-idle: rgba(140, 175, 225, 0.5);
-    --j-live: var(--gold);
-    --j-warn: #ffc46b;
-    --j-crit: var(--sun);
-    --j-good: var(--ok);
+    /* Edges. On white, overlapping strokes must DARKEN to build depth. */
+    --j-edge: rgba(139, 122, 214, 0.3);
+    --j-edge-blend: multiply;
+
+    /* Chips */
+    --j-chip-source: rgba(53, 197, 192, 0.2);
+    --j-chip-surface: rgba(239, 127, 168, 0.2);
+    --j-chip-external: rgba(167, 139, 250, 0.2);
+    --j-chip-store: rgba(79, 184, 232, 0.2);
+    --j-chip-ink: #4b4370;
+
+    --j-label: #443c68;
+    --j-label-halo: rgba(247, 245, 251, 0.9);
 
     position: relative;
     background:
-        radial-gradient(120% 90% at 50% 42%, rgba(36, 66, 132, 0.34) 0%, rgba(8, 13, 28, 0) 62%),
-        radial-gradient(70% 60% at 50% 50%, rgba(230, 196, 137, 0.07) 0%, rgba(5, 7, 15, 0) 70%),
-        var(--j-void);
-    color: var(--ink);
+        radial-gradient(120% 90% at 50% 45%, #ffffff 0%, rgba(255, 255, 255, 0) 62%),
+        var(--j-field);
+    color: var(--j-label);
     border-radius: 16px;
-    border: 1px solid rgba(111, 178, 255, 0.14);
+    border: 1px solid rgba(139, 122, 214, 0.16);
     overflow: hidden;
     isolation: isolate;
 }
 
-/* Faint engineering grid. Pure decoration, sits under everything. */
-.admin-root .jarvis::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(var(--j-grid) 1px, transparent 1px),
-        linear-gradient(90deg, var(--j-grid) 1px, transparent 1px);
-    background-size: 44px 44px;
-    mask-image: radial-gradient(circle at 50% 45%, #000 25%, transparent 78%);
-    -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 25%, transparent 78%);
-    pointer-events: none;
-    z-index: 0;
+/* ── NIGHT ──────────────────────────────────────────────────── */
+
+html[data-admin-theme='dark'] .admin-root .jarvis {
+    --j-field: #05070f;
+    --j-band: rgba(111, 178, 255, 0.022);
+    --j-band-line: rgba(111, 178, 255, 0.07);
+    --j-fleck: #6fb2ff;
+    --j-cluster: rgba(111, 178, 255, 0.045);
+    --j-cluster-line: rgba(111, 178, 255, 0.22);
+
+    --j-core-c: #e6c489;
+    --j-core-ink: #05070f;
+    --j-core-label: #e6c489;
+    --j-stage-c: #6fd6d0;
+    --j-worker-c: #f0b45c;
+    --j-surface-c: #ff92b8;
+    --j-source-c: #5fd3ce;
+    --j-external-c: #b39dff;
+    --j-store-c: #5fc9f5;
+
+    --j-idle: #6d7ba0;
+    --j-good: #35c88a;
+    --j-warn: #ffc46b;
+    --j-crit: #ff7a6b;
+    --j-pulse: #ffd88a;
+    --j-mote: #6fb2ff;
+    --j-agent-c: #6fb2ff;
+
+    /* On black, overlapping strokes must LIGHTEN. */
+    --j-edge: rgba(140, 180, 235, 0.26);
+    --j-edge-blend: screen;
+
+    --j-chip-source: rgba(95, 211, 206, 0.16);
+    --j-chip-surface: rgba(255, 146, 184, 0.16);
+    --j-chip-external: rgba(179, 157, 255, 0.16);
+    --j-chip-store: rgba(95, 201, 245, 0.16);
+    --j-chip-ink: #dbe8ff;
+
+    --j-label: rgba(232, 244, 255, 0.9);
+    --j-label-halo: rgba(5, 7, 15, 0.85);
+
+    background:
+        radial-gradient(120% 90% at 50% 42%, rgba(36, 66, 132, 0.34) 0%, rgba(8, 13, 28, 0) 62%),
+        radial-gradient(70% 60% at 50% 50%, rgba(230, 196, 137, 0.06) 0%, rgba(5, 7, 15, 0) 70%),
+        var(--j-field);
+    border-color: rgba(111, 178, 255, 0.14);
 }
 
 .admin-root .jarvis__stage {
@@ -86,42 +146,45 @@
 }
 
 .admin-root .jarvis .j-node__body {
-    transition: fill 400ms ease, stroke 400ms ease;
+    transition: fill 400ms ease;
 }
 
 .admin-root .jarvis .j-node__label {
     font-family: var(--ak-display, inherit);
     font-size: 11.5px;
     font-weight: 700;
-    fill: rgba(232, 244, 255, 0.88);
+    fill: var(--j-label);
     letter-spacing: 0.015em;
     pointer-events: none;
     transition: fill 260ms ease, opacity 260ms ease;
-    /* The labels sit over edges and glow; without a shadow they smear into
-       the field wherever a curve passes behind one. */
+    /* Labels sit over edges; without a halo they smear into the field wherever
+       a ribbon passes behind one. */
     paint-order: stroke;
-    stroke: rgba(5, 7, 15, 0.85);
-    stroke-width: 3px;
+    stroke: var(--j-label-halo);
+    stroke-width: 3.5px;
     stroke-linejoin: round;
 }
 
-.admin-root .jarvis .j-node--focused .j-node__label,
-.admin-root .jarvis .j-node:hover .j-node__label {
-    fill: var(--ink);
-}
-
-.admin-root .jarvis .j-node--dimmed {
-    opacity: 0.16;
+.admin-root .jarvis .j-chip__text {
+    font-family: var(--ak-display, inherit);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    fill: var(--j-chip-ink);
     pointer-events: none;
 }
 
-/* Keyboard focus has to be visible — the canvas is fully tab-navigable. */
+.admin-root .jarvis .j-node--dimmed {
+    opacity: 0.14;
+    pointer-events: none;
+}
+
 .admin-root .jarvis .j-node:focus-visible {
     outline: none;
 }
 
 .admin-root .jarvis .j-node:focus-visible .j-node__body {
-    stroke: var(--gold);
+    stroke: var(--j-core-c);
     stroke-width: 2.5;
 }
 
@@ -129,42 +192,23 @@
 
 .admin-root .jarvis .j-edge {
     fill: none;
-    stroke: rgba(111, 178, 255, 0.16);
-    stroke-width: 1;
-    transition: stroke 300ms ease, stroke-width 300ms ease;
+    transition: stroke-width 300ms ease, opacity 300ms ease;
+    opacity: 0.75;
 }
 
 .admin-root .jarvis .j-edge--active {
-    stroke: rgba(230, 196, 137, 0.5);
-    stroke-width: 1.6;
+    opacity: 1;
 }
 
 .admin-root .jarvis .j-edge--dimmed {
-    stroke: rgba(111, 178, 255, 0.05);
+    opacity: 0.1;
 }
 
-/* ── Breathing ──────────────────────────────────────────────── */
-/*
- * Ambient life for healthy idle nodes. Deliberately CSS rather than the rAF
- * loop: the compositor handles it off the main thread, so a hundred breathing
- * nodes cost nothing measurable, and prefers-reduced-motion switches it off
- * without any JS branching.
- */
+/* ── Motion ─────────────────────────────────────────────────── */
+
 @keyframes j-breathe {
     0%, 100% { opacity: 0.45; transform: scale(0.94); }
     50%      { opacity: 1;    transform: scale(1.1); }
-}
-
-/* Radar ping — emitted only by a node whose worker genuinely ran recently. */
-@keyframes j-ping {
-    0%   { transform: scale(0.7); opacity: 0.6; }
-    70%  { transform: scale(2.3); opacity: 0; }
-    100% { transform: scale(2.3); opacity: 0; }
-}
-
-/* The dashed orbit that marks scheduled machinery. */
-@keyframes j-orbit-spin {
-    to { transform: rotate(360deg); }
 }
 
 @keyframes j-flicker {
@@ -174,14 +218,32 @@
     58%       { opacity: 0.45; }
 }
 
+@keyframes j-ping {
+    0%   { transform: scale(0.7); opacity: 0.6; }
+    70%  { transform: scale(2.3); opacity: 0; }
+    100% { transform: scale(2.3); opacity: 0; }
+}
+
+@keyframes j-orbit-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes j-spin {
+    to { transform: rotate(360deg); }
+}
+
 .admin-root .jarvis .j-halo {
     transform-box: fill-box;
     transform-origin: center;
-    /* A softer curve than ease-in-out: it lingers at the extremes, which is
-       what makes it read as breathing rather than as a sine wave. */
+    /* Softer than ease-in-out: it lingers at the extremes, which is what makes
+       it read as breathing rather than as a sine wave. */
     animation: j-breathe var(--j-breathe-dur, 5.5s) cubic-bezier(0.45, 0, 0.35, 1) infinite;
     animation-delay: var(--j-breathe-delay, 0s);
     pointer-events: none;
+}
+
+.admin-root .jarvis .j-halo--crit {
+    animation: j-flicker 1.8s steps(1, end) infinite;
 }
 
 .admin-root .jarvis .j-ping {
@@ -203,34 +265,8 @@
     animation-direction: reverse;
 }
 
-/* Hover lift. The whole node group scales as one, so the sheen, ring and orbit
-   stay registered with the body instead of sliding against it. */
-.admin-root .jarvis .j-node__scale {
-    transform-box: fill-box;
-    transform-origin: center;
-    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform;
-}
-
-.admin-root .jarvis .j-node:hover .j-node__scale,
-.admin-root .jarvis .j-node:focus-visible .j-node__scale {
-    transform: scale(1.22);
-}
-
-.admin-root .jarvis .j-node--focused .j-node__scale {
-    transform: scale(1.16);
-}
-
-.admin-root .jarvis .j-halo--crit {
-    animation: j-flicker 1.8s steps(1, end) infinite;
-}
-
-/* Stalled: started and never finished. Rendered as a dashed, rotating ring so
-   it reads as "in progress but wrong" rather than simply failed. */
-@keyframes j-spin {
-    to { transform: rotate(360deg); }
-}
-
+/* Started and never finished — rendered as a dashed rotating ring so it reads
+   as "in progress but wrong" rather than simply failed. */
 .admin-root .jarvis .j-stalled {
     transform-box: fill-box;
     transform-origin: center;
@@ -240,24 +276,36 @@
     pointer-events: none;
 }
 
-/* ── Agent presence ─────────────────────────────────────────── */
-
-@keyframes j-orbit {
-    to { transform: rotate(360deg); }
-}
-
 .admin-root .jarvis .j-agent {
     transform-box: fill-box;
     transform-origin: center;
-    animation: j-orbit 6s linear infinite;
+    animation: j-orbit-spin 6s linear infinite;
     pointer-events: none;
+}
+
+/* Hover lift. The whole node group scales as one, so ring, arc and orbit stay
+   registered with the body instead of sliding against it. */
+.admin-root .jarvis .j-node__scale {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+.admin-root .jarvis .j-node:hover .j-node__scale,
+.admin-root .jarvis .j-node:focus-visible .j-node__scale {
+    transform: scale(1.24);
+}
+
+.admin-root .jarvis .j-node--focused .j-node__scale {
+    transform: scale(1.16);
 }
 
 /* ── Reduced motion ─────────────────────────────────────────── */
 /*
- * Everything above is decoration. Turning it all off must leave the page
- * equally INFORMATIVE, not merely usable — state still reads through colour,
- * which is why node state is never conveyed by motion alone.
+ * Everything above is decoration EXCEPT the ping, which means "this ran
+ * recently". Turning motion off must leave the page equally INFORMATIVE, not
+ * merely usable — which is why state is never conveyed by movement alone.
  */
 @media (prefers-reduced-motion: reduce) {
     .admin-root .jarvis .j-halo,
@@ -273,8 +321,6 @@
         transition: none;
     }
 
-    /* The ping carries meaning (this ran recently), so with motion off it
-       becomes a static ring rather than disappearing entirely. */
     .admin-root .jarvis .j-ping {
         opacity: 0.5;
     }
@@ -301,20 +347,25 @@
     gap: 6px;
     padding: 5px 10px;
     border-radius: 999px;
-    border: 1px solid rgba(111, 178, 255, 0.2);
-    background: rgba(8, 13, 28, 0.66);
+    border: 1px solid rgba(139, 122, 214, 0.24);
+    background: rgba(255, 255, 255, 0.72);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--ink-2);
+    color: var(--j-label);
     cursor: pointer;
     white-space: nowrap;
 }
 
-.admin-root .jarvis__chip:hover { color: var(--ink); border-color: rgba(230, 196, 137, 0.42); }
+html[data-admin-theme='dark'] .admin-root .jarvis__chip {
+    border-color: rgba(111, 178, 255, 0.2);
+    background: rgba(8, 13, 28, 0.66);
+}
+
+.admin-root .jarvis__chip:hover { border-color: var(--j-core-c); }
 .admin-root .jarvis__chip[disabled] { opacity: 0.4; cursor: default; }
 
 /* ── Inspector ──────────────────────────────────────────────── */
@@ -326,14 +377,20 @@
     right: 0;
     height: 100%;
     width: min(360px, 82vw);
-    background: linear-gradient(180deg, rgba(10, 16, 36, 0.95), rgba(6, 10, 24, 0.97));
-    border-left: 1px solid rgba(111, 178, 255, 0.18);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 247, 253, 0.98));
+    border-left: 1px solid rgba(139, 122, 214, 0.2);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 16px 16px 24px;
     animation: j-slide-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    color: var(--j-label);
+}
+
+html[data-admin-theme='dark'] .admin-root .jarvis__inspector {
+    background: linear-gradient(180deg, rgba(10, 16, 36, 0.95), rgba(6, 10, 24, 0.97));
+    border-left-color: rgba(111, 178, 255, 0.18);
 }
 
 @keyframes j-slide-in {
@@ -358,9 +415,13 @@
         height: auto;
         max-height: 62%;
         border-left: none;
-        border-top: 1px solid rgba(111, 178, 255, 0.18);
+        border-top: 1px solid rgba(139, 122, 214, 0.2);
         border-radius: 16px 16px 0 0;
         animation: j-sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    html[data-admin-theme='dark'] .admin-root .jarvis__inspector {
+        border-top-color: rgba(111, 178, 255, 0.18);
     }
 }
 
@@ -376,7 +437,8 @@
 }
 
 .admin-root .jarvis__kv dt {
-    color: var(--ink-3);
+    color: var(--j-label);
+    opacity: 0.6;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.66rem;
@@ -385,7 +447,7 @@
 }
 
 .admin-root .jarvis__kv dd {
-    color: var(--ink-2);
+    color: var(--j-label);
     margin: 0;
     font-variant-numeric: tabular-nums;
     min-width: 0;

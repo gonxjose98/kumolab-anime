@@ -55,6 +55,13 @@ export interface BlueprintNode {
     errorSources?: string[];
     /** Env var that configures it, for externals. */
     env?: string;
+    /**
+     * Constellation key. Nodes sharing one are laid out as a cluster of
+     * satellites rather than spread along an arc — seventeen individual dots on
+     * a ring read as a list, whereas two labelled clusters read as structure.
+     * Layout concern only; it has no effect on the graph itself.
+     */
+    group?: string;
     /** Written for an incoming AI agent: what this is, and how it fails. */
     doc: string;
 }
@@ -92,6 +99,7 @@ const rssNodes: BlueprintNode[] = [
     label: s.name,
     ring: 2 as const,
     tier: s.tier as 1 | 2 | 3 | 4,
+    group: 'rss',
     feeds: ['worker.detection'],
     errorSources: ['detection-worker', 'fetchers'],
     doc: `RSS feed (${s.url}), source tier ${s.tier}. Polled by the detection worker every 30 minutes. `
@@ -111,6 +119,7 @@ const youtubeNodes: BlueprintNode[] = [
     label: c.name,
     ring: 2 as const,
     tier: c.tier as 1 | 2 | 3 | 4,
+    group: 'youtube',
     feeds: ['worker.detection'],
     errorSources: ['detection-worker', 'fetchers'],
     doc: `Official YouTube channel (${c.channelId}), read via the free RSS feed — no API quota. Tier ${c.tier}: `

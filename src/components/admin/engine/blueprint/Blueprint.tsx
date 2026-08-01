@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Radio, Loader2 } from 'lucide-react';
 import { BLUEPRINT, NODES_BY_ID } from '@/lib/engine/blueprint';
-import { layoutNodes, focusBox, focusSet, SCENE, R } from './layout';
+import { layoutNodes, focusBox, focusSet, fieldDots, SCENE } from './layout';
 import { buildEdgeGeom, type EdgeGeom } from './geometry';
 import {
     EdgeLayer, ParticleLayer, PulseLayer, NodeLayer, Defs, RingGuides,
+    ClusterLayer, ClusterLabels,
     type Pulse, type NodeState,
 } from './Canvas';
 import Inspector from './Inspector';
@@ -84,7 +85,8 @@ export default function Blueprint({
     const reduced = useRef(false);
 
     // ── Geometry (recomputed only if the graph itself changes) ──
-    const placed = useMemo(() => layoutNodes(BLUEPRINT.nodes), []);
+    const { placed, clusters } = useMemo(() => layoutNodes(BLUEPRINT.nodes), []);
+    const dots = useMemo(() => fieldDots(), []);
     const posById = useMemo(
         () => new Map(placed.map((p) => [p.node.id, p])),
         [placed],
@@ -99,6 +101,36 @@ export default function Blueprint({
         return out;
     }, [posById]);
     const edgeIndex = useMemo(() => new Map(edges.map((e) => [e.key, e])), [edges]);
+
+    /**
+     * Ribbon weight. The pipeline spine is a wide band; a single RSS feed
+     * reaching detection is a thread. Without this every connection looks
+     * equally important and the picture flattens into a spider web.
+     */
+    const widthOf = useCallback((e: EdgeGeom) => {
+        const from = NODES_BY_ID[e.from];
+        const to = NODES_BY_ID[e.to];
+        if (!from || !to) return 1;
+        if (from.kind === 'source') return 1;            // many, individually light
+        if (from.kind === 'stage' && to.kind === 'stage') return 7;   // the spine
+        if (from.kind === 'worker' && to.kind === 'surface') return 5;
+        if (from.kind === 'stage' || to.kind === 'stage') return 4;
+        if (from.kind === 'worker') return 2.5;
+        return 1.6;
+    }, []);
+
+    /** Ribbons take the colour of where they come FROM, so traffic is traceable. */
+    const colourOf = useCallback((e: EdgeGeom) => {
+        const from = NODES_BY_ID[e.from];
+        switch (from?.kind) {
+            case 'source': return 'var(--j-source-c)';
+            case 'stage': return 'var(--j-stage-c)';
+            case 'worker': return 'var(--j-worker-c)';
+            case 'surface': return 'var(--j-surface-c)';
+            case 'store': return 'var(--j-store-c)';
+            default: return 'var(--j-edge)';
+        }
+    }, []);
     const edgesByFrom = useMemo(() => {
         const m = new Map<string, EdgeGeom[]>();
         for (const e of edges) {
@@ -396,13 +428,15 @@ export default function Blueprint({
                 aria-label="KumoLab system blueprint. Interactive node map of sources, workers and destinations."
             >
                 <Defs />
-                <RingGuides
-                    radii={[R.stage, R.worker, R.edge, R.outer]}
-                    cx={SCENE.cx}
-                    cy={SCENE.cy}
-                    dim={!!focusId}
+                <RingGuides dots={dots} dim={!!focusId} />
+                <ClusterLayer clusters={clusters} dim={!!focusId} />
+                <EdgeLayer
+                    edges={edges}
+                    litIds={lit}
+                    hasFocus={!!focusId}
+                    widthOf={widthOf}
+                    colourOf={colourOf}
                 />
-                <EdgeLayer edges={edges} litIds={lit} hasFocus={!!focusId} />
                 {mounted && <ParticleLayer edges={edges} t={frame} dense={dense} />}
                 {mounted && <PulseLayer pulses={pulsesRef.current} edgeIndex={edgeIndex} t={frame} />}
                 <NodeLayer
@@ -415,6 +449,7 @@ export default function Blueprint({
                     agentNodeIds={agentNodeIds}
                     pingIds={pingIds}
                 />
+                <ClusterLabels clusters={clusters} dim={!!focusId} />
             </svg>
 
             {focusNode && (

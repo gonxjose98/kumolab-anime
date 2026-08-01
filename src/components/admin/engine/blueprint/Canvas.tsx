@@ -2,7 +2,8 @@
 
 import { memo } from 'react';
 import type { BlueprintNode } from '@/lib/engine/blueprint';
-import type { Placed } from './layout';
+import type { Placed, ClusterMark } from './layout';
+import { R, SCENE } from './layout';
 import type { EdgeGeom } from './geometry';
 import { pointAt } from './geometry';
 
@@ -10,136 +11,40 @@ import { pointAt } from './geometry';
  * Canvas layers.
  *
  * Split into memoized layers on purpose. The animation loop re-renders roughly
- * 30 times a second, and only the light layer depends on the frame clock. Nodes
+ * 30 times a second, and only the light layers depend on the frame clock. Nodes
  * and edges re-render only when the DATA changes, which is what keeps a
  * permanently-animating scene affordable.
+ *
+ * Visual language: flat editorial data-viz, not skeuomorphic. Shapes are solid
+ * and unshaded; depth comes from overlap, scale and transparency rather than
+ * from gloss. Connections are wide, soft, flowing ribbons — the eye should be
+ * able to follow one strand of traffic across the whole picture.
  */
 
 export type NodeState = 'idle' | 'good' | 'warn' | 'crit' | 'stalled' | 'unknown';
-
-// ── Scene furniture ─────────────────────────────────────────────
-
-/**
- * Glow. Without it the nodes are flat discs on a dark field and the whole thing
- * reads as a scatter plot; with it they read as lights. One shared filter for
- * the scene rather than per-node, which keeps it cheap.
- */
-export function Defs() {
-    return (
-        <defs>
-            <filter id="j-glow" x="-70%" y="-70%" width="240%" height="240%">
-                <feGaussianBlur stdDeviation="5" result="blur" />
-                <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                </feMerge>
-            </filter>
-
-            <radialGradient id="j-core" cx="50%" cy="50%">
-                <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.9" />
-                <stop offset="70%" stopColor="var(--gold)" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
-            </radialGradient>
-
-            {/*
-             * Depth without a gradient per colour.
-             *
-             * Painting a white sheen and a dark shade OVER a flat fill gives
-             * every node a lit-sphere read using two shared gradients, instead
-             * of one bespoke gradient per kind and per state (which would be a
-             * dozen defs that all have to be kept in sync with the palette).
-             */}
-            <radialGradient id="j-sheen" cx="32%" cy="26%" r="76%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
-                <stop offset="42%" stopColor="#ffffff" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </radialGradient>
-
-            <linearGradient id="j-shade" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#000814" stopOpacity="0" />
-                <stop offset="100%" stopColor="#000814" stopOpacity="0.42" />
-            </linearGradient>
-
-            {/* Hollow nodes get a faint interior so they read as glass rather
-                than as holes punched in the field. */}
-            <radialGradient id="j-hollow" cx="34%" cy="28%" r="80%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
-                <stop offset="60%" stopColor="#0a1022" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#060a16" stopOpacity="0.95" />
-            </radialGradient>
-        </defs>
-    );
-}
-
-/**
- * Faint guide circles and sector captions.
- *
- * These carry no data — they exist so the radial arrangement reads as
- * deliberate structure rather than a cloud of dots. Without them a viewer has
- * no way to tell that distance from the centre means anything.
- */
-export const RingGuides = memo(function RingGuides({
-    radii, cx, cy, dim,
-}: { radii: number[]; cx: number; cy: number; dim: boolean }) {
-    return (
-        <g aria-hidden="true" opacity={dim ? 0.25 : 1}>
-            {radii.map((r) => (
-                <circle
-                    key={r}
-                    cx={cx}
-                    cy={cy}
-                    r={r}
-                    fill="none"
-                    stroke="rgba(111,178,255,0.10)"
-                    strokeWidth={1}
-                    strokeDasharray="2 9"
-                />
-            ))}
-            {/* Sector captions run vertically along the outer edges. The corners
-                belong to the HUD chips, and the vertical margin outside the
-                last ring is only ~70px, so upright text there would either
-                collide with a node or with the chrome. */}
-            <text
-                x={cx - radii[3] - 24} y={cy} textAnchor="middle"
-                transform={`rotate(-90 ${cx - radii[3] - 24} ${cy})`}
-                style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.3em', fill: 'rgba(126,166,216,0.72)' }}
-            >
-                SOURCES
-            </text>
-            <text
-                x={cx + radii[3] + 24} y={cy} textAnchor="middle"
-                transform={`rotate(90 ${cx + radii[3] + 24} ${cy})`}
-                style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.3em', fill: 'rgba(255,217,160,0.74)' }}
-            >
-                DESTINATIONS
-            </text>
-            <text x={cx} y={cy - radii[3] - 30} textAnchor="middle"
-                style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.26em', fill: 'rgba(168,151,232,0.6)' }}>
-                SERVICES &amp; APIS
-            </text>
-        </g>
-    );
-});
 
 /**
  * Two colour channels, deliberately separated.
  *
  * KIND says what a thing IS and never changes. STATE says how it is DOING and
- * lives in the halo.
+ * lives in the halo and the state ring.
  *
- * The first version used state for the node fill, and with no telemetry yet
+ * An early version used state for the node fill, and with no telemetry yet
  * every node rendered the same idle grey — a live system that looked dead, and
  * a picture that told you nothing until the first cron fired. Identity is
  * always knowable, so identity gets the fill.
+ *
+ * These read from CSS custom properties so the light and dark themes can carry
+ * genuinely different palettes rather than one washed-out compromise.
  */
 const KIND_COLOR: Record<string, string> = {
-    core: 'var(--gold)',
-    stage: '#7fc2ff',      // pipeline: sea blue, the spine of the system
-    worker: 'var(--gold)', // the things that fire on a schedule
-    surface: '#ffd9a0',    // where posts land
-    source: '#7ea6d8',     // inbound, quieter than the machinery but still legible
-    external: '#a897e8',   // not ours
-    store: '#4fc9a8',      // state at rest
+    core: 'var(--j-core-c)',
+    stage: 'var(--j-stage-c)',
+    worker: 'var(--j-worker-c)',
+    surface: 'var(--j-surface-c)',
+    source: 'var(--j-source-c)',
+    external: 'var(--j-external-c)',
+    store: 'var(--j-store-c)',
 };
 
 const STATE_COLOR: Record<NodeState, string> = {
@@ -151,30 +56,107 @@ const STATE_COLOR: Record<NodeState, string> = {
     unknown: 'var(--j-idle)',
 };
 
-/** How loudly the halo argues. Unknown must not look like confident health. */
+/**
+ * How loudly the halo argues. Unknown must not look like confident health.
+ *
+ * Idle and unknown are deliberately almost invisible. On the dark theme a faint
+ * grey halo reads as ambient glow; on the light theme the same value reads as a
+ * smudge behind every node, and fifty of them turn an airy diagram muddy. A
+ * node with nothing to report should say nothing.
+ */
 const STATE_HALO_OPACITY: Record<NodeState, number> = {
-    idle: 0.10,
-    unknown: 0.08,
-    good: 0.20,
-    warn: 0.34,
-    crit: 0.46,
-    stalled: 0.34,
+    idle: 0.05,
+    unknown: 0.04,
+    good: 0.16,
+    warn: 0.3,
+    crit: 0.42,
+    stalled: 0.3,
 };
+
+// ── Scene furniture ─────────────────────────────────────────────
+
+export function Defs() {
+    return (
+        <defs>
+            <filter id="j-glow" x="-70%" y="-70%" width="240%" height="240%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                </feMerge>
+            </filter>
+            <filter id="j-soft" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="14" />
+            </filter>
+            <radialGradient id="j-core" cx="50%" cy="50%">
+                <stop offset="0%" stopColor="var(--j-core-c)" stopOpacity="0.55" />
+                <stop offset="60%" stopColor="var(--j-core-c)" stopOpacity="0.12" />
+                <stop offset="100%" stopColor="var(--j-core-c)" stopOpacity="0" />
+            </radialGradient>
+        </defs>
+    );
+}
+
+/**
+ * Soft concentric bands and the outer dot field.
+ *
+ * The bands carry no data — they exist so the radial arrangement reads as
+ * deliberate structure rather than a cloud of dots. Without them a viewer has
+ * no way to tell that distance from the centre means anything.
+ */
+export const RingGuides = memo(function RingGuides({
+    dots, dim,
+}: { dots: { x: number; y: number; r: number; o: number }[]; dim: boolean }) {
+    const bands = [R.outer + 26, R.edge + 6, R.worker + 4];
+    return (
+        <g aria-hidden="true" opacity={dim ? 0.35 : 1}>
+            {bands.map((r, i) => (
+                <circle key={r} cx={SCENE.cx} cy={SCENE.cy} r={r}
+                    fill="var(--j-band)" opacity={0.55 + i * 0.22} />
+            ))}
+            {bands.map((r) => (
+                <circle key={`s-${r}`} cx={SCENE.cx} cy={SCENE.cy} r={r}
+                    fill="none" stroke="var(--j-band-line)" strokeWidth={1} />
+            ))}
+            {dots.map((d, i) => (
+                <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="var(--j-fleck)" opacity={d.o} />
+            ))}
+        </g>
+    );
+});
 
 // ── Edges ───────────────────────────────────────────────────────
 
+/**
+ * Flowing ribbons.
+ *
+ * Width encodes structural weight: the pipeline spine is a wide band, a single
+ * RSS feed reaching detection is a thread. Drawn with round caps and low
+ * opacity so overlapping strands build depth by accumulation, the way ink does,
+ * instead of fighting each other.
+ */
 export const EdgeLayer = memo(function EdgeLayer({
-    edges, litIds, hasFocus,
-}: { edges: EdgeGeom[]; litIds: Set<string>; hasFocus: boolean }) {
+    edges, litIds, hasFocus, widthOf, colourOf,
+}: {
+    edges: EdgeGeom[];
+    litIds: Set<string>;
+    hasFocus: boolean;
+    widthOf: (e: EdgeGeom) => number;
+    colourOf: (e: EdgeGeom) => string;
+}) {
     return (
-        <g aria-hidden="true">
+        <g aria-hidden="true" style={{ mixBlendMode: 'var(--j-edge-blend)' as never }}>
             {edges.map((e) => {
                 const lit = !hasFocus || (litIds.has(e.from) && litIds.has(e.to));
+                const w = widthOf(e);
                 return (
                     <path
                         key={e.key}
                         d={e.d}
                         className={`j-edge ${hasFocus && lit ? 'j-edge--active' : ''} ${hasFocus && !lit ? 'j-edge--dimmed' : ''}`}
+                        stroke={colourOf(e)}
+                        strokeWidth={hasFocus && lit ? w * 1.5 : w}
+                        strokeLinecap="round"
                     />
                 );
             })}
@@ -188,10 +170,10 @@ export const EdgeLayer = memo(function EdgeLayer({
  * The baseline "the system is alive" motion: faint motes drifting along every
  * edge even when nothing is firing.
  *
- * Position is a pure function of (time, edge index), so there is no per-particle
- * state to store or update — the whole layer is recomputed from the clock each
- * frame. Particle count scales with edge count and is capped, so a big graph on
- * a small phone doesn't melt.
+ * Position is a pure function of (time, edge index), so there is no
+ * per-particle state to store or update — the whole layer is recomputed from
+ * the clock each frame. Particle count scales with edge count and is capped, so
+ * a big graph on a small phone doesn't melt.
  */
 export const ParticleLayer = memo(function ParticleLayer({
     edges, t, dense,
@@ -202,7 +184,6 @@ export const ParticleLayer = memo(function ParticleLayer({
     for (let i = 0; i < edges.length; i++) {
         const e = edges[i];
         for (let k = 0; k < per; k++) {
-            // Stagger by index so they never march in lockstep.
             const phase = ((t / (7000 + (i % 5) * 900)) + (i * 0.137 + k * 0.5)) % 1;
             const p = pointAt(e, phase);
             dots.push(
@@ -210,9 +191,9 @@ export const ParticleLayer = memo(function ParticleLayer({
                     key={`${e.key}-${k}`}
                     cx={p.x}
                     cy={p.y}
-                    r={1.5}
-                    fill="var(--blue)"
-                    opacity={0.28 * Math.sin(Math.PI * phase)}
+                    r={1.7}
+                    fill="var(--j-mote)"
+                    opacity={0.34 * Math.sin(Math.PI * phase)}
                 />,
             );
         }
@@ -247,19 +228,112 @@ export const PulseLayer = memo(function PulseLayer({
                 const prog = (t - p.start) / p.duration;
                 if (prog < 0 || prog > 1) return null;
                 const pt = pointAt(e, prog);
-                const colour = p.ok ? 'var(--gold)' : 'var(--sun)';
-                // Fade in and out so packets don't pop into existence at a node.
+                const colour = p.ok ? 'var(--j-pulse)' : 'var(--j-crit)';
                 const fade = Math.sin(Math.PI * prog);
+                // A short comet tail reads as direction; a bare dot doesn't.
+                const tail = pointAt(e, Math.max(0, prog - 0.05));
                 return (
                     <g key={p.id} opacity={fade}>
-                        <circle cx={pt.x} cy={pt.y} r={9} fill={colour} opacity={0.16} />
-                        <circle cx={pt.x} cy={pt.y} r={3.2} fill={colour} />
+                        <line x1={tail.x} y1={tail.y} x2={pt.x} y2={pt.y}
+                            stroke={colour} strokeWidth={3} strokeLinecap="round" opacity={0.45} />
+                        <circle cx={pt.x} cy={pt.y} r={10} fill={colour} opacity={0.15} />
+                        <circle cx={pt.x} cy={pt.y} r={3.4} fill={colour} />
                     </g>
                 );
             })}
         </g>
     );
 });
+
+// ── Constellation marks ─────────────────────────────────────────
+
+/**
+ * The soft disc behind a cluster of sources.
+ *
+ * Discs only — the labels ride in ClusterLabels, drawn ABOVE the nodes. Kept in
+ * one layer they were painted before the node layer and the edges, so a cluster
+ * label sitting anywhere near a node simply vanished under it.
+ */
+export const ClusterLayer = memo(function ClusterLayer({
+    clusters, dim,
+}: { clusters: ClusterMark[]; dim: boolean }) {
+    return (
+        <g aria-hidden="true" opacity={dim ? 0.25 : 1}>
+            {clusters.map((c) => (
+                <g key={c.key}>
+                    <circle cx={c.x} cy={c.y} r={c.r + 24} fill="var(--j-cluster)" />
+                    <circle cx={c.x} cy={c.y} r={c.r + 24} fill="none"
+                        stroke="var(--j-cluster-line)" strokeWidth={1} strokeDasharray="3 6" />
+                </g>
+            ))}
+        </g>
+    );
+});
+
+export const ClusterLabels = memo(function ClusterLabels({
+    clusters, dim,
+}: { clusters: ClusterMark[]; dim: boolean }) {
+    return (
+        <g aria-hidden="true" opacity={dim ? 0.25 : 1}>
+            {clusters.map((c) => {
+                // Push the chip OUTWARD along the cluster's own radius rather
+                // than straight up. Straight up walks it back toward the worker
+                // ring, where it lands on top of a worker's label; outward is
+                // always open space.
+                const dx = c.x - SCENE.cx;
+                const dy = c.y - SCENE.cy;
+                const len = Math.hypot(dx, dy) || 1;
+                return (
+                    <Chip
+                        key={c.key}
+                        x={c.x + (dx / len) * (c.r + 40)}
+                        y={c.y + (dy / len) * (c.r + 40)}
+                        angle={0}
+                        text={`${c.label} · ${c.count}`}
+                        tone="source"
+                    />
+                );
+            })}
+        </g>
+    );
+});
+
+// ── Labels ──────────────────────────────────────────────────────
+
+/**
+ * A rounded label chip.
+ *
+ * Width is estimated from character count rather than measured. Measuring text
+ * in SVG needs getBBox, which forces layout and — worse — returns different
+ * numbers on the server and the client, guaranteeing a hydration mismatch on a
+ * server-rendered page.
+ */
+export function Chip({
+    x, y, angle, text, tone, anchor = 'middle',
+}: {
+    x: number; y: number; angle: number; text: string;
+    tone: 'source' | 'surface' | 'external' | 'store';
+    anchor?: 'start' | 'middle' | 'end';
+}) {
+    const w = text.length * 5.9 + 14;
+    const h = 17;
+    const dx = anchor === 'start' ? 0 : anchor === 'end' ? -w : -w / 2;
+    return (
+        <g transform={angle ? `rotate(${angle} ${x} ${y})` : undefined} pointerEvents="none">
+            <rect
+                x={x + dx} y={y - h / 2} width={w} height={h} rx={5}
+                fill={`var(--j-chip-${tone})`}
+            />
+            <text
+                x={x + dx + w / 2} y={y + 4}
+                textAnchor="middle"
+                className="j-chip__text"
+            >
+                {text}
+            </text>
+        </g>
+    );
+}
 
 // ── Nodes ───────────────────────────────────────────────────────
 
@@ -268,6 +342,16 @@ function labelAnchor(angle: number): 'start' | 'middle' | 'end' {
     if (angle > 195 && angle < 345) return 'end';
     return 'middle';
 }
+
+/** Keep perimeter chips upright rather than upside-down on the left half. */
+function radialAngle(angle: number): number {
+    const a = ((angle % 360) + 360) % 360;
+    return a > 180 ? a + 90 : a - 90;
+}
+
+const CHIP_TONE: Record<string, 'source' | 'surface' | 'external' | 'store'> = {
+    source: 'source', surface: 'surface', external: 'external', store: 'store',
+};
 
 export const NodeLayer = memo(function NodeLayer({
     placed, states, litIds, hasFocus, focusId, onFocus, agentNodeIds, pingIds,
@@ -293,24 +377,29 @@ export const NodeLayer = memo(function NodeLayer({
                 // must be unmissable, and that outranks the kind legend.
                 const alarmed = state === 'crit' || state === 'warn' || state === 'stalled';
                 const colour = alarmed ? stateColour : kindColour;
+
                 const dim = hasFocus && !litIds.has(n.id);
                 const isFocused = focusId === n.id;
                 const isCore = n.kind === 'core';
-                const hollow = n.kind === 'source' || n.kind === 'external';
-                // Only the load-bearing nodes get the glow filter. Applying it
-                // to all 55 would both cost more and flatten the hierarchy it
-                // is there to create.
-                const structural = n.kind === 'stage' || n.kind === 'worker' || n.kind === 'surface';
+                const inCluster = !!p.cluster;
 
-                // Labels are always on for the big structural nodes; source and
-                // external labels would collide at overview scale, so they
-                // appear when the ring is focused or the node is hovered.
-                const alwaysLabel = isCore || n.kind === 'stage' || n.kind === 'surface' || n.kind === 'worker';
-                const showLabel = alwaysLabel || isFocused || (hasFocus && litIds.has(n.id));
+                // Inner structural nodes get plain horizontal labels; the outer
+                // perimeter gets rotated chips. Mixing the two is what keeps a
+                // dense radial diagram readable.
+                const chipKind = n.kind === 'surface' || n.kind === 'external' || n.kind === 'store';
+                const plainLabel = isCore || n.kind === 'stage' || n.kind === 'worker';
+                const showChip = chipKind && (!hasFocus || litIds.has(n.id));
+                const showPlain = plainLabel || isFocused || (hasFocus && litIds.has(n.id) && !chipKind);
 
                 const anchor = labelAnchor(p.angle);
-                const lx = p.x + (anchor === 'start' ? p.r + 8 : anchor === 'end' ? -(p.r + 8) : 0);
-                const ly = p.y + (anchor === 'middle' ? (p.angle < 90 || p.angle > 270 ? -(p.r + 9) : p.r + 15) : 4);
+                const lx = p.x + (anchor === 'start' ? p.r + 9 : anchor === 'end' ? -(p.r + 9) : 0);
+                const ly = p.y + (anchor === 'middle' ? (p.angle < 90 || p.angle > 270 ? -(p.r + 10) : p.r + 16) : 4);
+
+                // Chips sit just outside the node, pushed along its own radius.
+                const chipDist = p.dist + p.r + 30;
+                const chipRad = ((p.angle - 90) * Math.PI) / 180;
+                const cxp = SCENE.cx + Math.cos(chipRad) * chipDist;
+                const cyp = SCENE.cy + Math.sin(chipRad) * chipDist;
 
                 return (
                     <g
@@ -326,136 +415,108 @@ export const NodeLayer = memo(function NodeLayer({
                     >
                         {/* Generous invisible hit target — the dots are far too
                             small to tap reliably on a phone. */}
-                        <circle className="j-node__hit" cx={p.x} cy={p.y} r={Math.max(p.r + 14, 22)} />
+                        <circle className="j-node__hit" cx={p.x} cy={p.y} r={Math.max(p.r + 14, 20)} />
 
                         {/* Two halos at different periods. A single one reads as
                             a mechanical throb; two drifting against each other
-                            never quite repeat, which is what makes it feel
-                            like breathing rather than blinking. Both are
-                            CSS-animated so they run on the compositor rather
-                            than through the frame loop. */}
-                        <circle
-                            className={`j-halo ${state === 'crit' ? 'j-halo--crit' : ''}`}
-                            cx={p.x}
-                            cy={p.y}
-                            r={p.r * (isCore ? 1.5 : 2.4)}
-                            fill={stateColour}
-                            opacity={STATE_HALO_OPACITY[state]}
-                            style={{
-                                ['--j-breathe-dur' as string]: `${4.2 + (i % 7) * 0.45}s`,
-                                ['--j-breathe-delay' as string]: `${(i % 11) * 0.29}s`,
-                            }}
-                        />
-                        <circle
-                            className="j-halo"
-                            cx={p.x}
-                            cy={p.y}
-                            r={p.r * (isCore ? 1.2 : 1.55)}
-                            fill={stateColour}
-                            opacity={STATE_HALO_OPACITY[state] * 0.85}
-                            style={{
-                                ['--j-breathe-dur' as string]: `${6.6 + (i % 5) * 0.7}s`,
-                                ['--j-breathe-delay' as string]: `${(i % 7) * 0.41}s`,
-                            }}
-                        />
+                            never quite repeat, which is what makes it feel like
+                            breathing. CSS-animated, so they run on the
+                            compositor rather than through the frame loop. */}
+                        {!inCluster && (
+                            <>
+                                <circle
+                                    className={`j-halo ${state === 'crit' ? 'j-halo--crit' : ''}`}
+                                    cx={p.x} cy={p.y} r={p.r * (isCore ? 1.5 : 2.4)}
+                                    fill={stateColour}
+                                    opacity={STATE_HALO_OPACITY[state]}
+                                    style={{
+                                        ['--j-breathe-dur' as string]: `${4.2 + (i % 7) * 0.45}s`,
+                                        ['--j-breathe-delay' as string]: `${(i % 11) * 0.29}s`,
+                                    }}
+                                />
+                                <circle
+                                    className="j-halo"
+                                    cx={p.x} cy={p.y} r={p.r * (isCore ? 1.2 : 1.55)}
+                                    fill={stateColour}
+                                    opacity={STATE_HALO_OPACITY[state] * 0.55}
+                                    style={{
+                                        ['--j-breathe-dur' as string]: `${6.6 + (i % 5) * 0.7}s`,
+                                        ['--j-breathe-delay' as string]: `${(i % 7) * 0.41}s`,
+                                    }}
+                                />
+                            </>
+                        )}
 
                         {/* Radar ping: this node's worker actually ran in the
                             last few minutes. Data-driven, not decoration. */}
                         {pingIds.has(n.id) && (
-                            <circle
-                                className="j-ping"
-                                cx={p.x}
-                                cy={p.y}
-                                r={p.r + 4}
-                                fill="none"
-                                stroke={colour}
-                                strokeWidth={1.4}
-                            />
-                        )}
-
-                        {state === 'stalled' && (
-                            <circle
-                                className="j-stalled"
-                                cx={p.x}
-                                cy={p.y}
-                                r={p.r + 7}
-                                stroke="var(--j-warn)"
-                                strokeWidth={1.4}
-                            />
+                            <circle className="j-ping" cx={p.x} cy={p.y} r={p.r + 4}
+                                fill="none" stroke={colour} strokeWidth={1.6} />
                         )}
 
                         {agentNodeIds.has(n.id) && (
                             <g className="j-agent">
-                                <circle cx={p.x} cy={p.y - (p.r + 13)} r={3} fill="var(--blue)" />
+                                <circle cx={p.x} cy={p.y - (p.r + 14)} r={3.4} fill="var(--j-agent-c)" />
                             </g>
                         )}
 
                         {isCore ? (
                             <g className="j-node__scale">
-                                <circle cx={p.x} cy={p.y} r={p.r * 2.4} fill="url(#j-core)" pointerEvents="none" />
-                                <circle className="j-orbit j-orbit--slow" cx={p.x} cy={p.y} r={p.r + 12}
-                                    fill="none" stroke="var(--gold)" strokeWidth={0.9} opacity={0.4} strokeDasharray="1 8" />
-                                <circle cx={p.x} cy={p.y} r={p.r} fill="none" stroke="var(--gold)" strokeWidth={1.2} opacity={0.7} />
-                                <circle cx={p.x} cy={p.y} r={p.r - 11} fill="none" stroke="var(--blue)" strokeWidth={0.8} opacity={0.45} />
-                                <circle className="j-node__body" cx={p.x} cy={p.y} r={p.r - 24}
-                                    fill={colour} opacity={0.95} filter="url(#j-glow)" />
-                                <circle cx={p.x} cy={p.y} r={p.r - 24} fill="url(#j-sheen)" pointerEvents="none" />
+                                <circle cx={p.x} cy={p.y} r={p.r * 2.6} fill="url(#j-core)" pointerEvents="none" />
+                                <circle className="j-orbit j-orbit--slow" cx={p.x} cy={p.y} r={p.r + 14}
+                                    fill="none" stroke="var(--j-core-c)" strokeWidth={1}
+                                    opacity={0.45} strokeDasharray="1 9" />
+                                <circle className="j-node__body" cx={p.x} cy={p.y} r={p.r} fill={colour} />
+                                <circle cx={p.x} cy={p.y} r={p.r - 13} fill="none"
+                                    stroke="var(--j-core-ink)" strokeWidth={1} opacity={0.32} />
                             </g>
                         ) : (
-                            // Hollow for the things KumoLab does not own (sources,
-                            // third parties); solid for the machinery it does. The
-                            // distinction should be legible before any label is.
                             <g className="j-node__scale">
-                                {/* Contact ring — a hairline of the node's own
-                                    colour just outside the body. Cheap, and it
-                                    stops the dots reading as flat stickers. */}
-                                <circle cx={p.x} cy={p.y} r={p.r + 3.5} fill="none"
-                                    stroke={colour} strokeWidth={1} opacity={0.32} />
+                                {/* An arc of the node's own colour, offset from
+                                    the body — the reference's signature accent.
+                                    Reads as motion frozen mid-orbit. */}
+                                {(n.kind === 'stage' || n.kind === 'surface' || n.kind === 'store') && (
+                                    <path
+                                        d={arcPath(p.x, p.y, p.r + 5, -120, 40)}
+                                        fill="none" stroke={colour} strokeWidth={2.4}
+                                        strokeLinecap="round" opacity={0.55}
+                                    />
+                                )}
 
                                 {/* Workers carry a slowly rotating dashed orbit,
                                     because they are the things that fire on a
                                     schedule and should look like it. */}
                                 {n.kind === 'worker' && (
-                                    <circle className="j-orbit" cx={p.x} cy={p.y} r={p.r + 8}
-                                        fill="none" stroke={colour} strokeWidth={1}
-                                        opacity={0.34} strokeDasharray="2 7"
+                                    <circle className="j-orbit" cx={p.x} cy={p.y} r={p.r + 7}
+                                        fill="none" stroke={colour} strokeWidth={1.1}
+                                        opacity={0.4} strokeDasharray="2 7"
                                         style={{ ['--j-orbit-dur' as string]: `${16 + (i % 6) * 4}s` }} />
                                 )}
 
-                                <circle
-                                    className="j-node__body"
-                                    cx={p.x} cy={p.y} r={p.r}
-                                    fill={hollow ? 'url(#j-hollow)' : colour}
-                                    stroke={colour}
-                                    strokeWidth={hollow ? 2 : 0}
-                                    opacity={1}
-                                    filter={structural ? 'url(#j-glow)' : undefined}
-                                />
-
-                                {/* Lit-sphere pass: highlight above, shadow below. */}
-                                <circle cx={p.x} cy={p.y} r={p.r} fill="url(#j-sheen)"
-                                    opacity={hollow ? 0.5 : 1} pointerEvents="none" />
-                                {!hollow && (
-                                    <circle cx={p.x} cy={p.y} r={p.r} fill="url(#j-shade)" pointerEvents="none" />
-                                )}
-
-                                {/* A hollow node still needs a bright centre or
-                                    it disappears against the field at overview
-                                    zoom. */}
-                                {hollow && (
-                                    <circle cx={p.x} cy={p.y} r={Math.max(p.r * 0.34, 2.2)}
-                                        fill={colour} opacity={0.95} pointerEvents="none" />
-                                )}
+                                {/* Flat, unshaded. Depth comes from overlap and
+                                    scale, not from a fake light source. */}
+                                <circle className="j-node__body" cx={p.x} cy={p.y} r={p.r} fill={colour} />
                             </g>
                         )}
 
-                        {showLabel && (
+                        {showChip && (
+                            <Chip
+                                x={cxp} y={cyp}
+                                angle={radialAngle(p.angle)}
+                                text={n.label}
+                                tone={CHIP_TONE[n.kind] ?? 'external'}
+                            />
+                        )}
+
+                        {showPlain && (
                             <text
                                 className="j-node__label"
                                 x={isCore ? p.x : lx}
-                                y={isCore ? p.y + p.r + 22 : ly}
+                                y={isCore ? p.y + p.r + 26 : ly}
                                 textAnchor={isCore ? 'middle' : anchor}
-                                style={isCore ? { fontSize: 15, fill: 'var(--gold)', letterSpacing: '0.08em' } : undefined}
+                                style={isCore
+                                    ? { fontSize: 16, fill: 'var(--j-core-label)', letterSpacing: '0.08em' }
+                                    : undefined}
                             >
                                 {n.label}
                             </text>
@@ -466,3 +527,15 @@ export const NodeLayer = memo(function NodeLayer({
         </g>
     );
 });
+
+/** An open arc, for the accent strokes that sit outside a node. */
+function arcPath(cx: number, cy: number, r: number, fromDeg: number, toDeg: number): string {
+    const a0 = ((fromDeg - 90) * Math.PI) / 180;
+    const a1 = ((toDeg - 90) * Math.PI) / 180;
+    const x0 = cx + Math.cos(a0) * r;
+    const y0 = cy + Math.sin(a0) * r;
+    const x1 = cx + Math.cos(a1) * r;
+    const y1 = cy + Math.sin(a1) * r;
+    const large = Math.abs(toDeg - fromDeg) > 180 ? 1 : 0;
+    return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}

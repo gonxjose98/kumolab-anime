@@ -14,19 +14,29 @@
  *
  * Angles are measured from 12 o'clock, clockwise, in degrees, so reasoning
  * about the picture matches reasoning about a clock face.
+ *
+ * Sources are CLUSTERED rather than strung along the arc. Seventeen equal dots
+ * on a ring read as a list; two labelled constellations read as structure, and
+ * their edges bundle naturally into a single flowing ribbon toward detection.
  */
 
 import type { BlueprintNode } from '@/lib/engine/blueprint';
 
-export const SCENE = { w: 1000, h: 1000, cx: 500, cy: 500 };
+export const SCENE = { w: 1120, h: 1120, cx: 560, cy: 560 };
 
-/** Ring radii by role. Exported so the canvas can draw the guide circles. */
+/** Ring radii by role. Exported so the canvas can draw the guide bands. */
 export const R = {
-    stage: 128,
-    worker: 232,
-    edge: 336,     // sources + destinations
-    outer: 428,    // externals + stores
+    stage: 152,
+    worker: 258,
+    edge: 362,     // source clusters + destinations
+    outer: 452,    // externals + stores
 } as const;
+
+/** Where each source constellation sits, and how wide it spreads. */
+const CLUSTERS: Record<string, { angle: number; radius: number; spread: number; label: string }> = {
+    youtube: { angle: 246, radius: 352, spread: 74, label: 'YouTube channels' },
+    rss: { angle: 310, radius: 340, spread: 44, label: 'RSS feeds' },
+};
 
 export interface Placed {
     node: BlueprintNode;
@@ -36,6 +46,20 @@ export interface Placed {
     r: number;
     /** Degrees from 12 o'clock, clockwise. Used to place labels outward. */
     angle: number;
+    /** Distance from the scene centre — chip labels sit just beyond this. */
+    dist: number;
+    /** Constellation this node belongs to, if any. */
+    cluster?: string;
+}
+
+export interface ClusterMark {
+    key: string;
+    label: string;
+    x: number;
+    y: number;
+    r: number;
+    angle: number;
+    count: number;
 }
 
 function polar(angleDeg: number, radius: number): { x: number; y: number } {
@@ -56,23 +80,19 @@ function spread(n: number, from: number, to: number, full: boolean): number[] {
 }
 
 const DOT: Record<BlueprintNode['kind'], number> = {
-    core: 46,
+    core: 48,
     stage: 17,
-    worker: 15,
-    source: 8.5,
+    worker: 14,
+    source: 6.5,
     surface: 15,
-    external: 10.5,
-    store: 12,
+    external: 10,
+    store: 11.5,
 };
 
-/**
- * Place every node.
- *
- * Sources take the left arc and destinations the right, so the picture reads
- * left-to-right as content flowing in and posts flowing out — the same
- * direction the pipeline is described in everywhere else.
- */
-export function layoutNodes(nodes: BlueprintNode[]): Placed[] {
+/** The golden angle. Phyllotaxis packs a disc evenly without looking gridded. */
+const GOLDEN = 137.50776405003785;
+
+export function layoutNodes(nodes: BlueprintNode[]): { placed: Placed[]; clusters: ClusterMark[] } {
     const by = (k: BlueprintNode['kind']) => nodes.filter((n) => n.kind === k);
 
     const core = by('core');
@@ -83,67 +103,109 @@ export function layoutNodes(nodes: BlueprintNode[]): Placed[] {
     const outer = [...by('external'), ...by('store')];
 
     const out: Placed[] = [];
+    const push = (node: BlueprintNode, x: number, y: number, r: number, cluster?: string) => {
+        const dx = x - SCENE.cx;
+        const dy = y - SCENE.cy;
+        out.push({
+            node, x, y, r, cluster,
+            angle: (Math.atan2(dy, dx) * 180) / Math.PI + 90,
+            dist: Math.hypot(dx, dy),
+        });
+    };
 
-    for (const n of core) {
-        out.push({ node: n, x: SCENE.cx, y: SCENE.cy, r: DOT.core, angle: 0 });
-    }
+    for (const n of core) push(n, SCENE.cx, SCENE.cy, DOT.core);
 
     // Stages: full circle, starting at the top so "Candidates" reads first.
     spread(stages.length, 0, 360, true).forEach((a, i) => {
         const p = polar(a, R.stage);
-        out.push({ node: stages[i], x: p.x, y: p.y, r: DOT.stage, angle: a });
+        push(stages[i], p.x, p.y, DOT.stage);
     });
 
-    // Workers: full circle, offset half a step so they interleave with the
-    // stages rather than hiding directly behind them.
+    // Workers: offset half a step so they interleave with the stages rather
+    // than hiding directly behind them.
     const wStep = 360 / Math.max(workers.length, 1);
     spread(workers.length, wStep / 2, 360 + wStep / 2, true).forEach((a, i) => {
         const p = polar(a % 360, R.worker);
-        out.push({ node: workers[i], x: p.x, y: p.y, r: DOT.worker, angle: a % 360 });
+        push(workers[i], p.x, p.y, DOT.worker);
     });
 
-    // Sources: left arc (roughly 8 o'clock round to 4 o'clock).
-    spread(sources.length, 200, 340, false).forEach((a, i) => {
+    // ── Source constellations ──
+    const clusters: ClusterMark[] = [];
+    const grouped = new Map<string, BlueprintNode[]>();
+    const ungrouped: BlueprintNode[] = [];
+    for (const s of sources) {
+        if (s.group && CLUSTERS[s.group]) {
+            const arr = grouped.get(s.group);
+            if (arr) arr.push(s); else grouped.set(s.group, [s]);
+        } else {
+            ungrouped.push(s);
+        }
+    }
+
+    for (const [key, members] of grouped) {
+        const cfg = CLUSTERS[key];
+        const centre = polar(cfg.angle, cfg.radius);
+        members.forEach((n, i) => {
+            // Phyllotaxis: sqrt keeps the disc evenly dense rather than
+            // crowding the middle, and the golden angle stops rings forming.
+            const rr = cfg.spread * Math.sqrt((i + 0.5) / members.length);
+            const th = ((i * GOLDEN - 90) * Math.PI) / 180;
+            push(n, centre.x + Math.cos(th) * rr, centre.y + Math.sin(th) * rr, DOT.source, key);
+        });
+        clusters.push({
+            key,
+            label: cfg.label,
+            x: centre.x,
+            y: centre.y,
+            r: cfg.spread,
+            angle: cfg.angle,
+            count: members.length,
+        });
+    }
+
+    // Any source without a cluster falls back to the old arc.
+    spread(ungrouped.length, 200, 340, false).forEach((a, i) => {
         const p = polar(a, R.edge);
-        out.push({ node: sources[i], x: p.x, y: p.y, r: DOT.source, angle: a });
+        push(ungrouped[i], p.x, p.y, DOT.source);
     });
 
-    // Destinations: right arc, mirrored.
-    spread(surfaces.length, 25, 155, false).forEach((a, i) => {
+    // Destinations: right arc.
+    spread(surfaces.length, 28, 152, false).forEach((a, i) => {
         const p = polar(a, R.edge);
-        out.push({ node: surfaces[i], x: p.x, y: p.y, r: DOT.surface, angle: a });
+        push(surfaces[i], p.x, p.y, DOT.surface);
     });
 
-    // Externals + stores: the outermost shell, full circle.
-    spread(outer.length, 12, 372, true).forEach((a, i) => {
+    // Externals + stores: the outermost shell. Kept off the extreme left so
+    // they don't sit on top of the source constellations.
+    spread(outer.length, 8, 368, true).forEach((a, i) => {
         const p = polar(a % 360, R.outer);
-        out.push({ node: outer[i], x: p.x, y: p.y, r: DOT[outer[i].kind], angle: a % 360 });
+        push(outer[i], p.x, p.y, DOT[outer[i].kind]);
     });
 
-    return out;
+    return { placed: out, clusters };
 }
 
 /**
- * A gently curved path between two points.
+ * Decorative dot field beyond the outer ring.
  *
- * Straight lines through a radial diagram look like spokes and make the whole
- * thing read as a wheel; a slight arc lets the eye follow one connection
- * through a crowd. The bow is perpendicular to the run and scales with
- * distance, so short hops stay nearly straight.
+ * Deterministic from a fixed seed rather than Math.random(): the dots must land
+ * in the same place on the server and on the client, or hydration mismatches.
  */
-export function edgePath(ax: number, ay: number, bx: number, by: number): string {
-    const mx = (ax + bx) / 2;
-    const my = (ay + by) / 2;
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = Math.hypot(dx, dy) || 1;
-    const bow = Math.min(len * 0.16, 54);
-    // Perpendicular, biased so curves bend away from the centre.
-    const nx = -dy / len;
-    const ny = dx / len;
-    const toCentre = (mx - SCENE.cx) * nx + (my - SCENE.cy) * ny;
-    const sign = toCentre >= 0 ? 1 : -1;
-    return `M ${ax.toFixed(1)} ${ay.toFixed(1)} Q ${(mx + nx * bow * sign).toFixed(1)} ${(my + ny * bow * sign).toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+export function fieldDots(count = 90): { x: number; y: number; r: number; o: number }[] {
+    const dots: { x: number; y: number; r: number; o: number }[] = [];
+    let seed = 20260731;
+    const rnd = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+    };
+    for (let i = 0; i < count; i++) {
+        const a = rnd() * 360;
+        const d = R.outer + 34 + rnd() * 118;
+        const p = polar(a, d);
+        if (p.x < 4 || p.x > SCENE.w - 4 || p.y < 4 || p.y > SCENE.h - 4) continue;
+        dots.push({ x: p.x, y: p.y, r: 1.2 + rnd() * 3.4, o: 0.10 + rnd() * 0.3 });
+    }
+    return dots;
 }
 
 /**
@@ -173,7 +235,7 @@ export function focusBox(
     }
 
     const pts = placed.filter((p) => neighbourIds.has(p.node.id));
-    const pad = 120;
+    const pad = 140;
     const minX = Math.min(...pts.map((p) => p.x - p.r)) - pad;
     const maxX = Math.max(...pts.map((p) => p.x + p.r)) + pad;
     const minY = Math.min(...pts.map((p) => p.y - p.r)) - pad;
@@ -181,8 +243,8 @@ export function focusBox(
 
     // Keep the scene's aspect ratio, or SVG letterboxes the focus and the
     // camera appears to jump sideways on the way in.
-    const w = Math.max(maxX - minX, 260);
-    const h = Math.max(maxY - minY, 260);
+    const w = Math.max(maxX - minX, 300);
+    const h = Math.max(maxY - minY, 300);
     const aspect = SCENE.w / SCENE.h;
     let fw = w;
     let fh = h;
