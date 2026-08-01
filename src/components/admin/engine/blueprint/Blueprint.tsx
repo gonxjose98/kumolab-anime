@@ -306,14 +306,16 @@ export default function Blueprint({
                 const res = await fetch('/api/admin/engine/state', { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
-                if (cancelled || !data?.runs) return;
+                // Live telemetry lives under `status` in the agent contract.
+                const status = data?.status;
+                if (cancelled || !status?.runs) return;
                 setLive({
                     generatedAt: data.generatedAt,
-                    runs: data.runs,
-                    health: data.health,
-                    agents: data.agents ?? [],
+                    runs: status.runs,
+                    health: status.health,
+                    agents: status.agents ?? [],
                 });
-                emitPulses(data.runs, false);
+                emitPulses(status.runs, false);
             } catch {
                 // Keep the last good state. A blank canvas would read as "the
                 // system is down" when only this fetch failed.
