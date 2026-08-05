@@ -1,6 +1,6 @@
 import { BlogPost } from '@/types';
 import { fetchYouTubeToBucket } from './trailer-fetcher';
-import { publishToTikTok } from './tiktok-publisher';
+import { enqueueTikTokPost } from './tiktok-publisher';
 import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
 import { buildSocialCaption } from './caption';
@@ -520,15 +520,33 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
 
     // ── 5. Video platforms for TRAILER_DROP only ───────────────
     if (stagedVideoUrl) {
-        // TikTok
-        const tiktok = await publishToTikTok({
-            title: post.title,
-            videoUrl: stagedVideoUrl,
-        });
-        if (tiktok.tiktok_publish_id) result.tiktok_publish_id = tiktok.tiktok_publish_id;
-        if (tiktok.tiktok_url) result.tiktok_url = tiktok.tiktok_url;
-        if (tiktok.skipped) console.log('[Social] TikTok:', tiktok.skipped);
-        if (tiktok.error) console.error('[Social] TikTok error:', tiktok.error);
+        // TikTok — MIRRORS INSTAGRAM (Jose, 2026-08-05). "Whatever goes up on
+        // IG goes up on TikTok."
+        //
+        // Gated on result.instagram_id rather than on stagedVideoUrl, so the
+        // mirror is exact: if the IG publish threw, hit a Meta rate limit, or
+        // was filtered out upstream, TikTok stays quiet too. Posting to TikTok
+        // something that never made it to IG would break the one rule this
+        // feature has.
+        //
+        // This is an ENQUEUE, not a publish — TikTok has no API for us (three
+        // dev-app rejections). A local Playwright runner picks the job up. See
+        // tiktok-publisher.ts.
+        if (result.instagram_id) {
+            const tiktok = await enqueueTikTokPost({
+                postId: (post as any).id,
+                slug: post.slug,
+                title: post.title,
+                videoUrl: stagedVideoUrl,
+                // Same text IG got, so the two captions can't drift.
+                caption: buildSocialCaption(post as any),
+            });
+            if (tiktok.queued) console.log('[Social] TikTok: queued for the local runner');
+            if (tiktok.skipped) console.log('[Social] TikTok:', tiktok.skipped);
+            if (tiktok.error) console.error('[Social] TikTok enqueue error:', tiktok.error);
+        } else {
+            console.log('[Social] TikTok: skipped (nothing went up on Instagram)');
+        }
 
         // YouTube Shorts — EDITED / ORIGINAL ONLY. Unlike every other platform,
         // reposting someone else's raw video to YouTube risks copyright strikes

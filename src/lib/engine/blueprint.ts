@@ -534,8 +534,11 @@ const SURFACES: BlueprintNode[] = [
     },
     {
         id: 'surface.tiktok', kind: 'surface', label: 'TikTok', ring: 2, feeds: [],
-        doc: 'Not automated. Proven manually via Playwright scripts in scripts/tiktok/ but parked: full '
-            + 'automation needs a hosted runner and a top-3 selection step.',
+        doc: 'MIRRORS INSTAGRAM — anything that successfully publishes to IG is queued for TikTok. No API '
+            + '(three dev-app rejections), so the publisher only writes a tiktok_queue row; the actual post '
+            + 'is made by scripts/tiktok/tt-runner.mjs on Jose\'s PC under Task Scheduler, driving the real '
+            + 'TikTok Studio upload with Playwright. Gated on TIKTOK_QUEUE_ENABLED=true. If the PC is off or '
+            + 'the saved login session expires, jobs simply wait in the queue.',
     },
     {
         id: 'surface.website', kind: 'surface', label: 'kumolabanime.com', ring: 2, feeds: ['external.vercel'],

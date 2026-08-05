@@ -1,90 +1,103 @@
 /**
  * tiktok-publisher.ts
  *
- * Content Posting API via PULL_FROM_URL. TikTok fetches the video from the
- * public Supabase URL we hand them. Saves us from streaming bytes through
- * Vercel twice (download from YT already consumed that budget).
+ * TikTok has no API path for us. Three developer-app submissions were rejected,
+ * so first-party automation of @kumolabanime via the Content Posting API is off
+ * the table permanently. This module used to hold that API client; it now
+ * ENQUEUES a job instead.
  *
- * Credentials: TikTok developer app required. Set after Jose's app approval:
- *   TIKTOK_ACCESS_TOKEN       — user-scoped OAuth token
- *   TIKTOK_OPEN_ID            — user's open_id (returned from OAuth)
+ * The real posting happens outside Vercel: `scripts/tiktok/tt-runner.mjs` runs
+ * on Jose's PC (Windows Task Scheduler), pulls pending rows from tiktok_queue,
+ * and drives the actual TikTok Studio web upload with Playwright using a saved
+ * login session. Running it from home matters — TikTok treats a session that
+ * suddenly appears from a datacenter IP as a takeover and silently logs it out.
  *
- * When credentials are missing, publisher no-ops gracefully so Phase 4 cutover
- * works before TikTok approval lands.
- *
- * Reference: https://developers.tiktok.com/doc/content-posting-api-reference-direct-post
+ * See scripts/tiktok/README.md for the runbook.
  */
 
-const TIKTOK_API_BASE = 'https://open.tiktokapis.com';
+import { supabaseAdmin } from '../supabase/admin';
+import { logError } from '../logging/structured-logger';
 
-export interface TikTokPublishInput {
+export interface TikTokEnqueueInput {
+    postId?: string | null;
+    slug?: string | null;
     title: string;
-    videoUrl: string;       // Must be a publicly fetchable URL (our Supabase bucket)
-    disableComment?: boolean;
-    disableDuet?: boolean;
-    disableStitch?: boolean;
+    /** Public bucket URL of the MP4 that was just published to Instagram. */
+    videoUrl: string;
+    /** The exact caption Instagram received, so the two platforms stay in sync. */
+    caption: string;
 }
 
-export interface TikTokPublishResult {
-    tiktok_publish_id?: string;
-    tiktok_url?: string;
-    skipped?: string;        // Reason if we didn't actually post
+export interface TikTokEnqueueResult {
+    queued?: boolean;
+    skipped?: string;
     error?: string;
 }
 
-export async function publishToTikTok(input: TikTokPublishInput): Promise<TikTokPublishResult> {
-    const token = process.env.TIKTOK_ACCESS_TOKEN;
-    if (!token) {
-        return { skipped: 'TIKTOK_ACCESS_TOKEN not set — TikTok publishing disabled' };
+/**
+ * Queue a video for the local TikTok runner to post.
+ *
+ * Upserts on post_id: a republish must not queue the same post twice. An
+ * already-posted row is left alone — re-queueing it would double-post to
+ * TikTok, which is exactly the failure the per-post lock in publishToSocials
+ * exists to prevent on the other platforms.
+ */
+export async function enqueueTikTokPost(input: TikTokEnqueueInput): Promise<TikTokEnqueueResult> {
+    if (process.env.TIKTOK_QUEUE_ENABLED !== 'true') {
+        return { skipped: 'TIKTOK_QUEUE_ENABLED not "true" — TikTok queueing disabled' };
     }
-    if (process.env.AUTO_PUBLISH_SOCIALS !== 'true') {
-        return { skipped: 'AUTO_PUBLISH_SOCIALS disabled' };
+    if (!input.videoUrl) {
+        return { skipped: 'no staged video URL' };
     }
 
     try {
-        const caption = `${input.title}\n\n#anime #animenews #kumolab`.substring(0, 2200);
+        if (input.postId) {
+            // Don't disturb a row the runner already acted on. Only a pending or
+            // failed job gets its content refreshed (the video URL may have been
+            // re-staged); posted stays posted.
+            const { data: existing } = await supabaseAdmin
+                .from('tiktok_queue')
+                .select('id, status')
+                .eq('post_id', input.postId)
+                .maybeSingle();
 
-        const body = {
-            post_info: {
-                title: caption,
-                privacy_level: 'PUBLIC_TO_EVERYONE',
-                disable_duet: !!input.disableDuet,
-                disable_comment: !!input.disableComment,
-                disable_stitch: !!input.disableStitch,
-                video_cover_timestamp_ms: 1000,
-            },
-            source_info: {
-                source: 'PULL_FROM_URL',
-                video_url: input.videoUrl,
-            },
-        };
-
-        const res = await fetch(`${TIKTOK_API_BASE}/v2/post/publish/video/init/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json; charset=UTF-8',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(body),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || data?.error?.code !== 'ok') {
-            const errMsg = data?.error?.message || `HTTP ${res.status}`;
-            console.error('[TikTok] Publish init failed:', errMsg, data);
-            return { error: errMsg };
+            if (existing) {
+                if (existing.status === 'posted') {
+                    return { skipped: 'already posted to TikTok' };
+                }
+                const { error } = await supabaseAdmin
+                    .from('tiktok_queue')
+                    .update({
+                        video_url: input.videoUrl,
+                        caption: input.caption,
+                        title: input.title,
+                        status: 'pending',
+                        last_error: null,
+                    })
+                    .eq('id', existing.id);
+                if (error) throw new Error(error.message);
+                return { queued: true };
+            }
         }
 
-        const publishId = data?.data?.publish_id;
-        return {
-            tiktok_publish_id: publishId,
-            // TikTok doesn't return a URL at init — it processes async. URL becomes
-            // queryable via /v2/post/publish/status/fetch/. For now we just store the ID.
-            tiktok_url: publishId ? `tiktok://publish/${publishId}` : undefined,
-        };
+        const { error } = await supabaseAdmin.from('tiktok_queue').insert({
+            post_id: input.postId || null,
+            slug: input.slug || null,
+            title: input.title,
+            video_url: input.videoUrl,
+            caption: input.caption,
+            status: 'pending',
+        });
+        if (error) throw new Error(error.message);
+        return { queued: true };
     } catch (e: any) {
-        console.error('[TikTok] Network/parse error:', e.message);
-        return { error: e.message };
+        // Queueing is bookkeeping — never let it fail a publish that already
+        // succeeded on IG/FB/Threads. Log it and move on.
+        await logError({
+            source: 'publisher.tiktok',
+            errorMessage: `TikTok enqueue failed: ${e?.message || e}`,
+            context: { post_id: input.postId, slug: input.slug },
+        }).catch(() => {});
+        return { error: e?.message || String(e) };
     }
 }
