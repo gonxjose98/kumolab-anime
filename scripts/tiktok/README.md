@@ -26,6 +26,9 @@ or a flagged account rather than a clean error.
 | `tt-post.mjs` | The browser flow itself. **Fix selectors here** — both entry points share it. |
 | `tt-upload.mjs` | Manual CLI, one video. For testing and one-offs. |
 | `tt-runner.mjs` | The scheduled job. Drains `tiktok_queue`. This is the production path. |
+| `tt-enqueue.ts` | Manually queue a post: `npx tsx scripts/tiktok/tt-enqueue.ts <slug>` or `--latest`. Reuses the IG caption, so a hand-queued job matches an automatic one. |
+| `run-tt-runner.cmd` | What Task Scheduler actually executes. Timestamps each run into `out/runner.log`. |
+| `tt-status.mjs` | Reads the content manager and reports each recent post's privacy / review state. Exits 3 if anything is private. |
 
 ## One-time setup
 ```bash
@@ -64,15 +67,23 @@ checks are softer on a real window) · `--dry`.
 
 Exit codes: `0` ok or nothing pending · `1` one or more jobs failed · `2` session expired.
 
-## Step 4 — schedule it
-Task Scheduler → Create Task:
-- **General:** "Run whether user is logged on or not" OFF. The browser needs a real
-  desktop session; a headless-service run will fail its bot checks.
-- **Triggers:** daily, repeat every 2 hours. The runner is a no-op when the queue is
-  empty, so frequent checks cost nothing and keep TikTok close behind IG.
-- **Actions:** Program `node`, arguments `scripts/tiktok/tt-runner.mjs`,
-  Start in `C:\Users\Jose G\Workspace\workspace-kumolab`.
-- **Conditions:** untick "Start only if on AC power" if this is a laptop.
+## Step 4 — the schedule (already set up)
+
+Task **"KumoLab TikTok Runner"** is registered on Jose's PC: daily from 07:00, repeating
+every 2 hours, 3-hour execution limit, `IgnoreNew` so two runs can't overlap and
+double-post. It runs `run-tt-runner.cmd`, which logs to `out/runner.log`.
+
+```powershell
+Get-ScheduledTask -TaskName "KumoLab TikTok Runner"          # state
+Get-ScheduledTaskInfo -TaskName "KumoLab TikTok Runner"      # last result + next run
+Start-ScheduledTask -TaskName "KumoLab TikTok Runner"        # run it now
+Get-Content scripts\tiktok\out\runner.log -Tail 40           # what happened
+```
+
+It runs as an **interactive** task on purpose ("run whether user is logged on or not" is
+OFF): the browser needs a real desktop session, and a headless service run fails TikTok's
+bot checks. **The PC has to be awake and logged in at trigger time.** Missed runs aren't
+lost — jobs stay pending and go out on the next trigger.
 
 ## When TikTok changes its DOM
 It happens every few weeks. The failing job screenshots every phase to
@@ -85,15 +96,18 @@ selectors in **`tt-post.mjs`** and both the CLI and the runner are fixed at once
    ×) — never "Turn on" / "Allow", so account settings are never changed.
 2. A second "Continue to post? / Post now" confirmation appears while the content check
    runs. Without confirming it the upload sits in limbo and never goes live.
-3. **The "Only me / Content under review" problem (July 2026) — diagnosed 2026-08-05.**
-   TikTok runs a *"Content check lite"* that takes ~10 minutes. Posting while it's still
-   running is what triggers the "Continue to post? / Post now" dialog, and TikTok then
-   publishes the video **privately, held under review**. From the automation's side that
-   looks like a clean success while nobody can see the post.
-   `tt-post.mjs` now WAITS for the check to clear before clicking Post (up to
-   `TIKTOK_CONTENT_CHECK_WAIT_MS`, default 12 min). That's ~10 min of runner time per
-   post, which is the right trade for a background job.
-   *Still to confirm with a real post:* that a check-cleared upload does land public.
+3. **The "Only me / Content under review" problem (July 2026) — RESOLVED 2026-08-05, it
+   was a false alarm.** Measured on a real post: TikTok holds a fresh upload as
+   *"Only me / Content under review"* for roughly 10 minutes, then **flips it to Everyone
+   by itself**. Nothing is wrong and nothing needs fixing — July's conclusion was just
+   drawn during the hold window.
+   Waiting for TikTok's "Content check lite" to clear before posting does NOT avoid the
+   hold (the check ran 12 minutes without clearing, and the post was held anyway), so
+   that wait is **off by default**. `TIKTOK_CONTENT_CHECK_WAIT_MS` re-enables it if
+   TikTok's behaviour ever changes.
+   **Don't re-diagnose this from a screenshot taken right after posting.** Use
+   `node scripts/tiktok/tt-status.mjs` a few minutes later — it reads the content manager
+   and exits 3 if anything is still private.
 4. Every caption ends in hashtags, so TikTok's hashtag autocomplete is open right when we
    go to click Post. `tt-post.mjs` dismisses it (Escape + click a neutral heading) — don't
    remove that, the dropdown covers the settings and the Post button.
@@ -103,9 +117,12 @@ selectors in **`tt-post.mjs`** and both the CLI and the runner are fixed at once
    `tiktok_queue.tiktok_url` stays null. The row records that the post was sent, not a
    link to it.
 
-**Timing note:** because of the content-check wait, a real run takes ~10-12 minutes per
-post. Three queued posts is ~35 minutes. Set the Task Scheduler task's "Stop the task if
-it runs longer than" to at least 2 hours, or it will be killed mid-post.
+**Timing note:** a real post takes ~1 minute, plus the runner's 90s pause between posts.
+Three queued posts is roughly 5 minutes. The scheduled task's 3-hour limit is slack, not
+a constraint.
+
+**Verified end to end 2026-08-05:** a real post (Demon Slayer Infinity Castle key visual)
+went out through the queue → runner → TikTok and is live and public on @kumolabanime.
 
 ## Queue admin (SQL)
 ```sql

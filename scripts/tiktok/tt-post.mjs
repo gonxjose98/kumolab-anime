@@ -266,20 +266,20 @@ export async function postToTikTok({ video, caption = '', dry = false, headless 
             await page.waitForTimeout(2000);
         }
 
-        // 4b) Wait out TikTok's "Content check lite" before posting.
+        // 4b) Optionally wait out TikTok's "Content check lite" before posting.
         //
-        // THIS IS THE FIX FOR THE JULY 2026 "Only me / Content under review"
-        // problem. TikTok runs a content check that takes ~10 minutes. Post
-        // while it's still running and TikTok shows the "Continue to post? /
-        // Post now" dialog and then publishes the video PRIVATELY, held under
-        // review — which looks like a successful post from the automation's
-        // point of view while nobody can actually see it.
+        // OFF BY DEFAULT, and the reason is worth keeping. The July 2026 test
+        // posts landed as "Only me / Content under review", so the theory was
+        // that posting mid-check causes the hold and waiting would avoid it.
+        // Measured on a real post 2026-08-05: the check did NOT clear in 12
+        // minutes, the post went out, landed "Only me / Content under review"
+        // as before — and then flipped to "Everyone" on its own about 10
+        // minutes later. The review hold is temporary and self-resolving, so
+        // waiting bought nothing and cost 12 minutes per post.
         //
-        // Waiting costs the runner ~10 minutes per post. That is fine: this is
-        // a background scheduled job, and a post nobody can see is worth less
-        // than a slow one. If the check hasn't cleared by the ceiling we post
-        // anyway (and confirm the dialog below) rather than dropping the job.
-        const checkWaitMs = Number(process.env.TIKTOK_CONTENT_CHECK_WAIT_MS ?? 12 * 60 * 1000);
+        // Kept behind an env var in case TikTok changes behaviour. Verify with
+        // tt-status.mjs rather than assuming either way.
+        const checkWaitMs = Number(process.env.TIKTOK_CONTENT_CHECK_WAIT_MS ?? 0);
         if (!dry && checkWaitMs > 0) {
             const started = Date.now();
             let cleared = false;
