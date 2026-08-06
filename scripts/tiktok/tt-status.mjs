@@ -66,12 +66,20 @@ try {
         const date = window.find((l) => /^[A-Z][a-z]{2} \d{1,2},/.test(l)) || '';
         const underReview = window.some((l) => /Content under review/i.test(l));
 
-        const title = caption.slice(0, 55);
+        // Counts follow the privacy cell: views, likes, comments.
+        const pIdx = window.findIndex((l) => /^(Only me|Everyone|Friends)$/i.test(l));
+        const counts = pIdx >= 0
+            ? window.slice(pIdx + 1).filter((l) => /^[\d,]+$/.test(l)).slice(0, 3)
+            : [];
+        const [views = '?', likes = '?'] = counts;
+
+        const title = caption.slice(0, 45);
+        const stats = `${views} views, ${likes} likes`;
         if (underReview || /only me/i.test(privacy)) {
             exitCode = 3;
-            log(`⚠ ${privacy}${underReview ? ' + UNDER REVIEW' : ''} — ${date} — ${title}`);
+            log(`⚠ ${privacy}${underReview ? ' + UNDER REVIEW' : ''} — ${date} — ${stats} — ${title}`);
         } else {
-            log(`✓ ${privacy} — ${date} — ${title}`);
+            log(`✓ ${privacy} — ${date} — ${stats} — ${title}`);
         }
         reported++;
     }
