@@ -160,6 +160,16 @@ export const CONTENT_RULES = {
         'giveaway', 'sweepstakes', 'contest', 'quiz', 'poll',
         'wallpaper', 'ringtone', 'sticker', 'emoji',
         'cosplay', 'review', 'opinion', 'ranking', 'top 10', 'best anime',
+        // Toy / brick / crossover-brand tie-ins (Jose, 2026-08-22): BANNED.
+        // These are licensed merchandise promos wearing a trailer's clothes,
+        // not anime news. "LEGO One Piece" shipped four times (2026-07-20 ->
+        // 2026-08-22) because this rule was never actually in the code.
+        // NOTE the trailing space on 'lego ': these lists are substring-matched
+        // (see matchOffTopic's caveat), and a bare 'lego' would swallow
+        // Beastars' Legoshi and any "allegory". Every real tie-in title reads
+        // "LEGO <franchise>", so the space is both safe and sufficient.
+        'lego ', 'duplo', 'minifigure', 'playmobil', 'funko',
+        'happy meal', 'toy line',
         // Watch-along / reaction content — KumoLab posts anime, not watch parties
         'watch party', 'watch along', 'watchalong', 'watch-along', 'react along',
         'reaction', 'reacts to', 'live reaction', 'commentary',

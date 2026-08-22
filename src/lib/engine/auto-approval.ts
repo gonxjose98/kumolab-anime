@@ -20,7 +20,7 @@ import { claimRisk } from './automation-config';
 import { validateAnime } from './anilist-validator';
 import { hasCorroboration } from './corroboration';
 import { AntigravityAI } from './ai';
-import { PostScore, SCORE_AUTO_PUBLISH_MIN } from './scoring';
+import { PostScore, SCORE_AUTO_PUBLISH_MIN, GATES } from './scoring';
 
 export interface AutoApprovalInput {
     title: string;
@@ -85,6 +85,22 @@ export async function decideAutoApproval(input: AutoApprovalInput): Promise<Auto
     // the claim-risk matrix (NEW_KEY_VISUAL is AUTO at T1/T2, REVIEW at T3).
     // The artifact gate above already guaranteed hasImage.
     if (claim === 'NEW_KEY_VISUAL') {
+        // The bypass skips the /100 TOTAL, never the hard gates. Off-topic
+        // (live action / games) and a disallowed category are REJECT no matter
+        // which product the post is destined for. Without this, a key visual
+        // for an untracked nothing-franchise auto-approved on the strength of
+        // being a key visual alone -- two scored 46/100 and still shipped
+        // (2026-08-01, 2026-08-14).
+        const blockingGate = ps.hard_gates.find(
+            g => !g.passed && (g.gate === GATES.ANIME_ONLY || g.gate === GATES.CATEGORY_ALLOWED),
+        );
+        if (blockingGate) {
+            return {
+                verdict: 'REJECT',
+                reason: `key visual failed hard gate ${blockingGate.gate}`,
+                signals,
+            };
+        }
         const kvRisk = claimRisk(input.claim_type ?? undefined, input.source_tier);
         signals.risk = kvRisk;
         signals.fb_only = true;

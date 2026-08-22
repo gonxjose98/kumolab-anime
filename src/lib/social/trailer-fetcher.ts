@@ -35,6 +35,17 @@ import {
 } from '../engine/scoring';
 
 const BUCKET = 'blog-videos';
+/**
+ * Minimum source-video length for an automatic Instagram reel, in seconds.
+ * Env override: KUMOLAB_MIN_TRAILER_SECONDS.
+ *
+ * Below this a YouTube upload is a short-form character spot / vertical Short,
+ * not a trailer. See the floor check in fetchAndStageTrailer for the why.
+ */
+export const MIN_TRAILER_SECONDS = (() => {
+    const parsed = parseInt(process.env.KUMOLAB_MIN_TRAILER_SECONDS || '', 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
+})();
 // Raised 80 → 120 MB (Jose 2026-07-17): once the Render worker serves 1080p
 // (bestvideo[height>=1080]+bestaudio), a ~3-min trailer can exceed 80 MB and
 // would otherwise be dropped before the quality gate ever ran.
@@ -60,6 +71,8 @@ export interface FetchYouTubeOptions {
     // Override the default 180s hard cap. Auto-publish keeps 180s; the
     // scrape path allows up to 300s (5min) to fit longer OPs/trailers.
     maxDurationSeconds?: number;
+    /** Reject sources shorter than this (default MIN_TRAILER_SECONDS). */
+    minDurationSeconds?: number;
 }
 
 function extractVideoId(url: string): string | null {
@@ -328,6 +341,24 @@ export async function fetchYouTubeToBucket(
     const maxDuration = options.maxDurationSeconds ?? 180;
     if (duration > maxDuration) {
         console.warn(`[TrailerFetcher] Video too long (${duration}s > ${maxDuration}s), skipping`);
+        return null;
+    }
+
+    // Minimum-duration floor (Jose, 2026-08-22). Distributors publish 15-25s
+    // vertical YouTube Shorts as character spots -- burned-in Japanese name
+    // cards, no cut, no narrative. Reposting one is indistinguishable from an
+    // amateur edit and they measured 176-747 views apiece over Aug 11-20.
+    // A real teaser runs 30s+; the Aniplex/Crunchyroll character spots that
+    // triggered this ran 23-24s. Anything under the floor is not an auto reel.
+    const minDuration = options.minDurationSeconds ?? MIN_TRAILER_SECONDS;
+    if (duration > 0 && duration < minDuration) {
+        console.warn(`[TrailerFetcher] Video too short (${duration}s < ${minDuration}s) -- short-form clip, skipping`);
+        await logAction({
+            action: 'social_publish_skipped',
+            actor: 'system',
+            entityTitle: title || slug,
+            reason: `Source video is a ${duration}s short-form clip (floor ${minDuration}s) -- not an auto reel`,
+        }).catch(() => {});
         return null;
     }
 

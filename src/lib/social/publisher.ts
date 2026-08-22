@@ -14,6 +14,14 @@ const FB_PAGE_ID = '833836379820504';
 // key-visuals through to Facebook ONLY (IG + Threads stay video-only), capped
 // to keep it a deliberate trickle, not a firehose. Override via env, default 3.
 const FB_IMAGE_DAILY_CAP = Number(process.env.FB_IMAGE_DAILY_CAP ?? 3);
+
+/**
+ * Claim types that must never become an Instagram reel (Jose, 2026-08-22).
+ * These are trivia -- a character visual or a cast name is not an event, and
+ * the feed reads as filler when they run back to back. They still publish to
+ * the website and to the Facebook Page.
+ */
+const NON_REEL_CLAIM_TYPES = new Set(['NEW_KEY_VISUAL', 'CAST_ADDITION', 'STAFF_UPDATE']);
 const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
 const THREADS_USER_ID = process.env.THREADS_USER_ID;
 // Threads "topic" (the "+ Community or topic" field in the composer). The API
@@ -462,6 +470,51 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             details: { slug: post.slug, claim_type: claim, type: (post as any).type, fb_posted: didFb },
         }).then(() => {}, () => {});
         (result as any).skipped_reason = didFb ? 'image_fb_keyvisual_only' : 'image_only_video_only_policy';
+        return result;
+    }
+
+    // ── 1d. Non-reel categories → Facebook only ────────────────
+    // Jose, 2026-08-22. NEW_KEY_VISUAL / CAST_ADDITION / STAFF_UPDATE are
+    // trivia, not events. They were ALREADY supposed to be Facebook-only:
+    // auto-approval.ts sets fbOnly on key visuals and processing-worker
+    // stamps score_breakdown.meta.fb_only -- but NOTHING ever read that flag,
+    // so every one of them published as an IG reel anyway. Aug 11-20 shipped
+    // eight Demon Slayer character spots at 176-747 views and 0-1 likes each.
+    //
+    // The image branch above (1c) only caught key visuals with NO video. When
+    // the "key visual" was itself a short YouTube clip it staged a video and
+    // sailed straight past into the IG path. This gate closes that hole for
+    // both shapes: whatever the format, these claims never become IG reels.
+    // Facebook still gets them so the Page timeline keeps a pulse.
+    const claimUpper = String(claim || '').toUpperCase();
+    const flaggedFbOnly = !!(post as any)?.score_breakdown?.meta?.fb_only;
+    if (NON_REEL_CLAIM_TYPES.has(claimUpper) || flaggedFbOnly) {
+        const { supabaseAdmin } = await import('../supabase/admin');
+        let didFb = false;
+        if (META_ACCESS_TOKEN) {
+            try {
+                const fbResult = await publishToFacebookPage(post, stagedVideoUrl);
+                Object.assign(result, fbResult);
+                didFb = !!result.facebook_id;
+            } catch (e: any) {
+                await logError({
+                    source: 'publisher.fb',
+                    errorMessage: `FB non-reel publish threw: ${e?.message || e}`,
+                    stackTrace: e?.stack,
+                    context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                });
+            }
+        }
+        await supabaseAdmin.from('action_logs').insert({
+            action: didFb ? 'social_publish_partial' : 'social_publish_skipped',
+            actor: 'system',
+            entity_type: 'post',
+            entity_id: (post as any).id,
+            entity_title: post.title,
+            reason: `${claimUpper} is not an IG reel category -- Facebook only`,
+            details: { slug: post.slug, claim_type: claimUpper, fb_only_flag: flaggedFbOnly, fb_posted: didFb },
+        }).then(() => {}, () => {});
+        (result as any).skipped_reason = didFb ? 'non_reel_category_fb_only' : 'non_reel_category';
         return result;
     }
 
