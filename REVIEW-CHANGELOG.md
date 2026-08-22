@@ -105,6 +105,59 @@ Reviews so far: Run 1 (2026-05-08), Run 2 (2026-05-14), Run 3 (2026-06-06), Run 
 
 ---
 
+## Run 5 (2026-08-22) — content quality, not cadence
+
+Triggered by Jose: "the videos we are uploading are trash ... LEGO content which I
+strictly BANNED ... Demon Slayer content which looks like an amateur edited it."
+
+**Measured first.** 234 IG posts since 6/20, cross-referenced with `posts`:
+
+- Median views flat at ~250 for nine straight weeks. The July volume cut (149 posts
+  in 4 weeks to 85 in 5) moved the median 261 to 252. **Volume was never the problem.**
+- Median engagement rate fell to 0.45% in the week of Aug 17. Shares are ~0 on almost
+  every post, including the 67,958-view Tanya breakout (1 share).
+- The account is carried by one show. Strip the Saga of Tanya the Evil episode posts
+  and there is no account.
+
+**Four root causes, all shipped fixed (commit 761f6ee + worker 82960d4, 8b1e6f1):**
+
+- **C5a — The LEGO ban never existed in code.** It lived only in conversation, so
+  "LEGO One Piece" shipped four times (2026-07-20 to 2026-08-22). Now in
+  NEGATIVE_KEYWORDS as `'lego '` (trailing space: the lists are substring-matched and
+  a bare `lego` swallows Beastars' Legoshi and "allegory"). Pinned by
+  `banned-tie-ins.test.ts`.
+- **C5b — `fb_only` was set but never read.** auto-approval flags key visuals `fbOnly`
+  and processing-worker stamps `score_breakdown.meta.fb_only`; no publisher code ever
+  looked at either. The image branch only caught key visuals with NO video, so when the
+  "key visual" was itself a short YouTube clip it staged a video and published as an IG
+  reel. Aug 11-20 shipped eight Demon Slayer character spots that way, 176-747 views and
+  0-1 likes each. NEW_KEY_VISUAL / CAST_ADDITION / STAFF_UPDATE are now Facebook-only
+  whatever their format.
+- **C5c — No minimum video length.** Distributors publish 15-25s vertical Shorts as
+  character spots with burned-in Japanese name cards. The Aniplex/Crunchyroll clips
+  behind the Demon Slayer run measured 23-24s; a real teaser runs 30s+. Floor is now 30s
+  (`KUMOLAB_MIN_TRAILER_SECONDS`). This is the "amateur edit" complaint's direct cause.
+- **C5d — 31% of auto-approved posts never published at all.** `video_fetch_failed`,
+  rising to 52% the week of Aug 15, on posts averaging 86/100 and including the highest
+  scorers in the window (Cyberpunk: Edgerunners 2 teaser 90, Demon Slayer Infinity Castle
+  trailers 94 x2, Tanya S2 93/97, Mushoku Tensei 87). Root cause was NOT the proxy: the
+  yt-dlp worker had **no JavaScript runtime**, so it could not solve YouTube's nsig/player
+  challenge and the signed media URLs returned 403 while `/info` kept working. Fixed by
+  installing yt-dlp from PyPI (Alpine's package was stale) and passing `--js-runtimes node`.
+  A `tv,web_safari` player_client was tried and REVERTED — it returns "The page needs to
+  be reloaded." on every download.
+  - **Verified:** the exact video that failed 3x on Aug 21 now returns HTTP 200,
+    32.5 MB, 1920x1080 @ 2.84 Mbps — above the 720p / 1.2 Mbps gate.
+
+**The net effect being corrected:** the feed was inverted. The best content was silently
+dropped and the trivia published.
+
+**Watch at Run 6:** median views, dead-post share, and `video_fetch_failed` rate. The
+volume lever is spent; if the median has not moved once the good trailers actually
+publish, the next lever is hook quality (first 1.5s) and captions, not scheduling.
+
+---
+
 ## Settled changes
 
 - **C1 — Video-only on social** ✅ **KEPT** at Run 4 (2026-07-15). Video median 305 vs image 27
