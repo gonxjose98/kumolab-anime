@@ -188,3 +188,76 @@ next review supersedes them.)_
   metadata line. Prompt-level change in `ai.ts`/`prompts.ts`, not yet shipped.
 - **Faster on tier-1 trailers** — detection→publish latency on TOHO uploads.
   Measure before changing.
+
+---
+
+## Run 6 (2026-09-07) — the delivery leak, not the content
+
+Triggered by Jose: "we should have hit 10k follows by now and we havent, we've
+been stuck at 2.5 for over a month."
+
+**Measured first.** 588 IG media pulled with per-post insights, 30-day account
+insights, cross-referenced against `posts`. Full report:
+https://claude.ai/code/artifact/bc9e0c19-4eaa-4d2e-89c0-091f46e183c0
+
+Baseline: 2,524 followers, +62 net in 30d, 161,518 views / 30d,
+**0.038% follows-per-view**, median avg watch **6.7s**, 1 website click / 30d.
+
+**Findings:**
+
+- **C6a — CRITICAL: the 180s duration cap is deleting our best posts.**
+  `trailer-fetcher.ts:341` hardcodes `maxDurationSeconds ?? 180`. Of 39 posts
+  that failed to reach IG since 7/15, **22 (56%) were rejected on length alone**,
+  clustered at 182-198s. Crunchyroll/Kadokawa ship announcement clips at ~3:10.
+  Killed: Re:ZERO S4 x4, Tanya S2 x2, Mushoku Tensei S3 x2, Iruma-kun S4,
+  Polar Opposites S2 x2. All `NEW_SEASON_CONFIRMED` / `DATE_ANNOUNCED` — the two
+  **highest-median claim types on the account**. No trim step, no retry. IG Reels
+  allows 15 min, so 180 protects nothing.
+- **C6b — CRITICAL: Run 5's `video_fetch_failed` fix did not hold.** 142 of 285
+  published posts since 7/1 never reached IG. Rate is *worsening*: week of 8/24
+  delivered 5 of 19 (26%). Worker is healthy — `/info` returns 200 in 13-16s for
+  every failing video tested. The single reason code hides four distinct causes
+  (too long 56%, info error 21%, in-range failure 18%, too short 5%).
+- **C6c — watch time is the master variable; posting hour is noise.** Median views
+  by avg watch: 0-3s → 186, 3-6s → 234, 6-10s → 343, 10-20s → 1,223, 20-30s →
+  1,484, **30s+ → 5,244** (8 of 18 broke 10k). Account median is 6.7s. Meanwhile
+  hour-of-day medians run 184-505 across all 24 hours over 404 posts — **the C2/C3
+  premium-hour work is a dead lever, stop spending on it.**
+- **C6d — the trailer thesis (Run 3) has inverted.** `TRAILER_DROP`: 71 posts,
+  median **181**, 4.2s watch, max 1,996, zero breakouts. Winners are
+  `DATE_ANNOUNCED` (median 1,521) and `NEW_SEASON_CONFIRMED` (506). By source,
+  **TOHO is now the weakest** (n=8, median 413, max 1,408) and **Kadokawa the
+  engine** (n=43, median 1,129, max 80,622). `isPremiumStudio` points at the
+  wrong studio. AnimeNewsNetwork (180) and Netflix Anime (90) are feed ballast.
+- **C6e — volume is confirmed spent, and Run 5's fixes are working.** Median views
+  ~250 for nine months regardless of cadence (170 posts in May, 63 in Aug, same
+  median). But August produced **6 breakouts vs July's 0** on a third of May's
+  volume. Direction is right, delivery is broken. Top 5 posts = 49% of all-time views.
+- **C6f — no shares, no click-through.** 353 of 518 reels have **0 shares**
+  (10+ shares → 5,275 median vs 243 for zero). Profile converts at 3.8%
+  (1,618 visits → 62 follows). **1 website click in 30 days** — the display-ads
+  track has no traffic to monetize; Mediavine's 50k floor is 3 orders of magnitude away.
+- **C6g — logging tables are empty.** `rejection_logs`, `source_health`,
+  `scheduler_logs` all returned 0 rows for recent windows. No visibility.
+
+**Proposed changes (NOT yet shipped — awaiting Jose):**
+
+1. Raise duration ceiling 180s → 360s via `KUMOLAB_MAX_TRAILER_SECONDS`.
+2. Split `video_fetch_failed` into real reason codes + surface a 7-day drop rate
+   on the dashboard health card.
+3. Demote `TRAILER_DROP` below announcement claim types; ban web radio in
+   NEGATIVE_KEYWORDS (4 radio episodes, 16-33 min, detected in 2 weeks); drop
+   AnimeNewsNetwork + Netflix Anime from the IG target list.
+4. Move premium studio tier TOHO → Kadokawa; retire premium-hour scheduling work.
+5. Hook + caption work (first 1.5s, first caption line) — Jose's creative call.
+6. Take display ads off the near-term roadmap; merch + sponsorship sell against
+   audience directly.
+
+**Watch at Run 7:** IG delivery rate (target >85%), median avg watch time
+(beat 6.7s), shares per post, follows-per-view (0.038% baseline).
+
+**The honest read:** plumbing fixes get the good posts published, worth ~6
+breakouts/month instead of 0. They do not reach 10k. At 0.038% follows-per-view,
+10x the reach still only buys ~620 followers/month. 588 reposted distributor
+clips with metadata captions give a viewer no reason to follow. Run 7's question
+is format and voice, and it is a creative-director call.
