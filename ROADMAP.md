@@ -289,6 +289,32 @@ New **↑ Upload** button on `/admin/posts` next to AI Assist. Lets Jose push a 
 - Community engagement (agent drafts, Jose approves). Track weekly in `SCOREBOARD.md`.
 - Reference growth checkpoint (informational, not a gate): ~10k combined followers unlocks stronger sponsor rates and premium ad networks.
 
+### Suggested optimizations: IG growth (agreed 2026-09-27, NOT started)
+
+Why: reposting raw distributor trailers does not grow the account. Real Graph API
+data (2026-09-26): followers shrinking (2,598 Jul to 2,459), 25 new follows in
+30 days, about 1 follow per 2,600 views, median watch 6.7s, near-zero shares.
+Watch time is the master variable (30s+ avg watch = ~20x the median views).
+
+Jose likes all five, but **nothing ships until he has approved samples**:
+3 edited reels plus 1 carousel mock first, then a locked template, then two
+weeks where every edited post waits for his approval before auto-publish returns.
+
+1. **Edit every reel, don't repost it.** Auto-trim each trailer to its best ~30s
+   and put an on-screen hook in the first second ("RE:ZERO SEASON 4 IS REAL").
+   Existing ffmpeg tooling (`video-trim.ts`) is the starting point.
+2. **2-3 original posts a week that get saved and shared:** carousels such as
+   "Fall 2026: what to watch", "Where to stream every fall show", "This week in
+   anime". Claude drafts, Jose approves. The carousel feature already exists.
+3. **Weekly episode posts for the 3-5 biggest shows airing that season**, the pattern that
+   made Saga of Tanya the Evil carry the account (8 of the top 12 posts Aug-Sep).
+4. **Community:** pin a follow CTA on breakout posts, end captions with a real
+   question, reply to comments.
+5. **Fewer, better:** 2 edited posts a day instead of 3 raw reposts.
+
+Longer term (Jose's brand call): give KumoLab a voice, either a narrated take
+(the free Kokoro voiceover in Studio) or a host.
+
 ---
 
 ## Phase 4 — Scale Revenue ⬜ Upcoming
