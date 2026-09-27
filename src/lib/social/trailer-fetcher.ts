@@ -41,10 +41,14 @@ const BUCKET = 'blog-videos';
  *
  * Below this a YouTube upload is a short-form character spot / vertical Short,
  * not a trailer. See the floor check in fetchAndStageTrailer for the why.
+ *
+ * Lowered 30 → 15 (Jose, 2026-09-26). At 30 the floor was also blocking real
+ * announcement clips: Re:ZERO S4 cour 2 (25s) and a Dorohedoro trailer (24s)
+ * both lost Instagram in one week.
  */
 export const MIN_TRAILER_SECONDS = (() => {
     const parsed = parseInt(process.env.KUMOLAB_MIN_TRAILER_SECONDS || '', 10);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 15;
 })();
 /**
  * Longest source video the AUTO publish path will stage. Env override:
@@ -372,8 +376,10 @@ export async function fetchYouTubeToBucket(
     // vertical YouTube Shorts as character spots -- burned-in Japanese name
     // cards, no cut, no narrative. Reposting one is indistinguishable from an
     // amateur edit and they measured 176-747 views apiece over Aug 11-20.
-    // A real teaser runs 30s+; the Aniplex/Crunchyroll character spots that
-    // triggered this ran 23-24s. Anything under the floor is not an auto reel.
+    // The Aniplex/Crunchyroll character spots that triggered this ran 23-24s.
+    // The floor was lowered to 15s on 2026-09-26 to let short announcement
+    // clips through, accepting that those character spots can return.
+    // Anything under the floor is not an auto reel.
     const minDuration = options.minDurationSeconds ?? MIN_TRAILER_SECONDS;
     if (duration > 0 && duration < minDuration) {
         console.warn(`[TrailerFetcher] Video too short (${duration}s < ${minDuration}s) -- short-form clip, skipping`);
