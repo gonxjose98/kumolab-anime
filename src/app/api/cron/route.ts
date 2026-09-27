@@ -284,8 +284,12 @@ async function dispatch(
     // still missing metrics. Rate-limit aware: stops cleanly if Meta throttles.
     if (worker === 'metrics-sync') {
         console.log('[Cron] Syncing per-post social metrics...');
+        // No ?limit on the scheduled call. Number(null) is 0, which is finite,
+        // so the old parse clamped every scheduled run to ONE post: for weeks
+        // each post was measured once, minutes after publishing, and never
+        // again. Only an explicit positive value overrides the default.
         const raw = Number(searchParams.get('limit'));
-        const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.trunc(raw), 1), 300) : 150;
+        const limit = Number.isFinite(raw) && raw > 0 ? Math.min(Math.trunc(raw), 300) : 150;
         const result = await syncSocialMetrics(limit);
         return { success: result.ok, worker: 'metrics-sync', ...result };
     }

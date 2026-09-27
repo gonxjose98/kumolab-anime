@@ -46,6 +46,22 @@ export const MIN_TRAILER_SECONDS = (() => {
     const parsed = parseInt(process.env.KUMOLAB_MIN_TRAILER_SECONDS || '', 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
 })();
+/**
+ * Longest source video the AUTO publish path will stage. Env override:
+ * KUMOLAB_MAX_TRAILER_SECONDS.
+ *
+ * Raised 180 → 240 (2026-09-26). Crunchyroll and Kadokawa cut season and date
+ * announcement clips at ~3:05-3:15, so a 180s cap silently dropped the
+ * account's best posts: Tanya S2 (189s), Mushoku Tensei S3 (186s) and Re:ZERO
+ * S4 (190s) all lost Instagram in one week. 240 clears that cluster while a
+ * 1080p file still fits MAX_BYTES and the publish function's time budget.
+ * Hour-long web radio streams are stopped at ingestion (NEGATIVE_KEYWORDS),
+ * not here.
+ */
+export const MAX_TRAILER_SECONDS = (() => {
+    const parsed = parseInt(process.env.KUMOLAB_MAX_TRAILER_SECONDS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 240;
+})();
 // Raised 80 → 120 MB (Jose 2026-07-17): once the Render worker serves 1080p
 // (bestvideo[height>=1080]+bestaudio), a ~3-min trailer can exceed 80 MB and
 // would otherwise be dropped before the quality gate ever ran.
@@ -68,8 +84,8 @@ export interface FetchYouTubeOptions {
     // the operator picked this video deliberately, so it is not for the
     // pipeline to reject it.
     skipQualityGate?: boolean;
-    // Override the default 180s hard cap. Auto-publish keeps 180s; the
-    // scrape path allows up to 300s (5min) to fit longer OPs/trailers.
+    // Override the MAX_TRAILER_SECONDS cap. The scrape path allows up to
+    // 300s (5min) to fit longer OPs/trailers.
     maxDurationSeconds?: number;
     /** Reject sources shorter than this (default MIN_TRAILER_SECONDS). */
     minDurationSeconds?: number;
@@ -338,9 +354,17 @@ export async function fetchYouTubeToBucket(
     title = infoRes.title;
     duration = infoRes.duration;
 
-    const maxDuration = options.maxDurationSeconds ?? 180;
+    const maxDuration = options.maxDurationSeconds ?? MAX_TRAILER_SECONDS;
     if (duration > maxDuration) {
         console.warn(`[TrailerFetcher] Video too long (${duration}s > ${maxDuration}s), skipping`);
+        // Logged, not just console: this skip used to be invisible and hid
+        // behind the generic video_fetch_failed for two months.
+        await logAction({
+            action: 'social_publish_skipped',
+            actor: 'system',
+            entityTitle: title || slug,
+            reason: `Source video is ${duration}s, over the ${maxDuration}s cap -- not an auto reel`,
+        }).catch(() => {});
         return null;
     }
 

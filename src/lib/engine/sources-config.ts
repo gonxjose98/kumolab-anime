@@ -173,6 +173,12 @@ export const CONTENT_RULES = {
         // Watch-along / reaction content — KumoLab posts anime, not watch parties
         'watch party', 'watch along', 'watchalong', 'watch-along', 'react along',
         'reaction', 'reacts to', 'live reaction', 'commentary',
+        // Web radio and archived live streams (2026-09-26). 29-58 minute
+        // uploads that can never become a reel, yet three of them took peak
+        // Instagram slots in one week and published nowhere but the site.
+        // Japanese forms match the raw YouTube title before the AI rewrite.
+        'web radio', 'radio episode', 'rebroadcast', 'live stream', 'livestream',
+        'archive stream', 'ラジオ', '復刻配信', 'アーカイブ',
         // Physical media releases — KumoLab covers new anime news, not
         // home-video / CD / box-set drops. ("Naruto Shippuden Set 10 Launch
         // Trailer" slipped through 2026-05-07 because Viz uses numbered-set
