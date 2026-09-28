@@ -9,7 +9,7 @@ body{background:#111;font-family:Manrope,sans-serif}
   background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 38%,var(--deep) 78%,var(--deeper) 100%)}
 .cloud{position:absolute;z-index:1;filter:drop-shadow(0 18px 24px rgba(15,50,120,.18))}
 .sun{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,250,228,.95) 0%,rgba(255,226,140,.75) 30%,rgba(255,214,110,.18) 55%,rgba(255,214,110,0) 70%)}
-.top{position:absolute;top:56px;left:72px;right:72px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.top{position:absolute;top:40px;left:72px;right:72px;display:flex;justify-content:space-between;align-items:center;z-index:5}
 .brand{display:flex;align-items:center;gap:14px;font-family:'Cormorant Garamond';font-weight:700;font-size:34px;letter-spacing:.14em}
 .brand svg{width:46px}
 .pill{font-weight:700;font-size:20px;letter-spacing:.2em;text-transform:uppercase;padding:12px 22px;border-radius:999px;
@@ -45,7 +45,7 @@ body{background:#111;font-family:Manrope,sans-serif}
 <div id="slides"></div>
 <script>
 const cloud=(x,y,w,o=1,flip=false,z=1)=>`<svg class="cloud" style="left:${x}px;top:${y}px;width:${w}px;opacity:${o};z-index:${z};${flip?'transform:scaleX(-1)':''}"><use href="#cloud"/></svg>`;
-const header=(label)=>`<div class="top"><div class="brand"><svg viewBox="0 0 64 40"><use href="#mark"/></svg>KUMOLAB</div><div class="pill">${label}</div></div>`;
+const header=(label)=>`<div class="top"><img src="logo-trim.png" alt="KumoLab" style="height:112px;width:auto;display:block;filter:brightness(0) invert(1) drop-shadow(0 2px 10px rgba(6,24,70,.45))"><div class="pill">${label}</div></div>`;
 const dots=(n,dark)=>`<div class="dots">${[0,1,2,3,4,5,6].map(i=>`<i class="${i===n?'on':''}" style="${dark&&i!==n?'background:#0B2A5B33':''}"></i>`).join('')}</div>`;
 const pick={title:'Delicious in Dungeon',meta:'2024 · 24 episodes · TRIGGER · Adventure / Comedy',votes:'765',score:'85%',watch:'Netflix',pitch:'A party cooks its way through a monster-filled dungeon. Warm, funny, and quietly deep about the bonds between them.'};
 const stats=(accent)=>`<div style="margin-top:24px;display:flex;gap:44px;align-items:flex-end">
