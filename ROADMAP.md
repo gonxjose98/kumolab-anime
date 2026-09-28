@@ -315,6 +315,43 @@ weeks where every edited post waits for his approval before auto-publish returns
 Longer term (Jose's brand call): give KumoLab a voice, either a narrated take
 (the free Kokoro voiceover in Studio) or a host.
 
+### Carousel calendar (approved by Jose 2026-09-28)
+
+Built for SHARES (shares drive reach, which drives follows). Everything is data-backed
+(AniList, our own feed), never opinion, which fits "verified, above the noise".
+Look: matches the live site (sky blue, illustrated clouds, serif headlines, gold accents).
+Every carousel ends with a share prompt that fits its format ("Send this to someone who...").
+
+**Formats, most shareable first (starting bet; data decides after 6 weeks):**
+1. "If You Loved ___, Watch These 5" (AniList recommendations): sent to friends
+2. "The Voice Behind ___ Also Played..." (AniList voice-actor data): the "wait, WHAT" reaction
+3. "How to Watch ___ in Order": saved and forwarded (Jose checks tricky franchises)
+4. "Fans' Top 10 ___" (by AniList score): sparks debate
+5. "___ Turns 10 This Week" (AniList start dates): nostalgia
+6. Season "Most Anticipated" / "What to Watch": timely
+7. "This Week in Anime" (our feed, ranked by real performance): news recap
+8. "Where to Stream ___": utility
+9. "Airing This Week": a schedule people save
+
+**Weekly rhythm (3/week):** Monday = send-to-a-friend (#1 or #2). Thursday = save or
+debate (#3, #4 or #8). Sunday = #7 This Week in Anime. Anniversaries (#5) and major
+breaking news take over a Monday or Thursday slot when they happen.
+
+**Yearly calendar (repeats):**
+- About 3 weeks before each season (early Dec/Mar/Jun/Sep): Most Anticipated [Season]
+- 1 week before: [Season] What to Watch
+- Premiere week (Jan/Apr/Jul/Oct): Where to Stream Every [Season] Show
+- Around week 6: [Season] So Far: Fans' Top 10
+- Season end: Top Rated of [Season]
+- Late Dec: Jump Festa announcements. Late Mar: AnimeJapan. Early Jul: Anime Expo.
+  Feb-Mar: Crunchyroll Anime Awards winners. Late Dec: Fans' Top 10 of the Year.
+
+**Pipeline (to build after samples are approved):** calendar and news triggers, then
+AniList/feed data, then AI copy (facts only, from the data), then a locked 1080x1350
+template, then the admin approval queue, then booking into the next free slot (never
+bunched), then IG + FB + Threads. Track shares per 1,000 reached per format and cut the
+losers after 6 weeks. The live IG carousel publish still needs one 2-slide throwaway test.
+
 ---
 
 ## Phase 4 — Scale Revenue ⬜ Upcoming
