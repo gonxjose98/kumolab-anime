@@ -72,6 +72,18 @@ def add(workdir, slug, title, day, hhmm='08:30'):
     verify()
 
 
+def reachable(url):
+    # The storage CDN throttles bursts of requests, so one failed check is not proof
+    # a slide is missing: retry with backoff before reporting it.
+    for attempt in range(4):
+        try:
+            urllib.request.urlopen(urllib.request.Request(url, headers={'Range': 'bytes=0-0'}), timeout=30)
+            return True
+        except Exception:
+            time.sleep(2 * (attempt + 1))
+    return False
+
+
 def verify():
     now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%dT%H:%M:%SZ')
     rows = json.loads(req('GET', f'{SB}/rest/v1/posts?status=eq.approved&scheduled_post_time=gte.{now}&select=id,title,scheduled_post_time,image_settings&order=scheduled_post_time'))
@@ -86,8 +98,7 @@ def verify():
         nums = [int(re.findall(r'-(\d+)\.jpg$', s.get('renderedUrl', ''))[0]) if re.findall(r'-(\d+)\.jpg$', s.get('renderedUrl', '')) else -1 for s in slides]
         if nums != list(range(1, len(nums) + 1)): probs.append(f'SLIDE ORDER {nums}')
         for s in slides:
-            try: urllib.request.urlopen(urllib.request.Request(s['renderedUrl'], method='HEAD'), timeout=30)
-            except Exception: probs.append('UNREACHABLE ' + s['renderedUrl'][-40:])
+            if not reachable(s['renderedUrl']): probs.append('UNREACHABLE ' + s['renderedUrl'][-40:])
         # In carousels-only mode other posts never reach social, so only
         # carousels can collide with each other.
         carousels_only = E.get('SOCIALS_CAROUSELS_ONLY') == 'true'
