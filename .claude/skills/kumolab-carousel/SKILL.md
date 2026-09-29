@@ -51,8 +51,10 @@ with `image_settings.slides`).
 
 **Recreating someone else's post:** see ALL of it first. Run
 `node scripts/carousel/ig_grab.mjs <postUrl> <workdir>/ref` (visible browser; if it
-needs a login, ask Jose to log in in that window, never guess from the cover). Take the
-idea, never their art or wording; our version still follows every rule here.
+needs a login, ask Jose to log in in that window, never guess from the cover). Their idea
+and art choices may be reused (source the same art at full quality, never a screenshot
+of their slide); their wording never word for word. Our version still follows every
+rule here.
 
 ### 2. Data
 AniList GraphQL (`https://graphql.anilist.co`, send `Accept` + `User-Agent` headers):
