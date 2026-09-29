@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Manrope:wght@500;600;700;800&family=Shippori+Mincho:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#F6B73C;--gold2:#FFD27A;--ink:#0B2A5B;--sky1:#9FD2FF;--sky2:#4F9BEA;--deep:#1F56C2;--deeper:#163F9A}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;font-family:Manrope,sans-serif}
+.slide{width:1080px;height:1350px;position:relative;overflow:hidden;margin:0 0 40px;color:#fff;
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 38%,var(--deep) 78%,var(--deeper) 100%)}
+.cloud{position:absolute;z-index:1;filter:drop-shadow(0 18px 24px rgba(15,50,120,.18))}
+.sun{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,250,228,.95) 0%,rgba(255,226,140,.75) 30%,rgba(255,214,110,.18) 55%,rgba(255,214,110,0) 70%)}
+.top{position:absolute;top:40px;left:72px;right:72px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.brand{display:flex;align-items:center;gap:14px;font-family:'Cormorant Garamond';font-weight:700;font-size:34px;letter-spacing:.14em}
+.brand svg{width:46px}
+.pill{font-weight:700;font-size:20px;letter-spacing:.2em;text-transform:uppercase;padding:12px 22px;border-radius:999px;
+  background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.45);backdrop-filter:blur(8px)}
+.jp{font-family:'Shippori Mincho';letter-spacing:.3em}
+.serif{font-family:'Cormorant Garamond';font-variant-numeric:lining-nums}
+.shadow{text-shadow:0 2px 18px rgba(8,30,80,.35)}
+.glass{background:linear-gradient(160deg,rgba(40,98,210,.78),rgba(24,70,170,.82));border:1.5px solid rgba(255,255,255,.42);
+  border-radius:34px;backdrop-filter:blur(14px);box-shadow:0 30px 60px rgba(10,35,100,.28)}
+.cover{border-radius:26px;box-shadow:0 36px 70px rgba(6,24,70,.45),0 0 0 6px rgba(255,255,255,.85);display:block}
+.gold{color:var(--gold2)}
+.btn{display:inline-block;background:linear-gradient(180deg,#FFD27A,#F6A93C);color:var(--ink);font-weight:800;letter-spacing:.16em;
+  text-transform:uppercase;border-radius:999px;box-shadow:0 14px 30px rgba(246,169,60,.45)}
+.foot{position:absolute;bottom:52px;left:72px;right:72px;display:flex;justify-content:space-between;align-items:center;font-weight:700;
+  font-size:22px;letter-spacing:.18em;text-transform:uppercase;opacity:.92;z-index:5}
+.dots{display:flex;gap:10px}.dots i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.4)}.dots i.on{background:var(--gold2);width:30px;border-radius:6px}
+.banner{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.13;mix-blend-mode:luminosity;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.6) 45%,transparent 75%)}
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute">
+ <defs>
+  <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".62" stop-color="#F4F9FF"/><stop offset="1" stop-color="#D6E7FB"/></linearGradient>
+  <symbol id="cloud" viewBox="0 0 400 170">
+   <path d="M30 150 C8 150 4 112 34 104 C30 70 70 52 98 70 C108 30 160 14 196 44 C218 12 282 16 296 62 C330 50 366 76 356 108 C392 112 394 150 364 150 Z" fill="url(#cg)"/>
+   <path d="M44 150 C60 132 92 136 104 146 C124 128 166 130 180 146 C200 126 248 128 262 146 C282 130 330 132 352 150 Z" fill="#C9DDF6" opacity=".7"/>
+   <path d="M110 64 C124 44 158 38 176 52" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" opacity=".9"/>
+  </symbol>
+  <symbol id="mark" viewBox="0 0 64 40"><path d="M12 36 C3 36 1 25 9 22 C8 13 17 8 24 12 C27 4 40 2 45 11 C52 9 60 15 58 23 C64 24 64 36 56 36 Z" fill="none" stroke="#FFD27A" stroke-width="3.2" stroke-linejoin="round"/></symbol>
+ </defs>
+</svg>
+
