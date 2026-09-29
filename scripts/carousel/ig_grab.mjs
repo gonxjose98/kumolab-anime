@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 
 const [url, outArg] = process.argv.slice(2);
 const out = resolve(outArg); mkdirSync(out, { recursive: true });
-const ctx = await chromium.launchPersistentContext(join(tmpdir(), 'kl-ig-profile'), { headless: false, viewport: { width: 1200, height: 1000 } });
+const ctx = await chromium.launchPersistentContext(process.env.KL_IG_PROFILE || join(tmpdir(), 'kl-ig-profile'), { headless: false, viewport: { width: 1200, height: 1000 } });
 const p = ctx.pages()[0] || await ctx.newPage();
 await p.goto(url);
 console.log('Log in in the browser window if asked. Waiting up to 10 min...');
