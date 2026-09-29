@@ -93,4 +93,22 @@ describe('carousel publish (FB multi-photo + Threads carousel)', () => {
             delete process.env.SOCIALS_CAROUSELS_ONLY;
         }
     });
+
+    it('carousels-only mode lets operator-built reels through', async () => {
+        process.env.SOCIALS_CAROUSELS_ONLY = 'true';
+        try {
+            const reel: any = { id: 'p4', slug: 'news30', title: 'News', image: 'https://cdn.test/c.jpg', caption_override: 'c',
+                image_settings: { reel_source: 'kumolab-reels' }, social_ids: { staged_video_url: 'https://cdn.test/r.mp4' } };
+            const p = publishToSocials(reel);
+            await vi.runAllTimersAsync();
+            const r = await p;
+            expect((r as any).skipped_reason).toBeUndefined();
+            expect(r.staged_video_url).toBe('https://cdn.test/r.mp4');
+            // A reel without the staged MP4 is still held back.
+            const bare: any = { id: 'p5', slug: 'x', title: 'X', image: 'https://cdn.test/c.jpg', image_settings: { reel_source: 'kumolab-reels' } };
+            expect(((await publishToSocials(bare)) as any).skipped_reason).toBe('socials_paused');
+        } finally {
+            delete process.env.SOCIALS_CAROUSELS_ONLY;
+        }
+    });
 });

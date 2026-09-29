@@ -84,7 +84,11 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
     // Undo: set SOCIALS_CAROUSELS_ONLY to anything but "true" and redeploy.
     const isCarouselPost = Array.isArray((post as any).image_settings?.slides)
         && (post as any).image_settings.slides.length >= 2;
-    if (process.env.SOCIALS_CAROUSELS_ONLY === 'true' && !isCarouselPost) {
+    // Operator-built reels (scripts/reels, 2026-09-29) are the slot-2 format and
+    // also post. They carry a pre-staged MP4, so they take the normal video flow.
+    const isOperatorReel = (post as any).image_settings?.reel_source === 'kumolab-reels'
+        && !!(post as any).social_ids?.staged_video_url;
+    if (process.env.SOCIALS_CAROUSELS_ONLY === 'true' && !isCarouselPost && !isOperatorReel) {
         const { supabaseAdmin } = await import('../supabase/admin');
         await supabaseAdmin.from('action_logs').insert({
             action: 'social_publish_skipped',
