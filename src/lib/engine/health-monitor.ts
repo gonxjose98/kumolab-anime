@@ -136,6 +136,8 @@ async function checkStuckPosts(): Promise<HealthCheck> {
 
     const stuck = (data || []).filter((p) => {
         const sid: any = p.social_ids || {};
+        // Deliberately paused posts (carousels-only mode) are not stuck.
+        if (sid.skipped_reason === 'socials_paused') return false;
         const hasPlatform = PLATFORM_KEYS.some((k) => !!sid[k]);
         const attempts = (sid.publish_attempts as number) || 0;
         return !hasPlatform && attempts >= retryCapFor(sid);

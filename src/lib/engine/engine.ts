@@ -72,6 +72,8 @@ export const RETRY_CAP_VIDEO_FETCH = 2;
 export const RETRY_CAP_DEFAULT = 5;
 
 export function retryCapFor(socialIds: any): number {
+    // Deliberately paused (carousels-only mode): never retry.
+    if (socialIds?.skipped_reason === 'socials_paused') return 0;
     return socialIds?.skipped_reason === 'video_fetch_failed'
         ? RETRY_CAP_VIDEO_FETCH
         : RETRY_CAP_DEFAULT;

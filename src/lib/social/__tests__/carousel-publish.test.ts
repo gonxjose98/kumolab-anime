@@ -74,4 +74,23 @@ describe('carousel publish (FB multi-photo + Threads carousel)', () => {
         expect(r.facebook_id).toBe('PAGE_POST1');
         expect(r.threads_id).toBe('THREAD_POST1');
     });
+
+    it('carousels-only mode skips non-carousel posts and still sends carousels', async () => {
+        process.env.SOCIALS_CAROUSELS_ONLY = 'true';
+        try {
+            const reel: any = { id: 'p2', slug: 'trailer', title: 'Trailer', image: 'https://cdn.test/x.jpg', image_settings: {} };
+            const r = await publishToSocials(reel);
+            expect((r as any).skipped_reason).toBe('socials_paused');
+            expect(calls.filter(c => c.url.includes('graph.'))).toHaveLength(0);
+
+            const car: any = { id: 'p3', slug: 'car', title: 'Car', image: 'https://cdn.test/s1.jpg', caption_override: 'c',
+                image_settings: { slides: [1, 2].map(i => ({ renderedUrl: `https://cdn.test/s${i}.jpg` })) } };
+            const p = publishToSocials(car);
+            await vi.runAllTimersAsync();
+            const r2 = await p;
+            expect(r2.facebook_id).toBe('PAGE_POST1');
+        } finally {
+            delete process.env.SOCIALS_CAROUSELS_ONLY;
+        }
+    });
 });

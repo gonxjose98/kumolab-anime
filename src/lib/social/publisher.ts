@@ -76,6 +76,29 @@ export async function publishToSocials(post: BlogPost): Promise<SocialPublishRes
         return result;
     }
 
+    // Carousels-only mode (Jose, 2026-09-28): the trailer/news auto-pipeline
+    // is paused on social while the content schedule is rebuilt. Such posts
+    // still publish to the WEBSITE; only the social broadcast is skipped, and
+    // retryCapFor gives 'socials_paused' zero retries so nothing re-fires.
+    // Operator-built carousels (image_settings.slides >= 2) still post.
+    // Undo: set SOCIALS_CAROUSELS_ONLY to anything but "true" and redeploy.
+    const isCarouselPost = Array.isArray((post as any).image_settings?.slides)
+        && (post as any).image_settings.slides.length >= 2;
+    if (process.env.SOCIALS_CAROUSELS_ONLY === 'true' && !isCarouselPost) {
+        const { supabaseAdmin } = await import('../supabase/admin');
+        await supabaseAdmin.from('action_logs').insert({
+            action: 'social_publish_skipped',
+            actor: 'system',
+            entity_type: 'post',
+            entity_id: (post as any).id,
+            entity_title: post.title,
+            reason: 'Socials paused for non-carousel posts (SOCIALS_CAROUSELS_ONLY); website only',
+            details: { slug: post.slug },
+        }).then(() => {}, () => {});
+        (result as any).skipped_reason = 'socials_paused';
+        return result;
+    }
+
     // ── 0. Per-post lock to prevent concurrent publishes ───────
     // Without this, two simultaneous calls (e.g. operator clicks
     // republish twice, or auto-retry fires while a manual retry is
