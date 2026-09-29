@@ -62,7 +62,9 @@ const page = await ctx.newPage();
 const rows = Object.entries(index).map(([k, arr]) => `<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start"><div style="width:90px;color:#ff0;font:bold 14px sans-serif">${k}</div>${arr.map((g, i) =>
     `<div style="position:relative"><img src="${pathToFileURL(g.fn).href}" style="height:240px"><span style="position:absolute;left:0;top:0;background:#000;color:#ff0;font:12px sans-serif;padding:2px">${i} ${g.w}x${g.h}</span></div>`).join('')}</div>`).join('');
 await page.setViewportSize({ width: 1800, height: 900 });
-await page.setContent(`<body style="background:#222;margin:8px">${rows}</body>`);
+// Load as a file:// page: a blank page is not allowed to show local files.
+writeFileSync(resolve(out, 'kv-sheet.html'), `<body style="background:#222;margin:8px">${rows}</body>`);
+await page.goto(pathToFileURL(resolve(out, 'kv-sheet.html')).href);
 await page.waitForTimeout(800);
 await page.screenshot({ path: resolve(out, 'kv-sheet.png'), fullPage: true });
 await b.close();

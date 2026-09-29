@@ -10,6 +10,7 @@
 // f-slide-N.png, writes f-slide-N.jpg (quality 94, the posted files) and
 // sheet.png (all slides tiled) for review.
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, copyFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -38,16 +39,15 @@ if (n < 5 || n > 8) errors.push(`slide count ${n} is outside the 5-8 rule`);
 for (let i = 0; i < n; i++) {
     const png = resolve(dir, `f-slide-${i + 1}.png`);
     await p.locator('section.slide').nth(i).screenshot({ path: png });
-    const jp = await b.newPage({ viewport: { width: 1080, height: 1350 } });
-    await jp.goto(pathToFileURL(png).href);
-    await jp.screenshot({ path: resolve(dir, `f-slide-${i + 1}.jpg`), type: 'jpeg', quality: 94 });
-    await jp.close();
+    // The posted file: JPEG quality 94 with 4:4:4 chroma so small text stays crisp.
+    await sharp(png).jpeg({ quality: 94, chromaSubsampling: '4:4:4' }).toFile(resolve(dir, `f-slide-${i + 1}.jpg`));
 }
 // Contact sheet: all slides at 1/3 scale in one row-wrapped image.
 const cols = Math.min(4, n);
 await p.setViewportSize({ width: cols * 360, height: Math.ceil(n / cols) * 450 });
-await p.setContent(`<body style="margin:0;display:flex;flex-wrap:wrap;background:#111">${Array.from({ length: n }, (_, i) =>
-    `<img src="${pathToFileURL(resolve(dir, `f-slide-${i + 1}.png`)).href}" style="width:360px;height:450px">`).join('')}</body>`);
+writeFileSync(resolve(dir, 'sheet.html'), `<body style="margin:0;display:flex;flex-wrap:wrap;background:#111">${Array.from({ length: n }, (_, i) =>
+    `<img src="f-slide-${i + 1}.png" style="width:360px;height:450px">`).join('')}</body>`);
+await p.goto(pathToFileURL(resolve(dir, 'sheet.html')).href);
 await p.waitForTimeout(500);
 await p.screenshot({ path: resolve(dir, 'sheet.png') });
 await b.close();
