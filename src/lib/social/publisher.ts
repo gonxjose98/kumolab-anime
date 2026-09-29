@@ -181,14 +181,31 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                 });
             }
 
+            // Facebook gets every slide as one multi-photo post (it used to get
+            // only the cover). Each platform is isolated: a failure here never
+            // undoes or blocks the Instagram carousel above.
             if (META_ACCESS_TOKEN) {
                 try {
-                    const fbResult = await publishToFacebookPage(post, null);
+                    const fbResult = await publishFacebookCarousel(post, slideImageUrls);
                     Object.assign(result, fbResult);
                 } catch (e: any) {
                     await logError({
-                        source: 'publisher.fb',
-                        errorMessage: `FB publish threw: ${e?.message || e}`,
+                        source: 'publisher.fb.carousel',
+                        errorMessage: `FB carousel publish threw: ${e?.message || e}`,
+                        stackTrace: e?.stack,
+                        context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+                    });
+                }
+            }
+
+            if (THREADS_ACCESS_TOKEN && THREADS_USER_ID) {
+                try {
+                    const thResult = await publishThreadsCarousel(post, slideImageUrls);
+                    Object.assign(result, thResult);
+                } catch (e: any) {
+                    await logError({
+                        source: 'publisher.threads.carousel',
+                        errorMessage: `Threads carousel publish threw: ${e?.message || e}`,
                         stackTrace: e?.stack,
                         context: { post_id: (post as any).id, slug: post.slug, title: post.title },
                     });
@@ -215,6 +232,8 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             if (result.instagram_url) ids.instagram_url = result.instagram_url;
             if (result.facebook_id) ids.facebook_id = result.facebook_id;
             if (result.facebook_url) ids.facebook_url = result.facebook_url;
+            if (result.threads_id) ids.threads_id = result.threads_id;
+            if (result.threads_url) ids.threads_url = result.threads_url;
             if (Object.keys(ids).length > 0) {
                 const { data: existing } = await supabaseAdmin
                     .from('posts').select('social_ids').eq('id', (post as any).id).maybeSingle();
@@ -234,7 +253,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         // Operational trail, mirroring the other terminal branches.
         {
             const { supabaseAdmin } = await import('../supabase/admin');
-            const published = !!(result.instagram_id || result.facebook_id);
+            const published = !!(result.instagram_id || result.facebook_id || result.threads_id);
             await supabaseAdmin.from('action_logs').insert({
                 action: published ? 'social_publish_carousel' : 'social_publish_skipped',
                 actor: 'system',
@@ -242,7 +261,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                 entity_id: (post as any).id,
                 entity_title: post.title,
                 reason: published
-                    ? 'Carousel post → IG carousel + FB cover photo (Threads carousel not wired yet)'
+                    ? 'Carousel post → IG carousel + FB multi-photo post + Threads carousel'
                     : 'Carousel post — IG/FB publish did not produce an id (see error_logs)',
                 details: {
                     slug: post.slug,
@@ -250,6 +269,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                     usable_urls: slideImageUrls.length,
                     ig_id: result.instagram_id ?? null,
                     fb_id: result.facebook_id ?? null,
+                    threads_id: result.threads_id ?? null,
                 },
             }).then(() => {}, () => {});
         }
@@ -1018,6 +1038,133 @@ export async function publishToInstagramCarousel(
 //     finish. Same video URL we feed IG; one bucket, two platforms.
 //   - Otherwise we use /{PAGE_ID}/photos (image + caption in one call)
 //     for image posts, falling back to /{PAGE_ID}/feed for text-only.
+// ── Carousel: Facebook multi-photo post + Threads carousel ─────────
+//
+// Per-platform caption text lives on the post itself so each one can be
+// tuned: image_settings.captions.{facebook,threads}. Anything not set falls
+// back to the shared social caption (caption_override first).
+function carouselCaption(post: BlogPost, platform: 'facebook' | 'threads'): string {
+    const c = (post as any).image_settings?.captions?.[platform];
+    if (typeof c === 'string' && c.trim()) return c.trim();
+    return buildSocialCaption(post as any);
+}
+
+// Facebook has no carousel container: upload every slide as an UNPUBLISHED
+// photo, then create one feed post with all of them attached. This is the
+// flow that published the Frieren carousel on 2026-09-28.
+async function publishFacebookCarousel(post: BlogPost, slideImageUrls: string[]): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!META_ACCESS_TOKEN) return result;
+    const urls = slideImageUrls.filter(u => /^https?:\/\//i.test(u)).slice(0, 10);
+    const photoIds: string[] = [];
+    for (let i = 0; i < urls.length; i++) {
+        const res = await fetchWithTimeout(
+            `https://graph.facebook.com/v21.0/${FB_PAGE_ID}/photos`,
+            { method: 'POST', body: new URLSearchParams({ url: urls[i], published: 'false', access_token: META_ACCESS_TOKEN }) },
+            30_000,
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!data.id) {
+            await logError({
+                source: 'publisher.fb.carousel',
+                errorMessage: `FB carousel photo ${i + 1}/${urls.length} upload failed: ${data?.error?.message || JSON.stringify(data).substring(0, 300)}`,
+                context: { post_slug: post.slug, slide_index: i + 1, image_url: urls[i], meta_code: data?.error?.code },
+            });
+            return result;
+        }
+        photoIds.push(data.id);
+    }
+    const body = new URLSearchParams({ message: carouselCaption(post, 'facebook'), access_token: META_ACCESS_TOKEN });
+    photoIds.forEach((id, i) => body.set(`attached_media[${i}]`, JSON.stringify({ media_fbid: id })));
+    const res = await fetchWithTimeout(`https://graph.facebook.com/v21.0/${FB_PAGE_ID}/feed`, { method: 'POST', body }, 30_000);
+    const data = await res.json().catch(() => ({}));
+    if (data.id) {
+        result.facebook_id = data.id;
+        result.facebook_url = `https://facebook.com/${data.id}`;
+        console.log(`✅ [Facebook] Published ${photoIds.length}-photo carousel: ${data.id}`);
+    } else {
+        await logError({
+            source: 'publisher.fb.carousel',
+            errorMessage: `FB carousel feed post failed: ${data?.error?.message || JSON.stringify(data).substring(0, 300)}`,
+            context: { post_slug: post.slug, photos: photoIds.length, meta_code: data?.error?.code },
+        });
+    }
+    return result;
+}
+
+// Threads carousel: one IMAGE child per slide (is_carousel_item), then a
+// CAROUSEL parent carrying the text, then publish. Up to 20 items, text <= 500.
+async function publishThreadsCarousel(post: BlogPost, slideImageUrls: string[]): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID) return result;
+    const base = `https://graph.threads.net/v1.0/${THREADS_USER_ID}`;
+    const urls = slideImageUrls.filter(u => /^https?:\/\//i.test(u)).slice(0, 20);
+    const text = carouselCaption(post, 'threads').substring(0, 500);
+    const children: string[] = [];
+    for (let i = 0; i < urls.length; i++) {
+        const res = await fetchWithTimeout(`${base}/threads`, {
+            method: 'POST',
+            body: new URLSearchParams({ media_type: 'IMAGE', image_url: urls[i], is_carousel_item: 'true', access_token: THREADS_ACCESS_TOKEN }),
+        }, 20_000);
+        const data = await res.json().catch(() => ({}));
+        if (!data.id) {
+            await logError({
+                source: 'publisher.threads.carousel',
+                errorMessage: `Threads carousel item ${i + 1}/${urls.length} failed: ${data?.error?.message || JSON.stringify(data).substring(0, 300)}`,
+                context: { post_slug: post.slug, slide_index: i + 1, image_url: urls[i] },
+            });
+            return result;
+        }
+        children.push(data.id);
+    }
+    // Let the image items settle before assembling the parent.
+    await new Promise(r => setTimeout(r, 8_000));
+    const parentRes = await fetchWithTimeout(`${base}/threads`, {
+        method: 'POST',
+        body: new URLSearchParams({
+            media_type: 'CAROUSEL', children: children.join(','), text, access_token: THREADS_ACCESS_TOKEN,
+            ...(THREADS_TOPIC_TAG ? { topic_tag: THREADS_TOPIC_TAG } : {}),
+        }),
+    }, 20_000);
+    const parent = await parentRes.json().catch(() => ({}));
+    if (!parent.id) {
+        await logError({
+            source: 'publisher.threads.carousel',
+            errorMessage: `Threads carousel container failed: ${parent?.error?.message || JSON.stringify(parent).substring(0, 300)}`,
+            context: { post_slug: post.slug, items: children.length },
+        });
+        return result;
+    }
+    for (let t = 0; t < 20; t++) {
+        const st = await fetchWithTimeout(
+            `https://graph.threads.net/v1.0/${parent.id}?fields=status&access_token=${encodeURIComponent(THREADS_ACCESS_TOKEN)}`,
+            { method: 'GET' }, 10_000);
+        const sd = await st.json().catch(() => ({}));
+        if (sd.status === 'FINISHED') break;
+        if (sd.status === 'ERROR') {
+            await logError({ source: 'publisher.threads.carousel', errorMessage: 'Threads carousel container ERROR', context: { post_slug: post.slug, container_id: parent.id } });
+            return result;
+        }
+        await new Promise(r => setTimeout(r, 3_000));
+    }
+    const pubRes = await fetchWithTimeout(`${base}/threads_publish`, {
+        method: 'POST', body: new URLSearchParams({ creation_id: parent.id, access_token: THREADS_ACCESS_TOKEN }),
+    }, 20_000);
+    const pub = await pubRes.json().catch(() => ({}));
+    if (pub.id) {
+        result.threads_id = pub.id;
+        result.threads_url = `https://www.threads.net/@kumolabanime/post/${pub.id}`;
+        console.log(`✅ [Threads] Published ${children.length}-image carousel: ${pub.id}`);
+    } else {
+        await logError({
+            source: 'publisher.threads.carousel',
+            errorMessage: `Threads carousel publish failed: ${pub?.error?.message || JSON.stringify(pub).substring(0, 300)}`,
+            context: { post_slug: post.slug, container_id: parent.id },
+        });
+    }
+    return result;
+}
+
 // How many image (non-video) posts have gone to the FB Page in the last 24h.
 // Video FB posts carry a staged_video_url and don't count. Fails CLOSED (returns
 // false) if the count can't be read, so we never over-post past the cap.
