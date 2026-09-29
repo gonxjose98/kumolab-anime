@@ -56,6 +56,10 @@ Do not copy-paste a variant or restyle one slide.
   Subaru suffers, we scream... We are not okay." Bad: "A former soldier learns what love
   means." Every claim true to the show, no spoilers beyond what's public.
 - **Voice: we ARE fans.** Say we/us/our ("we can't stop watching", "Our Top 5"), never "fans love it" or "fans' top 5". Label stats by source ("AniList score").
+- **Conviction, no hedging:** "anime that ARE masterpieces", never "anime that feel like
+  a masterpiece". Hedged phrasing reads AI-generated; fans state it flat (Jose, 2026-09-29).
+- **Recreating another account's post:** their idea and art choices are fine; their
+  wording is never reused word for word.
 - **Captions:** short. One hook line, one share call to action, 3-5 hashtags. No lists.
 - **Facts** (dates, scores, voice actors, streaming) verified against 2+ sources. AniList
   voice-actor data includes young or flashback versions, so check the main role.
