@@ -26,6 +26,8 @@ Do not copy-paste a variant or restyle one slide.
 
 ## Slide structure
 
+**Length: 5-8 slides total** (Jose, 2026-09-28: 10 is too long). Default: cover + 3-6 picks + share.
+
 1. **Cover:** a vertical strip of 4 panels of OFFICIAL POSTER / key-visual art above
    the cloud bank, then the hook headline (serif, with one amber/italic word), a small
    Japanese line above it, and a one-line subhead.
