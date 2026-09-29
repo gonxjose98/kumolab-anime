@@ -10,6 +10,9 @@ a numbered contact sheet for picking frames by eye.
 
 Prefer official channels (Crunchyroll, Netflix, TOHO, Aniplex, the studio).
 If downloads return HTTP 403: `python -m pip install -U yt-dlp` and retry.
+If YouTube says "Sign in to confirm you're not a bot": this IP made too many requests (e.g. several
+agents downloading at once). It clears on its own within hours. Only ONE process should download at a
+time; PACE below spaces requests out so it doesn't trip again.
 Then crop the chosen frame ABOVE any burned-in subtitle and away from
 watermarks (see crop.py).
 """
@@ -17,15 +20,18 @@ import glob, os, subprocess, sys
 from PIL import Image, ImageDraw
 
 
+# Space out YouTube requests: bursts from parallel agents got this IP bot-flagged (2026-09-29).
+PACE = ['--sleep-requests', '1', '--sleep-interval', '3', '--max-sleep-interval', '8']
+
 def search(q, n=5):
-    subprocess.run([sys.executable, '-m', 'yt_dlp', '--flat-playlist', '--print',
+    subprocess.run([sys.executable, '-m', 'yt_dlp', *PACE, '--flat-playlist', '--print',
                     '%(id)s | %(channel)s | %(duration)s | %(title).80s', f'ytsearch{n}:{q}'])
 
 
 def grab(out, ids):
     os.makedirs(f'{out}/vid', exist_ok=True); os.makedirs(f'{out}/sheets', exist_ok=True)
     for vid in ids:
-        subprocess.run([sys.executable, '-m', 'yt_dlp', '-q', '--no-warnings', '-f',
+        subprocess.run([sys.executable, '-m', 'yt_dlp', '-q', '--no-warnings', *PACE, '-f',
                         'bv*[height<=1080][ext=mp4]/bv*[height<=1080]', '-o', f'{out}/vid/%(id)s.%(ext)s',
                         f'https://www.youtube.com/watch?v={vid}'])
         files = glob.glob(f'{out}/vid/{vid}.*')
