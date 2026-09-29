@@ -51,8 +51,10 @@ Do not copy-paste a variant or restyle one slide.
 
 ## Copy rules
 
-- **Slides:** short, and entertaining in a fan's voice (a joke or a wink, never a
-  press release). Every claim true to the show.
+- **Slides:** short, and written like a HYPED FAN, never a synopsis. Inside references fans
+  recognize, humor and emotional hooks. Good: "Return by Death? More like return by pain.
+  Subaru suffers, we scream... We are not okay." Bad: "A former soldier learns what love
+  means." Every claim true to the show, no spoilers beyond what's public.
 - **Captions:** short. One hook line, one share call to action, 3-5 hashtags. No lists.
 - **Facts** (dates, scores, voice actors, streaming) verified against 2+ sources. AniList
   voice-actor data includes young or flashback versions, so check the main role.
