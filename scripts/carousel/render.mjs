@@ -20,7 +20,9 @@ const tplDir = resolve(here, '../../docs/carousel-templates');
 const dir = resolve(process.argv[2] || '.');
 
 const head = readFileSync(resolve(tplDir, 'head.html'), 'utf8');
-const tpl = readFileSync(resolve(tplDir, 'cloud-bank.js'), 'utf8');
+const tpl = readFileSync(resolve(tplDir, 'cloud-bank.js'), 'utf8')
+    // Seasonal skins (inert unless build.js calls e.g. Halloween.apply('lantern')).
+    + '\n' + readFileSync(resolve(tplDir, 'halloween.js'), 'utf8');
 const build = readFileSync(resolve(dir, 'build.js'), 'utf8');
 writeFileSync(resolve(dir, 'page.html'), `${head}<div id="slides"></div>\n<script>\n${tpl}\n${build}\n</script></body></html>`);
 copyFileSync(resolve(tplDir, 'logo-trim.png'), resolve(dir, 'logo-trim.png'));

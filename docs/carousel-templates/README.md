@@ -24,6 +24,12 @@ Do not copy-paste a variant or restyle one slide.
 - **Top-right pill:** a short uppercase label ("Fall 2026", "Same voice", "Save + share").
 - **Footer:** slide dots bottom-left, `@kumolabanime` (or "Swipe →" on the cover) bottom-right.
 
+## Halloween skin (Oct 25-31)
+
+Halloween week uses the SAME layout with the locked **Lantern Night** skin: end `build.js` with
+`Halloween.apply('lantern');` (from `halloween.js`, auto-loaded by render.mjs). Pill label 'Halloween'.
+Chosen by Jose 2026-09-29 over 5 alternatives; the light variants were rejected as not dark enough.
+
 ## Slide structure
 
 **Length: 5-8 slides total** (Jose, 2026-09-28: 10 is too long). Default: cover + 3-6 picks + share.
