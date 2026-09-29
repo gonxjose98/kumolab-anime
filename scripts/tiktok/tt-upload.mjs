@@ -30,6 +30,7 @@ try {
         caption,
         dry: flags.has('--dry'),
         headless: flags.has('--headless'),
+        privateOnly: flags.has('--private'),
         log,
     });
     if (r.dry) {

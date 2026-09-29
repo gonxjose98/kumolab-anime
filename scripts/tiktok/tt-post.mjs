@@ -117,11 +117,12 @@ async function dismissOverlays(page) {
  * @param {boolean} [opts.headless]
  * @param {string}  [opts.prefix]  screenshot filename prefix (keeps concurrent
  *                                 or sequential jobs from overwriting each other)
+ * @param {boolean} [opts.privateOnly] set "Who can watch" to Only you; ABORTS (no post) if it can't confirm
  * @param {function}[opts.log]
  * @returns {Promise<{posted: boolean, dry?: boolean, url: string|null}>}
  * @throws  {SessionExpiredError} when TikTok bounces us to login
  */
-export async function postToTikTok({ video, caption = '', dry = false, headless = false, prefix = '', log = console.log }) {
+export async function postToTikTok({ video, caption = '', dry = false, headless = false, prefix = '', privateOnly = false, log = console.log }) {
     mkdirSync(OUT_DIR, { recursive: true });
     if (!existsSync(SESSION_PATH)) {
         throw new SessionExpiredError(`no session file at ${SESSION_PATH} — run tt-capture.mjs first`);
@@ -239,15 +240,37 @@ export async function postToTikTok({ video, caption = '', dry = false, headless 
                         flat = s; break;
                     }
                 }
+                if (privateOnly && !/only (you|me)/i.test(flat)) {
+                    // Open the dropdown next to the label and pick "Only you".
+                    const dd = visRow.locator('xpath=following::*[@role="combobox" or contains(@class,"select") or self::button][1]').first();
+                    await dd.click({ timeout: 5000 }).catch(() => {});
+                    await page.waitForTimeout(800);
+                    await shot('3b-privacy-open');
+                    await page.locator('text=/^Only (you|me)$/i').first().click({ timeout: 5000 }).catch(() => {});
+                    await page.waitForTimeout(800);
+                    flat = '';
+                    for (let up = 1; up <= 4; up++) {
+                        const t = await visRow.locator(`xpath=${'../'.repeat(up).slice(0, -1)}`).innerText().catch(() => '');
+                        const s2 = t.replace(/\s+/g, ' ').trim();
+                        if (s2.replace(/Who can (see this post|watch this video)/i, '').trim().length > 2) { flat = s2; break; }
+                    }
+                }
                 if (flat) log('visibility:', flat.slice(0, 120));
+                if (privateOnly && !/only (you|me)/i.test(flat)) {
+                    await shot('3b-privacy-failed');
+                    throw new Error('could not confirm visibility = Only you; NOT posting (see 3b-privacy-failed.png)');
+                }
                 if (/only you|only me|private/i.test(flat)) {
                     log('WARN: visibility looks PRIVATE — this post may not be publicly visible.');
                 }
             } else {
                 log('note: visibility control not found on the page (see 3b-settings.png)');
+                if (privateOnly) throw new Error('visibility control not found; NOT posting a private-only upload');
             }
             await shot('3b-settings');
-        } catch {}
+        } catch (e) {
+            if (privateOnly) throw e;
+        }
 
         // 4) Post. Clear any overlay that reappeared, then wait for the button.
         await dismissOverlays(page);
