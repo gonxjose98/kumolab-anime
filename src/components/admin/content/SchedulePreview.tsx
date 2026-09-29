@@ -120,8 +120,12 @@ export default function SchedulePreview({ row, onClose }: { row: ScheduleRow; on
                     </div>
 
                     <div className="ak-pv__stage">
-                        <div className={`ak-pv__frame ${isCarousel ? '' : 'ak-pv__frame--contain'}`}>
-                            {n === 0 ? (
+                        <div className={`ak-pv__frame ${isCarousel ? '' : 'ak-pv__frame--contain'} ${row.videoUrl ? 'ak-pv__frame--reel' : ''}`}>
+                            {row.videoUrl ? (
+                                // Reels: play the exact MP4 that publishes, starting muted like IG.
+                                <video className="ak-pv__video" src={row.videoUrl} poster={row.cover ?? undefined}
+                                    controls playsInline autoPlay muted loop preload="metadata" />
+                            ) : n === 0 ? (
                                 <div className="ak-pv__noimg"><KindIcon kind={row.kind} size={28} /><span>No image yet</span></div>
                             ) : (
                                 <div ref={trackRef} className="ak-pv__track" tabIndex={-1}>
@@ -143,12 +147,12 @@ export default function SchedulePreview({ row, onClose }: { row: ScheduleRow; on
                                     ))}
                                 </div>
                             )}
-                            {row.kind === 'video' && row.youtubeUrl && (
+                            {row.kind === 'video' && !row.videoUrl && row.youtubeUrl && (
                                 <a className="ak-pv__play" href={row.youtubeUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch video on YouTube">
                                     <Play size={22} fill="currentColor" />
                                 </a>
                             )}
-                            {n > 1 && (
+                            {!row.videoUrl && n > 1 && (
                                 <>
                                     <button type="button" className="ak-pv__arrow ak-pv__arrow--prev" onClick={() => go(idx - 1)} disabled={idx === 0} aria-label="Previous slide">
                                         <ChevronLeft size={20} />

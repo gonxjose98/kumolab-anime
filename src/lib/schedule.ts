@@ -76,6 +76,8 @@ export interface ScheduleRow {
     fbCaption: string | null;
     threadsCaption: string | null;
     youtubeUrl: string | null;
+    /** Pre-staged MP4 (operator-built reels): played inline in the preview. */
+    videoUrl: string | null;
     /** Where this post is expected to go when it fires (derived, best effort). */
     platforms: SchedulePlatform[];
 }
@@ -90,8 +92,8 @@ function slideUrls(imageSettings: any): string[] {
         .filter(Boolean);
 }
 
-function derivePlatforms(kind: ScheduleKind, claim: string | null): SchedulePlatform[] {
-    if (kind === 'carousel') return ['instagram', 'facebook', 'threads', 'website'];
+function derivePlatforms(kind: ScheduleKind, claim: string | null, isReel = false): SchedulePlatform[] {
+    if (kind === 'carousel' || isReel) return ['instagram', 'facebook', 'threads', 'website'];
     // Non-carousel posts: socials paused while SOCIALS_CAROUSELS_ONLY=true.
     if (process.env.SOCIALS_CAROUSELS_ONLY === 'true') return ['website'];
     // Legacy routing: key visuals are Facebook-only, the rest are IG reels.
@@ -123,7 +125,7 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
 
         const { data } = await supabaseAdmin
             .from('posts')
-            .select('id, title, slug, status, claim_type, scheduled_post_time, image, excerpt, caption_override, image_settings, youtube_video_id, youtube_url')
+            .select('id, title, slug, status, claim_type, scheduled_post_time, image, excerpt, caption_override, image_settings, social_ids, youtube_video_id, youtube_url')
             .not('scheduled_post_time', 'is', null)
             .gte('scheduled_post_time', since)
             .lte('scheduled_post_time', until)
@@ -133,7 +135,10 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
         return (data || []).map((p: any) => {
             const is = p.image_settings || {};
             const urls = slideUrls(is);
-            const kind: ScheduleKind = urls.length >= 2 ? 'carousel' : p.youtube_video_id ? 'video' : 'image';
+            const videoUrl = isHttp(p.social_ids?.staged_video_url) ? p.social_ids.staged_video_url : null;
+            // Mirrors the publisher's operator-reel exception (posts even in carousels-only mode).
+            const isReel = is.reel_source === 'kumolab-reels' && !!videoUrl;
+            const kind: ScheduleKind = urls.length >= 2 ? 'carousel' : (p.youtube_video_id || videoUrl) ? 'video' : 'image';
             const cover = kind === 'carousel' ? urls[0] : isHttp(p.image) ? p.image : null;
             const ig = typeof p.caption_override === 'string' && p.caption_override.trim() ? p.caption_override.trim() : null;
             const excerpt = typeof p.excerpt === 'string' && p.excerpt.trim() ? p.excerpt.trim() : null;
@@ -158,7 +163,8 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
             fbCaption: cap(is.captions?.facebook),
             threadsCaption: cap(is.captions?.threads),
             youtubeUrl: isHttp(p.youtube_url) ? p.youtube_url : p.youtube_video_id ? `https://www.youtube.com/watch?v=${p.youtube_video_id}` : null,
-            platforms: derivePlatforms(kind, p.claim_type ?? null),
+            videoUrl,
+            platforms: derivePlatforms(kind, p.claim_type ?? null, isReel),
             };
         });
     } catch {
