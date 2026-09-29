@@ -6,6 +6,8 @@
       (a fresh name each run, so no stale CDN copy can ever post), then inserts
       an approved posts row the admin Schedule tab shows and the publish cron
       fires (IG carousel + FB multi-photo + Threads carousel).
+  python scripts/carousel/schedule.py replace <workdir> <post_id> ["<New title>"]
+      Re-uploads an edited carousel into an already-scheduled post (same time).
   python scripts/carousel/schedule.py verify
       Checks every upcoming carousel: title set, slides 1..N in order and
       reachable, and nothing else booked within 60 minutes of it.
@@ -48,7 +50,7 @@ def add(workdir, slug, title, day, hhmm='08:30'):
     ig, fb, th = read('ig.txt'), read('fb.txt'), read('threads.txt')
     assert len(th) <= 500, 'threads.txt over 500 chars'
     for t in (ig, fb, th, title):
-        assert '—' not in t, 'em dash found'
+        assert '\u2014' not in t, 'em dash found'
     stamp = time.strftime('%Y%m%d%H%M%S')
     urls = []
     for i, f in enumerate(jpgs, 1):
@@ -69,6 +71,40 @@ def add(workdir, slug, title, day, hhmm='08:30'):
     out = json.loads(req('POST', f'{SB}/rest/v1/posts', json.dumps(row).encode(),
                          {'Content-Type': 'application/json', 'Prefer': 'return=representation'}))
     print(f'scheduled {title} | {len(urls)} slides | {et:%a %b %d %I:%M %p} ET | id {out[0]["id"]}')
+    verify()
+
+
+def upload(workdir, slug):
+    jpgs = sorted([f for f in os.listdir(workdir) if re.match(r'f-slide-\d+\.jpg$', f)], key=lambda f: int(re.findall(r'\d+', f)[0]))
+    assert 5 <= len(jpgs) <= 8, f'{len(jpgs)} slides: rule is 5-8'
+    stamp = time.strftime('%Y%m%d%H%M%S')
+    urls = []
+    for i, f in enumerate(jpgs, 1):
+        path = f'carousels/{slug}-{stamp}-{i}.jpg'
+        req('POST', f'{SB}/storage/v1/object/blog-images/{path}', open(os.path.join(workdir, f), 'rb').read(),
+            {'Content-Type': 'image/jpeg', 'x-upsert': 'true'})
+        urls.append(f'{SB}/storage/v1/object/public/blog-images/{path}')
+    return urls
+
+
+def replace(workdir, post_id, title=None):
+    """Swap an already-scheduled carousel's slides + captions (+ title) in place; keeps its time."""
+    read = lambda n: open(os.path.join(workdir, n), encoding='utf-8').read().strip()
+    ig, fb, th = read('ig.txt'), read('fb.txt'), read('threads.txt')
+    assert len(th) <= 500, 'threads.txt over 500 chars'
+    for t in (ig, fb, th, title or ''):
+        assert '\u2014' not in t, 'em dash found'
+    row = json.loads(req('GET', f'{SB}/rest/v1/posts?id=eq.{post_id}&select=slug,image_settings'))[0]
+    urls = upload(workdir, row['slug'])
+    ims = row['image_settings'] or {}
+    ims.update({'sourceUrl': urls[0], 'captions': {'facebook': fb, 'threads': th},
+                'slides': [{'sourceUrl': u, 'renderedUrl': u, 'title': '', 'excerpt': '', 'settings': {}} for u in urls]})
+    hook = ig.split('\n')[0]
+    patch = {'image': urls[0], 'caption_override': ig, 'content': hook, 'excerpt': hook, 'image_settings': ims}
+    if title: patch['title'] = title
+    out = json.loads(req('PATCH', f'{SB}/rest/v1/posts?id=eq.{post_id}', json.dumps(patch).encode(),
+                         {'Content-Type': 'application/json', 'Prefer': 'return=representation'}))
+    print(f'replaced {out[0]["title"]} | {len(urls)} slides | {out[0]["scheduled_post_time"]}')
     verify()
 
 
@@ -115,5 +151,6 @@ def verify():
 if __name__ == '__main__':
     c = sys.argv[1]
     if c == 'add': add(*sys.argv[2:])
+    elif c == 'replace': replace(*sys.argv[2:])
     elif c == 'verify': verify()
     else: print(__doc__)
