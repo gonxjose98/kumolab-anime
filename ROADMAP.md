@@ -319,7 +319,7 @@ Longer term (Jose's brand call): give KumoLab a voice, either a narrated take
 
 Built for SHARES (shares drive reach, which drives follows). Everything is data-backed
 (AniList, our own feed), never opinion, which fits "verified, above the noise".
-Look: matches the live site (sky blue, illustrated clouds, serif headlines, gold accents).
+Look: LOCKED to the Cloud Bank theme, see docs/carousel-templates/README.md (never deviate).
 Every carousel ends with a share prompt that fits its format ("Send this to someone who...").
 
 **Formats, most shareable first (starting bet; data decides after 6 weeks):**

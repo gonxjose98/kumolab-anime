@@ -36,3 +36,9 @@ autonomous pipeline trustworthy, protect quality. Jose has final authority.
 ---
 
 *Workspace active. Full repository access. Deploys: push `main` → Vercel auto-deploy.*
+
+## Carousels: Cloud Bank theme is LOCKED
+Every carousel uses the Cloud Bank theme (Jose, 2026-09-28). Spec, rules and the shared
+template: `docs/carousel-templates/` (README.md + cloud-bank.js). Never restyle or
+propose a new look unless Jose asks. Real logo only, big official art, short captions,
+posted through the engine so they show in Admin > Content > Schedule.
