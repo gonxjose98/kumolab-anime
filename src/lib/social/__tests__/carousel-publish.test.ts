@@ -111,4 +111,17 @@ describe('carousel publish (FB multi-photo + Threads carousel)', () => {
             delete process.env.SOCIALS_CAROUSELS_ONLY;
         }
     });
+
+    it('layered KumoLab reels skip YouTube unless opted in', async () => {
+        const { publishToYouTubeShorts } = await import('../youtube-publisher');
+        const spy = vi.mocked(publishToYouTubeShorts); spy.mockClear();
+        const reel: any = { id: 'p6', slug: 'r', title: 'R', image: 'https://cdn.test/c.jpg', caption_override: 'c',
+            image_settings: { reel_source: 'kumolab-reels', video_project: { tracks: [] } }, social_ids: { staged_video_url: 'https://cdn.test/r.mp4' } };
+        const p = publishToSocials(reel); await vi.runAllTimersAsync(); await p;
+        expect(spy).not.toHaveBeenCalled();
+        // Opting in sends it.
+        const optIn = { ...reel, id: 'p7', image_settings: { ...reel.image_settings, youtube: true } };
+        const p2 = publishToSocials(optIn); await vi.runAllTimersAsync(); await p2;
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
 });

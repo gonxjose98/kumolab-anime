@@ -657,7 +657,12 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         // uses for "edited". This is defense in depth alongside the
         // YOUTUBE_AUTO_PUBLISH env gate inside publishToYouTubeShorts.
         const isStudioEdited = !!(post as any).image_settings?.video_project;
-        if (isStudioEdited) {
+        // Operator-built reels carry a layered Studio project so Jose can edit them,
+        // but stay OFF YouTube unless a post opts in with image_settings.youtube = true
+        // (Jose, 2026-09-30: "No for now").
+        const isKumoReel = (post as any).image_settings?.reel_source === 'kumolab-reels';
+        const youtubeOptIn = (post as any).image_settings?.youtube === true;
+        if (isStudioEdited && (!isKumoReel || youtubeOptIn)) {
             const yt = await publishToYouTubeShorts({
                 title: post.title,
                 description: post.content,
