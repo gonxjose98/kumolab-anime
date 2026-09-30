@@ -6,6 +6,8 @@ import { getBlob } from '../store/blobStore';
 import { useMediaStore } from '../store/mediaStore';
 import type { VideoProject, Clip, Track, MediaAsset, TextStyle, Transform } from '../types';
 import { paintText } from '../paintText';
+import { ensureTextFonts } from '../studioFonts';
+import { buildCompositePlan, canUseSingleBase, clampTempo, projectDuration, srcName } from './compositeGraph';
 
 export interface ExportOptions {
     width: number;
@@ -206,7 +208,8 @@ function throwIfAborted(signal?: AbortSignal) {
  *
  * Stages: (1) normalize each video/image clip on the video track — plus black
  * gap fillers — into uniform segments; (2) concat them into a base timeline;
- * (3) overlay text PNGs; (4) mix in the audio track. Each stage is a discrete
+ * (3) overlay text PNGs; (4) mix in every unmuted audio track. Layered
+ * projects replace (1)+(2)+(4) with one compositor pass (compositeGraph.ts). Each stage is a discrete
  * ffmpeg.exec so failures are localizable and the graph stays simple.
  */
 export async function renderProject(project: VideoProject, opts: ExportOptions): Promise<Blob> {
@@ -221,88 +224,116 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
     // through the single-sequence path — see writeCaptionSequence.
     const textClips = allTextClips.filter((c) => !c.text?.words?.length);
     const captionClips = allTextClips.filter((c) => !!c.text?.words?.length);
-    const audioTrack = project.tracks.find((t) => t.kind === 'audio' && !t.muted);
+    const audioTracks = project.tracks.filter((t) => t.kind === 'audio' && !t.muted && t.clips.length);
+    // Layered edits (several visual tracks, or positioned / scaled / transparent
+    // clips) go through the compositor; a plain single-track edit keeps the
+    // original segment+concat fast path.
+    const composite = !canUseSingleBase(project);
 
     // For M3 the base sequence is the primary (top) video/image track.
     const baseTrack: Track | undefined = videoTracks.find((t) => !t.hidden);
     const baseClips = (baseTrack?.clips ?? []).slice().sort((a, b) => a.timelineStart - b.timelineStart);
-    const totalDur = Math.max(project.durationSec, baseClips.reduce((mx, c) => Math.max(mx, c.timelineStart + c.duration), 0)) || 1;
+    const totalDur = composite
+        ? projectDuration(project)
+        : Math.max(project.durationSec, baseClips.reduce((mx, c) => Math.max(mx, c.timelineStart + c.duration), 0)) || 1;
 
     report(0.02, 'Loading engine');
     throwIfAborted(signal);
 
-    // ── Stage 1: normalized segments (+ black gap fillers) ──────────────────
-    const segList: string[] = [];
-    let segIdx = 0;
-    let cursor = 0;
-    const writeBlackSeg = async (dur: number) => {
-        if (dur < 0.03) return;
-        const name = `seg_${segIdx++}.mp4`;
-        await ffmpeg.exec([
-            '-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}:d=${dur.toFixed(3)}`,
-            '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
-            '-t', dur.toFixed(3), '-map', '0:v', '-map', '1:a', ...VCODEC, ...ACODEC, '-shortest', name,
-        ]);
-        segList.push(name);
-    };
-
-    for (let i = 0; i < baseClips.length; i++) {
+    let baseName = 'base.mp4';
+    if (composite) {
+        // ── Stage 1+2 (layered): every visual layer + every audio source in one graph
+        report(0.05, 'Loading media');
+        const plan = buildCompositePlan(project, W, H, fps);
+        for (const asset of plan.files) {
+            throwIfAborted(signal);
+            const name = srcName(asset);
+            if (!(await fileExists(ffmpeg, name))) await ffmpeg.writeFile(name, await assetBytes(asset));
+        }
         throwIfAborted(signal);
-        const clip = baseClips[i];
-        if (clip.timelineStart > cursor + 0.03) await writeBlackSeg(clip.timelineStart - cursor);
-        const asset = clip.mediaId ? mediaById.get(clip.mediaId) : undefined;
-        const outName = `seg_${segIdx++}.mp4`;
-        const clipDur = clip.duration;
+        report(0.12, 'Compositing layers');
+        onLog?.(`[studio] composite graph: ${plan.filter}`);
+        await ffmpeg.exec([
+            ...plan.args, '-filter_complex', plan.filter,
+            '-map', plan.vOut, '-map', plan.aOut, '-t', totalDur.toFixed(3),
+            ...VCODEC, ...ACODEC, baseName,
+        ]);
+        if (!(await fileExists(ffmpeg, baseName))) throw new Error('Layer compositing failed (see log)');
+    } else {
+        // ── Stage 1: normalized segments (+ black gap fillers) ──────────────────
+        const segList: string[] = [];
+        let segIdx = 0;
+        let cursor = 0;
+        const writeBlackSeg = async (dur: number) => {
+            if (dur < 0.03) return;
+            const name = `seg_${segIdx++}.mp4`;
+            await ffmpeg.exec([
+                '-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}:d=${dur.toFixed(3)}`,
+                '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
+                '-t', dur.toFixed(3), '-map', '0:v', '-map', '1:a', ...VCODEC, ...ACODEC, '-shortest', name,
+            ]);
+            segList.push(name);
+        };
 
-        if (!asset) { await writeBlackSeg(clipDur); cursor = clip.timelineStart + clipDur; continue; }
+        for (let i = 0; i < baseClips.length; i++) {
+            throwIfAborted(signal);
+            const clip = baseClips[i];
+            if (clip.timelineStart > cursor + 0.03) await writeBlackSeg(clip.timelineStart - cursor);
+            const asset = clip.mediaId ? mediaById.get(clip.mediaId) : undefined;
+            const outName = `seg_${segIdx++}.mp4`;
+            const clipDur = clip.duration;
 
-        const inName = `src_${asset.id}`;
-        if (!(await fileExists(ffmpeg, inName))) await ffmpeg.writeFile(inName, await assetBytes(asset));
+            if (!asset) { await writeBlackSeg(clipDur); cursor = clip.timelineStart + clipDur; continue; }
 
-        const hasAudio = asset.kind === 'video' && asset.hasAudio && !clip.muted;
-        const vBase = asset.kind === 'image'
-            ? `${fitFilter(clip.transform, W, H)}`
-            : `trim=start=${clip.srcStart}:end=${clip.srcEnd},setpts=(PTS-STARTPTS)/${clip.speed},${fitFilter(clip.transform, W, H)}`;
-        const vChain = `[0:v]${vBase}${effectsFilter(clip)}${fadeFilter(clip, clipDur)},fps=${fps},format=yuv420p,setsar=1[v]`;
+            const inName = `src_${asset.id}`;
+            if (!(await fileExists(ffmpeg, inName))) await ffmpeg.writeFile(inName, await assetBytes(asset));
 
-        const args: string[] = [];
-        if (asset.kind === 'image') { args.push('-loop', '1', '-t', clipDur.toFixed(3), '-i', inName); }
-        else { args.push('-i', inName); }
+            const hasAudio = asset.kind === 'video' && asset.hasAudio && !clip.muted && !baseTrack?.muted;
+            const vBase = asset.kind === 'image'
+                ? `${fitFilter(clip.transform, W, H)}`
+                : `trim=start=${clip.srcStart}:end=${clip.srcEnd},setpts=(PTS-STARTPTS)/${clip.speed},${fitFilter(clip.transform, W, H)}`;
+            const vChain = `[0:v]${vBase}${effectsFilter(clip)}${fadeFilter(clip, clipDur)},fps=${fps},format=yuv420p,setsar=1[v]`;
 
-        let filter = vChain;
-        let aMap = '';
-        if (hasAudio) {
-            filter += `;[0:a]atrim=start=${clip.srcStart}:end=${clip.srcEnd},asetpts=PTS-STARTPTS,atempo=${clampTempo(clip.speed)},volume=${clip.volume}[a]`;
-            aMap = '[a]';
-        } else {
-            args.push('-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`);
-            aMap = asset.kind === 'image' ? '1:a' : '1:a';
+            const args: string[] = [];
+            if (asset.kind === 'image') { args.push('-loop', '1', '-t', clipDur.toFixed(3), '-i', inName); }
+            else { args.push('-i', inName); }
+
+            let filter = vChain;
+            let aMap = '';
+            if (hasAudio) {
+                filter += `;[0:a]atrim=start=${clip.srcStart}:end=${clip.srcEnd},asetpts=PTS-STARTPTS,atempo=${clampTempo(clip.speed)},volume=${clip.volume}[a]`;
+                aMap = '[a]';
+            } else {
+                args.push('-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`);
+                aMap = asset.kind === 'image' ? '1:a' : '1:a';
+            }
+
+            await ffmpeg.exec([
+                ...args, '-filter_complex', filter,
+                '-map', '[v]', '-map', aMap, '-t', clipDur.toFixed(3),
+                ...VCODEC, ...ACODEC, '-shortest', outName,
+            ]);
+            segList.push(outName);
+            cursor = clip.timelineStart + clipDur;
+            report(0.05 + 0.5 * ((i + 1) / Math.max(1, baseClips.length)), 'Rendering clips');
         }
 
-        await ffmpeg.exec([
-            ...args, '-filter_complex', filter,
-            '-map', '[v]', '-map', aMap, '-t', clipDur.toFixed(3),
-            ...VCODEC, ...ACODEC, '-shortest', outName,
-        ]);
-        segList.push(outName);
-        cursor = clip.timelineStart + clipDur;
-        report(0.05 + 0.5 * ((i + 1) / Math.max(1, baseClips.length)), 'Rendering clips');
+        if (segList.length === 0) { await writeBlackSeg(totalDur); }
+
+        // ── Stage 2: concat → base.mp4 ──────────────────────────────────────────
+        throwIfAborted(signal);
+        report(0.58, 'Sequencing');
+        const listTxt = segList.map((s) => `file '${s}'`).join('\n');
+        await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(listTxt));
+        await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', baseName]);
     }
-
-    if (segList.length === 0) { await writeBlackSeg(totalDur); }
-
-    // ── Stage 2: concat → base.mp4 ──────────────────────────────────────────
-    throwIfAborted(signal);
-    report(0.58, 'Sequencing');
-    const listTxt = segList.map((s) => `file '${s}'`).join('\n');
-    await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(listTxt));
-    let baseName = 'base.mp4';
-    await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', baseName]);
 
     // ── Stage 3: text overlays ──────────────────────────────────────────────
     if (textClips.length) {
         throwIfAborted(signal);
         report(0.7, 'Adding text');
+        // Text PNGs are painted once, so the brand fonts must be ready first.
+        await ensureTextFonts(textClips.map((c) => c.text));
         const inputs = ['-i', baseName];
         const parts: string[] = [];
         let last = '[0:v]';
@@ -327,6 +358,7 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
     if (captionClips.length) {
         throwIfAborted(signal);
         report(0.75, 'Rendering captions');
+        await ensureTextFonts(captionClips.map((c) => c.text));
         const layer = await writeCaptionSequence(ffmpeg, captionClips, W, H, signal);
         throwIfAborted(signal);
         report(0.8, 'Burning in captions');
@@ -347,15 +379,16 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
         }
     }
 
-    // ── Stage 4: audio track mix ────────────────────────────────────────────
-    if (audioTrack && audioTrack.clips.length) {
+    // ── Stage 4: audio track mix (the compositor already mixed everything) ──
+    const audioClips = composite ? [] : audioTracks.flatMap((t) => t.clips.filter((c) => !c.muted));
+    if (audioClips.length) {
         throwIfAborted(signal);
         report(0.85, 'Mixing audio');
         const inputs = ['-i', baseName];
         const chains: string[] = [];
         const labels: string[] = ['[0:a]'];
         let idx = 1;
-        for (const c of audioTrack.clips) {
+        for (const c of audioClips) {
             const asset = c.mediaId ? mediaById.get(c.mediaId) : undefined;
             if (!asset) continue;
             const inName = `asrc_${asset.id}`;
@@ -402,13 +435,6 @@ export async function renderProject(project: VideoProject, opts: ExportOptions):
     // SharedArrayBuffer-backed view, which is not a valid BlobPart.
     const uint = data as Uint8Array;
     return new Blob([uint.slice().buffer], { type: 'video/mp4' });
-}
-
-function clampTempo(speed: number): string {
-    // atempo supports 0.5–2.0 per stage; chain for extremes.
-    if (speed >= 0.5 && speed <= 2) return String(speed);
-    if (speed > 2) return `2.0,atempo=${(speed / 2).toFixed(3)}`;
-    return `0.5,atempo=${(speed / 0.5).toFixed(3)}`;
 }
 
 async function fileExists(ffmpeg: any, name: string): Promise<boolean> {

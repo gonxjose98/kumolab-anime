@@ -10,7 +10,7 @@ import type { TextStyle } from './types';
 const KEY = 'kumolab_text_template_v1';
 
 export interface TextTemplate {
-    style: Pick<TextStyle, 'color' | 'sizePct' | 'weight' | 'align' | 'bg' | 'strokePx' | 'strokeColor'>;
+    style: Pick<TextStyle, 'color' | 'sizePct' | 'weight' | 'align' | 'bg' | 'strokePx' | 'strokeColor' | 'fontFamily' | 'letterSpacing'>;
     xPct: number;
     yPct: number;
 }

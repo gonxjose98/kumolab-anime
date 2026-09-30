@@ -14,6 +14,7 @@ import PreviewCanvas from './PreviewCanvas';
 import Timeline from './Timeline';
 import Inspector from './Inspector';
 import ExportDialog from './ExportDialog';
+import { loadStudioFonts } from './studioFonts';
 import './studio.css';
 
 export default function StudioApp({ postId }: { postId: string }) {
@@ -85,6 +86,9 @@ export default function StudioApp({ postId }: { postId: string }) {
         }, 1200);
         return () => clearTimeout(t);
     }, [project, postId]);
+
+    // Brand fonts for text clips (preview repaints every frame, so no await).
+    useEffect(() => { void loadStudioFonts(); }, []);
 
     // Expose stores for debugging / automated verification (dev only).
     useEffect(() => {

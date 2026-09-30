@@ -13,7 +13,9 @@
  */
 
 export type TrackKind = 'video' | 'audio' | 'text' | 'image';
-export type FillStyle = 'black' | 'white' | 'blur';
+/** Background behind a `contain` clip's bars. 'none' = transparent, so layers
+ *  below show through (e.g. a clip sitting in an overlay's window). */
+export type FillStyle = 'black' | 'white' | 'blur' | 'none';
 export type FitMode = 'contain' | 'cover';
 
 /** An imported source asset. Bytes are referenced, never stored in the project. */
@@ -53,8 +55,9 @@ export interface TextStyle {
     text: string;
     color: string;                        // base colour for the whole line
     sizePct: number;                      // font size as a fraction of canvas height
-    fontFamily?: string;
+    fontFamily?: string;                  // CSS family list; see studioFonts.STUDIO_FONTS
     weight?: number;
+    letterSpacing?: number;               // tracking in em (0.1 = 10% of font size)
     align?: 'left' | 'center' | 'right';
     bg?: string | null;                   // optional caption box
     strokePx?: number;

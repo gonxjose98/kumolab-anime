@@ -64,6 +64,13 @@ export function paintText(
     ctx.save();
     ctx.font = `${ts.weight ?? 800} ${fontPx}px ${ts.fontFamily || 'Inter, system-ui, sans-serif'}`;
     ctx.textBaseline = 'middle';
+    // Optional tracking. Canvas applies letterSpacing after EVERY glyph, the
+    // last included, so measured widths carry one trailing gap; `trail` backs
+    // it out so centred / right-aligned text stays optically placed. Browsers
+    // without ctx.letterSpacing simply draw untracked.
+    const lsPx = (ts.letterSpacing ?? 0) * fontPx;
+    const trail = lsPx !== 0 && 'letterSpacing' in ctx ? lsPx : 0;
+    if (trail) (ctx as any).letterSpacing = `${lsPx}px`;
 
     const allWords = text.split(' ').filter((w) => w.length > 0);
     const active = activeIndex(ts, opts.localT);
@@ -91,7 +98,7 @@ export function paintText(
         const words = lines[li];
         const lineText = words.join(' ');
         const lineY = firstY + li * lineH;
-        const lineW = ctx.measureText(lineText).width;
+        const lineW = ctx.measureText(lineText).width - trail;
         const left = align === 'left' ? x : align === 'right' ? x - lineW : x - lineW / 2;
 
         // Optional caption background box, sized per line.
@@ -103,9 +110,10 @@ export function paintText(
 
         if (!perWord) {
             ctx.textAlign = align;
-            stroke(lineText, x, lineY);
+            const ax = x + (align === 'center' ? trail / 2 : align === 'right' ? trail : 0);
+            stroke(lineText, ax, lineY);
             ctx.fillStyle = ts.color;
-            ctx.fillText(lineText, x, lineY);
+            ctx.fillText(lineText, ax, lineY);
             wordCursor += words.length;
             continue;
         }

@@ -7,6 +7,7 @@ import { usePlaybackStore } from './store/playbackStore';
 import { saveTextTemplate } from './textTemplate';
 import { retimeWords } from './autoCaptions';
 import type { Clip, Track, ClipEffect, ClipEffectType, TextStyle } from './types';
+import { STUDIO_FONTS, fontFor } from './studioFonts';
 
 /** Tap a word to give it its own colour (highlight key words). Only shown for
  *  multi-word captions. Indices track the space-split words, matching paintText. */
@@ -47,6 +48,39 @@ function WordColors({ clipId, text, wordColors, baseColor, onChange }: {
             )}
             <span className="st-hint">Tap a word, then pick a colour to highlight it.</span>
         </div>
+    );
+}
+
+/** Font family + weight + letter spacing for a text clip (or a selection). */
+function FontControls({ ts, onChange }: { ts: TextStyle; onChange: (patch: Partial<TextStyle>) => void }) {
+    const font = fontFor(ts.fontFamily);
+    const weight = ts.weight ?? 800;
+    // Snap to the nearest weight the family actually ships.
+    const nearest = (ws: number[], w: number) => ws.reduce((a, b) => (Math.abs(b - w) < Math.abs(a - w) ? b : a), ws[0]);
+    return (
+        <>
+            <div className="st-field">
+                <span className="st-field__label">Font</span>
+                <Seg
+                    value={font.value}
+                    options={STUDIO_FONTS.map((f) => ({ value: f.value, label: f.label }))}
+                    onChange={(v) => {
+                        const next = STUDIO_FONTS.find((f) => f.value === v)!;
+                        onChange({ fontFamily: v, weight: nearest(next.weights, weight) });
+                    }}
+                />
+            </div>
+            <div className="st-field">
+                <span className="st-field__label">Weight</span>
+                <Seg
+                    value={String(nearest(font.weights, weight))}
+                    options={font.weights.map((w) => ({ value: String(w), label: String(w) }))}
+                    onChange={(v) => onChange({ weight: Number(v) })}
+                />
+            </div>
+            <RangeRow label="Letter spacing" min={0} max={0.4} step={0.01} value={ts.letterSpacing ?? 0}
+                fmt={(v) => (v ? `${Math.round(v * 100)}%` : 'off')} onChange={(v) => onChange({ letterSpacing: v || undefined })} />
+        </>
     );
 }
 
@@ -199,8 +233,9 @@ function MultiInspector({ ids }: { ids: string[] }) {
                                 </div>
                             </div>
                         </div>
-                        <RangeRow label="Size" min={0.02} max={0.2} step={0.005} value={first.text.sizePct}
+                        <RangeRow label="Size" min={0.01} max={0.2} step={0.005} value={first.text.sizePct}
                             fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setTextAll({ sizePct: v })} />
+                        <FontControls ts={first.text} onChange={setTextAll} />
                     </div>
 
                     {textClips.some((c) => c.text?.words?.length) && (
@@ -286,8 +321,9 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                                 </div>
                             </div>
                         </div>
-                        <RangeRow label="Size" min={0.02} max={0.2} step={0.005} value={clip.text.sizePct}
+                        <RangeRow label="Size" min={0.01} max={0.2} step={0.005} value={clip.text.sizePct}
                             fmt={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setText({ sizePct: v })} />
+                        <FontControls ts={clip.text} onChange={setText} />
                         <WordColors clipId={clip.id} text={clip.text.text} wordColors={clip.text.wordColors}
                             baseColor={clip.text.color} onChange={(wc) => setText({ wordColors: wc })} />
                     </div>
@@ -337,7 +373,7 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                             onClick={() => {
                                 const t = clip.text as TextStyle;
                                 saveTextTemplate({
-                                    style: { color: t.color, sizePct: t.sizePct, weight: t.weight, align: t.align, bg: t.bg, strokePx: t.strokePx, strokeColor: t.strokeColor },
+                                    style: { color: t.color, sizePct: t.sizePct, weight: t.weight, align: t.align, bg: t.bg, strokePx: t.strokePx, strokeColor: t.strokeColor, fontFamily: t.fontFamily, letterSpacing: t.letterSpacing },
                                     xPct: clip.transform?.xPct ?? 0.5,
                                     yPct: clip.transform?.yPct ?? 0.8,
                                 });
@@ -363,7 +399,7 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                                 options={[{ value: 'contain', label: 'Fit' }, { value: 'cover', label: 'Crop' }]}
                                 onChange={(v) => setTransform({ fit: v })}
                             />
-                            <span className="st-hint">{clip.transform.fit === 'contain' ? 'Whole clip visible, sides filled.' : 'Fills the frame, edges cropped.'}</span>
+                            <span className="st-hint">{clip.transform.fit === 'contain' ? 'Whole clip visible, sides filled (None = layers below show through).' : 'Fills the frame, edges cropped.'}</span>
                         </div>
                         {clip.transform.fit === 'contain' && (
                             <>
@@ -371,7 +407,7 @@ function ClipInspector({ clip, track }: { clip: Clip; track: Track }) {
                                     <span className="st-field__label">Background</span>
                                     <Seg
                                         value={clip.transform.fillStyle ?? 'blur'}
-                                        options={[{ value: 'blur', label: 'Blur' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }]}
+                                        options={[{ value: 'blur', label: 'Blur' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }, { value: 'none', label: 'None' }]}
                                         onChange={(v) => setTransform({ fillStyle: v })}
                                     />
                                 </div>

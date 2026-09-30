@@ -50,7 +50,9 @@ export default function PreviewCanvas() {
     const project = useProjectStore((s) => s.project);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const poolRef = useRef<HTMLDivElement | null>(null);
-    const videoPool = useRef<Map<string, HTMLVideoElement>>(new Map());
+    // Video AND audio-track media share one pool of media elements: both are
+    // seeked / played / paused by the same sync loop (audio just isn't drawn).
+    const videoPool = useRef<Map<string, HTMLMediaElement>>(new Map());
     const imagePool = useRef<Map<string, HTMLImageElement>>(new Map());
     // Three reusable scratch canvases for the blur ping-pong (see blurredCover).
     // Reused across frames so a 30fps preview doesn't allocate per frame.
@@ -67,15 +69,15 @@ export default function PreviewCanvas() {
         let cancelled = false;
         (async () => {
             for (const asset of project.media) {
-                if (asset.kind === 'video' && !videoPool.current.has(asset.id)) {
+                if ((asset.kind === 'video' || asset.kind === 'audio') && !videoPool.current.has(asset.id)) {
                     try {
                         const url = await media.resolve(asset);
                         if (cancelled) return;
-                        const v = document.createElement('video');
+                        const v = document.createElement(asset.kind === 'audio' ? 'audio' : 'video');
                         v.src = url;
                         v.crossOrigin = 'anonymous';
                         v.preload = 'auto';
-                        v.playsInline = true;
+                        if (v instanceof HTMLVideoElement) v.playsInline = true;
                         v.muted = true;
                         // Mount hidden in the DOM so the browser reliably decodes
                         // frames (detached video elements often won't paint to canvas).
@@ -244,7 +246,7 @@ export default function PreviewCanvas() {
             const cy = transform.yPct * ch;
 
             // Background fill for contain bars.
-            if (transform.fit === 'contain' && (dw < cw || dh < ch)) {
+            if (transform.fit === 'contain' && transform.fillStyle !== 'none' && (dw < cw || dh < ch)) {
                 if (transform.fillStyle === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
                 else if (transform.fillStyle === 'blur') {
                     const blurred = blurredCover(src, srcAspect, transform.blurIntensity ?? 60);
@@ -341,7 +343,7 @@ export default function PreviewCanvas() {
                 }
                 if (clip.mediaId && track.kind === 'video') {
                     const v = videoPool.current.get(clip.mediaId);
-                    if (v && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform, fa);
+                    if (v instanceof HTMLVideoElement && v.readyState >= 2) drawTransformed(v, v.videoWidth, v.videoHeight, clip.transform, fa);
                 } else if (clip.mediaId && track.kind === 'image') {
                     const img = imagePool.current.get(clip.mediaId);
                     if (img && img.complete) drawTransformed(img, img.naturalWidth, img.naturalHeight, clip.transform, fa);
@@ -354,7 +356,7 @@ export default function PreviewCanvas() {
         // is the playback MASTER: while playing we read the timeline clock from
         // its currentTime (see tick) instead of seeking it to a wall-clock
         // target every frame. Continuous native playback = smooth audio.
-        const pickMaster = (p: VideoProject, t: number): { v: HTMLVideoElement; clip: Clip } | null => {
+        const pickMaster = (p: VideoProject, t: number): { v: HTMLMediaElement; clip: Clip } | null => {
             const act = activeClipsAt(p, t).filter((x) => x.track.kind === 'video' && x.clip.mediaId);
             for (let i = act.length - 1; i >= 0; i--) {           // last painted = frontmost
                 const v = videoPool.current.get(act[i].clip.mediaId!);
@@ -368,7 +370,9 @@ export default function PreviewCanvas() {
             if (!p) return;
             const active = new Set<string>();
             for (const { clip, track } of activeClipsAt(p, t)) {
-                if (track.kind !== 'video' || !clip.mediaId) continue;
+                // Audio-track clips ride the same loop, so the preview is not silent
+                // when the soundtrack lives on its own track.
+                if ((track.kind !== 'video' && track.kind !== 'audio') || !clip.mediaId) continue;
                 const v = videoPool.current.get(clip.mediaId);
                 if (!v) continue;
                 active.add(clip.mediaId);
