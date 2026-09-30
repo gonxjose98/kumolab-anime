@@ -22,15 +22,15 @@ const Reel = (() => {
         .map(([x, yy, w], i) => cloud(x, yy, w, 1, i % 2 === 1, 4)).join('');
     const stars = (top, bot, n = 40) => { let s = '', r = 7; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
         for (let i = 0; i < n; i++) { const z = 2 + rnd() * 3, y = top + rnd() * (bot - top); s += `<i style="position:absolute;left:${rnd() * 1070}px;top:${y}px;width:${z}px;height:${z}px;border-radius:50%;background:#fff;opacity:${.3 + rnd() * .6};z-index:2"></i>`; } return s; };
-    const logo = (day) => `<img src="logo-trim.png" style="position:absolute;top:120px;left:50%;transform:translateX(-50%);height:86px;z-index:9;${day ? 'filter:brightness(0) saturate(100%) invert(12%) sepia(55%) saturate(2400%) hue-rotate(205deg)' : 'filter:brightness(0) invert(1)'}">`;
-    const title = (R, color, accent) => `<div style="position:absolute;left:60px;right:60px;top:${PY - 380}px;text-align:center;z-index:6;color:${color}">
+    const logo = (day) => `<img src="logo-trim.png" style="position:absolute;top:132px;left:50%;transform:translateX(-50%);height:64px;z-index:9;${day ? 'filter:brightness(0) saturate(100%) invert(12%) sepia(55%) saturate(2400%) hue-rotate(205deg)' : 'filter:brightness(0) invert(1)'}">`;
+    const title = (R, color, accent) => `<div style="position:absolute;left:60px;right:60px;top:${PY - 400}px;text-align:center;z-index:6;color:${color}">
       <div style="display:flex;justify-content:center;align-items:center;gap:14px">
-        <span style="font-size:28px;color:${accent}">&#9733;</span>
-        <span style="font-size:24px;font-weight:800;letter-spacing:.2em;color:${accent}">${R.label || 'KUMO PICKS'}</span></div>
-      <div class="serif" style="margin-top:12px;font-size:92px;font-weight:700;line-height:1">${R.line1}<br>${R.line2Html.replace(/<i>/g, `<i style="color:${accent}">`)}</div></div>`;
+        <span style="font-size:34px;color:${accent}">&#9733;</span>
+        <span style="font-size:31px;font-weight:800;letter-spacing:.2em;color:${accent}">${R.label || 'KUMO PICKS'}</span></div>
+      <div class="serif" style="margin-top:10px;font-size:112px;font-weight:700;line-height:.95">${R.line1}<br>${R.line2Html.replace(/<i>/g, `<i style="color:${accent}">`)}</div></div>`;
     const show = (R, y, acc) => `<div style="position:absolute;left:0;right:0;top:${y}px;z-index:7;display:flex;justify-content:center;align-items:baseline;gap:16px;color:${NAVY}">
-        <span class="serif" style="font-size:60px;font-weight:700;color:${acc};line-height:1">${R.show}</span>
-        <span style="font-size:21px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">${R.showSub || ''}</span></div>`;
+        <span class="serif" style="font-size:84px;font-weight:700;color:${acc};line-height:1">${R.show}</span>
+        <span style="font-size:29px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">${R.showSub || ''}</span></div>`;
     const hole = `<div style="position:absolute;left:0;top:${PY}px;width:1080px;height:${PH}px;background:transparent"></div>`;
     function widescreen() {
         const R = window.REEL, day = R.theme === 'day';
