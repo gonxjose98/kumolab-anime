@@ -23,12 +23,17 @@ const Reel = (() => {
     const stars = (top, bot, n = 40) => { let s = '', r = 7; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
         for (let i = 0; i < n; i++) { const z = 2 + rnd() * 3, y = top + rnd() * (bot - top); s += `<i style="position:absolute;left:${rnd() * 1070}px;top:${y}px;width:${z}px;height:${z}px;border-radius:50%;background:#fff;opacity:${.3 + rnd() * .6};z-index:2"></i>`; } return s; };
     const logo = (day) => `<img src="logo-trim.png" style="position:absolute;top:132px;left:50%;transform:translateX(-50%);height:64px;z-index:9;${day ? 'filter:brightness(0) saturate(100%) invert(12%) sepia(55%) saturate(2400%) hue-rotate(205deg)' : 'filter:brightness(0) invert(1)'}">`;
+    const plain = (h) => h.replace(/<[^>]+>/g, '');
+    // Auto-fit: long headlines shrink (max 112px, min 72px) so each stays ONE line inside the 960px column.
+    const fitTitle = (R) => Math.max(72, Math.min(112, Math.floor(960 / (0.45 * Math.max(plain(R.line1).length, plain(R.line2Html).length)))));
+    // Show line: one row if it fits, otherwise the detail drops under the name.
+    const showFits = (R) => 0.47 * 84 * R.show.length + 0.72 * 29 * (R.showSub || '').length + 16 <= 980;
     const title = (R, color, accent) => `<div class="kl-text" style="position:absolute;left:60px;right:60px;top:${PY - 400}px;text-align:center;z-index:6;color:${color}">
       <div style="display:flex;justify-content:center;align-items:center;gap:14px">
         <span style="font-size:34px;color:${accent}">&#9733;</span>
         <span style="font-size:31px;font-weight:800;letter-spacing:.2em;color:${accent}">${R.label || 'KUMO PICKS'}</span></div>
-      <div class="serif" style="margin-top:10px;font-size:112px;font-weight:700;line-height:.95">${R.line1}<br>${R.line2Html.replace(/<i>/g, `<i style="color:${accent}">`)}</div></div>`;
-    const show = (R, y, acc) => `<div class="kl-text" style="position:absolute;left:0;right:0;top:${y}px;z-index:7;display:flex;justify-content:center;align-items:baseline;gap:16px;color:${NAVY}">
+      <div class="serif" style="margin-top:10px;font-size:${fitTitle(R)}px;font-weight:700;line-height:.95;white-space:nowrap">${R.line1}<br>${R.line2Html.replace(/<i>/g, `<i style="color:${accent}">`)}</div></div>`;
+    const show = (R, y, acc) => `<div class="kl-text" style="position:absolute;left:0;right:0;top:${showFits(R) ? y : y - 30}px;z-index:7;display:flex;${showFits(R) ? 'justify-content:center;align-items:baseline;gap:16px' : 'flex-direction:column;align-items:center;gap:4px'};color:${NAVY}">
         <span class="serif" style="font-size:84px;font-weight:700;color:${acc};line-height:1">${R.show}</span>
         <span style="font-size:29px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">${R.showSub || ''}</span></div>`;
     const hole = `<div style="position:absolute;left:0;top:${PY}px;width:1080px;height:${PH}px;background:transparent"></div>`;
