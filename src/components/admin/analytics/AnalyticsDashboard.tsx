@@ -8,12 +8,12 @@ import {
 import type { AnalyticsData, TopPost } from '@/lib/analytics/dashboard';
 import type { ViewPlatform } from '@/lib/analytics/daily-views';
 
-const AXIS = 'rgba(52,70,102,0.85)';
+const AXIS = 'rgba(112,130,165,0.95)'; // mid-tone: readable in light and dark
 const GRID = 'rgba(125,140,168,0.16)';
 
 // Shown platforms, in tile + stack order. FB and TikTok stay hidden until they pull real views.
 const PLATFORMS: { key: ViewPlatform; label: string; color: string }[] = [
-    { key: 'threads', label: 'Threads', color: '#24365c' },
+    { key: 'threads', label: 'Threads', color: '#6d7fc4' },
     { key: 'instagram', label: 'Instagram', color: '#e0457b' },
     { key: 'website', label: 'Website', color: '#16a3a6' },
     { key: 'x', label: 'X', color: '#9aa3b2' },

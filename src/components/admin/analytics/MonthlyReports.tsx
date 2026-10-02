@@ -99,7 +99,7 @@ export default function MonthlyReports({ reports }: { reports: MonthlyReportRow[
 
     // Hero card mirrors the Live tab: total views + one tile per platform.
     const tiles: { key: string; label: string; color: string; views: string | null; followers?: string }[] = [
-        { key: 'threads', label: 'Threads', color: '#24365c', views: 'threads.views', followers: 'threads.followers' },
+        { key: 'threads', label: 'Threads', color: '#6d7fc4', views: 'threads.views', followers: 'threads.followers' },
         { key: 'instagram', label: 'Instagram', color: '#e0457b', views: 'instagram.views', followers: 'instagram.followers' },
         { key: 'website', label: 'Website', color: '#16a3a6', views: 'website.pageviews' },
         { key: 'x', label: 'X', color: '#9aa3b2', views: null },
