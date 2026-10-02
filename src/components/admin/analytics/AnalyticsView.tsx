@@ -4,6 +4,8 @@ import { useState } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import MonthlyReports from './MonthlyReports';
 import SponsorGenerator from './SponsorGenerator';
+import SyncMetricsButton from './SyncMetricsButton';
+import SnapshotButton from './SnapshotButton';
 import type { AnalyticsData } from '@/lib/analytics/dashboard';
 import type { MonthlyReportRow } from '@/lib/analytics/monthly-report';
 
@@ -25,12 +27,20 @@ export default function AnalyticsView({ live, reports }: { live: AnalyticsData; 
     const [view, setView] = useState<View>('live');
     return (
         <div className="flex flex-col gap-4 min-w-0">
-            <div className="ak-pills ak-no-print" style={{ alignSelf: 'flex-start' }}>
-                {TABS.map((t) => (
-                    <button key={t.key} className={`ak-pill ${view === t.key ? 'ak-pill--active' : ''}`} onClick={() => setView(t.key)}>
-                        {t.label}
-                    </button>
-                ))}
+            <div className="ak-anctrl ak-no-print">
+                <div className="ak-pills">
+                    {TABS.map((t) => (
+                        <button key={t.key} className={`ak-pill ${view === t.key ? 'ak-pill--active' : ''}`} onClick={() => setView(t.key)}>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+                {view === 'live' && (
+                    <div className="ak-anctrl__right">
+                        <SyncMetricsButton />
+                        <SnapshotButton />
+                    </div>
+                )}
             </div>
             {view === 'live' && <AnalyticsDashboard data={live} />}
             {view === 'monthly' && <MonthlyReports reports={reports} />}

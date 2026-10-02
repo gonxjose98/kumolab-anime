@@ -11,10 +11,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const rangeDays = RANGE_MAP[sp?.range ?? '30'] ?? 30;
     const [data, reports] = await Promise.all([getAnalyticsData(rangeDays), getMonthlyReports()]);
     return (
-        <div className="max-w-6xl mx-auto">
-            <p className="ak-caption" style={{ marginBottom: 14 }}>
-                Live realtime dashboard · or per-platform Monthly Reports you can print to PDF
-            </p>
+        <div className="w-full">
             <AnalyticsView live={data} reports={reports} />
         </div>
     );

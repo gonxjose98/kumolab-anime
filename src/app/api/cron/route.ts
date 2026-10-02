@@ -8,6 +8,7 @@ import { generateIntelImage } from '@/lib/engine/image-processor';
 import { refreshMetaToken } from '@/lib/engine/token-health';
 import { publishToSocials } from '@/lib/social/publisher';
 import { syncSocialMetrics } from '@/lib/social/metrics-sync';
+import { refreshRecentDailyViews } from '@/lib/analytics/daily-views';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { withRun } from '@/lib/engine/worker-runs';
 
@@ -291,7 +292,9 @@ async function dispatch(
         const raw = Number(searchParams.get('limit'));
         const limit = Number.isFinite(raw) && raw > 0 ? Math.min(Math.trunc(raw), 300) : 150;
         const result = await syncSocialMetrics(limit);
-        return { success: result.ok, worker: 'metrics-sync', ...result };
+        // Daily views per platform for the Analytics chart (last 3 days, idempotent).
+        const dailyViews = await refreshRecentDailyViews(3).catch((e) => ({ error: String(e?.message || e) }));
+        return { success: result.ok, worker: 'metrics-sync', ...result, dailyViews };
     }
 
     // Monthly analytics snapshot → monthly_metrics. Scheduled for 00:30 UTC

@@ -1,517 +1,251 @@
 'use client';
 
-import { useState, useTransition, Fragment } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
 } from 'recharts';
-import { ChevronDown } from 'lucide-react';
 import type { AnalyticsData, TopPost } from '@/lib/analytics/dashboard';
-import SyncMetricsButton from './SyncMetricsButton';
-import SnapshotButton from './SnapshotButton';
+import type { ViewPlatform } from '@/lib/analytics/daily-views';
 
-const GOLD = '#d9a441';
-const BLUE = '#3a8be0';
-const GREEN = '#35a877';
-const AXIS = 'rgba(125,140,168,0.7)';
-const GRID = 'rgba(125,140,168,0.18)';
+const AXIS = 'rgba(52,70,102,0.85)';
+const GRID = 'rgba(125,140,168,0.16)';
 
+// Shown platforms, in tile + stack order. FB and TikTok stay hidden until they pull real views.
+const PLATFORMS: { key: ViewPlatform; label: string; color: string }[] = [
+    { key: 'threads', label: 'Threads', color: '#24365c' },
+    { key: 'instagram', label: 'Instagram', color: '#e0457b' },
+    { key: 'website', label: 'Website', color: '#16a3a6' },
+    { key: 'x', label: 'X', color: '#9aa3b2' },
+];
+// Not wired up yet: shown grayed so the full picture is always on screen.
+const COMING: { key: string; label: string; note: string }[] = [
+    { key: 'facebook', label: 'Facebook', note: 'Paused while we fix reach' },
+    { key: 'tiktok', label: 'TikTok', note: 'New account warming up' },
+    { key: 'youtube', label: 'YouTube', note: 'Needs a channel connected' },
+];
+const RANGES = [{ key: '30', label: '30 days' }, { key: '60', label: '60 days' }, { key: '90', label: '90 days' }, { key: 'all', label: 'All time' }];
 const CLAIM_LABEL: Record<string, string> = {
     TRAILER_DROP: 'Trailer', NEW_KEY_VISUAL: 'Key Visual', NEW_SEASON_CONFIRMED: 'New Season',
     DATE_ANNOUNCED: 'Release Date', DELAY: 'Delay', CAST_ADDITION: 'Cast', STAFF_UPDATE: 'Staff', OTHER: 'News',
 };
-const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-US'));
-const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
-const money = (n: number, ccy: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: ccy || 'USD' }).format(n || 0);
 
-type PlatformKey = 'all' | 'website' | 'instagram' | 'facebook' | 'threads';
-const PLATFORMS: { key: PlatformKey; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'website', label: 'Website' },
-    { key: 'instagram', label: 'Instagram' },
-    { key: 'facebook', label: 'Facebook' },
-    { key: 'threads', label: 'Threads' },
-];
-const RANGES: { key: string; label: string }[] = [
-    { key: '7', label: '7d' }, { key: '30', label: '30d' }, { key: '60', label: '60d' }, { key: '90', label: '90d' }, { key: 'all', label: 'All' },
-];
+const DASH = String.fromCharCode(8212); // empty-value placeholder
+const fmt = (n: number | null | undefined) => (n == null ? DASH : n.toLocaleString('en-US'));
+const compact = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
+const pctChange = (cur: number, prev: number | undefined) => (prev && prev > 0 ? ((cur - prev) / prev) * 100 : null);
 
 export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
-    const { ig, fb, threads, web, viewsSeries, pipeline, topPosts, claimPerf, revenue, range, socialDays, igViewsRange, siteViewsRange } = data;
-    const snap = ig.snapshot;
-    const igEngRate = snap.totalInteractions28d && snap.reach28d
-        ? `${((snap.totalInteractions28d / snap.reach28d) * 100).toFixed(1)}%` : '—';
-    // Meta caps IG/FB/Threads account insights at a 30-day window, so past 30d the
-    // social numbers physically can't widen. Label them "30d max" (not a plain "30d")
-    // when a longer range is picked, so the selection doesn't look ignored — the
-    // website / posts / revenue metrics below still follow the chosen range.
-    const socialCapped = range === 0 || range > 30;
-    const socialLabel = socialCapped ? '30d max' : `${socialDays}d`;
-    const rangeShort = range === 0 ? 'all-time' : `${range}d`;
-    // Past the cap, IG views can still follow the range: per-post insights are
-    // lifetime, so summing them across the range's posts gives a true total.
-    // Reach can't be summed (unique accounts), so it stays on the 30d window.
-    const igViews = igViewsRange ?? snap.views28d;
-    const igViewsLabel = igViewsRange != null ? `Views · ${rangeShort}` : `Views · ${socialLabel}`;
-
+    const { views, ig, threads, topPosts, claimPerf, range } = data;
     const router = useRouter();
     const [pending, startTransition] = useTransition();
-    const [platform, setPlatform] = useState<PlatformKey>('all');
+    const [focus, setFocus] = useState<ViewPlatform | null>(null);
     const activeRange = range === 0 ? 'all' : String(range);
     const rangeLabel = range === 0 ? 'all time' : `last ${range} days`;
     const setRange = (key: string) => startTransition(() => router.push(`/admin/analytics?range=${key}`));
 
-    const show = {
-        all: platform === 'all',
-        ig: platform === 'all' || platform === 'instagram',
-        fb: platform === 'all' || platform === 'facebook',
-        threads: platform === 'all' || platform === 'threads',
-        website: platform === 'all' || platform === 'website',
-        revenue: platform === 'all',
-        avgType: platform === 'all',
-        igRecent: platform === 'all' || platform === 'instagram',
+    const shown = PLATFORMS.filter((p) => focus === null || p.key === focus);
+    const headline = focus ? views.totals[focus] : views.totals.total;
+    const headlinePrev = focus ? views.prevTotals?.[focus] : views.prevTotals?.total;
+    const headlineDelta = pctChange(headline, headlinePrev);
+    const followers: Partial<Record<ViewPlatform, number | null>> = {
+        instagram: ig.snapshot.followers, threads: threads.followers,
     };
-    const anyCard = show.ig || show.fb || show.threads;
-
-    // When a single platform is filtered, lead with a comprehensive KPI band so
-    // every platform reads as equally complete (not "Website = one chart" while
-    // "Instagram = a full card"). Each tile degrades to "—" honestly.
-    const kpiBand: { label: string; value: string }[] =
-        platform === 'website'
-            ? [
-                { label: `Site views · ${rangeShort}`, value: web.ok ? fmt(siteViewsRange) : '—' },
-                { label: 'Views · 7d', value: web.ok ? fmt(web.views7d) : '—' },
-                { label: 'Views · 30d', value: web.ok ? fmt(web.views30d) : '—' },
-                { label: 'Bots filtered · 30d', value: web.ok ? fmt(web.botViews30d) : '—' },
-                { label: 'Referral sources', value: web.ok ? fmt(web.topReferrers.length) : '—' },
-                { label: 'Top page views', value: web.ok && web.topPaths[0] ? fmt(web.topPaths[0].views) : '—' },
-                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
-                { label: 'Tracked pages', value: web.ok ? fmt(web.topPaths.length) : '—' },
-            ]
-            : platform === 'instagram'
-            ? [
-                { label: 'Followers', value: fmt(snap.followers) },
-                { label: `Reach · ${socialLabel}`, value: fmt(snap.reach28d) },
-                { label: igViewsLabel, value: fmt(igViews) },
-                { label: `Interactions · ${socialLabel}`, value: fmt(snap.totalInteractions28d) },
-                { label: 'Eng. rate', value: igEngRate },
-                { label: `Profile visits · ${socialLabel}`, value: fmt(snap.profileViews28d) },
-                { label: `Website clicks · ${socialLabel}`, value: fmt(snap.websiteClicks28d) },
-                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
-            ]
-            : platform === 'facebook'
-            ? [
-                { label: 'Followers', value: fmt(fb.followers) },
-                { label: `Views · ${socialLabel}`, value: fmt(fb.views28d) },
-                { label: `Engagements · ${socialLabel}`, value: fmt(fb.engagement28d) },
-                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
-            ]
-            : platform === 'threads'
-            ? [
-                { label: 'Followers', value: fmt(threads.followers) },
-                { label: `Views · ${socialLabel}`, value: fmt(threads.views28d) },
-                { label: `Engagements · ${socialLabel}`, value: fmt(threads.engagement28d) },
-                { label: `Posts published · ${rangeShort}`, value: fmt(data.postedTotal) },
-            ]
-            : [];
 
     return (
-        <div className="max-w-6xl mx-auto flex flex-col gap-6 min-w-0 w-full">
-            {/* Controls: platform filter · time range · sync */}
-            <div className="ak-anctrl">
-                <div className="ak-pills" style={{ flexWrap: 'wrap' }}>
-                    {PLATFORMS.map((p) => (
-                        <button key={p.key} className={`ak-pill ${platform === p.key ? 'ak-pill--active' : ''}`} onClick={() => setPlatform(p.key)}>{p.label}</button>
-                    ))}
-                </div>
-                <div className="ak-anctrl__right">
-                    <div className={`ak-pills ${pending ? 'ak-pills--busy' : ''}`} style={{ flexWrap: 'wrap' }}>
-                        {RANGES.map((r) => (
-                            <button key={r.key} className={`ak-pill ${activeRange === r.key ? 'ak-pill--active' : ''}`} onClick={() => setRange(r.key)} disabled={pending}>{r.label}</button>
-                        ))}
-                    </div>
-                    <SyncMetricsButton />
-                    <SnapshotButton />
-                </div>
-            </div>
-
-            {/* Meta 30-day cap note — only when the picked range exceeds it and a
-                social card is on screen, so the "30d max" labels make sense. */}
-            {socialCapped && anyCard && (
-                <p className="ak-caption" style={{ marginTop: -8 }}>
-                    {igViewsRange != null
-                        ? 'Meta caps account insights at a 30-day window, so Instagram views here are summed from per-post lifetime insights to cover your full range. IG reach, Facebook and Threads stay at 30 days.'
-                        : 'Instagram, Facebook and Threads limit account insights to a 30-day window, so those cards stay at 30 days. Website, posts and revenue follow your selected range.'}
-                </p>
-            )}
-
-            {/* All-platforms overview: the three social snapshot cards */}
-            {show.all && anyCard && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <PlatformCard name="Instagram" ok={snap.ok} reason={snap.reason} followers={snap.followers} views={igViews} viewsLabel={igViewsLabel} eng={igEngRate} engLabel="Eng. rate" />
-                    <PlatformCard name="Facebook" ok={fb.ok} reason={fb.reason} followers={fb.followers} views={fb.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(fb.engagement28d)} engLabel="Engagements" />
-                    <PlatformCard name="Threads" ok={threads.ok} reason={threads.reason} followers={threads.followers} views={threads.views28d} viewsLabel={`Views · ${socialLabel}`} eng={fmt(threads.engagement28d)} engLabel="Engagements" />
-                </div>
-            )}
-
-            {/* Single-platform view: a comprehensive KPI band up top so every
-                platform reads as equally complete. */}
-            {!show.all && kpiBand.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {kpiBand.map((k) => <Kpi key={k.label} label={k.label} value={k.value} />)}
-                </div>
-            )}
-
-            {/* Reach + site views KPIs (range-aware) */}
-            {show.all && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Kpi label={`IG reach · ${socialLabel}`} value={fmt(snap.reach28d)} />
-                    <Kpi label={`IG interactions · ${socialLabel}`} value={fmt(snap.totalInteractions28d)} />
-                    <Kpi label={`Site views · ${rangeShort}`} value={web.ok ? fmt(siteViewsRange) : '—'} />
-                    <Kpi label={`Posts published · ${rangeShort}`} value={fmt(data.postedTotal)} />
-                </div>
-            )}
-
-            {/* Website traffic trend */}
-            {show.website && (
-                <div className="ak-card">
-                    <div className="flex items-baseline justify-between mb-3">
-                        <span className="ak-overline">Website views · {rangeLabel}</span>
-                        <span className="ak-caption">{web.ok ? `${fmt(web.botViews30d)} bots filtered` : ''}</span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={180}>
-                        <AreaChart data={viewsSeries} margin={{ top: 4, right: 6, left: -18, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="ak-v" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={BLUE} stopOpacity={0.5} />
-                                    <stop offset="100%" stopColor={BLUE} stopOpacity={0.04} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke={GRID} vertical={false} />
-                            <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 10 }} interval={Math.max(1, Math.floor(viewsSeries.length / 8))} tickLine={false} axisLine={false} />
-                            <YAxis tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} axisLine={false} width={40} />
-                            <Tooltip {...tooltip} />
-                            <Area type="monotone" dataKey="views" stroke={BLUE} strokeWidth={2} fill="url(#ak-v)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
-
-            {/* Website sources + pages (single-platform Website view) */}
-            {platform === 'website' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="ak-an flex flex-col gap-5 min-w-0 w-full">
+            <div className="ak-an__grid">
+                {/* ── Main column: total, platform tiles, chart ── */}
+                <div className="flex flex-col gap-5 min-w-0">
                     <div className="ak-card">
-                        <div className="ak-overline mb-3">Top pages</div>
-                        {web.ok && web.topPaths.length > 0 ? (
-                            <ul className="flex flex-col gap-2">
-                                {web.topPaths.slice(0, 8).map((r) => <TrafficBar key={r.label} row={r} max={web.topPaths[0].views} />)}
-                            </ul>
-                        ) : <Empty text="No page views recorded in range yet." />}
-                    </div>
-                    <div className="ak-card">
-                        <div className="ak-overline mb-3">Top sources</div>
-                        {web.ok && web.topReferrers.length > 0 ? (
-                            <ul className="flex flex-col gap-2">
-                                {web.topReferrers.map((r) => <TrafficBar key={r.label} row={r} max={web.topReferrers[0].views} />)}
-                            </ul>
-                        ) : <Empty text="No referrers yet — traffic is mostly direct." />}
-                    </div>
-                </div>
-            )}
-
-            {/* Revenue */}
-            {show.revenue && (
-                <div className="ak-card">
-                    <div className="flex items-baseline justify-between mb-3">
-                        <span className="ak-overline">Revenue · {rangeLabel}</span>
-                        <span className="ak-caption">{revenue.ok ? 'live from Printful orders' : 'store not connected'}</span>
-                    </div>
-                    {revenue.orders === 0 ? (
-                        <Empty text={revenue.ok
-                            ? 'No orders yet. Revenue and order trends appear here the moment the store starts taking payments.'
-                            : 'Store not connected yet.'} />
-                    ) : (
-                        <>
-                            <div className="grid grid-cols-3 gap-3 mb-4">
-                                <Kpi label="Revenue" value={money(revenue.total, revenue.currency)} />
-                                <Kpi label="Orders" value={fmt(revenue.orders)} />
-                                <Kpi label="Avg order" value={money(revenue.aov, revenue.currency)} />
+                        <div className="ak-an__hero">
+                            <div>
+                                <div className="ak-overline">{focus ? `${PLATFORMS.find((p) => p.key === focus)?.label} views` : 'Total views'} · {rangeLabel}</div>
+                                <div className="ak-an__big">{fmt(headline)}</div>
+                                <Delta value={headlineDelta} suffix={range === 0 ? '' : `vs previous ${range} days`} />
                             </div>
-                            <ResponsiveContainer width="100%" height={160}>
-                                <BarChart data={revenue.series} margin={{ top: 4, right: 6, left: -12, bottom: 0 }}>
-                                    <CartesianGrid stroke={GRID} vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 10 }} interval={Math.max(1, Math.floor(revenue.series.length / 8))} tickLine={false} axisLine={false} />
-                                    <YAxis tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} axisLine={false} width={48} tickFormatter={(v: any) => money(Number(v), revenue.currency)} />
-                                    <Tooltip {...tooltip} formatter={(v: any) => [money(Number(v), revenue.currency), 'revenue']} />
-                                    <Bar dataKey="amount" fill={GREEN} radius={[4, 4, 0, 0]} />
+                            <div className="ak-an__herotools">
+                                <div className={`ak-pills ${pending ? 'ak-pills--busy' : ''}`}>
+                                    {RANGES.map((r) => (
+                                        <button key={r.key} className={`ak-pill ${activeRange === r.key ? 'ak-pill--active' : ''}`} onClick={() => setRange(r.key)} disabled={pending}>{r.label}</button>
+                                    ))}
+                                </div>
+                                {focus && <button className="ak-an__link" onClick={() => setFocus(null)}>Show all platforms</button>}
+                            </div>
+                        </div>
+
+                        <div className="ak-an__tiles">
+                            {PLATFORMS.map((p) => {
+                                const v = views.totals[p.key];
+                                const has = views.hasData[p.key];
+                                const share = views.totals.total > 0 ? Math.round((v / views.totals.total) * 100) : 0;
+                                const active = focus === p.key;
+                                return (
+                                    <button
+                                        key={p.key}
+                                        className={`ak-an__tile ${active ? 'ak-an__tile--active' : ''} ${!has ? 'ak-an__tile--off' : ''}`}
+                                        onClick={() => has && setFocus(active ? null : p.key)}
+                                        disabled={!has}
+                                        style={{ ['--tile' as any]: p.color }}
+                                    >
+                                        <span className="ak-an__tilehead"><i />{p.label}</span>
+                                        {has ? (
+                                            <>
+                                                <span className="ak-an__tilenum">{compact(v)}</span>
+                                                <span className="ak-an__tilesub">
+                                                    <Delta value={pctChange(v, views.prevTotals?.[p.key])} small />
+                                                    <span>{share}% of total</span>
+                                                </span>
+                                                {followers[p.key] != null && <span className="ak-caption">{fmt(followers[p.key])} followers</span>}
+                                            </>
+                                        ) : (
+                                            <span className="ak-caption" style={{ marginTop: 6 }}>{p.key === 'x' ? 'Waiting on the X API' : 'No data yet'}</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                            {COMING.map((c) => (
+                                <div key={c.key} className="ak-an__tile ak-an__tile--off">
+                                    <span className="ak-an__tilehead"><i />{c.label}</span>
+                                    <span className="ak-caption" style={{ marginTop: 6 }}>{c.note}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="ak-card">
+                        <div className="flex items-baseline justify-between mb-3">
+                            <span className="ak-overline">Views per day · {rangeLabel}</span>
+                            <span className="ak-an__legend">
+                                {shown.filter((p) => views.hasData[p.key]).map((p) => (
+                                    <span key={p.key}><i style={{ background: p.color }} />{p.label}</span>
+                                ))}
+                            </span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={250}>
+                            <AreaChart data={views.series} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                                <defs>
+                                    {PLATFORMS.map((p) => (
+                                        <linearGradient key={p.key} id={`ak-an-${p.key}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={p.color} stopOpacity={0.7} />
+                                            <stop offset="100%" stopColor={p.color} stopOpacity={0.18} />
+                                        </linearGradient>
+                                    ))}
+                                </defs>
+                                <CartesianGrid stroke={GRID} vertical={false} />
+                                <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 11 }} interval={Math.max(0, Math.floor(views.series.length / 10))} tickLine={false} axisLine={false} />
+                                <YAxis tick={{ fill: AXIS, fontSize: 11 }} tickLine={false} axisLine={false} width={48} tickFormatter={compact} />
+                                <Tooltip {...tooltip} formatter={(v: any, name: any) => [fmt(Number(v)), PLATFORMS.find((p) => p.key === name)?.label || name]} />
+                                {shown.filter((p) => views.hasData[p.key]).map((p) => (
+                                    <Area key={p.key} type="monotone" dataKey={p.key} stackId="views" stroke={p.color} strokeWidth={2} fill={`url(#ak-an-${p.key})`} />
+                                ))}
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* ── Side column: glanceable cards ── */}
+                <aside className="flex flex-col gap-5 min-w-0">
+                    <TopPostsCard posts={topPosts} rangeLabel={rangeLabel} />
+
+                    <div className="ak-card">
+                        <div className="ak-overline mb-3">What performs · avg views by type</div>
+                        {claimPerf.length === 0 ? <Empty text="No performance data synced yet." /> : (
+                            <ResponsiveContainer width="100%" height={Math.max(140, claimPerf.length * 30)}>
+                                <BarChart data={claimPerf.map((c) => ({ ...c, name: CLAIM_LABEL[c.claim] || c.claim }))} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                                    <XAxis type="number" hide />
+                                    <YAxis type="category" dataKey="name" tick={{ fill: AXIS, fontSize: 11 }} width={84} tickLine={false} axisLine={false} />
+                                    <Tooltip {...tooltip} formatter={(v: any) => [fmt(v), 'avg views']} />
+                                    <Bar dataKey="avgViews" radius={[0, 5, 5, 0]}>
+                                        {claimPerf.map((_, i) => <Cell key={i} fill={i === 0 ? '#d9a441' : '#3a8be0'} />)}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
-                        </>
-                    )}
-                </div>
-            )}
-
-            {/* Top performing posts */}
-            <TopPostsCard posts={topPosts} platform={platform} rangeLabel={rangeLabel} />
-
-            {/* Content that performs + IG top recent */}
-            {(show.avgType || show.igRecent) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {show.avgType && (
-                        <div className="ak-card">
-                            <div className="ak-overline mb-3">Which content performs · avg views by type</div>
-                            {claimPerf.length === 0 ? <Empty text="No performance data synced yet." /> : (
-                                <ResponsiveContainer width="100%" height={Math.max(160, claimPerf.length * 34)}>
-                                    <BarChart data={claimPerf.map((c) => ({ ...c, name: CLAIM_LABEL[c.claim] || c.claim }))} layout="vertical" margin={{ top: 0, right: 12, left: 6, bottom: 0 }}>
-                                        <CartesianGrid stroke={GRID} horizontal={false} />
-                                        <XAxis type="number" tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={compact} />
-                                        <YAxis type="category" dataKey="name" tick={{ fill: AXIS, fontSize: 11 }} width={78} tickLine={false} axisLine={false} />
-                                        <Tooltip {...tooltip} formatter={(v: any) => [fmt(v), 'avg views']} />
-                                        <Bar dataKey="avgViews" radius={[0, 5, 5, 0]}>
-                                            {claimPerf.map((_, i) => <Cell key={i} fill={i === 0 ? GOLD : BLUE} />)}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
-                        </div>
-                    )}
-
-                    {show.igRecent && (
-                        <div className="ak-card">
-                            <div className="flex items-baseline justify-between mb-3">
-                                <span className="ak-overline">Instagram · top recent</span>
-                                {!snap.ok && <span className="ak-caption" style={{ color: 'var(--sun)' }}>IG not connected</span>}
-                            </div>
-                            {ig.topRecent.length === 0 ? <Empty text={snap.reason || 'No recent posts to score.'} /> : (
-                                <ul className="flex flex-col gap-2">
-                                    {ig.topRecent.slice(0, 6).map((m) => (
-                                        <li key={m.id} className="ak-uprow" style={{ padding: '8px 10px' }}>
-                                            {m.thumbnail ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img src={m.thumbnail} alt="" className="w-10 h-10 rounded object-cover shrink-0" style={{ border: '1px solid var(--line)' }} />
-                                            ) : <div className="w-10 h-10 rounded shrink-0" style={{ background: 'var(--surface-2)' }} />}
-                                            <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="ak-body-sm truncate flex-1 hover:underline" style={{ color: 'var(--ink)' }}>
-                                                {m.caption || '(no caption)'}
-                                            </a>
-                                            <span className="ak-body-sm shrink-0" style={{ fontWeight: 700, color: 'var(--ink)' }}>{compact(m.views)}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Pipeline + website sources (secondary, collapsible) */}
-            {show.all && (
-                <details className="ak-card ak-card--flush">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
-                        <span className="ak-overline">Pipeline &amp; sources</span>
-                        <span className="ak-caption">Show</span>
-                    </summary>
-                    <div className="p-5 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div>
-                            <div className="ak-overline mb-3">Posts published · daily</div>
-                            {pipeline.length === 0 ? <Empty text="No pipeline history." /> : (
-                                <ResponsiveContainer width="100%" height={150}>
-                                    <BarChart data={pipeline} margin={{ top: 4, right: 6, left: -20, bottom: 0 }}>
-                                        <CartesianGrid stroke={GRID} vertical={false} />
-                                        <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 10 }} interval={4} tickLine={false} axisLine={false} />
-                                        <YAxis tick={{ fill: AXIS, fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
-                                        <Tooltip {...tooltip} />
-                                        <Bar dataKey="published" fill={GOLD} radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
-                        </div>
-                        <div>
-                            <div className="ak-overline mb-3">Top sources</div>
-                            {web.ok && web.topReferrers.length > 0 ? (
-                                <ul className="flex flex-col gap-2">
-                                    {web.topReferrers.map((r) => (
-                                        <TrafficBar key={r.label} row={r} max={web.topReferrers[0].views} />
-                                    ))}
-                                </ul>
-                            ) : <Empty text="No referrers yet — traffic is mostly direct." />}
-                        </div>
+                        )}
                     </div>
-                </details>
-            )}
+                </aside>
+            </div>
         </div>
     );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Delta({ value, suffix, small }: { value: number | null; suffix?: string; small?: boolean }) {
+    if (value == null) return small ? null : <div className="ak-caption">{suffix ? 'No previous period to compare' : ''}</div>;
+    const up = value >= 0;
+    const text = `${up ? '▲' : '▼'} ${Math.abs(value).toFixed(Math.abs(value) < 10 ? 1 : 0)}%`;
+    if (small) return <span className={up ? 'ak-an__up' : 'ak-an__down'}>{text}</span>;
     return (
-        <div className="ak-stat">
-            <div className="ak-overline">{label}</div>
-            <div className="ak-stat__num">{value}</div>
-            {sub && <div className="ak-caption">{sub}</div>}
+        <div className="ak-caption" style={{ marginTop: 4 }}>
+            <span className={up ? 'ak-an__up' : 'ak-an__down'} style={{ fontWeight: 700 }}>{text}</span> {suffix}
         </div>
     );
 }
 
-function PlatformCard({ name, ok, reason, followers, views, viewsLabel, eng, engLabel }: {
-    name: string; ok: boolean; reason?: string;
-    followers: number | null; views: number | null; viewsLabel: string; eng: string; engLabel: string;
-}) {
+function PostRow({ p, i }: { p: TopPost; i: number }) {
+    return (
+        <a href={`/blog/${p.slug}`} target="_blank" rel="noopener noreferrer" className="ak-an__row" title={`Site ${fmt(p.webViews)} · IG ${fmt(p.ig)} · Threads ${fmt(p.th)}`}>
+            <span className="ak-an__rank">{i + 1}</span>
+            {p.image
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={p.image} alt="" />
+                : <span className="ak-an__thumb" />}
+            <span className="ak-an__rowtitle">{p.title}</span>
+            <strong>{compact(p.webViews + p.views)}</strong>
+        </a>
+    );
+}
+
+function TopPostsCard({ posts, rangeLabel }: { posts: TopPost[]; rangeLabel: string }) {
+    const [open, setOpen] = useState(false);
+    const ranked = [...posts].sort((a, b) => (b.webViews + b.views) - (a.webViews + a.views));
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open]);
     return (
         <div className="ak-card">
             <div className="flex items-baseline justify-between mb-3">
-                <span className="ak-overline">{name}</span>
-                {!ok && <span className="ak-caption" title={reason} style={{ color: 'var(--sun)' }}>not connected</span>}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-                <MiniStat label="Followers" value={fmt(followers)} />
-                <MiniStat label={viewsLabel} value={fmt(views)} />
-                <MiniStat label={engLabel} value={eng} />
-            </div>
-        </div>
-    );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-    return (
-        <div>
-            <div style={{ fontFamily: 'var(--ak-display)', fontWeight: 800, fontSize: '1.15rem', lineHeight: 1.1, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-            <div className="ak-caption" style={{ marginTop: 2 }}>{label}</div>
-        </div>
-    );
-}
-
-// Which per-post metric a platform filter ranks + shows in the Social column.
-const PLATFORM_KEY: Record<PlatformKey, keyof Pick<TopPost, 'webViews' | 'ig' | 'fb' | 'th'>> = {
-    all: 'webViews', website: 'webViews', instagram: 'ig', facebook: 'fb', threads: 'th',
-};
-
-function TopPostsCard({ posts, platform, rangeLabel }: { posts: TopPost[]; platform: PlatformKey; rangeLabel: string }) {
-    const [sort, setSort] = useState<'webViews' | 'engagement'>('webViews');
-    const [openId, setOpenId] = useState<string | null>(null);
-
-    // For a specific platform, rank by that platform's views. For 'all', keep the toggle.
-    const sortKey: 'webViews' | 'engagement' | 'ig' | 'fb' | 'th' =
-        platform === 'all' ? sort : PLATFORM_KEY[platform];
-    const sorted = [...posts].sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number));
-
-    const socialVal = (p: TopPost): number =>
-        platform === 'instagram' ? p.ig : platform === 'facebook' ? p.fb : platform === 'threads' ? p.th : p.views;
-    const socialLabel = platform === 'instagram' ? 'IG views' : platform === 'facebook' ? 'FB views' : platform === 'threads' ? 'Threads' : 'Social';
-
-    return (
-        <div className="ak-card ak-card--flush">
-            <div className="flex items-center justify-between gap-3 p-5 pb-3">
                 <span className="ak-overline">Top posts · {rangeLabel}</span>
-                {platform === 'all' && (
-                    <div className="ak-pills">
-                        <button className={`ak-pill ${sort === 'webViews' ? 'ak-pill--active' : ''}`} onClick={() => setSort('webViews')}>Site views</button>
-                        <button className={`ak-pill ${sort === 'engagement' ? 'ak-pill--active' : ''}`} onClick={() => setSort('engagement')}>Engagement</button>
-                    </div>
-                )}
+                {ranked.length > 3 && <button className="ak-an__link" onClick={() => setOpen(true)}>See all {ranked.length}</button>}
             </div>
-            {sorted.length === 0 ? (
-                <div className="px-5 pb-5"><Empty text="No post metrics in this range yet. Metrics populate as published posts are synced." /></div>
-            ) : (
-                <div style={{ overflowX: 'auto' }}>
-                    <table className="ak-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: 34 }}>#</th>
-                                <th>Post</th>
-                                <th>Type</th>
-                                <th style={{ textAlign: 'right' }}>Site views</th>
-                                <th style={{ textAlign: 'right' }}>{socialLabel}</th>
-                                <th style={{ width: 90 }}>Platforms</th>
-                                <th style={{ width: 34 }} />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sorted.slice(0, 20).map((p, i) => {
-                                const open = openId === p.id;
-                                const sv = socialVal(p);
-                                return (
-                                    <Fragment key={p.id}>
-                                        <tr className={open ? 'ak-trow--open' : ''} style={{ cursor: 'pointer' }} onClick={() => setOpenId(open ? null : p.id)}>
-                                            <td style={{ color: 'var(--ink-3)', fontWeight: 700 }}>{i + 1}</td>
-                                            <td>
-                                                <a href={`/blog/${p.slug}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                                                    {p.title}
-                                                </a>
-                                                <div className="ak-caption">{p.source || ''}{p.publishedAt ? ` · ${new Date(p.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</div>
-                                            </td>
-                                            <td><span className="ak-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>{p.claim ? (CLAIM_LABEL[p.claim] || 'News') : '—'}</span></td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{compact(p.webViews)}</td>
-                                            <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>{sv > 0 ? compact(sv) : '—'}</td>
-                                            <td>
-                                                <span className="ak-caption" style={{ display: 'inline-flex', gap: 6 }}>
-                                                    {p.ig > 0 && <span title={`Instagram ${fmt(p.ig)}`}>IG</span>}
-                                                    {p.fb > 0 && <span title={`Facebook ${fmt(p.fb)}`}>FB</span>}
-                                                    {p.th > 0 && <span title={`Threads ${fmt(p.th)}`}>TH</span>}
-                                                    {p.tw > 0 && <span title={`X ${fmt(p.tw)}`}>X</span>}
-                                                </span>
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <ChevronDown size={15} style={{ color: 'var(--ink-3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                                            </td>
-                                        </tr>
-                                        {open && (
-                                            <tr className="ak-trow-detail">
-                                                <td colSpan={7}>
-                                                    <div className="ak-postdetail">
-                                                        <DetailStat label="Website" views={p.webViews} />
-                                                        {p.platforms.instagram && <DetailStat label="Instagram" {...p.platforms.instagram} />}
-                                                        {p.platforms.facebook && <DetailStat label="Facebook" {...p.platforms.facebook} />}
-                                                        {p.platforms.threads && <DetailStat label="Threads" {...p.platforms.threads} />}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+            {ranked.length === 0 ? <Empty text="No post metrics in this range yet." /> : (
+                <ul className="flex flex-col gap-1.5">
+                    {ranked.slice(0, 3).map((p, i) => <li key={p.id}><PostRow p={p} i={i} /></li>)}
+                </ul>
+            )}
+            {open && (
+                <div className="ak-an__overlay" onClick={() => setOpen(false)}>
+                    <div className="ak-an__popup" role="dialog" aria-label="Top posts" onClick={(e) => e.stopPropagation()}>
+                        <div className="ak-an__popuphead">
+                            <div>
+                                <div className="ak-overline">Top posts</div>
+                                <div className="ak-an__popuptitle">{rangeLabel}</div>
+                            </div>
+                            <button className="ak-an__close" onClick={() => setOpen(false)} aria-label="Close">×</button>
+                        </div>
+                        <ul className="ak-an__popuplist">
+                            {ranked.map((p, i) => <li key={p.id}><PostRow p={p} i={i} /></li>)}
+                        </ul>
+                    </div>
                 </div>
             )}
         </div>
-    );
-}
-
-function DetailStat({ label, views, likes, comments }: { label: string; views: number; likes?: number; comments?: number }) {
-    return (
-        <div className="ak-postdetail__col">
-            <div className="ak-postdetail__plat">{label}</div>
-            <div className="ak-postdetail__row"><span>Views</span><strong>{fmt(views)}</strong></div>
-            {likes != null && <div className="ak-postdetail__row"><span>Likes</span><strong>{fmt(likes)}</strong></div>}
-            {comments != null && <div className="ak-postdetail__row"><span>Comments</span><strong>{fmt(comments)}</strong></div>}
-        </div>
-    );
-}
-
-function TrafficBar({ row, max }: { row: { label: string; views: number }; max: number }) {
-    const pct = max > 0 ? Math.max(4, Math.round((row.views / max) * 100)) : 0;
-    return (
-        <li className="space-y-1.5">
-            <div className="flex items-baseline justify-between gap-3">
-                <span className="ak-body-sm truncate">{row.label}</span>
-                <span className="ak-body-sm shrink-0" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>{fmt(row.views)}</span>
-            </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--gold)', opacity: 0.9 }} />
-            </div>
-        </li>
     );
 }
 
 function Empty({ text }: { text: string }) {
-    return <div className="text-center ak-caption" style={{ padding: '20px 0' }}>{text}</div>;
+    return <div className="text-center ak-caption" style={{ padding: '18px 0' }}>{text}</div>;
 }
 
 const tooltip = {
-    cursor: { fill: 'rgba(125,140,168,0.12)' },
+    cursor: { stroke: 'rgba(125,140,168,0.35)' },
     contentStyle: {
         background: 'rgba(18,26,44,0.94)', border: '1px solid rgba(196,146,44,0.4)',
         borderRadius: 10, fontSize: 12, color: '#f2f9ff', padding: '6px 10px',
     },
     labelStyle: { color: '#c9d6ea', marginBottom: 2 },
+    itemStyle: { color: '#f2f9ff' },
 } as const;
