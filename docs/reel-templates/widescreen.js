@@ -28,13 +28,15 @@ const Reel = (() => {
     const fitTitle = (R) => Math.max(72, Math.min(112, Math.floor(960 / (0.45 * Math.max(plain(R.line1).length, plain(R.line2Html).length)))));
     // Show line: one row if it fits, otherwise the detail drops under the name.
     const showFits = (R) => 0.47 * 84 * R.show.length + 0.72 * 29 * (R.showSub || '').length + 16 <= 980;
+    // Stacked (long) show names shrink to stay on one centered line inside a 980px gutter.
+    const showSize = (R) => (showFits(R) ? 84 : Math.max(48, Math.min(84, Math.floor(980 / (0.47 * R.show.length)))));
     const title = (R, color, accent) => `<div class="kl-text" style="position:absolute;left:60px;right:60px;top:${PY - 400}px;text-align:center;z-index:6;color:${color}">
       <div style="display:flex;justify-content:center;align-items:center;gap:14px">
         <span style="font-size:34px;color:${accent}">&#9733;</span>
         <span style="font-size:31px;font-weight:800;letter-spacing:.2em;color:${accent}">${R.label || 'KUMO PICKS'}</span></div>
       <div class="serif" style="margin-top:10px;font-size:${fitTitle(R)}px;font-weight:700;line-height:.95;white-space:nowrap">${R.line1}<br>${R.line2Html.replace(/<i>/g, `<i style="color:${accent}">`)}</div></div>`;
     const show = (R, y, acc) => `<div class="kl-text" style="position:absolute;left:0;right:0;top:${showFits(R) ? y : y - 30}px;z-index:7;display:flex;${showFits(R) ? 'justify-content:center;align-items:baseline;gap:16px' : 'flex-direction:column;align-items:center;gap:4px'};color:${NAVY}">
-        <span class="serif" style="font-size:84px;font-weight:700;color:${acc};line-height:1">${R.show}</span>
+        <span class="serif" style="font-size:${showSize(R)}px;font-weight:700;color:${acc};line-height:1;text-align:center;white-space:nowrap">${R.show}</span>
         <span style="font-size:29px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">${R.showSub || ''}</span></div>`;
     const hole = `<div style="position:absolute;left:0;top:${PY}px;width:1080px;height:${PH}px;background:transparent"></div>`;
     function widescreen() {
