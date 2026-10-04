@@ -2720,3 +2720,10 @@ html[data-admin-theme='dark'] .admin-root .ak-plat--facebook { color: #7fb2ff; }
 .admin-root .ak-mrep__select select { appearance: none; -webkit-appearance: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 34px 7px 14px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
 .admin-root .ak-mrep__select select:focus { outline: 2px solid color-mix(in srgb, var(--gold) 45%, transparent); outline-offset: 1px; }
 .admin-root .ak-mrep__select svg { position: absolute; right: 12px; pointer-events: none; color: var(--ink-2); }
+
+/* Save-to-device button on schedule cards */
+.admin-root .ak-dlbtn { margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.admin-root .ak-dlbtn:hover:not(:disabled) { color: var(--ink); border-color: var(--gold); }
+.admin-root .ak-dlbtn:disabled { opacity: .6; cursor: default; }
+.admin-root .ak-dlbtn--done { color: #2f9e6e; border-color: #2f9e6e; }
+.admin-root .ak-dlbtn--error { color: #d4534f; border-color: #d4534f; }

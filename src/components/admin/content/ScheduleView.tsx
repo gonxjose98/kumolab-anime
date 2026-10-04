@@ -9,6 +9,7 @@ import type { ScheduleRow } from '@/lib/schedule';
 import { KindIcon, PLATFORM_LABEL, isOptimizable, kindLabel } from './scheduleUi';
 import ScheduleSlotButton from './ScheduleSlotButton';
 import SchedulePreview from './SchedulePreview';
+import DownloadMediaButton from './DownloadMediaButton';
 
 /*
  * Content > Schedule: a day-by-day agenda. Every ET calendar day between the
@@ -147,6 +148,13 @@ export default function ScheduleView({ rows }: { rows: ScheduleRow[] }) {
     );
 }
 
+/** What a post actually publishes: the reel MP4, every carousel slide, or the single image. */
+function mediaUrls(r: ScheduleRow): string[] {
+    if (r.videoUrl) return [r.videoUrl];
+    if (r.slides.length) return r.slides;
+    return r.cover ? [r.cover] : [];
+}
+
 function ScheduleCard({ row: r, onOpen, priority }: { row: ScheduleRow; onOpen: () => void; priority?: boolean }) {
     return (
         <article className={`ak-scard ${r.isFuture ? '' : 'ak-scard--done'}`}>
@@ -179,6 +187,7 @@ function ScheduleCard({ row: r, onOpen, priority }: { row: ScheduleRow; onOpen: 
                     {r.isPeak && <span className="ak-scard__peak" title="Peak slot" aria-label="Peak slot"><Star size={10} /></span>}
                     <span className={`ak-scard__kind ak-scard__kind--${r.kind}`}>{kindLabel(r)}</span>
                     {r.status === 'published' && <span className="ak-scard__posted">Posted</span>}
+                    <DownloadMediaButton urls={mediaUrls(r)} baseName={r.slug || 'kumolab-post'} />
                 </div>
                 <button type="button" className="ak-scard__open" onClick={onOpen}>
                     <span className="ak-scard__title">{r.title}</span>
