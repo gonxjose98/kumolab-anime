@@ -164,6 +164,8 @@ export default function PostEditor() {
     // slide sequentially. Separate from `busy` so a download never dims the
     // whole editor — it only debounces the download buttons themselves.
     const [downloadBusy, setDownloadBusy] = useState<null | 'one' | 'all'>(null);
+    // Phones: files ready for the Save-to-Photos share sheet (needs its own tap).
+    const [shareFiles, setShareFiles] = useState<File[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [imageError, setImageError] = useState<string | null>(null);
     // Autosave: persists edits (settings + title/caption/hashtags) after every
@@ -1123,6 +1125,25 @@ export default function PostEditor() {
         return imageToBlob(json.image);
     }
 
+    // Phones get the native share sheet ("Save N Images" → camera roll); iOS
+    // only opens it inside a fresh tap, so the files are staged here and a
+    // second "Save to Photos" tap shares them. Desktop downloads directly.
+    function deliverFiles(files: File[]) {
+        const phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (phone && navigator.canShare?.({ files })) { setShareFiles(files); return; }
+        files.forEach((f, i) => setTimeout(() => saveBlobToDevice(f, f.name), i * 400));
+    }
+
+    async function shareStagedFiles() {
+        if (!shareFiles) return;
+        try {
+            await navigator.share({ files: shareFiles });
+            setShareFiles(null);
+        } catch (e: any) {
+            if (e?.name !== 'AbortError') setError(e?.message || 'Could not open the save sheet');
+        }
+    }
+
     // Download the ACTIVE slide's rendered overlay. Single photo:
     // kumolab-<slug>.<ext>; carousel: kumolab-<slug>-slide-<n>.<ext>
     // (slug = the post headline, i.e. slide 1's title).
@@ -1137,7 +1158,7 @@ export default function PostEditor() {
             const slug = slugifyForFile(cur[0]?.title || post?.title || '');
             const ext = extForMime(blob.type);
             const name = cur.length >= 2 ? `kumolab-${slug}-slide-${idx + 1}.${ext}` : `kumolab-${slug}.${ext}`;
-            saveBlobToDevice(blob, name);
+            deliverFiles([new File([blob], name, { type: blob.type })]);
         } catch (e: any) {
             setError(e?.message || 'Download failed');
         } finally {
@@ -1155,11 +1176,12 @@ export default function PostEditor() {
         try {
             const cur = syncedSlides();
             const slug = slugifyForFile(cur[0]?.title || post?.title || '');
+            const files: File[] = [];
             for (let i = 0; i < cur.length; i++) {
                 const blob = await slideImageBlob(cur[i], i === activeSlide);
-                saveBlobToDevice(blob, `kumolab-${slug}-slide-${i + 1}.${extForMime(blob.type)}`);
-                if (i < cur.length - 1) await new Promise(r => setTimeout(r, 400));
+                files.push(new File([blob], `kumolab-${slug}-slide-${i + 1}.${extForMime(blob.type)}`, { type: blob.type }));
             }
+            deliverFiles(files);
         } catch (e: any) {
             setError(e?.message || 'Download failed');
         } finally {
@@ -1979,8 +2001,18 @@ export default function PostEditor() {
                                         {downloadBusy === 'all' ? 'Downloading…' : `Download all ${slides.length} slides`}
                                     </button>
                                 )}
+                                {shareFiles && (
+                                    <button
+                                        type="button"
+                                        onClick={shareStagedFiles}
+                                        className="ak-btn ak-btn--primary ak-btn--sm ak-savephotos"
+                                        title="Opens the share sheet: choose Save Images to put them in Photos"
+                                    >
+                                        Save {shareFiles.length > 1 ? `${shareFiles.length} ` : ''}to Photos
+                                    </button>
+                                )}
                                 <span className="text-[9px] ml-auto" style={{ color: 'var(--text-muted)' }}>
-                                    Saves to this device. The post is untouched.
+                                    {shareFiles ? 'Tap Save to Photos, then Save Images.' : 'Saves to this device. The post is untouched.'}
                                 </span>
                             </div>
                         )}
