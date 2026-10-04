@@ -2727,3 +2727,5 @@ html[data-admin-theme='dark'] .admin-root .ak-plat--facebook { color: #7fb2ff; }
 .admin-root .ak-dlbtn:disabled { opacity: .6; cursor: default; }
 .admin-root .ak-dlbtn--done { color: #2f9e6e; border-color: #2f9e6e; }
 .admin-root .ak-dlbtn--error { color: #d4534f; border-color: #d4534f; }
+.admin-root .ak-dlbtn--ready { width: auto; padding: 0 11px; gap: 5px; border-radius: 999px; background: var(--gold); border-color: var(--gold); color: #fff; font-size: 12px; font-weight: 800; animation: akDlPulse 1.2s ease-in-out infinite; }
+@keyframes akDlPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }

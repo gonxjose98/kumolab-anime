@@ -1,59 +1,95 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Download, Loader2 } from 'lucide-react';
+import { AlertTriangle, Check, Download, Loader2 } from 'lucide-react';
 
 /**
- * Save a post's media to the device. On phones this opens the native share
- * sheet with the files attached, so iOS/Android offer "Save Image(s)" /
- * "Save Video" straight into the gallery. Desktop (no file sharing) falls
- * back to plain downloads. Carousels save every slide in order.
+ * Save a post's media to the device.
+ *
+ * Phones: tap 1 fetches the files, tap 2 opens the native share sheet with
+ * every file attached ("Save N Images" / "Save Video" → camera roll). It has
+ * to be two taps: iOS only allows navigator.share() inside a fresh tap, and
+ * downloading a whole carousel first uses that tap up (the old one-tap
+ * version fell back to a single download into Files).
+ * Desktop: downloads every file directly.
  */
-export default function DownloadMediaButton({ urls, baseName, label = 'Save to device' }: { urls: string[]; baseName: string; label?: string }) {
-    const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mp4: 'video/mp4', mov: 'video/quicktime' };
+const isPhone = () => typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    async function save(e: React.MouseEvent) {
+export default function DownloadMediaButton({ urls, baseName }: { urls: string[]; baseName: string }) {
+    const [state, setState] = useState<'idle' | 'busy' | 'ready' | 'done' | 'error'>('idle');
+    const [files, setFiles] = useState<File[]>([]);
+    const [msg, setMsg] = useState('');
+
+    async function fetchFiles(): Promise<File[]> {
+        return Promise.all(urls.map(async (url, i) => {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const urlExt = (url.split('?')[0].split('.').pop() || '').toLowerCase();
+            const type = blob.type && blob.type !== 'application/octet-stream' ? blob.type : MIME[urlExt] || 'image/jpeg';
+            const ext = type.split('/')[1].replace('jpeg', 'jpg').replace('quicktime', 'mov');
+            const suffix = urls.length > 1 ? `-${String(i + 1).padStart(2, '0')}` : '';
+            return new File([blob], `${baseName}${suffix}.${ext}`, { type });
+        }));
+    }
+
+    function flash(next: 'done' | 'error', text = '') {
+        setState(next); setMsg(text);
+        setTimeout(() => { setState('idle'); setMsg(''); setFiles([]); }, next === 'error' ? 4000 : 2200);
+    }
+
+    async function onClick(e: React.MouseEvent) {
         e.stopPropagation();
         if (!urls.length || state === 'busy') return;
+
+        // Tap 2 on a phone: share the prepared files inside this fresh tap.
+        if (state === 'ready') {
+            try {
+                await navigator.share({ files });
+                flash('done');
+            } catch (err: any) {
+                if (err?.name === 'AbortError') { setState('ready'); return; }
+                console.error('DownloadMediaButton share:', err);
+                flash('error', 'Could not open the save sheet');
+            }
+            return;
+        }
+
         setState('busy');
         try {
-            const files = await Promise.all(urls.map(async (url, i) => {
-                const res = await fetch(url, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const blob = await res.blob();
-                const ext = (blob.type.split('/')[1] || url.split('?')[0].split('.').pop() || 'bin').replace('jpeg', 'jpg');
-                const suffix = urls.length > 1 ? `-${String(i + 1).padStart(2, '0')}` : '';
-                return new File([blob], `${baseName}${suffix}.${ext}`, { type: blob.type });
-            }));
-
-            if (typeof navigator !== 'undefined' && navigator.canShare?.({ files })) {
-                try {
-                    await navigator.share({ files });
-                } catch (err: any) {
-                    if (err?.name === 'AbortError') { setState('idle'); return; } // user closed the sheet
-                    throw err;
+            const prepared = await fetchFiles();
+            if (isPhone()) {
+                if (navigator.canShare?.({ files: prepared })) {
+                    setFiles(prepared);
+                    setState('ready');
+                } else {
+                    flash('error', 'This browser cannot save to Photos. Open the CRM in Safari.');
                 }
-            } else {
-                for (const f of files) {
-                    const href = URL.createObjectURL(f);
-                    const a = Object.assign(document.createElement('a'), { href, download: f.name });
-                    document.body.appendChild(a); a.click(); a.remove();
-                    setTimeout(() => URL.revokeObjectURL(href), 4000);
-                }
+                return;
             }
-            setState('done');
-            setTimeout(() => setState('idle'), 2200);
+            for (const f of prepared) {
+                const href = URL.createObjectURL(f);
+                const a = Object.assign(document.createElement('a'), { href, download: f.name });
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(href), 4000);
+            }
+            flash('done');
         } catch (err) {
             console.error('DownloadMediaButton:', err);
-            setState('error');
-            setTimeout(() => setState('idle'), 2500);
+            flash('error', 'Download failed, try again');
         }
     }
 
-    const title = state === 'error' ? 'Download failed, try again' : `${label}${urls.length > 1 ? ` (${urls.length} files)` : ''}`;
+    const n = urls.length;
+    const title = msg || (state === 'ready' ? `Tap to save ${n > 1 ? `${n} files` : 'to Photos'}` : `Save to device${n > 1 ? ` (${n} files)` : ''}`);
     return (
-        <button type="button" className={`ak-dlbtn ak-dlbtn--${state}`} onClick={save} disabled={!urls.length || state === 'busy'} title={title} aria-label={title}>
-            {state === 'busy' ? <Loader2 size={14} className="ak-spin" /> : state === 'done' ? <Check size={14} /> : <Download size={14} />}
+        <button type="button" className={`ak-dlbtn ak-dlbtn--${state}`} onClick={onClick} disabled={!n || state === 'busy'} title={title} aria-label={title}>
+            {state === 'busy' && <Loader2 size={14} className="ak-spin" />}
+            {state === 'done' && <Check size={14} />}
+            {state === 'error' && <AlertTriangle size={14} />}
+            {state === 'idle' && <Download size={14} />}
+            {state === 'ready' && <><Download size={13} /><span>Save {n > 1 ? n : ''}</span></>}
         </button>
     );
 }
