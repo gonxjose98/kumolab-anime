@@ -1167,7 +1167,10 @@ async function publishThreadsCarousel(post: BlogPost, slideImageUrls: string[]):
         });
         return result;
     }
-    for (let t = 0; t < 20; t++) {
+    // Big carousels can take well over a minute to process. Publishing before
+    // the container is FINISHED fails with "The requested resource does not
+    // exist" (2026-10-04 lost a Threads post that way), so poll up to ~2 min.
+    for (let t = 0; t < 40; t++) {
         const st = await fetchWithTimeout(
             `https://graph.threads.net/v1.0/${parent.id}?fields=status&access_token=${encodeURIComponent(THREADS_ACCESS_TOKEN)}`,
             { method: 'GET' }, 10_000);
@@ -1179,10 +1182,16 @@ async function publishThreadsCarousel(post: BlogPost, slideImageUrls: string[]):
         }
         await new Promise(r => setTimeout(r, 3_000));
     }
-    const pubRes = await fetchWithTimeout(`${base}/threads_publish`, {
-        method: 'POST', body: new URLSearchParams({ creation_id: parent.id, access_token: THREADS_ACCESS_TOKEN }),
-    }, 20_000);
-    const pub = await pubRes.json().catch(() => ({}));
+    // Still-settling containers can reject the first publish; retry a few times.
+    let pub: any = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const pubRes = await fetchWithTimeout(`${base}/threads_publish`, {
+            method: 'POST', body: new URLSearchParams({ creation_id: parent.id, access_token: THREADS_ACCESS_TOKEN }),
+        }, 20_000);
+        pub = await pubRes.json().catch(() => ({}));
+        if (pub.id) break;
+        await new Promise(r => setTimeout(r, 10_000));
+    }
     if (pub.id) {
         result.threads_id = pub.id;
         result.threads_url = `https://www.threads.net/@kumolabanime/post/${pub.id}`;
