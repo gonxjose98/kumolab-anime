@@ -8,6 +8,7 @@ import { pickLayoutSettings } from '@/lib/studio/slides';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
 import { Images, ArrowLeft } from 'lucide-react';
 import { getReturnTo } from '@/lib/admin/returnTo';
+import { fetchAllAsFiles, sameOrigin, saveFiles } from '@/lib/client/save-to-photos';
 import PostVideoCard from '@/components/admin/PostVideoCard';
 
 // Cap mirrors buildSocialHashtags' publish-time cap so what the operator
@@ -1079,7 +1080,7 @@ export default function PostEditor() {
     // object URL downloads reliably on desktop AND mobile (huge data: hrefs
     // get truncated or blocked by some mobile browsers).
     async function imageToBlob(src: string): Promise<Blob> {
-        const res = await fetch(src);
+        const res = await fetch(sameOrigin(src)); // same-origin: iOS Safari blocks the direct Storage fetch
         if (!res.ok) throw new Error(`Could not fetch the image (HTTP ${res.status})`);
         return res.blob();
     }
@@ -1125,22 +1126,42 @@ export default function PostEditor() {
         return imageToBlob(json.image);
     }
 
-    // Phones get the native share sheet ("Save N Images" → camera roll); iOS
-    // only opens it inside a fresh tap, so the files are staged here and a
-    // second "Save to Photos" tap shares them. Desktop downloads directly.
-    function deliverFiles(files: File[]) {
-        const phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (phone && navigator.canShare?.({ files })) { setShareFiles(files); return; }
-        files.forEach((f, i) => setTimeout(() => saveBlobToDevice(f, f.name), i * 400));
+    // One-tap Save to Photos: the saved slide renders are fetched in the
+    // background when the editor opens, so a Download tap can open the iOS
+    // share sheet instantly (it only works inside a fresh tap). If the slides
+    // were edited since, we render fresh bytes first; should iOS then refuse
+    // the sheet, a "Save to Photos" button appears for one more tap.
+    const preparedFiles = useRef<{ key: string; files: File[] } | null>(null);
+    const slidesKey = slides.map((sl) => `${sl.renderedUrl || ''}#${slideRenderKey(sl)}`).join('|');
+    useEffect(() => {
+        if (isVideoPost || !slides.length || slides.some((sl) => !sl.renderedUrl)) return;
+        const key = slidesKey;
+        const slug = slugifyForFile(slides[0]?.title || post?.title || '');
+        const base = slides.length >= 2 ? `kumolab-${slug}-slide` : `kumolab-${slug}`;
+        let cancelled = false;
+        fetchAllAsFiles(slides.map((sl) => sl.renderedUrl as string), base)
+            .then((files) => { if (!cancelled) preparedFiles.current = { key, files }; })
+            .catch(() => {});
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slidesKey, isVideoPost]);
+    const readyFiles = () => (preparedFiles.current?.key === slidesKey ? preparedFiles.current.files : null);
+
+    async function deliverFiles(files: File[]) {
+        try {
+            await saveFiles(files);
+        } catch (e: any) {
+            if (e?.name === 'NotAllowedError') setShareFiles(files); // iOS wants its own tap
+            else throw e;
+        }
     }
 
     async function shareStagedFiles() {
         if (!shareFiles) return;
         try {
-            await navigator.share({ files: shareFiles });
-            setShareFiles(null);
+            if ((await saveFiles(shareFiles)) === 'saved') setShareFiles(null);
         } catch (e: any) {
-            if (e?.name !== 'AbortError') setError(e?.message || 'Could not open the save sheet');
+            setError(e?.message || 'Could not open the save sheet');
         }
     }
 
@@ -1149,6 +1170,12 @@ export default function PostEditor() {
     // (slug = the post headline, i.e. slide 1's title).
     async function handleDownloadActive() {
         if (downloadBusy) return;
+        const ready = readyFiles();
+        if (ready) {
+            const i = Math.min(activeSlide, ready.length - 1);
+            saveFiles([ready[i]]).catch((e) => setError(e?.message || 'Could not save'));
+            return;
+        }
         setDownloadBusy('one');
         setError(null);
         try {
@@ -1158,7 +1185,7 @@ export default function PostEditor() {
             const slug = slugifyForFile(cur[0]?.title || post?.title || '');
             const ext = extForMime(blob.type);
             const name = cur.length >= 2 ? `kumolab-${slug}-slide-${idx + 1}.${ext}` : `kumolab-${slug}.${ext}`;
-            deliverFiles([new File([blob], name, { type: blob.type })]);
+            await deliverFiles([new File([blob], name, { type: blob.type })]);
         } catch (e: any) {
             setError(e?.message || 'Download failed');
         } finally {
@@ -1171,6 +1198,11 @@ export default function PostEditor() {
     // N straight files: kumolab-<slug>-slide-1..N.<ext>.
     async function handleDownloadAll() {
         if (downloadBusy) return;
+        const ready = readyFiles();
+        if (ready) {
+            saveFiles(ready).catch((e) => setError(e?.message || 'Could not save'));
+            return;
+        }
         setDownloadBusy('all');
         setError(null);
         try {
@@ -1181,7 +1213,7 @@ export default function PostEditor() {
                 const blob = await slideImageBlob(cur[i], i === activeSlide);
                 files.push(new File([blob], `kumolab-${slug}-slide-${i + 1}.${extForMime(blob.type)}`, { type: blob.type }));
             }
-            deliverFiles(files);
+            await deliverFiles(files);
         } catch (e: any) {
             setError(e?.message || 'Download failed');
         } finally {
