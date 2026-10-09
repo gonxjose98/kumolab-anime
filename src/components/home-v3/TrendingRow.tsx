@@ -14,7 +14,7 @@ export default function TrendingRow({ items }: { items: Item[] }) {
             <button type="button" className={`${s.trendBtn} ${s.trendPrev}`} onClick={() => nudge(-1)} aria-label="Previous">‹</button>
             <div className={s.trendRow} ref={row}>
                 {items.map((t) => (
-                    <a key={t.rank} href={t.href} target="_blank" rel="noopener noreferrer" className={s.trend}>
+                    <a key={t.rank} href={t.href} target="_blank" rel="noopener noreferrer" className={s.trend} data-reveal data-reveal-i={t.rank - 1}>
                         <div className={s.trendArt}>
                             {t.image && (
                                 // eslint-disable-next-line @next/next/no-img-element

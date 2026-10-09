@@ -4,6 +4,7 @@ import { Cormorant_Garamond } from 'next/font/google';
 import { BlogPost, Product } from '@/types';
 import Forecast from './Forecast';
 import TrendingRow from './TrendingRow';
+import Reveal from './Reveal';
 import s from './HomeV3.module.css';
 
 const serif = Cormorant_Garamond({ subsets: ['latin'], weight: ['600', '700'], variable: '--hv3-serif' });
@@ -93,6 +94,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
         <div className={`${s.page} ${serif.variable}`}>
             {/* The storefront locks html/body to 100vh for the old scroll journey; this page uses normal flow. */}
             <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
+            <Reveal />
             {/* ── Nav ─────────────────────────────────────────── */}
             <header className={s.nav}>
                 <Link href="/" className={s.brand} aria-label="KumoLab home">
@@ -115,6 +117,8 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                 <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispA}`} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispB}`} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/home-v3/boat.webp" alt="" aria-hidden="true" className={s.boat} />
                 <div className={s.heroInner}>
                     <h1 className={s.headline} aria-label="Today in anime.">
                         {/* Same intro as the live homepage wordmark: each letter rises in, 0.07s apart. Words stay unbroken. */}
@@ -150,7 +154,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
             <div className={s.sky}>
                 {/* ── Today's Drops ────────────────────────────── */}
                 <section id="drops" className={s.section}>
-                    <div className={s.head}>
+                    <div className={s.head} data-reveal>
                         <div>
                             <h2 className={s.h2}><SectionIcon name="sparkle" />Today&apos;s Drops</h2>
                             <p className={s.sub}>Fresh anime news, trailers and releases, updated daily.</p>
@@ -160,7 +164,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                         {drops.map((p) => {
                             const c = chip(p);
                             return (
-                                <Link key={p.slug} href={`/blog/${p.slug}`} className={s.drop}>
+                                <Link key={p.slug} href={`/blog/${p.slug}`} className={s.drop} data-reveal data-reveal-i={drops.indexOf(p)}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={p.image} alt="" loading="lazy" className={s.dropImg} />
                                     <div className={s.dropBody}>
@@ -171,13 +175,13 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                             );
                         })}
                     </div>
-                    <Link href="/blog" className={s.seeAll}>See all</Link>
+                    <Link href="/blog" className={s.seeAll} data-reveal>See all</Link>
                 </section>
 
                 {/* ── Trending Now ─────────────────────────────── */}
                 {trending.length > 0 && (
                     <section id="trending" className={s.section}>
-                        <div className={s.head}>
+                        <div className={s.head} data-reveal>
                             <div>
                                 <h2 className={s.h2}><SectionIcon name="flame" />Trending Now</h2>
                                 <p className={s.sub}>The most-followed anime on AniList this week.</p>
@@ -193,13 +197,13 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                                 href: t.url || '#',
                             }))}
                         />
-                        <a href="https://anilist.co/search/anime/trending" target="_blank" rel="noopener noreferrer" className={s.seeAll}>See all</a>
+                        <a href="https://anilist.co/search/anime/trending" target="_blank" rel="noopener noreferrer" className={s.seeAll} data-reveal>See all</a>
                     </section>
                 )}
 
                 {/* ── Explore ──────────────────────────────────── */}
                 <section id="explore" className={s.section}>
-                    <div className={s.head}>
+                    <div className={s.head} data-reveal>
                         <div>
                             <h2 className={s.h2}><SectionIcon name="compass" />Explore Anime Your Way</h2>
                             <p className={s.sub}>Different stories. Same beautiful sky.</p>
@@ -207,7 +211,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                     </div>
                     <div className={s.exploreGrid}>
                         {EXPLORE.map((e) => (
-                            <a key={e.title} href={e.href} className={s.explore} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                            <a key={e.title} href={e.href} className={s.explore} data-reveal data-reveal-i={EXPLORE.indexOf(e)} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={e.img} alt="" loading="lazy" className={s.exploreImg} />
                                 <span className={s.exploreName}>{e.title}</span>
@@ -224,7 +228,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                 {/* ── Merch ────────────────────────────────────── */}
                 {merch.length > 0 && (
                     <section className={s.section}>
-                        <div className={s.head}>
+                        <div className={s.head} data-reveal>
                             <div>
                                 <h2 className={s.h2}><SectionIcon name="bag" />The Cloud Collection</h2>
                                 <p className={s.sub}>Wear the anime weather.</p>
@@ -233,7 +237,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                         </div>
                         <div className={s.merchGrid}>
                             {merch.map((m, i) => (
-                                <Link key={m.id} href={`/merch/${m.id}`} className={s.merch}>
+                                <Link key={m.id} href={`/merch/${m.id}`} className={s.merch} data-reveal data-reveal-i={i}>
                                     {(m.label || m.isFeatured || i === 0) && (
                                         <span className={`${s.badge} ${m.isFeatured || i === 0 ? s.badgeGold : s.badgeBlue}`}>{m.label || 'The flagship'}</span>
                                     )}
@@ -251,7 +255,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
 
                 {/* ── Join the Conversation ────────────────────── */}
                 <section className={s.section}>
-                    <div className={s.head}>
+                    <div className={s.head} data-reveal>
                         <div>
                             <h2 className={s.h2}><SectionIcon name="chat" />Join the Conversation</h2>
                             <p className={s.sub}>Anime lives here too.</p>
@@ -260,13 +264,13 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                     <div className={s.convo}>
                         <div className={s.socialStrip}>
                             {social.map((p) => (
-                                <a key={p.slug} href={(p.social_ids as any).instagram_url} target="_blank" rel="noopener noreferrer" className={s.socialTile} title={p.title}>
+                                <a key={p.slug} href={(p.social_ids as any).instagram_url} target="_blank" rel="noopener noreferrer" className={s.socialTile} title={p.title} data-reveal data-reveal-i={social.indexOf(p)}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={p.image} alt={p.title} loading="lazy" />
                                 </a>
                             ))}
                         </div>
-                        <div className={s.follow}>
+                        <div className={s.follow} data-reveal data-reveal-i={3}>
                             <h3>Follow KumoLab</h3>
                             <p>News, clips and community, everywhere.</p>
                             <div className={s.icons}>

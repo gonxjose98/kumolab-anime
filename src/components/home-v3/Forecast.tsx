@@ -42,7 +42,7 @@ export default function Forecast() {
             <div className={s.inner}>
                 <div className={s.art} aria-hidden="true" />
 
-                <div className={s.copy}>
+                <div className={s.copy} data-reveal>
                     <p className={s.kicker}>The KumoLab Forecast</p>
                     <h2 className={s.title}>Tomorrow&apos;s Anime Weather,<br />In Your Inbox.</h2>
                     <p className={s.sub}>The best new trailers, releases and stories, handpicked and delivered every Sunday.</p>
@@ -59,7 +59,7 @@ export default function Forecast() {
                     {status === 'error' && <p className={s.err}>Something went wrong. Please try again in a moment.</p>}
                 </div>
 
-                <ul className={s.perks}>
+                <ul className={s.perks} data-reveal data-reveal-i={2}>
                     {PERKS.map((p) => (
                         <li key={p.label}>
                             <span className={s.perkIcon}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={p.d} /></svg></span>
