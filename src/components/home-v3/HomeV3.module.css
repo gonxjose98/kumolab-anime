@@ -19,44 +19,67 @@
     max-width: 1240px; margin: 0 auto; padding: 20px 28px;
 }
 .brand { font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: 26px; letter-spacing: 0.12em; color: #fff; text-decoration: none; text-shadow: 0 2px 10px rgba(20, 60, 120, 0.3); }
-.links { display: flex; gap: 26px; margin-left: 18px; }
-.links a { color: #fff; text-decoration: none; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.35); opacity: 0.95; }
+.links { display: flex; gap: 34px; margin-left: 40px; }
+.links a { color: #fff; text-decoration: none; font-family: var(--hv3-serif), Georgia, serif; font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.35); opacity: 0.95; }
 .links a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 6px; }
-.navCta { margin-left: auto; padding: 9px 20px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: var(--ink); font-size: 12.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; box-shadow: 0 6px 18px rgba(20, 60, 120, 0.18); }
+.search { margin-left: auto; width: 38px; height: 38px; display: grid; place-items: center; color: #fff; }
+.search svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 1px 6px rgba(20, 60, 120, 0.35)); }
+.navCta { margin-left: 4px; padding: 9px 20px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: var(--ink); font-size: 12.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; box-shadow: 0 6px 18px rgba(20, 60, 120, 0.18); }
 
-/* ── Hero ──────────────────────────────────────── */
-.hero { position: relative; min-height: clamp(560px, 50vw, 760px); display: flex; align-items: center; overflow: hidden; }
-.heroImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 40%; }
-.heroShade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(25, 80, 160, 0.38) 0%, rgba(25, 80, 160, 0.12) 45%, rgba(25, 80, 160, 0) 70%); }
-.heroInner { position: relative; z-index: 2; width: 100%; max-width: 1240px; margin: 0 auto; padding: 120px 28px 120px; color: #fff; }
-.kicker { margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: 0.26em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.4); }
+/* ── Hero ──────────────────────────────────────
+   The art is Jose's reference illustration with only the text/UI removed, so
+   on desktop it shows uncropped at its own aspect ratio and the copy sits on
+   top in the same spots as the reference. */
+.hero { position: relative; aspect-ratio: 16 / 9; min-height: 560px; overflow: hidden; background: #6aa8ea; }
+.heroImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% 50%; opacity: 1; animation: none; }
+.heroInner { position: relative; z-index: 2; width: 100%; max-width: 1240px; margin: 0 auto; padding: clamp(96px, 9.5vw, 150px) 28px 0; color: #fff; }
+.heroCloud { width: 40px; height: 30px; color: #fff; margin-bottom: 4px; filter: drop-shadow(0 1px 6px rgba(20, 60, 120, 0.35)); }
+.kicker { margin: 0 0 4px; padding-left: 36px; font-family: var(--hv3-serif), Georgia, serif; font-size: clamp(13px, 1.1vw, 17px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.4); }
 .wordmark {
     margin: 0; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700;
-    font-size: clamp(64px, 10vw, 148px); line-height: 0.9; letter-spacing: 0.03em;
-    text-shadow: 0 4px 24px rgba(20, 60, 120, 0.35);
+    font-size: clamp(64px, 8.6vw, 140px); line-height: 0.92; letter-spacing: 0.02em;
+    text-shadow: 0 4px 24px rgba(20, 60, 120, 0.3);
 }
-.tagline { margin: 10px 0 8px; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(24px, 2.6vw, 34px); text-shadow: 0 2px 12px rgba(20, 60, 120, 0.4); }
-.heroSub { margin: 0; max-width: 430px; font-size: 16px; line-height: 1.5; text-shadow: 0 1px 10px rgba(20, 60, 120, 0.5); }
-.heroCtas { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
+.tagline { margin: 8px 0 6px; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(24px, 2.5vw, 38px); text-shadow: 0 2px 12px rgba(20, 60, 120, 0.35); }
+.heroSub { margin: 0; max-width: 470px; font-family: var(--hv3-serif), Georgia, serif; font-size: clamp(16px, 1.35vw, 20px); font-weight: 600; line-height: 1.4; text-shadow: 0 1px 10px rgba(20, 60, 120, 0.45); }
+.heroCtas { display: flex; flex-wrap: wrap; gap: 14px; margin-top: clamp(18px, 2vw, 30px); }
 .btnGold, .btnGhost {
-    display: inline-flex; align-items: center; gap: 8px; padding: 14px 26px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 10px; padding: 15px 30px; border-radius: 999px;
     font-size: 13px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
 }
-.btnGold { color: #2a2208; background: linear-gradient(180deg, var(--gold-a), var(--gold-b)); box-shadow: 0 10px 26px rgba(160, 110, 10, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.08); }
-.btnGhost { color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.9); background: rgba(20, 70, 150, 0.28); backdrop-filter: blur(4px); }
-.btnGold:hover, .btnGhost:hover { transform: translateY(-1px); }
+.btnGold { color: #2a2208; background: linear-gradient(180deg, var(--gold-a), var(--gold-b)); box-shadow: 0 10px 26px rgba(160, 110, 10, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.08); }
+.btnGhost { color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.9); background: rgba(40, 100, 190, 0.22); backdrop-filter: blur(3px); }
+.btnGhost svg, .heroPill svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; flex: none; }
+.btnGold:hover, .btnGhost:hover, .heroPill:hover { transform: translateY(-1px); }
+.heroPills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.heroPill {
+    display: inline-flex; align-items: center; gap: 10px; padding: 11px 20px; border-radius: 999px;
+    border: 1.5px solid rgba(255, 255, 255, 0.85); background: rgba(40, 100, 190, 0.22); backdrop-filter: blur(3px);
+    color: #fff; text-decoration: none; font-family: var(--hv3-serif), Georgia, serif; font-size: 16px; font-weight: 700;
+}
+.heroNote {
+    position: absolute; z-index: 2; right: 3%; top: 21%; margin: 0; transform: rotate(-10deg);
+    font-family: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive; font-size: clamp(16px, 1.6vw, 24px); line-height: 1.15; color: #fff; text-shadow: 0 1px 6px rgba(20, 60, 120, 0.4);
+}
+.heroJp { position: absolute; z-index: 2; right: 3%; top: 61%; display: flex; flex-direction: column; gap: 6px; color: #1f4f9a; font-size: clamp(9px, 0.8vw, 12px); font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; line-height: 1.5; }
+.heroJpBig { font-family: 'Zen Kaku Gothic New', sans-serif; font-size: clamp(14px, 1.3vw, 19px); letter-spacing: 0.08em; }
 
 .wave { position: absolute; left: 0; bottom: -1px; width: 100%; height: 70px; z-index: 3; }
 .waveFlip { position: absolute; top: -1px; bottom: auto; transform: scaleY(-1); }
 
 /* ── Sky body ──────────────────────────────────── */
-.sky {
-    position: relative;
-    background:
-        linear-gradient(180deg, #ffffff 0, rgba(255, 255, 255, 0) 70px),
-        url('/home-v3/sky.webp') center top / 100% auto repeat-y,
-        #9fcaf3;
-    padding: 30px 0 40px;
+.sky { position: relative; padding: 30px 0 40px; }
+.sky::before {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: url('/home-v3/sky.webp') center top / 100% auto repeat-y, #9fcaf3;
+}
+.sky > * { position: relative; z-index: 1; }
+/* The first sky block rides up onto the hero's soft lower band (as in the
+   reference) and fades in, so there is no seam under the wave line. */
+.hero + .sky { margin-top: -12vw; padding-top: 0; }
+.hero + .sky::before {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 6vw, #000 16vw);
+    mask-image: linear-gradient(180deg, transparent 0, transparent 6vw, #000 16vw);
 }
 .section { max-width: 1240px; margin: 0 auto; padding: 34px 28px; }
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
@@ -153,10 +176,16 @@
 @media (max-width: 760px) {
     .links { display: none; }
     .nav { padding: 16px; }
-    .hero { min-height: 640px; align-items: flex-start; }
-    .heroImg { object-position: 50% 30%; }
-    .heroShade { background: linear-gradient(180deg, rgba(25, 80, 160, 0.42) 0%, rgba(25, 80, 160, 0.15) 55%, rgba(25, 80, 160, 0) 80%); }
-    .heroInner { padding: 104px 16px 110px; }
+    .hero { aspect-ratio: auto; min-height: 700px; }
+    .hero + .sky { margin-top: -60px; }
+    .hero + .sky::before { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 90px); mask-image: linear-gradient(180deg, transparent 0, #000 90px); }
+    .heroImg { object-position: 50% 50%; }
+    .hero::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(180deg, rgba(38, 104, 196, 0.62) 0%, rgba(38, 104, 196, 0.45) 48%, rgba(38, 104, 196, 0) 72%); }
+    .heroInner { padding: 96px 16px 40px; }
+    .heroNote, .heroJp { display: none; }
+    .heroPill { font-size: 14px; padding: 9px 14px; }
+    .search { display: none; }
+    .navCta { margin-left: auto; }
     .heroSub { font-size: 15px; }
     .heroCtas { flex-direction: column; align-items: stretch; }
     .btnGold, .btnGhost { justify-content: center; }
@@ -182,7 +211,6 @@
     .merchBody h3 { font-size: 13.5px; line-height: 1.15; }
     .price { font-size: 13.5px; }
     .badge { left: 6px; top: 6px; font-size: 8.5px; padding: 3px 6px; }
-    .hero { min-height: 600px; }
     .exploreGrid { gap: 12px; }
     .exploreBody { padding: 12px; }
     .exploreBody h3 { font-size: 21px; }

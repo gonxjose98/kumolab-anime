@@ -64,6 +64,14 @@ const EXPLORE = [
     { title: 'Website News', line: 'Every announcement, verified first.', img: '/home-v3/card-town.webp', href: '/blog', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18' },
 ];
 
+const HERO_PILLS = [
+    { label: 'Daily Drops', href: '/latest-daily-drop', icon: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4M8 13h3M8 16h6' },
+    { label: 'Trailers', href: '/blog', icon: 'M3 6h18v12H3zM10 9.5l5 2.5-5 2.5z' },
+    { label: 'Reels', href: `${IG}reels/`, icon: 'M5 4h14v16H5zM5 8h14M9 4l2 4M14 4l2 4M10 12l5 3-5 3z' },
+    { label: 'News', href: '/blog', icon: 'M5 4h11l3 3v13H5zM8 10h8M8 14h8M8 18h5' },
+    { label: 'Weekly Forecast', href: '#forecast', icon: 'M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18Z' },
+];
+
 function Wave({ flip = false }: { flip?: boolean }) {
     return (
         <svg className={`${s.wave} ${flip ? s.waveFlip : ''}`} viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
@@ -88,35 +96,52 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
             <header className={s.nav}>
                 <Link href="/" className={s.brand}>KUMOLAB</Link>
                 <nav className={s.links} aria-label="Main">
-                    <Link href="/blog">Latest</Link>
-                    <a href="#trending">Trending</a>
-                    <a href="#explore">Explore</a>
+                    <a href="#trending">Discover</a>
+                    <Link href="/blog">News</Link>
+                    <Link href="/blog">Trailers</Link>
+                    <a href="#explore">Features</a>
                     <Link href="/merch">Shop</Link>
-                    <Link href="/about">About</Link>
                 </nav>
+                <Link href="/blog" className={s.search} aria-label="Search the feed">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+                </Link>
                 <a href="#forecast" className={s.navCta}>Join</a>
             </header>
 
             {/* ── Hero ────────────────────────────────────────── */}
             <section className={s.hero}>
                 <picture>
-                    <source media="(max-width: 700px)" srcSet="/home-v3/hero-mobile.webp" />
-                    <source media="(max-width: 1500px)" srcSet="/home-v3/hero-1440.webp" />
+                    <source media="(max-width: 760px)" srcSet="/home-v3/hero-m.webp" />
+                    <source media="(max-width: 1500px)" srcSet="/home-v3/hero-1440x.webp" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/home-v3/hero-2560.webp" alt="" className={s.heroImg} fetchPriority="high" />
+                    <img src="/home-v3/hero.webp" alt="" className={s.heroImg} fetchPriority="high" />
                 </picture>
-                <div className={s.heroShade} aria-hidden="true" />
                 <div className={s.heroInner}>
+                    <svg viewBox="0 0 32 24" className={s.heroCloud} aria-hidden="true"><path d="M9 21h15a6 6 0 0 0 .6-12A8 8 0 0 0 9.2 7.5 6.8 6.8 0 0 0 9 21Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
                     <p className={s.kicker}>Anime, above the noise.</p>
                     <h1 className={s.wordmark}>KUMOLAB</h1>
                     <p className={s.tagline}>Your daily anime destination.</p>
                     <p className={s.heroSub}>Fresh drops. New trailers. Real talk. A brighter view on what to watch next.</p>
                     <div className={s.heroCtas}>
                         <a href="#drops" className={s.btnGold}>Explore today&apos;s drops <span aria-hidden="true">→</span></a>
-                        <a href="#forecast" className={s.btnGhost}>Join the forecast</a>
+                        <a href="#forecast" className={s.btnGhost}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                            Join the forecast
+                        </a>
+                    </div>
+                    <div className={s.heroPills}>
+                        {HERO_PILLS.map((pl) => (
+                            <a key={pl.label} href={pl.href} className={s.heroPill} {...(pl.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d={pl.icon} /></svg>{pl.label}
+                            </a>
+                        ))}
                     </div>
                 </div>
-                <Wave />
+                <p className={s.heroNote} aria-hidden="true">Same sky.<br />More to explore.</p>
+                <div className={s.heroJp} aria-hidden="true">
+                    <span className={s.heroJpBig}>雲の上へ</span>
+                    <span>Anime<br />community<br />culture<br />and beyond.</span>
+                </div>
             </section>
 
             <div className={s.sky}>
