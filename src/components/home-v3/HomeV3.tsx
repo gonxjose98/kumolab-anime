@@ -86,10 +86,6 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
             <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
             {/* ── Nav ─────────────────────────────────────────── */}
             <header className={s.nav}>
-                <Link href="/" className={s.brand} aria-label="KumoLab home">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.brandLogo} />
-                </Link>
                 <Link href="/merch" className={s.navLink}>Shop</Link>
                 <a href="#forecast" className={s.navCta}>Join</a>
             </header>
@@ -102,6 +98,10 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/home-v3/hero.webp" alt="" className={s.heroImg} fetchPriority="high" />
                 </picture>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispA}`} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispB}`} />
                 <div className={s.heroInner}>
                     <h1 className={s.wordmark}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -117,7 +117,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                 <section id="drops" className={s.section}>
                     <div className={s.head}>
                         <div>
-                            <h2 className={s.h2}><CloudIcon />Today&apos;s Drops</h2>
+                            <h2 className={s.h2}><SectionIcon name="sparkle" />Today&apos;s Drops</h2>
                             <p className={s.sub}>Fresh anime news, trailers and releases, updated daily.</p>
                         </div>
                     </div>
@@ -144,7 +144,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     <section id="trending" className={s.section}>
                         <div className={s.head}>
                             <div>
-                                <h2 className={s.h2}><span className={s.flame} aria-hidden="true">🔥</span>Trending Now</h2>
+                                <h2 className={s.h2}><SectionIcon name="flame" />Trending Now</h2>
                                 <p className={s.sub}>The most-followed anime on AniList this week.</p>
                             </div>
                         </div>
@@ -166,7 +166,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                 <section id="explore" className={s.section}>
                     <div className={s.head}>
                         <div>
-                            <h2 className={s.h2}><CloudIcon />Explore Anime Your Way</h2>
+                            <h2 className={s.h2}><SectionIcon name="compass" />Explore Anime Your Way</h2>
                             <p className={s.sub}>Different stories. Same beautiful sky.</p>
                         </div>
                     </div>
@@ -191,7 +191,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     <section className={s.section}>
                         <div className={s.head}>
                             <div>
-                                <h2 className={s.h2}><CloudIcon />The Cloud Collection</h2>
+                                <h2 className={s.h2}><SectionIcon name="bag" />The Cloud Collection</h2>
                                 <p className={s.sub}>Wear the anime weather.</p>
                             </div>
                             <Link href="/merch" className={s.pill}>Shop all →</Link>
@@ -218,7 +218,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                 <section className={s.section}>
                     <div className={s.head}>
                         <div>
-                            <h2 className={s.h2}><CloudIcon />Join the Conversation</h2>
+                            <h2 className={s.h2}><SectionIcon name="chat" />Join the Conversation</h2>
                             <p className={s.sub}>Anime lives here too.</p>
                         </div>
                     </div>
@@ -269,10 +269,18 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
     );
 }
 
-function CloudIcon() {
+const ICONS: Record<string, string> = {
+    sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z',
+    flame: 'M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2-4.6.3 1.6 1.2 2.6 2.2 2.9C10.4 8.6 11 5.6 12 3Z',
+    compass: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM15.5 8.5l-2 5-5 2 2-5 5-2Z',
+    bag: 'M5 8h14l-1 12H6L5 8ZM9 8V7a3 3 0 0 1 6 0v1',
+    chat: 'M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z',
+};
+
+function SectionIcon({ name }: { name: string }) {
     return (
-        <svg viewBox="0 0 32 24" className={s.cloudIcon} aria-hidden="true">
-            <path d="M9 21h15a6 6 0 0 0 .6-12A8 8 0 0 0 9.2 7.5 6.8 6.8 0 0 0 9 21Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-        </svg>
+        <span className={s.secIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d={ICONS[name]} /></svg>
+        </span>
     );
 }

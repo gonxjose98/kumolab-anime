@@ -307,3 +307,20 @@
 .heroLogo { height: clamp(120px, 13vw, 210px); width: auto; opacity: 1; animation: none; filter: drop-shadow(0 4px 18px rgba(20, 60, 120, 0.3)); }
 .footLogo { height: 46px; width: auto; opacity: 1; animation: none; margin-bottom: 6px; }
 @media (max-width: 760px) { .heroLogo { height: 120px; } .brandLogo { height: 34px; } }
+
+/* Section title icons: one simple line icon per section (the logo is only used once, in the hero). */
+.secIcon { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.85); box-shadow: 0 3px 12px rgba(40, 90, 160, 0.12); }
+.secIcon svg { width: 21px; height: 21px; fill: none; stroke: #2f6fc4; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+
+/* Faint clouds so the left sky is not empty (cut from the hero art itself). */
+.wisp { position: absolute; z-index: 1; height: auto; pointer-events: none; animation: drift 38s ease-in-out infinite alternate; }
+.wispA { left: 2%; top: 13%; width: clamp(180px, 20vw, 340px); opacity: 0.42; }
+.wispB { left: 30%; top: 5%; width: clamp(110px, 11vw, 190px); opacity: 0.28; transform: scaleX(-1); animation-name: driftB; animation-duration: 46s; }
+@keyframes drift { from { translate: 0 0; } to { translate: 26px -4px; } }
+@keyframes driftB { from { translate: 0 0; } to { translate: -20px 3px; } }
+@media (max-width: 760px) {
+    .wispA { top: 9%; width: 170px; opacity: 0.3; }
+    .wispB { display: none; }
+    .navLink { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .wisp { animation: none; } }
