@@ -15,7 +15,7 @@ export default function ConditionalLayout({
     const isAdmin = pathname?.startsWith('/admin');
     // The link-in-bio hub (/links) is a focused, nav-free landing for social
     // bio traffic; it renders its own full-bleed layout.
-    const isBare = isAdmin || pathname === '/links';
+    const isBare = isAdmin || pathname === '/links' || pathname === '/home-v3';
 
     return (
         <>
