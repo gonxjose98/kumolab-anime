@@ -111,23 +111,37 @@ async function decorateWire(rows: WireRow[]): Promise<WireRow[]> {
 
 const STORY_STOP = new Set(['the', 'a', 'an', 'of', 'and', 'to', 'in', 'on', 'for', 'with', 'is', 'at', 'by', 'its', 'new', 'anime']);
 
-/**
- * Same-story key: the first five meaningful words of the headline, so two
- * outlets covering the same news collapse to one row (Jose: no story twice).
- */
-export function storyKey(r: { plain_title?: string | null; title: string }): string {
+function storyWords(r: { plain_title?: string | null; title: string }): Set<string> {
     const words = (r.plain_title || r.title).toLowerCase().replace(/['’"]/g, '').split(/[^\p{L}\p{N}]+/u)
-        .filter((w) => w && !STORY_STOP.has(w));
-    return words.slice(0, 5).join(' ');
+        .filter((w) => w.length > 2 && !STORY_STOP.has(w));
+    return new Set(words);
 }
 
-/** Keep the first row of each story (input is already in priority order). */
-export function dedupeStories<T extends { plain_title?: string | null; title: string }>(rows: T[], seen = new Set<string>()): T[] {
+/** Two headlines are the same story when most of their meaningful words overlap. */
+function sameStory(a: Set<string>, b: Set<string>): boolean {
+    if (!a.size || !b.size) return false;
+    let shared = 0;
+    for (const w of a) if (b.has(w)) shared++;
+    return shared >= 3 && shared / Math.min(a.size, b.size) >= 0.5;
+}
+
+/** Stable text key for a story (used to pass "already shown" stories between lists). */
+export function storyKey(r: { plain_title?: string | null; title: string }): string {
+    return [...storyWords(r)].join(' ');
+}
+
+/**
+ * Keep the first row of each story (input is already in priority order), so two
+ * outlets covering the same news collapse to one row (Jose: no story twice).
+ * `seen` holds story keys already shown elsewhere (e.g. Top stories).
+ */
+export function dedupeStories<T extends { plain_title?: string | null; title: string }>(rows: T[], seen: Iterable<string> = []): T[] {
+    const kept: Set<string>[] = [...seen].map((k) => new Set(k.split(' ').filter(Boolean)));
     const out: T[] = [];
     for (const r of rows) {
-        const k = storyKey(r);
-        if (k && seen.has(k)) continue;
-        if (k) seen.add(k);
+        const w = storyWords(r);
+        if (kept.some((k) => sameStory(k, w))) continue;
+        kept.push(w);
         out.push(r);
     }
     return out;
@@ -154,7 +168,7 @@ export async function getWireItems(opts: { kind?: string | null; offset?: number
     if (opts.excludeIds?.length) q = q.not('id', 'in', `(${opts.excludeIds.join(',')})`);
     const { data, error } = await q;
     if (error || !data) return [];
-    const unique = dedupeStories(data as WireRow[], new Set(opts.excludeStories || [])).slice(0, want);
+    const unique = dedupeStories(data as WireRow[], opts.excludeStories || []).slice(0, want);
     return decorateWire(unique);
 }
 
@@ -182,14 +196,13 @@ export async function getTopStories(limit = 3): Promise<WireRow[]> {
         || when(b) - when(a));
     const out: WireRow[] = [];
     const shows = new Set<string>();
-    const stories = new Set<string>();
+    const picked: string[] = [];
     for (const r of rows) {
-        const sk = storyKey(r);
-        if (sk && stories.has(sk)) continue;
-        if (sk) stories.add(sk);
+        if (dedupeStories([r], picked).length === 0) continue;
         const key = r.radar_id != null ? `r${r.radar_id}` : r.anime_title ? `t${r.anime_title.toLowerCase()}` : `i${r.id}`;
         if (shows.has(key)) continue;
         shows.add(key);
+        picked.push(storyKey(r));
         out.push(r);
         if (out.length >= limit) break;
     }
