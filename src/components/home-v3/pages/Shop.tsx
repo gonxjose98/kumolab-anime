@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { getVisibleProducts } from '@/lib/merch';
 import { Product } from '@/types';
 import PageShell from '../PageShell';
-import s from '../HomeV3.module.css';
 import p from '../Pages.module.css';
 
 /** Printful thumbs are low-res; the same asset is served larger as `_preview`. */
@@ -27,13 +26,18 @@ export default async function ShopPage() {
                             {products.map((m, i) => {
                                 const anchor = m.anchorPrice != null && m.anchorPrice > m.price ? m.anchorPrice : null;
                                 return (
-                                    <Link key={m.id} href={`/merch/${m.id}`} className={s.merch} data-reveal data-reveal-i={i % 4}>
-                                        {(m.label || m.isFeatured) && <span className={`${s.badge} ${s.badgeGold}`}>{m.label || 'The flagship'}</span>}
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={upgrade(m.image)} alt={m.name} loading="lazy" className={s.merchImg} />
-                                        <div className={s.merchBody}>
-                                            <h3>{m.name}</h3>
-                                            <p className={s.price}>{anchor && <span className={p.anchor}>${anchor.toFixed(2)}</span>}${m.price.toFixed(2)}</p>
+                                    <Link key={m.id} href={`/merch/${m.id}`} className={p.shopCard} data-reveal data-reveal-i={i % 4}>
+                                        <div className={p.shopStage}>
+                                            {(m.label || m.isFeatured) && <span className={p.shopBadge}>{m.label || 'The flagship'}</span>}
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={upgrade(m.image)} alt={m.name} loading="lazy" className={p.shopImg} />
+                                        </div>
+                                        <div className={p.shopInfo}>
+                                            <div>
+                                                <h3 className={p.shopName}>{m.name}</h3>
+                                                <span className={p.shopView}>View details →</span>
+                                            </div>
+                                            <span className={p.shopPrice}>{anchor && <span className={p.anchor}>${anchor.toFixed(2)}</span>}${m.price.toFixed(2)}</span>
                                         </div>
                                     </Link>
                                 );

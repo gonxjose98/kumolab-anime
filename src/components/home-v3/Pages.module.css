@@ -2,7 +2,7 @@
    Card, nav, footer and sky styles come from HomeV3.module.css; this file adds
    the page band, page layouts and the legal two-column layout. */
 .navLinks { display: flex; gap: clamp(14px, 2vw, 34px); margin-left: auto; margin-right: 8px; }
-.navLink { color: #fff; text-decoration: none; font-family: 'Quicksand', sans-serif; font-size: 18px; font-weight: 700; padding: 8px 4px; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.35); opacity: 0.92; border-bottom: 2px solid transparent; }
+.navLink { color: #fff; text-decoration: none; font-family: 'Quicksand', sans-serif; font-size: 18px; font-weight: 700; padding: 8px 4px; text-shadow: 0 1px 3px rgba(10, 40, 90, 0.55), 0 2px 14px rgba(10, 40, 90, 0.45); opacity: 0.92; border-bottom: 2px solid transparent; }
 .navLink:hover { opacity: 1; }
 .navActive { opacity: 1; border-bottom-color: #ffe08a; }
 
@@ -89,3 +89,27 @@
 }
 @media (max-width: 760px) { .grid4[style] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 @media (max-width: 480px) { .grid4[style] { grid-template-columns: minmax(0, 1fr) !important; } }
+
+/* ── Seamless band (Jose, 2026-10-09) ─────────────────────────────────────
+   One sky behind the whole page; the painted band fades into it (no line),
+   the title sits up under the nav, and the content rises into the fade. */
+.skyWrap { position: relative; background: url('/home-v3/sky.webp') center top / 100% auto repeat-y, #9fcaf3; }
+.band { height: clamp(330px, 31vw, 470px); align-items: center; }
+.band::after { display: none; }
+.bandImg { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, rgba(0, 0, 0, 0.6) 72%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 52%, rgba(0, 0, 0, 0.6) 72%, transparent 100%); object-position: 62% 30%; }
+.bandInner { padding-top: 70px; padding-bottom: clamp(70px, 7vw, 120px); }
+.bandSub { color: #fff; text-shadow: 0 2px 12px rgba(20, 60, 120, 0.45); }
+.body { position: relative; z-index: 2; margin-top: clamp(-110px, -6.5vw, -60px); padding-top: 0; }
+
+/* Shop cards: bigger product, soft stage, clear name + price chip. */
+.shopCard { display: flex; flex-direction: column; background: #fff; border-radius: 24px; overflow: hidden; text-decoration: none; color: #13305e; box-shadow: 0 6px 24px rgba(40, 90, 160, 0.12); transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; }
+.shopCard:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(40, 90, 160, 0.18); }
+.shopStage { position: relative; aspect-ratio: 1 / 1; background: radial-gradient(circle at 50% 42%, #ffffff 0%, #eef5fe 70%, #e3eefc 100%); display: grid; place-items: center; }
+.shopImg { width: 82%; height: 82%; object-fit: contain; opacity: 1; animation: none; transition: transform 0.4s ease; mix-blend-mode: multiply; }
+.shopCard:hover .shopImg { transform: scale(1.04); }
+.shopBadge { position: absolute; left: 16px; top: 16px; padding: 5px 12px; border-radius: 999px; background: #fff3c8; color: #a87600; font-family: 'Quicksand', sans-serif; font-size: 13.5px; font-weight: 700; }
+.shopInfo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 20px; }
+.shopName { margin: 0; font-family: 'Quicksand', sans-serif; font-size: clamp(17px, 1.35vw, 21px); font-weight: 700; line-height: 1.25; }
+.shopView { display: block; margin-top: 4px; font-family: 'Quicksand', sans-serif; font-size: 14px; font-weight: 700; color: #2f6fc4; }
+.shopPrice { flex: none; padding: 9px 16px; border-radius: 14px; background: #e3edff; color: #13305e; font-family: 'Quicksand', sans-serif; font-size: clamp(16px, 1.25vw, 19px); font-weight: 700; }
+@media (max-width: 760px) { .bandInner { padding-top: 60px; } .body { margin-top: -50px; } }

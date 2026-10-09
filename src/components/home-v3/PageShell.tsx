@@ -45,6 +45,7 @@ export default function PageShell({
                 <Link href="/#forecast" className={s.navCta}>Join</Link>
             </header>
 
+            <div className={p.skyWrap}>
             <section className={p.band}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/hero-1440x.webp" alt="" className={p.bandImg} />
@@ -54,7 +55,8 @@ export default function PageShell({
                 </div>
             </section>
 
-            <div className={`${s.sky} ${p.body}`}>{children}</div>
+            <div className={p.body}>{children}</div>
+            </div>
 
             <footer className={s.footer}>
                 <svg className={`${s.wave} ${s.waveFlip}`} viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
