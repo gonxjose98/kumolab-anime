@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 // Live terms page now renders the sky-themed version. Implementation lives
 // in the (non-indexed) preview route; rendered here under the canonical
 // /terms URL with production, indexable metadata.
-export { default } from '../redesign-legal/terms/page';
+export { default } from '@/components/home-v3/pages/Terms';
 
 export const metadata: Metadata = {
     title: 'Terms of Service · KumoLab',

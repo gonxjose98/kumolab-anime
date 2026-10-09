@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 // Live feed now renders the sky-themed blog. Implementation lives in the
 // (non-indexed) preview route; rendered here under the canonical /blog URL
 // with production, indexable metadata.
-export { default } from '../redesign-blog/page';
+export { default } from '@/components/home-v3/pages/Latest';
 
 // ISR: cached render, refreshed at most every 5 min (publish revalidates /blog
 // on demand so new posts land immediately). Was force-dynamic.

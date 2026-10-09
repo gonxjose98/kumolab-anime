@@ -1,0 +1,91 @@
+/* Inner pages (Latest, Shop, About, Privacy, Terms) on the home v3 theme.
+   Card, nav, footer and sky styles come from HomeV3.module.css; this file adds
+   the page band, page layouts and the legal two-column layout. */
+.navLinks { display: flex; gap: clamp(14px, 2vw, 34px); margin-left: auto; margin-right: 8px; }
+.navLink { color: #fff; text-decoration: none; font-family: 'Quicksand', sans-serif; font-size: 18px; font-weight: 700; padding: 8px 4px; text-shadow: 0 1px 8px rgba(20, 60, 120, 0.35); opacity: 0.92; border-bottom: 2px solid transparent; }
+.navLink:hover { opacity: 1; }
+.navActive { opacity: 1; border-bottom-color: #ffe08a; }
+
+/* Short band of the hero art with the page title. */
+.band { position: relative; height: clamp(300px, 30vw, 420px); overflow: hidden; display: flex; align-items: flex-end; }
+.bandImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 32%; opacity: 1; animation: none; }
+.band::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(30, 90, 180, 0.15), rgba(30, 90, 180, 0) 40%, rgba(159, 202, 243, 0.9) 100%); }
+.bandInner { position: relative; z-index: 2; width: 100%; max-width: 1720px; margin: 0 auto; padding: 0 clamp(20px, 3.6vw, 72px) clamp(26px, 3vw, 44px); }
+.bandTitle { margin: 0; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(44px, 5.4vw, 92px); line-height: 1; color: #fff; text-shadow: 0 4px 22px rgba(20, 60, 120, 0.35); }
+.bandSub { margin: 10px 0 0; max-width: 760px; font-family: 'Quicksand', sans-serif; font-weight: 700; font-size: clamp(16px, 1.4vw, 21px); color: #13305e; }
+
+.body { padding-top: 10px; min-height: 40vh; }
+.wrap { max-width: 1720px; margin: 0 auto; padding: 24px clamp(20px, 3.6vw, 72px) 60px; }
+
+/* Latest: controls + wide grid */
+.controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 0; cursor: pointer; padding: 10px 18px; border-radius: 999px; background: rgba(255, 255, 255, 0.75); color: #22457c; font-family: 'Quicksand', sans-serif; font-size: 15.5px; font-weight: 700; transition: background 0.2s, color 0.2s; }
+.chip:hover { background: #fff; }
+.chipOn { background: #13305e; color: #fff; }
+.chipOn:hover { background: #13305e; }
+.search { flex: 0 1 380px; min-width: 220px; border: 0; outline: 0; padding: 13px 20px; border-radius: 999px; background: #fff; color: #13305e; font-family: 'Quicksand', sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(16px, 1.6vw, 28px); }
+.more { display: block; margin: 34px auto 0; border: 0; cursor: pointer; padding: 14px 30px; border-radius: 16px; background: linear-gradient(180deg, #ffe58a, #f7c84f); color: #2a2208; font-family: 'Quicksand', sans-serif; font-size: 17px; font-weight: 700; box-shadow: 0 10px 24px rgba(160, 110, 10, 0.22); }
+.empty { text-align: center; padding: 60px 20px; font-family: 'Quicksand', sans-serif; font-size: 18px; font-weight: 700; color: #22457c; }
+
+/* Shop */
+.shopNote { margin: 28px 0 0; text-align: center; font-family: 'Quicksand', sans-serif; font-size: 16px; font-weight: 700; color: #22457c; }
+.anchor { margin-right: 8px; color: #8aa0c2; text-decoration: line-through; font-weight: 600; }
+
+/* About */
+.aboutGrid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(20px, 2.4vw, 40px); align-items: start; }
+.card { background: #fff; border-radius: 22px; padding: clamp(22px, 2.2vw, 36px); box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.cardTitle { margin: 0 0 12px; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(28px, 2.4vw, 40px); color: #13305e; }
+.prose p { margin: 0 0 14px; font-family: 'Quicksand', sans-serif; font-size: clamp(16px, 1.2vw, 19px); font-weight: 600; line-height: 1.6; color: #22457c; }
+.offer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.offerItem { background: #fff; border-radius: 20px; padding: 22px; box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.offerIcon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 12px; }
+.offerIcon svg { width: 24px; height: 24px; fill: none; stroke: var(--pc); stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+.offerItem h3 { margin: 0 0 4px; font-family: 'Quicksand', sans-serif; font-size: clamp(17px, 1.3vw, 20px); font-weight: 700; color: #13305e; }
+.offerItem p { margin: 0; font-family: 'Quicksand', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.45; color: #4c6a96; }
+.t_gold { background: #fff3c8; --pc: #c48a00; }
+.t_pink { background: #ffe1ec; --pc: #d94d82; }
+.t_mint { background: #dcf7e9; --pc: #1d9a62; }
+.t_sky { background: #e1edff; --pc: #2f6fc4; }
+.aboutRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(16px, 1.6vw, 28px); margin-top: clamp(20px, 2.4vw, 40px); align-items: stretch; }
+.ctaCard { display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.ctaCard p { margin: 0; font-family: 'Quicksand', sans-serif; font-size: 16px; font-weight: 600; line-height: 1.5; color: #4c6a96; }
+.ctaBtn { align-self: flex-start; margin-top: 6px; padding: 13px 24px; border-radius: 16px; background: linear-gradient(180deg, #ffe58a, #f7c84f); color: #2a2208; text-decoration: none; font-family: 'Quicksand', sans-serif; font-size: 16.5px; font-weight: 700; box-shadow: 0 8px 20px rgba(160, 110, 10, 0.2); }
+.mail { font-family: 'Quicksand', sans-serif; font-size: 18px; font-weight: 700; color: #2f6fc4; text-decoration: none; word-break: break-all; }
+
+/* Legal: sticky contents on the left, readable document on the right */
+.legal { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: clamp(20px, 3vw, 56px); align-items: start; }
+.toc { position: sticky; top: 24px; background: #fff; border-radius: 20px; padding: 20px 18px; box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.tocTitle { margin: 0 0 10px 8px; font-family: 'Quicksand', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #8aa0c2; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc a { display: block; padding: 8px 10px; border-radius: 10px; text-decoration: none; font-family: 'Quicksand', sans-serif; font-size: 15px; font-weight: 700; color: #22457c; }
+.toc a:hover { background: #f1f6fe; }
+.updated { margin: 14px 0 0 8px; font-family: 'Quicksand', sans-serif; font-size: 13px; font-weight: 700; color: #8aa0c2; }
+.doc { background: #fff; border-radius: 22px; padding: clamp(24px, 3vw, 56px); box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.doc p, .doc li { font-family: 'Quicksand', sans-serif; font-size: clamp(16px, 1.15vw, 18.5px); font-weight: 600; line-height: 1.7; color: #22457c; }
+.doc h2 { margin: 36px 0 10px; scroll-margin-top: 24px; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(26px, 2vw, 34px); color: #13305e; }
+.doc h2:first-of-type { margin-top: 20px; }
+.doc strong { color: #13305e; }
+.doc a { color: #2f6fc4; font-weight: 700; }
+
+@media (max-width: 1100px) {
+    .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .aboutGrid { grid-template-columns: minmax(0, 1fr); }
+    .aboutRow { grid-template-columns: minmax(0, 1fr); }
+    .legal { grid-template-columns: minmax(0, 1fr); }
+    .toc { position: static; }
+}
+@media (max-width: 760px) {
+    .navLinks { gap: 14px; }
+    .navLink { font-size: 15px; }
+    .band { height: 260px; }
+    .search { flex: 1 1 100%; }
+    .offer { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+    .grid4 { grid-template-columns: minmax(0, 1fr); }
+    .navLinks { display: none; }
+}
+@media (max-width: 760px) { .grid4[style] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 480px) { .grid4[style] { grid-template-columns: minmax(0, 1fr) !important; } }

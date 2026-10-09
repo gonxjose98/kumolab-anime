@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 // Live storefront now renders the sky-themed collection. The implementation
 // lives in the (non-indexed) preview route; here we render it under the
 // canonical /merch URL with production, indexable metadata.
-export { default } from '../redesign-merch/page';
+export { default } from '@/components/home-v3/pages/Shop';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
