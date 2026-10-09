@@ -48,7 +48,7 @@ export default function PageShell({
             <div className={p.skyWrap}>
             <section className={p.band}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/home-v3/hero-1440x.webp" alt="" className={p.bandImg} />
+                <img src="/home-v3/hero-1440-s2.webp" alt="" className={p.bandImg} />
                 <div className={p.bandInner}>
                     <h1 className={p.bandTitle}>{title}</h1>
                     {sub && <p className={p.bandSub}>{sub}</p>}

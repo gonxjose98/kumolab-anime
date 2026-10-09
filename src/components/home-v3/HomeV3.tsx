@@ -108,10 +108,10 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
             {/* ── Hero ────────────────────────────────────────── */}
             <section className={s.hero}>
                 <picture>
-                    <source media="(max-width: 760px)" srcSet="/home-v3/hero-m.webp" />
-                    <source media="(max-width: 1500px)" srcSet="/home-v3/hero-1440x.webp" />
+                    <source media="(max-width: 760px)" srcSet="/home-v3/hero-m-s2.webp" />
+                    <source media="(max-width: 1500px)" srcSet="/home-v3/hero-1440-s2.webp" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/home-v3/hero.webp" alt="" className={s.heroImg} fetchPriority="high" />
+                    <img src="/home-v3/hero-s2.webp" alt="" className={s.heroImg} fetchPriority="high" />
                 </picture>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispA}`} />
