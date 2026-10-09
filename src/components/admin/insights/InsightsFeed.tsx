@@ -124,17 +124,18 @@ export default function InsightsFeed({ items, now, empty, footnote }: { items: F
 
     return (
         <div className="ak-ai-feedwrap">
-            <div className="ak-ai-tabs" role="tablist" aria-label="Filter insights">
-                {FEED_TABS.map((t) => (
-                    <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
-                        className={`ak-ai-tab${tab === t.key ? ' is-active' : ''}`} onClick={() => setTab(t.key)}>
-                        {t.label}
-                        {t.key !== 'all' && counts[t.key] > 0 && <span className="ak-ai-tab__n">{counts[t.key]}</span>}
-                    </button>
-                ))}
-            </div>
-
             <section className="ak-ai-feed" aria-label="Insights">
+                <div className="ak-ai-feed__bar">
+                    <div className="ak-ai-tabs" role="tablist" aria-label="Filter insights">
+                        {FEED_TABS.map((t) => (
+                            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
+                                className={`ak-ai-tab${tab === t.key ? ' is-active' : ''}`} onClick={() => setTab(t.key)}>
+                                {t.label}
+                                {t.key !== 'all' && counts[t.key] > 0 && <span className="ak-ai-tab__n">{counts[t.key]}</span>}
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 {shown.length === 0 ? (
                     <div className="ak-ai-empty">
                         <strong>{live.length === 0 ? empty.title : 'Nothing here right now'}</strong>

@@ -175,7 +175,12 @@ export default async function InsightsPage() {
                     <h1 className="ak-ai__title">AI Insights</h1>
                     <div className="ak-ai__status">{statusLine}</div>
                 </div>
-                <RegenerateButton hasKey={hasKey} enabled={enabled} allowed={gate.allowed} reason={gate.reason ?? null} nextAt={gate.nextAt ?? null} />
+                <div className="ak-ai__headr">
+                    <Suspense fallback={<SystemPillFallback />}>
+                        <SystemPillLoader systemCards={systemCards} />
+                    </Suspense>
+                    <RegenerateButton hasKey={hasKey} enabled={enabled} allowed={gate.allowed} reason={gate.reason ?? null} nextAt={gate.nextAt ?? null} />
+                </div>
             </header>
 
             <div className="ak-ai__grid">
@@ -188,9 +193,6 @@ export default async function InsightsPage() {
                 </div>
 
                 <div className="ak-ai__main">
-                    <Suspense fallback={<SystemPillFallback />}>
-                        <SystemPillLoader systemCards={systemCards} />
-                    </Suspense>
                     <InsightsFeed items={feed} now={now} empty={empty} footnote={missing.size > 0 ? `Not available in the last read: ${[...missing].join(', ')}` : null} />
                 </div>
 

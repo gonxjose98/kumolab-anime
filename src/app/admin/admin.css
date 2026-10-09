@@ -3281,3 +3281,17 @@ html[data-admin-theme='dark'] .admin-root .ak-home-fmt--reel { background: rgba(
     .admin-root .ak-ai-tab { padding: 7px 8px; font-size: 12.5px; }
     .admin-root .ak-ai-tab__n { display: none; }
 }
+
+/* AI Insights alignment (Jose, 2026-10-09): the system pill sits in the header
+   and the filter tabs live inside the feed card, so the feed and the "This week"
+   rail start on the same line. */
+.admin-root .ak-ai__headr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.admin-root .ak-ai__headr .ak-xp-pill { align-self: center; }
+.admin-root .ak-ai-feed__bar { padding: 12px 14px; border-bottom: 1px solid var(--ai-line); min-width: 0; }
+.admin-root .ak-ai-feed__bar .ak-ai-tabs { align-self: auto; }
+.admin-root .ak-ai-feed__bar + .ak-ai-row { border-top: 0; }
+@media (max-width: 640px) {
+    .admin-root .ak-ai__head { align-items: flex-start; }
+    .admin-root .ak-ai__headr { width: 100%; }
+    .admin-root .ak-ai-feed__bar { padding: 10px; }
+}
