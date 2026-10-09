@@ -707,4 +707,5 @@ export const CRON_WORKER_KEYS = [
     'detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup',
     'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social',
     'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter', 'refresh-tiers',
+    'radar',
 ] as const;

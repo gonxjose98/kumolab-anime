@@ -2748,3 +2748,68 @@ html[data-admin-theme='dark'] .admin-root .ak-plat--facebook { color: #7fb2ff; }
     .admin-root .ak-an__herotools { align-items: flex-start; }
     .admin-root .ak-an__herotools .ak-pills { max-width: 100%; flex-wrap: wrap; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DISCOVER: Release Radar + Anime Wire (+ dashboard Today/Radar/Wire)
+   Owned by the Discover feature. Calm list rows, details behind expand.
+   ═══════════════════════════════════════════════════════════════════ */
+.admin-root .ak-disc__tabs { align-self: flex-start; }
+.admin-root .ak-disc__bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.admin-root .ak-disc__scrollpills { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+.admin-root .ak-disc__scrollpills::-webkit-scrollbar { display: none; }
+.admin-root .ak-disc__scrollpills .ak-pill { flex: 0 0 auto; }
+
+.admin-root .ak-disc__row { border-top: 1px solid var(--line); min-width: 0; }
+.admin-root ul > .ak-disc__row:first-child { border-top: 0; }
+.admin-root .ak-disc__rowmain { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 16px; background: none; border: 0; text-align: left; color: inherit; cursor: pointer; min-width: 0; font: inherit; }
+.admin-root button.ak-disc__rowmain:hover, .admin-root .ak-disc__rowmain--wire:hover { background: var(--surface-2); }
+.admin-root .ak-disc__rowmain--wire { cursor: default; padding-right: 8px; }
+.admin-root .ak-disc__thumb { width: 36px; height: 50px; border-radius: 6px; object-fit: cover; flex: 0 0 auto; background: var(--surface-2); border: 1px solid var(--line); }
+.admin-root .ak-disc__text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; text-decoration: none; color: inherit; }
+.admin-root .ak-disc__title { font-size: 14px; font-weight: 650; color: var(--ink); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-disc__headline { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.admin-root a.ak-disc__text:hover .ak-disc__headline { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.admin-root .ak-disc__tag { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; vertical-align: 1px; }
+.admin-root .ak-disc__facts { font-size: 12px; color: var(--ink-3); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-disc__anime { align-self: flex-start; max-width: 100%; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--gold-text); background: color-mix(in srgb, var(--gold) 12%, transparent); border-radius: 999px; padding: 1px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-disc__date { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; gap: 2px; font-variant-numeric: tabular-nums; }
+.admin-root .ak-disc__day { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.admin-root .ak-disc__rel { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.admin-root .ak-disc__chev { flex: 0 0 auto; color: var(--ink-3); transition: transform .15s; }
+.admin-root .ak-disc__row--open .ak-disc__chev { transform: rotate(180deg); }
+.admin-root .ak-disc__expand { flex: 0 0 auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 0; background: none; cursor: pointer; }
+.admin-root .ak-disc__expand:hover { background: var(--surface); }
+.admin-root .ak-disc__fav { width: 20px; height: 20px; border-radius: 5px; flex: 0 0 auto; align-self: flex-start; margin-top: 2px; }
+.admin-root .ak-disc__fav--initial { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); }
+
+.admin-root .ak-disc__detail { padding: 2px 16px 14px 64px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.admin-root .ak-disc__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-root .ak-disc__chip { font-size: 12px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.admin-root .ak-disc__dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13px; margin: 0; }
+.admin-root .ak-disc__dl dt { color: var(--ink-3); }
+.admin-root .ak-disc__dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.admin-root .ak-disc__dl a, .admin-root .ak-disc__link { color: var(--gold-text); text-decoration: none; }
+.admin-root .ak-disc__links { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.admin-root .ak-disc__link { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 650; }
+.admin-root .ak-disc__summary { font-size: 13px; line-height: 1.5; color: var(--ink-2); margin: 0; overflow-wrap: anywhere; }
+.admin-root .ak-disc__more { align-self: center; padding: 8px 20px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.admin-root .ak-disc__more:disabled { opacity: .6; cursor: default; }
+
+/* Dashboard blocks (Today / Radar / Wire) */
+.admin-root .ak-dash3__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 16px 8px; }
+.admin-root .ak-dash3__link { font-size: 12px; font-weight: 700; color: var(--gold-text); text-decoration: none; white-space: nowrap; }
+.admin-root .ak-dash3__sub { padding: 10px 16px 4px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.admin-root .ak-dash3__line { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line); min-width: 0; }
+.admin-root .ak-dash3__time { font-size: 12px; font-weight: 700; color: var(--blue); min-width: 62px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.admin-root .ak-dash3__title { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.admin-root .ak-dash3__fmt { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.admin-root .ak-dash3__orders { display: flex; align-items: center; gap: 8px; margin: 8px 16px 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--gold) 12%, transparent); color: var(--gold-text); font-size: 13px; font-weight: 700; text-decoration: none; }
+.admin-root .ak-dash3__empty { padding: 10px 16px 14px; font-size: 13px; color: var(--ink-3); }
+.admin-root .ak-dash3__review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); min-width: 0; }
+.admin-root .ak-dash3__review > .ak-dash3__title { flex-basis: 160px; }
+
+@media (max-width: 560px) {
+    .admin-root .ak-disc__rowmain { padding: 10px 12px; gap: 10px; }
+    .admin-root .ak-disc__detail { padding: 2px 12px 14px 12px; }
+    .admin-root .ak-disc__thumb { width: 32px; height: 44px; }
+}

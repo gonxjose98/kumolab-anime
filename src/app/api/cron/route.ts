@@ -50,6 +50,7 @@ const VALID_WORKERS = [
     'detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup',
     'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social',
     'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter', 'refresh-tiers',
+    'radar',
 ];
 
 // Ad-hoc diagnostics. Dispatchable, but not part of the scheduled cron surface
@@ -451,6 +452,13 @@ async function dispatch(
             lookups: result.lookups,
             reason: result.reason,
         };
+    }
+
+    if (worker === 'radar') {
+        // Release Radar: AniList premieres / upcoming / airing + trending into the wire.
+        const { runRadarWorker } = await import('@/lib/discover/radar');
+        const result = await runRadarWorker();
+        return { success: result.ok, worker: 'radar', ...result };
     }
 
     if (worker === 'cleanup') {

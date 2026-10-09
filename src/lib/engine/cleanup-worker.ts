@@ -391,6 +391,14 @@ export async function runCleanupWorker(): Promise<CleanupResult> {
         result.errors.push(`cleanup_old_daily_reports: ${e.message}`);
     }
 
+    // 10b. Anime Wire: 60-day retention
+    try {
+        const { pruneWire } = await import('../discover/wire');
+        await pruneWire(60);
+    } catch (e: any) {
+        result.errors.push(`wire_prune: ${e.message}`);
+    }
+
     // 11. Stale worker locks
     try {
         const { data } = await supabaseAdmin.rpc('cleanup_stale_locks');

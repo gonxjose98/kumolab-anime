@@ -13,6 +13,7 @@ import {
     Mail,
     Menu,
     Cpu,
+    Radar,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
 import ThemeToggle from './ThemeToggle';
@@ -34,7 +35,12 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
             { href: '/admin/engine', label: 'Engine', jp: '頭脳', icon: Cpu, perm: 'content' },
         ],
     },
-    { label: 'Insight', jp: '観測', items: [{ href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' }] },
+    {
+        label: 'Insight', jp: '観測', items: [
+            { href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' },
+            { href: '/admin/discover', label: 'Discover', jp: '探索', icon: Radar, perm: 'content' },
+        ],
+    },
     { label: 'Shop', jp: '売店', items: [{ href: '/admin/store', label: 'Store', jp: '売店', icon: Store, perm: 'store' }] },
     {
         label: 'Admin', jp: '管理', items: [

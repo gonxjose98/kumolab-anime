@@ -22,6 +22,14 @@ import { YOUTUBE_STUDIO_CHANNELS, CONTENT_RULES } from './sources-config';
 import { logSchedulerRun } from '../logging/scheduler';
 import { logScraperDecision, logError, logAgentAction, logAction } from '../logging/structured-logger';
 import { createFingerprint } from './utils';
+import { parseFeedForWire, upsertWireItems, scanWireOnlyFeeds, type WireItemInput } from '../discover/wire';
+
+// Anime Wire buffer: every scanned feed item lands here BEFORE filtering and is
+// flushed once at the end of the run. Wire failures never break detection.
+let wireBuffer: WireItemInput[] = [];
+function collectWire(xml: string, sourceName: string, youtube = false) {
+  try { wireBuffer.push(...parseFeedForWire(xml, sourceName, { youtube })); } catch { /* wire is best-effort */ }
+}
 
 // RSS positive keyword filter — only accept RSS items matching these terms
 const RSS_REQUIRED_KEYWORDS = [
@@ -547,6 +555,7 @@ async function scanSingleYouTubeChannel(channel: { name: string; channelId: stri
     }
 
     await updateSourceHealthDB(`YouTube_${channel.name}`, channel.tier, true);
+    collectWire(xml, channel.name, true);
 
     const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
     const entries = xml.match(entryRegex) || [];
@@ -677,6 +686,7 @@ export async function runDetectionWorker(): Promise<{
   const allCandidates: DetectionCandidate[] = [];
   const errors: string[] = [];
   let sourcesChecked = 0;
+  wireBuffer = [];
 
   // 1. Scan RSS feeds (Tier 2)
   console.log('[DetectionWorker] Scanning RSS feeds...');
@@ -691,6 +701,7 @@ export async function runDetectionWorker(): Promise<{
     try {
       const xmlText = await fetchRSSWithRetry(source.url);
       if (xmlText) {
+        collectWire(xmlText, source.name);
         const candidates = parseRSSItems(xmlText, source.name);
         allCandidates.push(...candidates);
         await updateSourceHealthDB(source.name, source.tier, true);
@@ -724,6 +735,19 @@ export async function runDetectionWorker(): Promise<{
     errors.push(`YouTube RSS: ${error.message}`);
     await logError({ source: 'detection-worker', errorMessage: error.message, context: { module: 'youtube-rss' } });
   }
+
+  // 2b. Anime Wire: flush everything scanned (pre-filter) + the wire-only feeds.
+  try {
+    const passed = new Set(allCandidates.map(c => c.source_url.replace('://www.', '://')));
+    for (const w of wireBuffer) {
+      if (w.url && passed.has(w.url.replace('://www.', '://'))) w.decision = 'Passed detection filters';
+    }
+    await upsertWireItems(wireBuffer);
+    await scanWireOnlyFeeds();
+  } catch (e: any) {
+    console.error('[DetectionWorker] Wire flush failed (ignored):', e?.message);
+  }
+  wireBuffer = [];
 
   // 3. Save candidates
   console.log(`[DetectionWorker] Saving ${allCandidates.length} candidates...`);

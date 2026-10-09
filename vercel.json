@@ -51,6 +51,10 @@
     {
       "path": "/api/cron?worker=refresh-tiers",
       "schedule": "0 6 * * 3"
+    },
+    {
+      "path": "/api/cron?worker=radar",
+      "schedule": "15 */6 * * *"
     }
   ],
   "build": {
