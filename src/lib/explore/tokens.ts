@@ -203,16 +203,26 @@ async function vercelToken(nowMs: number): Promise<TokenStatus> {
     const base = { key: 'vercel', label: 'Vercel API (saves rotated tokens)' };
     const token = process.env.VERCEL_TOKEN;
     if (!token) return { ...base, level: 'warn', expiresAt: null, daysLeft: null, window: null, detail: 'VERCEL_TOKEN not set, so Meta/Threads auto-refresh cannot save new tokens', action: 'Create a Vercel token and set VERCEL_TOKEN' };
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
     try {
-        const { status, json } = await fetchJson('https://api.vercel.com/v5/user/tokens/current', { headers: { Authorization: `Bearer ${token}` } });
-        if (status === 401 || status === 403) {
-            return { ...base, level: 'crit', expiresAt: null, daysLeft: null, window: 0, detail: `Vercel rejected the token (HTTP ${status}). Meta/Threads auto-refresh cannot save new tokens`, action: 'Create a new Vercel token and set VERCEL_TOKEN' };
+        // The real test is the exact call the rotations make: list the project's env vars.
+        const project = process.env.VERCEL_PROJECT_ID;
+        if (project) {
+            const team = process.env.VERCEL_TEAM_ID ? `?teamId=${process.env.VERCEL_TEAM_ID}` : '';
+            const { status: envStatus } = await fetchJson(`https://api.vercel.com/v9/projects/${project}/env${team}`, auth);
+            if (envStatus !== 200) {
+                return { ...base, level: 'crit', expiresAt: null, daysLeft: null, window: 0, detail: `Vercel rejected the project env call (HTTP ${envStatus}). Meta/Threads auto-refresh cannot save new tokens`, action: 'Create a new Vercel token with access to this project and set VERCEL_TOKEN' };
+            }
         }
-        const exp = typeof json?.token?.expiresAt === 'number' ? json.token.expiresAt : null;
-        if (status !== 200) return { ...base, level: 'unknown', expiresAt: null, daysLeft: null, window: null, detail: `Could not read token info (HTTP ${status})` };
+        // Expiry, when the token type exposes it. A scoped token may 403 here; that alone is not a fault.
+        const { status, json } = await fetchJson('https://api.vercel.com/v5/user/tokens/current', auth);
+        const exp = status === 200 && typeof json?.token?.expiresAt === 'number' ? json.token.expiresAt : null;
+        if (!project && status !== 200) {
+            return { ...base, level: status === 401 || status === 403 ? 'crit' : 'unknown', expiresAt: null, daysLeft: null, window: status === 401 || status === 403 ? 0 : null, detail: `Vercel token check failed (HTTP ${status})`, action: 'Create a new Vercel token and set VERCEL_TOKEN' };
+        }
         return withDates({
             ...base,
-            detail: exp ? `Expires ${fmtDay(new Date(exp).toISOString())}` : 'Valid. No expiry set',
+            detail: exp ? `Working. Expires ${fmtDay(new Date(exp).toISOString())}` : status === 200 ? 'Working. No expiry set' : 'Working. Expiry not readable for this token type',
             action: 'Create a new Vercel token and set VERCEL_TOKEN',
         }, exp, nowMs);
     } catch (e: any) {
