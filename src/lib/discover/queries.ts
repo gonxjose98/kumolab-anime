@@ -81,6 +81,8 @@ export async function getWireItems(opts: { kind?: string | null; offset?: number
         .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
     if (opts.kind && (WIRE_KINDS as readonly string[]).includes(opts.kind)) q = q.eq('kind', opts.kind);
+    // "All" = headlines; the AniList trending top 20 has its own filter so it never floods the feed.
+    else q = q.neq('kind', 'trending');
     const { data, error } = await q;
     if (error || !data) return [];
     const rows = data as WireRow[];

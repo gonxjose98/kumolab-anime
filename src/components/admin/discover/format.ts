@@ -19,8 +19,14 @@ export function radarDate(r: RadarRow): { day: string; rel: string } {
 
 /** The row's one facts line: chips minus the date chip (the date has its own column). */
 export function radarFacts(r: RadarRow, max = 2): string {
-    return (r.chips || [])
-        .filter((c) => !/^(Premieres|Episode \d+ airs|Starts )/.test(c))
+    // Row line: members first (short), then the next most telling fact. The
+    // full wording with its source lives in the expanded chips.
+    const chips = (r.chips || []).filter((c) => !/^(Premieres|Episode \d+ airs|Starts )/.test(c));
+    const members = chips.find((c) => c.includes('members on AniList'));
+    const rest = chips.filter((c) => c !== members);
+    return [members, ...rest]
+        .filter(Boolean)
+        .map((c) => c!.replace(' upcoming on AniList', '').replace(' on AniList', ''))
         .slice(0, max)
         .join(' · ');
 }

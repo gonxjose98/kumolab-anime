@@ -63,7 +63,7 @@ export default function RadarList({ upcoming, airing, bigThreshold, updatedAt }:
 export function RadarItem({ r, compact = false }: { r: RadarRow; compact?: boolean }) {
     const [open, setOpen] = useState(false);
     const { day, rel } = radarDate(r);
-    const facts = radarFacts(r, compact ? 1 : 2);
+    const facts = radarFacts(r, 2);
 
     return (
         <li className={`ak-disc__row ${open ? 'ak-disc__row--open' : ''}`}>

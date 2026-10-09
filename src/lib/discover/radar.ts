@@ -279,7 +279,7 @@ export async function runRadarWorker(): Promise<{ ok: boolean; rows: number; tre
                     title: `#${i + 1} trending on AniList: ${title}`,
                     url: m.siteUrl,
                     source_name: 'AniList Trending',
-                    published_at: runStart.toISOString(),
+                    published_at: new Date(runStart.getTime() - i * 1000).toISOString(), // keeps #1 on top
                     anime_title: title,
                     image: m.coverImage?.large ?? null,
                     summary: `Trending score ${m.trending}. ${compact(m.popularity || 0)} members on AniList.`,

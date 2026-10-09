@@ -99,7 +99,7 @@ export function WireItem({ w, compact = false }: { w: WireRow; compact?: boolean
                         {source}{when && ` · ${when}`}
                         {!compact && w.kind !== 'news' && ` · ${KIND_LABEL[w.kind]}`}
                     </span>
-                    {w.anime_title && <span className="ak-disc__anime">{w.anime_title}</span>}
+                    {w.anime_title && w.kind !== 'trending' && <span className="ak-disc__anime">{w.anime_title}</span>}
                 </a>
                 {!compact && (w.summary || w.decision || w.posted) && (
                     <button className="ak-disc__expand" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Show summary">
