@@ -4,7 +4,7 @@ import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
 import { getScheduleRows, etDayKey, type ScheduleKind } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
-import { getTopStories, getComingUp, getWireItems, type RadarRow } from '@/lib/discover/queries';
+import { getTopStories, getComingUp, getWireItems, getNewsPulse, type RadarRow } from '@/lib/discover/queries';
 import { getTokenAlerts, type TokenAlert } from '@/lib/dashboard/alerts';
 import { WireItem } from '@/components/admin/discover/WireFeed';
 import { radarTitle, countdown } from '@/components/admin/discover/format';
@@ -84,7 +84,12 @@ export default async function DashboardPage() {
         canDiscover ? getTopStories(3).catch(() => []) : Promise.resolve([]),
         canDiscover ? getComingUp(4).catch(() => []) : Promise.resolve([]),
     ]);
-    const latest = canDiscover ? await getWireItems({ limit: 4, excludeIds: stories.map((s) => s.id) }).catch(() => []) : [];
+    const [latest, pulse] = canDiscover
+        ? await Promise.all([
+            getWireItems({ limit: 6, excludeIds: stories.map((s) => s.id) }).catch(() => []),
+            getNewsPulse().catch(() => ({ total: 0, big: 0 })),
+        ])
+        : [[], { total: 0, big: 0 }];
 
     const upcoming = today.scheduled.filter((r) => r.isFuture);
     const nextId = upcoming[0]?.id;
@@ -106,31 +111,19 @@ export default async function DashboardPage() {
                 <NeedsYou tokens={tokens} pending={today.pending} pendingTotal={today.pendingTotal} ordersAwaiting={today.ordersAwaiting} />
             </header>
 
-            <div className="ak-home-cols">
-                <div className="ak-home-col">
-                    {/* 2. Today */}
-                    <section className="ak-card ak-home-card">
-                        <div className="ak-home-h">
-                            <h2>Today</h2>
-                            <Link href="/admin/content/schedule">Schedule</Link>
-                        </div>
-                        {today.scheduled.length === 0 ? (
-                            <p className="ak-home-empty">Nothing scheduled today.</p>
-                        ) : (
-                            <ul className="ak-home-tl">
-                                {today.scheduled.map((r) => (
-                                    <li key={r.id} className={`ak-home-slot ${r.id === nextId ? 'ak-home-slot--next' : ''} ${r.isFuture ? '' : 'ak-home-slot--past'}`}>
-                                        <time>{r.slotLabel}</time>
-                                        <Pic srcs={r.cover ? [r.cover] : []} label={r.title} className="ak-home-slot__img" />
-                                        <Link href={`/admin/post/${r.id}`} className="ak-home-slot__title">{r.title}</Link>
-                                        <span className={`ak-home-fmt ${r.kind === 'video' ? 'ak-home-fmt--reel' : ''}`}>{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
+            <div className="ak-home-layout">
+                <div className="ak-home-main">
+                    {/* News pulse: how much happened in anime since yesterday */}
+                    {canDiscover && (
+                        <p className="ak-home-pulse">
+                            <span className="ak-home-pulse__num">{pulse.total}</span>
+                            {pulse.total === 1 ? 'new anime story' : 'new anime stories'} in the last 24 hours
+                            {pulse.big > 0 && <> · <strong>{pulse.big} big {pulse.big === 1 ? 'one' : 'ones'}</strong></>}
+                            {pulse.total === 0 && ' · a quiet day'}
+                        </p>
+                    )}
 
-
+                    <div className="ak-home-row">
                     {/* 3. Top stories */}
                     {canDiscover && stories.length > 0 && (
                         <section className="ak-card ak-home-card">
@@ -141,10 +134,22 @@ export default async function DashboardPage() {
                             <TopStories stories={stories} />
                         </section>
                     )}
-                </div>
+                    {/* 5. Latest */}
+                    {canDiscover && (
+                    <section className="ak-card ak-home-card">
+                        <div className="ak-home-h">
+                            <h2>Latest</h2>
+                            <Link href="/admin/discover?tab=wire">See all</Link>
+                        </div>
+                        {latest.length === 0
+                            ? <p className="ak-home-empty">The wire fills every 30 minutes.</p>
+                            : <ul>{latest.map((w) => <WireItem key={w.id} w={w} />)}</ul>}
+                    </section>
+                    )}
+                    </div>
 
-                {canDiscover && (
-                    <div className="ak-home-col">
+                    {canDiscover && (
+                        <>
                         {/* 4. Coming up */}
                         <section className="ak-card ak-home-card">
                             <div className="ak-home-h">
@@ -173,19 +178,33 @@ export default async function DashboardPage() {
                                 </div>
                             )}
                         </section>
+                        </>
+                    )}
+                </div>
 
-                        {/* 5. Latest */}
-                        <section className="ak-card ak-home-card">
-                            <div className="ak-home-h">
-                                <h2>Latest</h2>
-                                <Link href="/admin/discover?tab=wire">See all</Link>
-                            </div>
-                            {latest.length === 0
-                                ? <p className="ak-home-empty">The wire fills every 30 minutes.</p>
-                                : <ul>{latest.map((w) => <WireItem key={w.id} w={w} />)}</ul>}
-                        </section>
-                    </div>
-                )}
+                <aside className="ak-home-rail">
+                    {/* 2. Today */}
+                    <section className="ak-card ak-home-card">
+                        <div className="ak-home-h">
+                            <h2>Today</h2>
+                            <Link href="/admin/content/schedule">Schedule</Link>
+                        </div>
+                        {today.scheduled.length === 0 ? (
+                            <p className="ak-home-empty">Nothing scheduled today.</p>
+                        ) : (
+                            <ul className="ak-home-tl">
+                                {today.scheduled.map((r) => (
+                                    <li key={r.id} className={`ak-home-slot ${r.id === nextId ? 'ak-home-slot--next' : ''} ${r.isFuture ? '' : 'ak-home-slot--past'}`}>
+                                        <time>{r.slotLabel}</time>
+                                        <Pic srcs={r.cover ? [r.cover] : []} label={r.title} className="ak-home-slot__img" />
+                                        <Link href={`/admin/post/${r.id}`} className="ak-home-slot__title">{r.title}</Link>
+                                        <span className={`ak-home-fmt ${r.kind === 'video' ? 'ak-home-fmt--reel' : ''}`}>{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                </aside>
             </div>
         </div>
     );
