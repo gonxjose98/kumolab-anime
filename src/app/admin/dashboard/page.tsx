@@ -97,7 +97,7 @@ export default async function DashboardPage() {
         <div className="ak-home">
             {showWelcome && <WelcomeGate name={access.name!.trim()} />}
 
-            <header className="ak-home-top">
+            <header className="ak-home-head">
                 <div className="ak-home-hello">
                     <h1 className="ak-display">{greeting()}{firstName ? `, ${firstName}` : ''}</h1>
                     <p>{dateLine} · {postsLine}</p>

@@ -3299,7 +3299,7 @@ html[data-admin-theme='dark'] .admin-root .ak-home-fmt--reel { background: rgba(
 /* ── Dashboard layout v2 (Jose, 2026-10-09): alerts in a top-right dropdown,
    Today in a right-hand column, content uses the full width. ── */
 .admin-root .ak-home { max-width: none; }
-.admin-root .ak-home-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.admin-root .ak-home-head { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: nowrap; }
 .admin-root .ak-home-bell { position: relative; }
 .admin-root .ak-home-bell__btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid #f4d48a; background: #fff7e6; color: #3a2a08; font: 700 13px/1 var(--ak-sans); cursor: pointer; }
 .admin-root .ak-home-bell__btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
@@ -3320,8 +3320,7 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn--ok { background: r
 }
 @media (max-width: 899px) { .admin-root .ak-home-col--today { order: -1; } }
 .admin-root .ak-content:has(.ak-home) { max-width: none; }
-.admin-root .ak-home-top { flex-wrap: nowrap; }
-.admin-root .ak-home-top .ak-home-hello { flex: 1 1 auto; min-width: 0; }
+.admin-root .ak-home-head .ak-home-hello { flex: 1 1 auto; min-width: 0; }
 .admin-root .ak-home-bell { flex: 0 0 auto; margin-top: 4px; }
 @media (min-width: 900px) {
     .admin-root .ak-home-cols { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(360px, 400px); }
@@ -3329,6 +3328,5 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn--ok { background: r
 @media (min-width: 900px) and (max-width: 1279px) {
     .admin-root .ak-home-cols { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
 }
-.admin-root header.ak-home-top { flex-direction: row; align-items: flex-start; }
 .admin-root .ak-home-bell__panel { background: #ffffff; z-index: 60; }
 html[data-admin-theme='dark'] .admin-root .ak-home-bell__panel { background: #131c38; border-color: rgba(255, 255, 255, .12); box-shadow: 0 18px 44px rgba(0, 0, 0, .5); }
