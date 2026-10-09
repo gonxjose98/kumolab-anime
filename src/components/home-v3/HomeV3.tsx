@@ -272,14 +272,23 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                         </div>
                         <div className={s.follow} data-reveal data-reveal-i={3}>
                             <h3>Follow KumoLab</h3>
-                            <p>News, clips and community, everywhere.</p>
-                            <div className={s.icons}>
+                            <p>Fresh anime every day, wherever you scroll.</p>
+                            <ul className={s.followList}>
                                 {SOCIALS.map((x) => (
-                                    <a key={x.name} href={x.href} target="_blank" rel="noopener noreferrer" aria-label={x.name} className={s.icon}>
-                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={x.path} /></svg>
-                                    </a>
+                                    <li key={x.name}>
+                                        <a href={x.href} target="_blank" rel="noopener noreferrer" className={s.followRow}>
+                                            <span className={`${s.followIcon} ${s[`brand_${x.name.toLowerCase()}`]}`}>
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d={x.path} /></svg>
+                                            </span>
+                                            <span className={s.followText}>
+                                                <span className={s.followName}>{x.name}</span>
+                                                <span className={s.followHandle}>@kumolabanime</span>
+                                            </span>
+                                            <span className={s.followArrow} aria-hidden="true">→</span>
+                                        </a>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         </div>
                     </div>
                 </section>
