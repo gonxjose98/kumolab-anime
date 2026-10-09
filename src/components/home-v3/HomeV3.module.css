@@ -458,3 +458,15 @@
    tiny scale, with a gentle overshoot so it feels light and friendly. */
 :global(html.hv3-reveal) .page [data-reveal] { opacity: 0; translate: 0 28px; scale: 0.97; transition: opacity 0.7s ease var(--d, 0ms), translate 0.8s cubic-bezier(.34, 1.4, .64, 1) var(--d, 0ms), scale 0.8s cubic-bezier(.34, 1.4, .64, 1) var(--d, 0ms); }
 :global(html.hv3-reveal) .page [data-reveal]:global(.is-in) { opacity: 1; translate: 0 0; scale: 1; }
+
+/* Subtitles: darker, a touch heavier, with a soft white halo so they read over clouds. */
+.sub { color: #22457c; font-weight: 700; text-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.8); }
+
+/* Under the Forecast: the cloud field fades into the regular sky (no hard seam). */
+.skyClouds::before { background: url('/home-v3/sky.webp') center top / 100% auto repeat-y, #9fcaf3; }
+.skyClouds::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 30.3vw; z-index: 0; pointer-events: none;
+    background: url('/home-v3/clouds-field.webp') center top / 100% auto no-repeat;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
