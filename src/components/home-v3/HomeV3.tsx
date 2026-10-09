@@ -1,3 +1,4 @@
+import type React from 'react';
 import Link from 'next/link';
 import { Cormorant_Garamond } from 'next/font/google';
 import { BlogPost, Product } from '@/types';
@@ -115,10 +116,22 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispB}`} />
                 <div className={s.heroInner}>
-                    <h1 className={s.headline}>Today in anime.</h1>
-                    <p className={s.tagline}>New episodes, trailers and news, checked every morning.</p>
+                    <h1 className={s.headline} aria-label="Today in anime.">
+                        {/* Same intro as the live homepage wordmark: each letter rises in, 0.07s apart. Words stay unbroken. */}
+                        {(() => {
+                            let i = 0;
+                            return 'Today in anime.'.split(' ').map((word, w) => (
+                                <span key={w} className={s.word} aria-hidden="true">
+                                    {word.split('').map((ch) => (
+                                        <span key={i} className={s.letter} style={{ '--i': i++ } as React.CSSProperties}>{ch}</span>
+                                    ))}
+                                </span>
+                            ));
+                        })()}
+                    </h1>
+                    <p className={`${s.tagline} ${s.introTagline}`}>New episodes, trailers and news, checked every morning.</p>
                     {(soon || todayCount > 0) && (
-                        <a href={soon?.url || '#drops'} className={s.today} {...(soon?.url ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                        <a href={soon?.url || '#drops'} className={`${s.today} ${s.introToday}`} {...(soon?.url ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
                             {soon?.image && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={soon.image} alt="" className={s.todayPoster} />
@@ -130,7 +143,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                             </span>
                         </a>
                     )}
-                    <a href="#drops" className={s.cta}>See what&apos;s new <span className={s.ctaArrow} aria-hidden="true">↓</span></a>
+                    <a href="#drops" className={`${s.cta} ${s.introCta}`}>See what&apos;s new <span className={s.ctaArrow} aria-hidden="true">↓</span></a>
                 </div>
             </section>
 
