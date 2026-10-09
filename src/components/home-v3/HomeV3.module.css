@@ -324,3 +324,12 @@
     .navLink { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .wisp { animation: none; } }
+
+/* Hero copy: plain headline, one sub line, one live fact pill, one button. */
+.headline { margin: 0; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(54px, 6.6vw, 104px); line-height: 0.98; color: #fff; text-shadow: 0 4px 24px rgba(20, 60, 120, 0.3); }
+.heroInner .tagline { margin: 12px 0 18px; max-width: 680px; font-family: var(--round); font-weight: 600; font-size: clamp(18px, 1.6vw, 23px); line-height: 1.35; }
+.live { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 26px; padding: 8px 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.55); backdrop-filter: blur(4px); font-family: var(--round); font-size: 15px; font-weight: 700; color: #fff; }
+.liveDot { width: 8px; height: 8px; border-radius: 50%; background: #7dffb0; box-shadow: 0 0 0 0 rgba(125, 255, 176, 0.7); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(125, 255, 176, 0.6); } 70% { box-shadow: 0 0 0 9px rgba(125, 255, 176, 0); } 100% { box-shadow: 0 0 0 0 rgba(125, 255, 176, 0); } }
+.heroInner > .btnGold { display: flex; width: max-content; }
+@media (max-width: 760px) { .headline { font-size: 50px; } .live { font-size: 13px; padding: 7px 12px; } }

@@ -73,12 +73,23 @@ function Wave({ flip = false }: { flip?: boolean }) {
     );
 }
 
-export default function HomeV3({ posts, products, trending }: { posts: BlogPost[]; products: Product[]; trending: TrendingShow[] }) {
+export default function HomeV3({ posts, products, trending, nextBig }: { posts: BlogPost[]; products: Product[]; trending: TrendingShow[]; nextBig: TrendingShow | null }) {
     const drops = posts.filter((p) => p.image).slice(0, 4);
     const social = posts
         .filter((p) => p.image && (p.social_ids as any)?.instagram_url)
         .slice(0, 6);
     const merch = products.filter((p) => p.isVisible !== false).slice(0, 3);
+
+    // One live, factual line so visitors land with a reason: today's drop count
+    // plus the next episode/premiere among the most-followed shows (this week).
+    const dayAgo = Date.now() - 86400000;
+    const todayCount = posts.filter((p) => new Date(p.published_at || p.timestamp).getTime() > dayAgo).length;
+    const soon = nextBig;
+    const short = (raw: string) => { const t = raw.replace(/\s+(Season|Part|Cour)\s+\d+$/i, ''); return t.length > 28 ? `${t.slice(0, 26).trimEnd()}…` : t; };
+    const parts: string[] = [];
+    if (todayCount > 0) parts.push(`${todayCount} new ${todayCount === 1 ? 'drop' : 'drops'} today`);
+    if (soon) parts.push(`${short(soon.title)} ${airLine(soon).replace(/^Episode/, 'episode').replace(/^Premieres/, 'premieres')}`);
+    const liveLine = parts.join(' · ');
 
     return (
         <div className={`${s.page} ${serif.variable}`}>
@@ -86,6 +97,10 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
             <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
             {/* ── Nav ─────────────────────────────────────────── */}
             <header className={s.nav}>
+                <Link href="/" className={s.brand} aria-label="KumoLab home">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.brandLogo} />
+                </Link>
                 <Link href="/merch" className={s.navLink}>Shop</Link>
                 <a href="#forecast" className={s.navCta}>Join</a>
             </header>
@@ -103,12 +118,10 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/wisp.webp" alt="" aria-hidden="true" className={`${s.wisp} ${s.wispB}`} />
                 <div className={s.heroInner}>
-                    <h1 className={s.wordmark}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.heroLogo} />
-                    </h1>
-                    <p className={s.tagline}>Your daily anime destination.</p>
-                    <a href="#drops" className={s.btnGold}>See today&apos;s drops <span aria-hidden="true">↓</span></a>
+                    <h1 className={s.headline}>Today in anime.</h1>
+                    <p className={s.tagline}>New episodes, trailers and news, checked every morning.</p>
+                    {liveLine && <p className={s.live}><span className={s.liveDot} aria-hidden="true" />{liveLine}</p>}
+                    <a href="#drops" className={s.btnGold}>See what&apos;s new <span aria-hidden="true">↓</span></a>
                 </div>
             </section>
 
