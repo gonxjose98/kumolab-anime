@@ -303,7 +303,7 @@
 }
 
 /* Real KumoLab logo (public/logo.png, recoloured white) everywhere the name appears. */
-.brandLogo { height: 46px; width: auto; opacity: 1; animation: none; filter: drop-shadow(0 2px 8px rgba(20, 60, 120, 0.3)); }
+.brandLogo { height: 40px; width: auto; opacity: 1; animation: none; filter: drop-shadow(0 2px 8px rgba(20, 60, 120, 0.3)); }
 .heroLogo { height: clamp(120px, 13vw, 210px); width: auto; opacity: 1; animation: none; filter: drop-shadow(0 4px 18px rgba(20, 60, 120, 0.3)); }
 .footLogo { height: 46px; width: auto; opacity: 1; animation: none; margin-bottom: 6px; }
 @media (max-width: 760px) { .heroLogo { height: 120px; } .brandLogo { height: 34px; } }
