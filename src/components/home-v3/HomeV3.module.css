@@ -537,3 +537,22 @@
 /* Bigger logo top-left (all v3 pages). */
 .brandLogo { height: 62px; }
 @media (max-width: 760px) { .brandLogo { height: 44px; } }
+
+/* ── Mobile fixes (Jose, 2026-10-09) ─────────────────────────────────────── */
+/* Trending: horizontal swipe only; never drags the cards vertically. */
+.trendRow { overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+/* Cloud Collection cards: product on a soft stage, name + price chip. */
+.merch { display: flex; flex-direction: column; }
+.merchImg { background: radial-gradient(circle at 50% 42%, #ffffff 0%, #eef5fe 72%, #e3eefc 100%); mix-blend-mode: multiply; }
+.merchBody { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.price { flex: none; padding: 6px 12px; border-radius: 12px; background: #e3edff; color: #13305e; margin: 0; }
+@media (max-width: 760px) {
+    .merchGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+    .merchGrid > :first-child { grid-column: 1 / -1; }
+    .merchGrid > :first-child .merchImg { aspect-ratio: auto; height: 220px; }
+    .merchImg { aspect-ratio: 1; padding: 10px; }
+    .merchBody { flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px 14px; }
+    .merchBody h3 { font-size: 14.5px; line-height: 1.25; }
+    .price { font-size: 13.5px; padding: 4px 10px; }
+    .badge { font-size: 11px; padding: 3px 8px; left: 10px; top: 10px; }
+}

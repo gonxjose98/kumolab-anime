@@ -91,3 +91,24 @@
 .perk_pink { background: #ffe1ec; --pc: #d94d82; }
 .perk_mint { background: #dcf7e9; --pc: #1d9a62; }
 .perk_sky { background: #e1edff; --pc: #2f6fc4; }
+
+/* ── Mobile layout (Jose, 2026-10-09): mascot strip with the headline beside
+   the cloud, then a short line, a compact one-row form, and 2x2 perks. ── */
+@media (max-width: 960px) {
+    .wrap { display: block; padding: 0 0 34px; background: linear-gradient(180deg, #4b8fdc 0%, #5f9fe4 60%, #74b0ec 100%); }
+    .band { position: absolute; top: 0; left: 0; right: 0; height: 210px; object-position: 0% 50%; }
+    .inner { position: relative; display: block; padding: 0 16px; }
+    .art { display: none; }
+    .copy { text-align: left; }
+    .kicker { margin: 0; padding: 52px 0 0 53%; font-size: 10.5px; letter-spacing: 0.16em; }
+    .title { padding-left: 53%; font-size: 22px; line-height: 1.12; margin-top: 6px; min-height: 120px; }
+    .sub { margin: 26px 0 14px; max-width: none; font-size: 15.5px; text-align: center; }
+    .form { flex-direction: row; border-radius: 999px; padding: 4px; gap: 0; max-width: none; }
+    .input { padding: 11px 14px; font-size: 15px; }
+    .btn { padding: 10px 16px; font-size: 13.5px; letter-spacing: 0; text-transform: none; font-family: "Quicksand", sans-serif; }
+    .input { font-size: 14.5px; }
+    .perks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; max-width: none; }
+    .perks li { font-size: 13px; gap: 8px; align-items: center; background: rgba(255, 255, 255, 0.16); border-radius: 14px; padding: 8px 10px; }
+    .perkIcon { width: 30px; height: 30px; }
+    .perkIcon svg { width: 15px; height: 15px; }
+}

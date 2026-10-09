@@ -94,7 +94,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
     return (
         <div className={`${s.page} ${serif.variable}`}>
             {/* The storefront locks html/body to 100vh for the old scroll journey; this page uses normal flow. */}
-            <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
+            <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}body>nav,body>header,body>footer,nav[class*=Navigation-module],footer[class*=Footer-module]{display:none!important}`}</style>
             <Reveal />
             {/* ── Nav ─────────────────────────────────────────── */}
             <header className={s.nav}>
@@ -235,7 +235,6 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                                 <h2 className={s.h2}><SectionIcon name="bag" />The Cloud Collection</h2>
                                 <p className={s.sub}>Wear the anime weather.</p>
                             </div>
-                            <Link href="/merch" className={s.pill}>Shop all →</Link>
                         </div>
                         <div className={s.merchGrid}>
                             {merch.map((m, i) => (
@@ -252,6 +251,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                                 </Link>
                             ))}
                         </div>
+                        <Link href="/merch" className={s.seeAll} data-reveal>Shop all</Link>
                     </section>
                 )}
 

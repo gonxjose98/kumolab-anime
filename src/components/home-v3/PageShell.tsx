@@ -32,7 +32,7 @@ export default function PageShell({
 }) {
     return (
         <div className={`${s.page} ${serif.variable}`}>
-            <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
+            <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}body>nav,body>header,body>footer,nav[class*=Navigation-module],footer[class*=Footer-module]{display:none!important}`}</style>
             <Reveal />
             <header className={s.nav}>
                 <Link href="/" className={s.brand} aria-label="KumoLab home">
