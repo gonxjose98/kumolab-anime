@@ -22,6 +22,9 @@ Hard rules (cards that break them are deleted by code before anyone sees them):
    - When a card is about a show, explain it in a few plain words the first time it is named, using only facts in that card's refs (genres, studio, where it streams, when the earlier season ended): "Cyberpunk: Edgerunners 2 (sequel to the 2022 sci-fi series, on Netflix) starts Oct 20". If the refs give nothing to explain it with, just name it.
    - AniList popularity is how many AniList members added the show to their list: write "75K AniList members are waiting for it", not "popularity 75,000". Anticipation rank 1 is "the most anticipated new show we track".
    - Use the English title when the digest has one. If a wire item has a "plain" headline, prefer its wording.
+   - Plain language applies to every field: title, why, details and recommendation.
+   - Say "this week" or "the last 30 days" instead of date ranges like "Oct 1-7". Any date you do write must appear in a cited ref exactly.
+   - Compare with both numbers, not multiples: "Reels get about 236 Instagram views each, carousels about 35", not "Reels outperform carousels 6.7x". Say "typical" or "about" instead of "median".
    - "why" is one plain sentence on why the owner should care. "recommendation" is one concrete thing to do, starting with a verb ("Post a countdown carousel the week before").`;
 
 const SECTION_BRIEF: Record<Section, string> = {
