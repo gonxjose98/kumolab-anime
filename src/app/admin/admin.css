@@ -3324,7 +3324,7 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__panel { background: #13
 .admin-root .ak-home-pulse { margin: 0 2px; font-size: 15px; font-weight: 600; color: var(--ink-2); }
 .admin-root .ak-home-pulse__num { display: inline-block; min-width: 30px; margin-right: 6px; padding: 2px 10px; border-radius: 999px; background: var(--blue, #2f6fc4); color: #fff; font-weight: 800; text-align: center; }
 .admin-root .ak-home-pulse strong { color: var(--ink); }
-.admin-root .ak-home-row { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.admin-root .ak-home-band { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .admin-root .ak-home-rail .ak-home-slot { gap: 10px; padding: 6px 0; }
 .admin-root .ak-home-rail .ak-home-slot time { width: 62px; font-size: 12px; }
 .admin-root .ak-home-rail .ak-home-slot__img { width: 30px; height: 38px; border-radius: 6px; }
@@ -3333,8 +3333,8 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__panel { background: #13
 @media (min-width: 1100px) {
     .admin-root .ak-home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: 18px; }
     .admin-root .ak-home-rail { position: sticky; top: 16px; }
-    .admin-root .ak-home-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; gap: 18px; }
-    .admin-root .ak-home-row > .ak-home-card { height: 100%; display: flex; flex-direction: column; }
+    .admin-root .ak-home-band { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; gap: 18px; }
+    .admin-root .ak-home-band > .ak-home-card { height: 100%; display: flex; flex-direction: column; }
     .admin-root .ak-home-main .ak-home-posters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 1099px) { .admin-root .ak-home-rail { order: -1; } }
@@ -3342,6 +3342,6 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__panel { background: #13
 /* Today sits in the same row as Top stories + Latest so all three cards match in height. */
 @media (min-width: 1100px) {
     .admin-root .ak-home-layout { display: flex; }
-    .admin-root .ak-home-row { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 300px; }
+    .admin-root .ak-home-band { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 300px; }
 }
 @media (max-width: 1099px) { .admin-root .ak-home-todaycard { order: -1; } }

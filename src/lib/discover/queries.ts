@@ -109,12 +109,37 @@ async function decorateWire(rows: WireRow[]): Promise<WireRow[]> {
     return rows;
 }
 
+const STORY_STOP = new Set(['the', 'a', 'an', 'of', 'and', 'to', 'in', 'on', 'for', 'with', 'is', 'at', 'by', 'its', 'new', 'anime']);
+
+/**
+ * Same-story key: the first five meaningful words of the headline, so two
+ * outlets covering the same news collapse to one row (Jose: no story twice).
+ */
+export function storyKey(r: { plain_title?: string | null; title: string }): string {
+    const words = (r.plain_title || r.title).toLowerCase().replace(/['’"]/g, '').split(/[^\p{L}\p{N}]+/u)
+        .filter((w) => w && !STORY_STOP.has(w));
+    return words.slice(0, 5).join(' ');
+}
+
+/** Keep the first row of each story (input is already in priority order). */
+export function dedupeStories<T extends { plain_title?: string | null; title: string }>(rows: T[], seen = new Set<string>()): T[] {
+    const out: T[] = [];
+    for (const r of rows) {
+        const k = storyKey(r);
+        if (k && seen.has(k)) continue;
+        if (k) seen.add(k);
+        out.push(r);
+    }
+    return out;
+}
+
 /**
  * Wire rows, newest first. Default view hides items enrichment flagged as
  * non-anime (`all: true` shows everything). Unenriched rows always show.
  */
-export async function getWireItems(opts: { kind?: string | null; offset?: number; limit?: number; all?: boolean; excludeIds?: number[] } = {}): Promise<WireRow[]> {
-    const limit = Math.min(opts.limit ?? 50, 100);
+export async function getWireItems(opts: { kind?: string | null; offset?: number; limit?: number; all?: boolean; excludeIds?: number[]; excludeStories?: string[] } = {}): Promise<WireRow[]> {
+    const want = Math.min(opts.limit ?? 50, 100);
+    const limit = Math.min(want * 2, 200);
     const offset = Math.max(opts.offset ?? 0, 0);
     let q = supabaseAdmin
         .from('wire_items')
@@ -129,7 +154,8 @@ export async function getWireItems(opts: { kind?: string | null; offset?: number
     if (opts.excludeIds?.length) q = q.not('id', 'in', `(${opts.excludeIds.join(',')})`);
     const { data, error } = await q;
     if (error || !data) return [];
-    return decorateWire(data as WireRow[]);
+    const unique = dedupeStories(data as WireRow[], new Set(opts.excludeStories || [])).slice(0, want);
+    return decorateWire(unique);
 }
 
 /**
@@ -156,7 +182,11 @@ export async function getTopStories(limit = 3): Promise<WireRow[]> {
         || when(b) - when(a));
     const out: WireRow[] = [];
     const shows = new Set<string>();
+    const stories = new Set<string>();
     for (const r of rows) {
+        const sk = storyKey(r);
+        if (sk && stories.has(sk)) continue;
+        if (sk) stories.add(sk);
         const key = r.radar_id != null ? `r${r.radar_id}` : r.anime_title ? `t${r.anime_title.toLowerCase()}` : `i${r.id}`;
         if (shows.has(key)) continue;
         shows.add(key);

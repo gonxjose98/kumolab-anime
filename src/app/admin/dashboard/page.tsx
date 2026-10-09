@@ -4,7 +4,7 @@ import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
 import { getScheduleRows, etDayKey, type ScheduleKind } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
-import { getTopStories, getComingUp, getWireItems, getNewsPulse, type RadarRow } from '@/lib/discover/queries';
+import { getTopStories, getComingUp, getWireItems, getNewsPulse, storyKey, type RadarRow } from '@/lib/discover/queries';
 import { getTokenAlerts, type TokenAlert } from '@/lib/dashboard/alerts';
 import { WireItem } from '@/components/admin/discover/WireFeed';
 import { radarTitle, countdown } from '@/components/admin/discover/format';
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
     ]);
     const [latest, pulse] = canDiscover
         ? await Promise.all([
-            getWireItems({ limit: 6, excludeIds: stories.map((s) => s.id) }).catch(() => []),
+            getWireItems({ limit: 6, excludeIds: stories.map((s) => s.id), excludeStories: stories.map(storyKey) }).catch(() => []),
             getNewsPulse().catch(() => ({ total: 0, big: 0 })),
         ])
         : [[], { total: 0, big: 0 }];
@@ -123,7 +123,7 @@ export default async function DashboardPage() {
                         </p>
                     )}
 
-                    <div className="ak-home-row">
+                    <div className="ak-home-band">
                     {/* 3. Top stories */}
                     {canDiscover && stories.length > 0 && (
                         <section className="ak-card ak-home-card">
