@@ -151,11 +151,20 @@ export async function upsertWireItems(items: WireItemInput[]): Promise<number> {
                 ...i,
                 anime_title: i.anime_title ?? matchTitle(i.title, titles) ?? matchTitle(i.summary || '', titles),
             }));
-        // Don't overwrite a decision already recorded with null.
-        const withDecision = rows.filter((r) => r.decision);
-        const without = rows.filter((r) => !r.decision).map(({ decision: _d, ...rest }) => rest); // eslint-disable-line @typescript-eslint/no-unused-vars
+        // Never overwrite a stored decision / image / anime_title with null on a
+        // re-sighting (enrichment fills image + anime_title later). Rows are
+        // grouped by column set because a bulk upsert nulls missing columns.
+        const KEEP = ['decision', 'image', 'anime_title'] as const;
+        const groups = new Map<string, Record<string, unknown>[]>();
+        for (const r of rows) {
+            const row: Record<string, unknown> = { ...r };
+            for (const k of KEEP) if (row[k] == null) delete row[k];
+            const sig = Object.keys(row).sort().join(',');
+            if (!groups.has(sig)) groups.set(sig, []);
+            groups.get(sig)!.push(row);
+        }
         let written = 0;
-        for (const batch of [withDecision, without]) {
+        for (const batch of groups.values()) {
             if (!batch.length) continue;
             const { error } = await supabaseAdmin.from('wire_items').upsert(batch, { onConflict: 'fingerprint' });
             if (error) console.error('[Wire] upsert failed:', error.message);

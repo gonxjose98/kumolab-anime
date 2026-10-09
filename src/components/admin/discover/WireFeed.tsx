@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { WireRow } from '@/lib/discover/queries';
-import { timeAgo, domainOf, KIND_LABEL } from './format';
+import Pic from '@/components/admin/home/Pic';
+import { KIND_LABEL, KIND_CHIP, wireHeadline, wireImages, shortSource, ageShort, wireDayGroup } from './format';
 
 const FILTERS = [
     { key: '', label: 'All' },
@@ -16,17 +17,18 @@ const FILTERS = [
 
 const PAGE = 50;
 
-/** Anime Wire: every item the scrapers saw, newest first, one line each. */
+/** Anime Wire: every item the scrapers saw, newest first, grouped by day. */
 export default function WireFeed({ initial }: { initial: WireRow[] }) {
     const [kind, setKind] = useState('');
+    const [everything, setEverything] = useState(false);
     const [items, setItems] = useState<WireRow[]>(initial);
     const [busy, setBusy] = useState(false);
     const [done, setDone] = useState(initial.length < PAGE);
 
-    async function load(nextKind: string, offset: number) {
+    async function load(nextKind: string, offset: number, all: boolean) {
         setBusy(true);
         try {
-            const res = await fetch(`/api/admin/wire?kind=${nextKind}&offset=${offset}&limit=${PAGE}`);
+            const res = await fetch(`/api/admin/wire?kind=${nextKind}&offset=${offset}&limit=${PAGE}${all ? '&all=1' : ''}`);
             const json = await res.json();
             const got: WireRow[] = json.items || [];
             setItems((prev) => (offset === 0 ? got : [...prev, ...got]));
@@ -39,7 +41,21 @@ export default function WireFeed({ initial }: { initial: WireRow[] }) {
     function pick(k: string) {
         if (k === kind) return;
         setKind(k);
-        load(k, 0);
+        load(k, 0, everything);
+    }
+
+    function toggleAll() {
+        const next = !everything;
+        setEverything(next);
+        load(kind, 0, next);
+    }
+
+    const groups: { label: string; rows: WireRow[] }[] = [];
+    for (const w of items) {
+        const g = wireDayGroup(w.published_at || w.detected_at);
+        const last = groups[groups.length - 1];
+        if (last && last.label === g) last.rows.push(w);
+        else groups.push({ label: g, rows: [w] });
     }
 
     return (
@@ -52,20 +68,28 @@ export default function WireFeed({ initial }: { initial: WireRow[] }) {
                         </button>
                     ))}
                 </div>
+                <button className="ak-home-toggle" onClick={toggleAll} aria-pressed={everything} title="Anime only hides gaming, live-action and other non-anime items">
+                    {everything ? 'Showing everything' : 'Anime only'}
+                </button>
             </div>
 
-            <div className="ak-card ak-card--flush">
+            <div className="ak-card ak-home-card">
                 {items.length === 0 ? (
-                    <div className="ak-caption" style={{ padding: '28px 16px', textAlign: 'center' }}>
+                    <div className="ak-caption" style={{ padding: '20px 0', textAlign: 'center' }}>
                         {busy ? 'Loading...' : 'Nothing here yet. The wire fills every 30 minutes.'}
                     </div>
                 ) : (
-                    <ul>{items.map((w) => <WireItem key={w.id} w={w} />)}</ul>
+                    groups.map((g, i) => (
+                        <div key={`${g.label}-${i}`}>
+                            <div className="ak-home-group">{g.label}</div>
+                            <ul>{g.rows.map((w) => <WireItem key={w.id} w={w} />)}</ul>
+                        </div>
+                    ))
                 )}
             </div>
 
             {!done && items.length > 0 && (
-                <button className="ak-disc__more" disabled={busy} onClick={() => load(kind, items.length)}>
+                <button className="ak-disc__more" disabled={busy} onClick={() => load(kind, items.length, everything)}>
                     {busy ? 'Loading...' : 'Load more'}
                 </button>
             )}
@@ -73,46 +97,32 @@ export default function WireFeed({ initial }: { initial: WireRow[] }) {
     );
 }
 
-export function SourceMark({ url, name }: { url: string | null; name: string | null }) {
-    const [failed, setFailed] = useState(false);
-    const domain = domainOf(url);
-    const initial = (name || domain || '?').replace(/^YouTube_/, '').charAt(0).toUpperCase();
-    if (!domain || failed) return <span className="ak-disc__fav ak-disc__fav--initial">{initial}</span>;
-    return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="ak-disc__fav" src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} alt="" loading="lazy" onError={() => setFailed(true)} />
-    );
-}
-
-export function WireItem({ w, compact = false }: { w: WireRow; compact?: boolean }) {
+/** One wire row: thumbnail, plain headline, colored kind chip, source and age. Tap for the original. */
+export function WireItem({ w }: { w: WireRow }) {
     const [open, setOpen] = useState(false);
-    const when = timeAgo(w.published_at || w.detected_at);
-    const source = (w.source_name || domainOf(w.url) || '').replace(/^YouTube_/, '');
+    const headline = wireHeadline(w);
+    const age = ageShort(w.published_at || w.detected_at);
+    const source = shortSource(w.source_name, w.url);
 
     return (
-        <li className={`ak-disc__row ${open ? 'ak-disc__row--open' : ''}`}>
-            <div className="ak-disc__rowmain ak-disc__rowmain--wire">
-                <SourceMark url={w.url} name={w.source_name} />
-                <a className="ak-disc__text" href={w.url || '#'} target="_blank" rel="noreferrer">
-                    <span className="ak-disc__headline">{w.title}</span>
-                    <span className="ak-disc__facts">
-                        {source}{when && ` · ${when}`}
-                        {!compact && w.kind !== 'news' && ` · ${KIND_LABEL[w.kind]}`}
+        <li className={`ak-home-row ${open ? 'ak-home-row--open' : ''}`}>
+            <button className="ak-home-row__main" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+                <Pic srcs={wireImages(w)} label={w.anime_title || headline} className="ak-home-row__thumb" />
+                <span className="ak-home-row__text">
+                    <span className="ak-home-row__title">{headline}</span>
+                    <span className="ak-home-row__meta">
+                        <span className={`ak-home-chip ${KIND_CHIP[w.kind] || ''}`}>{KIND_LABEL[w.kind] || 'News'}</span>
+                        <span className="ak-home-row__src">{source}{age && ` · ${age}`}</span>
                     </span>
-                    {w.anime_title && w.kind !== 'trending' && <span className="ak-disc__anime">{w.anime_title}</span>}
-                </a>
-                {!compact && (w.summary || w.decision || w.posted) && (
-                    <button className="ak-disc__expand" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Show summary">
-                        <ChevronDown size={16} className="ak-disc__chev" />
-                    </button>
-                )}
-            </div>
+                </span>
+                <ChevronDown size={16} className="ak-home-row__chev" aria-hidden="true" />
+            </button>
             {open && (
-                <div className="ak-disc__detail">
-                    {w.summary && <p className="ak-disc__summary">{w.summary}</p>}
-                    {(w.posted || w.decision) && (
-                        <p className="ak-caption">KumoLab pipeline: {w.posted ? 'Posted' : w.decision}</p>
-                    )}
+                <div className="ak-home-orig ak-home-orig--row">
+                    {w.plain_title && w.plain_title !== w.title && <p><b>Original headline:</b> {w.title}</p>}
+                    {w.summary && <p className="ak-home-orig__sum">{w.summary}</p>}
+                    {(w.posted || w.decision) && <p className="ak-caption">KumoLab pipeline: {w.posted ? 'Posted' : w.decision}</p>}
+                    {w.url && <a href={w.url} target="_blank" rel="noreferrer">Read at {source || 'source'} ›</a>}
                 </div>
             )}
         </li>

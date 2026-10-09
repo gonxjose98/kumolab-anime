@@ -749,6 +749,16 @@ export async function runDetectionWorker(): Promise<{
   }
   wireBuffer = [];
 
+  // 2c. Wire enrichment: plain headlines + og:images for new rows (capped,
+  // kill switch WIRE_ENRICH_ENABLED). Never allowed to break detection.
+  try {
+    const { runWireEnrich } = await import('../discover/enrich');
+    const er = await runWireEnrich({ cap: 60, budgetMs: 60_000 });
+    console.log('[DetectionWorker] Wire enrich:', JSON.stringify(er));
+  } catch (e: any) {
+    console.error('[DetectionWorker] Wire enrich failed (ignored):', e?.message);
+  }
+
   // 3. Save candidates
   console.log(`[DetectionWorker] Saving ${allCandidates.length} candidates...`);
   const saved = await saveCandidates(allCandidates);

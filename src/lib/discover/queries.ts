@@ -24,6 +24,7 @@ export interface RadarRow {
     prequel_end_date: string | null;
     prequel_site_url: string | null;
     cover_image: string | null;
+    banner_image?: string | null;
     site_url: string | null;
     genres: string[];
     anticipation_rank: number | null;
@@ -43,7 +44,15 @@ export interface WireRow {
     image: string | null;
     summary: string | null;
     decision: string | null;
+    plain_title: string | null;
+    is_anime: boolean | null;
+    importance: number | null;
+    radar_id: number | null;
     posted?: boolean;
+    /** Radar art for the matched show (fallback when the item has no image). */
+    radar_cover?: string | null;
+    radar_banner?: string | null;
+    radar_popularity?: number | null;
 }
 
 const RADAR_COLS = 'anilist_id, title_english, title_romaji, season_label, format, episodes, next_airing_at, next_episode, start_date, status, popularity, favourites, average_score, studios, streaming, prequel_title, prequel_end_date, prequel_site_url, cover_image, site_url, genres, anticipation_rank, chips, updated_at';
@@ -71,28 +80,113 @@ export async function getNextBigPremieres(limit = 5): Promise<RadarRow[]> {
 
 export const WIRE_KINDS = ['news', 'streaming', 'release', 'youtube', 'trending'] as const;
 
-export async function getWireItems(opts: { kind?: string | null; offset?: number; limit?: number } = {}): Promise<WireRow[]> {
+const WIRE_COLS = 'id, kind, title, url, source_name, published_at, detected_at, anime_title, image, summary, decision, plain_title, is_anime, importance, radar_id';
+
+/** Attach "posted" flags + radar art/popularity to wire rows (in place). */
+async function decorateWire(rows: WireRow[]): Promise<WireRow[]> {
+    const urls = rows.map((r) => r.url).filter(Boolean) as string[];
+    const radarIds = [...new Set(rows.map((r) => r.radar_id).filter((x): x is number => x != null))];
+    const titles = [...new Set(rows.filter((r) => r.radar_id == null && r.anime_title).map((r) => r.anime_title as string))];
+    const [posts, radarById, radarByTitle] = await Promise.all([
+        urls.length ? supabaseAdmin.from('posts').select('source_url').in('source_url', urls) : Promise.resolve({ data: [] as { source_url: string }[] }),
+        radarIds.length ? supabaseAdmin.from('release_radar').select('anilist_id, title_english, title_romaji, cover_image, banner_image, popularity').in('anilist_id', radarIds) : Promise.resolve({ data: [] as any[] }),
+        titles.length ? supabaseAdmin.from('release_radar').select('anilist_id, title_english, title_romaji, cover_image, banner_image, popularity').in('title_english', titles) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const posted = new Set((posts.data || []).map((p) => p.source_url));
+    const byId = new Map<number, any>();
+    const byTitle = new Map<string, any>();
+    for (const r of [...(radarById.data || []), ...(radarByTitle.data || [])]) {
+        byId.set(r.anilist_id, r);
+        if (r.title_english) byTitle.set(r.title_english, r);
+    }
+    for (const r of rows) {
+        r.posted = !!r.url && posted.has(r.url);
+        const m = (r.radar_id != null ? byId.get(r.radar_id) : null) || (r.anime_title ? byTitle.get(r.anime_title) : null);
+        r.radar_cover = m?.cover_image ?? null;
+        r.radar_banner = m?.banner_image ?? null;
+        r.radar_popularity = m?.popularity ?? null;
+    }
+    return rows;
+}
+
+/**
+ * Wire rows, newest first. Default view hides items enrichment flagged as
+ * non-anime (`all: true` shows everything). Unenriched rows always show.
+ */
+export async function getWireItems(opts: { kind?: string | null; offset?: number; limit?: number; all?: boolean; excludeIds?: number[] } = {}): Promise<WireRow[]> {
     const limit = Math.min(opts.limit ?? 50, 100);
     const offset = Math.max(opts.offset ?? 0, 0);
     let q = supabaseAdmin
         .from('wire_items')
-        .select('id, kind, title, url, source_name, published_at, detected_at, anime_title, image, summary, decision')
+        .select(WIRE_COLS)
         .order('published_at', { ascending: false, nullsFirst: false })
         .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
     if (opts.kind && (WIRE_KINDS as readonly string[]).includes(opts.kind)) q = q.eq('kind', opts.kind);
     // "All" = headlines; the AniList trending top 20 has its own filter so it never floods the feed.
     else q = q.neq('kind', 'trending');
+    if (!opts.all) q = q.or('is_anime.is.null,is_anime.eq.true');
+    if (opts.excludeIds?.length) q = q.not('id', 'in', `(${opts.excludeIds.join(',')})`);
     const { data, error } = await q;
     if (error || !data) return [];
-    const rows = data as WireRow[];
+    return decorateWire(data as WireRow[]);
+}
 
-    // Mark items that became a KumoLab post (exact source URL match).
-    const urls = rows.map((r) => r.url).filter(Boolean) as string[];
-    if (urls.length) {
-        const { data: posts } = await supabaseAdmin.from('posts').select('source_url').in('source_url', urls);
-        const posted = new Set((posts || []).map((p) => p.source_url));
-        for (const r of rows) r.posted = !!r.url && posted.has(r.url);
+/**
+ * Top stories: last 48h, anime only, ranked by importance, then the matched
+ * show's AniList popularity, then recency. At most one story per show.
+ */
+export async function getTopStories(limit = 3): Promise<WireRow[]> {
+    const since = new Date(Date.now() - 48 * 3600_000).toISOString();
+    const { data, error } = await supabaseAdmin
+        .from('wire_items')
+        .select(WIRE_COLS)
+        .neq('kind', 'trending')
+        .eq('is_anime', true)
+        .not('plain_title', 'is', null)
+        .or(`published_at.gte.${since},and(published_at.is.null,detected_at.gte.${since})`)
+        .order('importance', { ascending: false, nullsFirst: false })
+        .limit(120);
+    if (error || !data) return [];
+    const rows = await decorateWire(data as WireRow[]);
+    const when = (r: WireRow) => Date.parse(r.published_at || r.detected_at) || 0;
+    rows.sort((a, b) =>
+        (b.importance ?? 0) - (a.importance ?? 0)
+        || (b.radar_popularity ?? 0) - (a.radar_popularity ?? 0)
+        || when(b) - when(a));
+    const out: WireRow[] = [];
+    const shows = new Set<string>();
+    for (const r of rows) {
+        const key = r.radar_id != null ? `r${r.radar_id}` : r.anime_title ? `t${r.anime_title.toLowerCase()}` : `i${r.id}`;
+        if (shows.has(key)) continue;
+        shows.add(key);
+        out.push(r);
+        if (out.length >= limit) break;
     }
-    return rows;
+    return out;
+}
+
+/**
+ * Coming up: 2 big premieres + 2 big shows with an episode in the next 3 days,
+ * topped up from either list, then date-sorted.
+ */
+export async function getComingUp(limit = 4): Promise<RadarRow[]> {
+    const { data, error } = await supabaseAdmin.from('release_radar').select(`${RADAR_COLS}, banner_image`).limit(1000);
+    if (error || !data) return [];
+    const rows = data as unknown as RadarRow[];
+    const now = Date.now();
+    const when = (r: RadarRow) => Date.parse(r.next_airing_at || (r.start_date ? `${r.start_date}T12:00:00Z` : '')) || Infinity;
+    const big = (r: RadarRow) => (r.popularity || 0) >= BIG_POPULARITY;
+    const isPremiere = (r: RadarRow) => r.status === 'NOT_YET_RELEASED' || (r.next_episode === 1 && when(r) > now);
+    const premieres = rows.filter((r) => big(r) && isPremiere(r) && when(r) > now - 86_400_000 && when(r) !== Infinity)
+        .sort((a, b) => when(a) - when(b));
+    const episodes = rows.filter((r) => big(r) && !isPremiere(r) && r.next_airing_at && when(r) > now && when(r) < now + 3 * 86_400_000)
+        .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    const half = Math.ceil(limit / 2);
+    const pick = [...premieres.slice(0, half), ...episodes.slice(0, limit - half)];
+    for (const r of [...premieres, ...episodes]) {
+        if (pick.length >= limit) break;
+        if (!pick.includes(r)) pick.push(r);
+    }
+    return pick.sort((a, b) => when(a) - when(b));
 }

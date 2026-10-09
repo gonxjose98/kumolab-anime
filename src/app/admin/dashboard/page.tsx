@@ -1,143 +1,190 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
-import PendingPreview from '@/components/admin/dashboard/PendingPreview';
 import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
 import { getScheduleRows, etDayKey, type ScheduleKind } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
-import { getNextBigPremieres, getWireItems } from '@/lib/discover/queries';
-import { RadarItem } from '@/components/admin/discover/RadarList';
+import { getTopStories, getComingUp, getWireItems, type RadarRow } from '@/lib/discover/queries';
+import { getTokenAlerts, type TokenAlert } from '@/lib/dashboard/alerts';
 import { WireItem } from '@/components/admin/discover/WireFeed';
+import { radarTitle, countdown } from '@/components/admin/discover/format';
+import NeedsYou, { type PendingLite } from '@/components/admin/home/NeedsYou';
+import TopStories from '@/components/admin/home/TopStories';
+import Pic from '@/components/admin/home/Pic';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Dashboard = exactly three calm blocks: Today, Radar, Wire.
- * (System health, source health, social pulse, stat tiles and the activity log
- * moved off the dashboard in the 2026-10 trim; their components live on in
- * components/admin/dashboard/LegacyCards.tsx for the Explore tab.)
+ * Dashboard (2026-10 redesign, approved mock): one calm column on phones.
+ *   1. Needs you   yellow strips only when something needs action, else "All clear"
+ *   2. Today       the posts going out today, next one highlighted
+ *   3. Top stories 1 hero + 2 cards, plain-English headlines (Wire enrichment)
+ *   4. Coming up   2x2 poster grid from the Release Radar
+ *   5. Latest      4 newest wire rows, then the full Wire
+ * Desktop puts 2+3 and 4+5 side by side.
  */
 
 const FORMAT_LABEL: Record<ScheduleKind, string> = { carousel: 'Carousel', video: 'Reel', image: 'Image' };
 const HIDDEN_STATUSES = new Set(['declined', 'rejected', 'deleted']);
+const TZ = 'America/New_York';
 
-async function fetchToday(canReview: boolean) {
+async function fetchToday(canReview: boolean, canStore: boolean) {
     const todayKey = etDayKey(new Date());
     const [rows, pending, orders] = await Promise.all([
         getScheduleRows({ pastHours: 24, futureHours: 24, limit: 60 }),
         canReview
             ? supabaseAdmin.from('posts')
-                .select('id, title, image, source, source_url, youtube_video_id', { count: 'exact' })
-                .eq('status', 'pending').order('timestamp', { ascending: false }).limit(5)
+                .select('id, title, image, source_url, youtube_video_id', { count: 'exact' })
+                .eq('status', 'pending').order('timestamp', { ascending: false }).limit(8)
             : Promise.resolve({ data: [] as any[], count: 0 }),
-        fetchOrders(150).catch(() => ({ orders: [] as any[] })),
+        canStore ? fetchOrders(150).catch(() => ({ orders: [] as any[] })) : Promise.resolve({ orders: [] as any[] }),
     ]);
     return {
         scheduled: rows.filter((r) => r.dayKey === todayKey && !HIDDEN_STATUSES.has((r.status || '').toLowerCase())),
-        pending: (pending.data || []) as any[],
+        pending: (pending.data || []) as PendingLite[],
         pendingTotal: pending.count ?? 0,
         ordersAwaiting: (orders.orders || []).filter((o: any) => o.stage === 'awaiting').length,
     };
+}
+
+function greeting(): string {
+    const h = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: TZ }));
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
+
+function compact(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+    return String(n);
+}
+
+/** "Ep 2 · 84K members · Crunchyroll" or "Premiere · #1 anticipated · Netflix". */
+function posterFacts(r: RadarRow): string {
+    const premiere = r.status === 'NOT_YET_RELEASED' || r.next_episode === 1;
+    const parts: string[] = [];
+    parts.push(premiere ? 'Premiere' : r.next_episode ? `Ep ${r.next_episode}` : 'Airing');
+    if (premiere && r.anticipation_rank && r.anticipation_rank <= 10) parts.push(`#${r.anticipation_rank} anticipated`);
+    else if (r.popularity) parts.push(`${compact(r.popularity)} members`);
+    const stream = (r.streaming || [])[0]?.name;
+    if (stream) parts.push(stream);
+    return parts.join(' · ');
 }
 
 export default async function DashboardPage() {
     const access = await getAccess();
     const canReview = access.isOwner || access.perms.pending;
     const canDiscover = access.isOwner || access.perms.content;
-    const firstName = access.name ? access.name.trim().split(/\s+/)[0] : '';
+    const canStore = access.isOwner || access.perms.store;
+    const firstName = access.name ? access.name.trim().split(/\s+/)[0] : access.isOwner ? 'Jose' : '';
     const showWelcome = access.welcomePending && !!access.name;
 
-    const [today, premieres, wire] = await Promise.all([
-        fetchToday(canReview),
-        canDiscover ? getNextBigPremieres(5) : Promise.resolve([]),
-        canDiscover ? getWireItems({ limit: 8 }) : Promise.resolve([]),
+    const [today, tokens, stories, comingUp] = await Promise.all([
+        fetchToday(canReview, canStore),
+        access.isOwner ? getTokenAlerts().catch(() => [] as TokenAlert[]) : Promise.resolve([] as TokenAlert[]),
+        canDiscover ? getTopStories(3).catch(() => []) : Promise.resolve([]),
+        canDiscover ? getComingUp(4).catch(() => []) : Promise.resolve([]),
     ]);
+    const latest = canDiscover ? await getWireItems({ limit: 4, excludeIds: stories.map((s) => s.id) }).catch(() => []) : [];
+
+    const upcoming = today.scheduled.filter((r) => r.isFuture);
+    const nextId = upcoming[0]?.id;
+    const dateLine = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: TZ });
+    const postsLine = upcoming.length
+        ? `${upcoming.length} ${upcoming.length === 1 ? 'post' : 'posts'} going out today`
+        : today.scheduled.length ? "Today's posts are out" : 'Nothing scheduled today';
 
     return (
-        <div className="flex flex-col gap-5 min-w-0">
+        <div className="ak-home">
             {showWelcome && <WelcomeGate name={access.name!.trim()} />}
-            <div className="ak-display" style={{ fontSize: 22 }}>{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
 
-            {/* ── 1. Today ─────────────────────────────────────────── */}
-            <section className="ak-card ak-card--flush">
-                <div className="ak-dash3__head">
-                    <span className="ak-title">Today</span>
-                    <Link href="/admin/content/schedule" className="ak-dash3__link">Schedule →</Link>
+            <header className="ak-home-hello">
+                <h1 className="ak-display">{greeting()}{firstName ? `, ${firstName}` : ''}</h1>
+                <p>{dateLine} · {postsLine}</p>
+            </header>
+
+            {/* 1. Needs you */}
+            <NeedsYou tokens={tokens} pending={today.pending} pendingTotal={today.pendingTotal} ordersAwaiting={today.ordersAwaiting} />
+
+            <div className="ak-home-cols">
+                <div className="ak-home-col">
+                    {/* 2. Today */}
+                    <section className="ak-card ak-home-card">
+                        <div className="ak-home-h">
+                            <h2>Today</h2>
+                            <Link href="/admin/content/schedule">Schedule</Link>
+                        </div>
+                        {today.scheduled.length === 0 ? (
+                            <p className="ak-home-empty">Nothing scheduled today.</p>
+                        ) : (
+                            <ul className="ak-home-tl">
+                                {today.scheduled.map((r) => (
+                                    <li key={r.id} className={`ak-home-slot ${r.id === nextId ? 'ak-home-slot--next' : ''} ${r.isFuture ? '' : 'ak-home-slot--past'}`}>
+                                        <time>{r.slotLabel}</time>
+                                        <Pic srcs={r.cover ? [r.cover] : []} label={r.title} className="ak-home-slot__img" />
+                                        <Link href={`/admin/post/${r.id}`} className="ak-home-slot__title">{r.title}</Link>
+                                        <span className={`ak-home-fmt ${r.kind === 'video' ? 'ak-home-fmt--reel' : ''}`}>{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+
+                    {/* 3. Top stories */}
+                    {canDiscover && stories.length > 0 && (
+                        <section className="ak-card ak-home-card">
+                            <div className="ak-home-h">
+                                <h2>Top stories</h2>
+                                <Link href="/admin/discover?tab=wire">All news</Link>
+                            </div>
+                            <TopStories stories={stories} />
+                        </section>
+                    )}
                 </div>
 
-                {today.ordersAwaiting > 0 && (
-                    <Link href="/admin/store/orders" className="ak-dash3__orders">
-                        {today.ordersAwaiting} paid {today.ordersAwaiting === 1 ? 'order' : 'orders'} awaiting your approval →
-                    </Link>
+                {canDiscover && (
+                    <div className="ak-home-col">
+                        {/* 4. Coming up */}
+                        <section className="ak-card ak-home-card">
+                            <div className="ak-home-h">
+                                <h2>Coming up</h2>
+                                <Link href="/admin/discover?tab=radar">Full radar</Link>
+                            </div>
+                            {comingUp.length === 0 ? (
+                                <p className="ak-home-empty">No big premieres or episodes in the next few days.</p>
+                            ) : (
+                                <div className="ak-home-posters">
+                                    {comingUp.map((r) => {
+                                        const cd = countdown(r);
+                                        const title = radarTitle(r);
+                                        return (
+                                            <a key={r.anilist_id} href={r.site_url || '#'} target="_blank" rel="noreferrer" className="ak-home-poster">
+                                                <Pic srcs={[r.cover_image, r.banner_image].filter((x): x is string => !!x)} label={title} className="ak-home-poster__img" />
+                                                <span className="ak-home-poster__shade" aria-hidden="true" />
+                                                <span className={`ak-home-cd ${cd.hot ? 'ak-home-cd--hot' : ''}`}>{cd.label}</span>
+                                                <span className="ak-home-poster__text">
+                                                    <span className="ak-home-poster__title">{title}</span>
+                                                    <span className="ak-home-poster__meta">{posterFacts(r)}</span>
+                                                </span>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* 5. Latest */}
+                        <section className="ak-card ak-home-card">
+                            <div className="ak-home-h">
+                                <h2>Latest</h2>
+                                <Link href="/admin/discover?tab=wire">See all</Link>
+                            </div>
+                            {latest.length === 0
+                                ? <p className="ak-home-empty">The wire fills every 30 minutes.</p>
+                                : <ul>{latest.map((w) => <WireItem key={w.id} w={w} />)}</ul>}
+                        </section>
+                    </div>
                 )}
-
-                {today.scheduled.length === 0 ? (
-                    <div className="ak-dash3__empty">Nothing scheduled today.</div>
-                ) : (
-                    <ul style={{ marginTop: 6 }}>
-                        {today.scheduled.map((r) => (
-                            <li key={r.id} className="ak-dash3__line" style={r.isFuture ? undefined : { opacity: 0.55 }}>
-                                <span className="ak-dash3__time">{r.slotLabel}</span>
-                                <Link href={`/admin/post/${r.id}`} className="ak-dash3__title">{r.title}</Link>
-                                <span className="ak-dash3__fmt">{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-
-                {canReview && today.pending.length > 0 && (
-                    <>
-                        <div className="ak-dash3__sub">Needs approval · {today.pendingTotal}</div>
-                        <ul>
-                            {today.pending.map((p) => (
-                                <li key={p.id} className="ak-dash3__review">
-                                    <PendingPreview image={p.image} youtubeId={p.youtube_video_id} sourceUrl={p.source_url} title={p.title} />
-                                    <Link href={`/admin/post/${p.id}`} className="ak-dash3__title">{p.title}</Link>
-                                    <div className="ml-auto shrink-0">
-                                        <PendingReviewActions
-                                            postId={p.id}
-                                            originalFormat={(p.youtube_video_id || /youtube\.com|youtu\.be/.test(p.source_url || '')) ? 'reel' : 'landscape'}
-                                        />
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                        {today.pendingTotal > today.pending.length && (
-                            <Link href="/admin/content/posts" className="ak-dash3__link" style={{ display: 'block', padding: '10px 16px 14px' }}>
-                                All {today.pendingTotal} pending →
-                            </Link>
-                        )}
-                    </>
-                )}
-                <div style={{ height: 8 }} />
-            </section>
-
-            {canDiscover && (
-                <>
-                    {/* ── 2. Radar ─────────────────────────────────── */}
-                    <section className="ak-card ak-card--flush">
-                        <div className="ak-dash3__head">
-                            <span className="ak-title">Radar · next big premieres</span>
-                            <Link href="/admin/discover?tab=radar" className="ak-dash3__link">Full Radar →</Link>
-                        </div>
-                        {premieres.length === 0
-                            ? <div className="ak-dash3__empty">No big premieres in the next 60 days.</div>
-                            : <ul>{premieres.map((r) => <RadarItem key={r.anilist_id} r={r} compact />)}</ul>}
-                    </section>
-
-                    {/* ── 3. Wire ──────────────────────────────────── */}
-                    <section className="ak-card ak-card--flush">
-                        <div className="ak-dash3__head">
-                            <span className="ak-title">Wire · latest</span>
-                            <Link href="/admin/discover?tab=wire" className="ak-dash3__link">Full Wire →</Link>
-                        </div>
-                        {wire.length === 0
-                            ? <div className="ak-dash3__empty">The wire fills every 30 minutes.</div>
-                            : <ul>{wire.map((w) => <WireItem key={w.id} w={w} compact />)}</ul>}
-                    </section>
-                </>
-            )}
+            </div>
         </div>
     );
 }
