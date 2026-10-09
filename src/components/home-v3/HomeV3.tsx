@@ -64,14 +64,6 @@ const EXPLORE = [
     { accent: 'mint', title: 'Website News', line: 'Every announcement, verified first.', img: '/home-v3/card-town.webp', href: '/blog', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18' },
 ];
 
-const HERO_PILLS = [
-    { label: 'Daily Drops', href: '/latest-daily-drop', icon: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4M8 13h3M8 16h6' },
-    { label: 'Trailers', href: '/blog', icon: 'M3 6h18v12H3zM10 9.5l5 2.5-5 2.5z' },
-    { label: 'Reels', href: `${IG}reels/`, icon: 'M5 4h14v16H5zM5 8h14M9 4l2 4M14 4l2 4M10 12l5 3-5 3z' },
-    { label: 'News', href: '/blog', icon: 'M5 4h11l3 3v13H5zM8 10h8M8 14h8M8 18h5' },
-    { label: 'Weekly Forecast', href: '#forecast', icon: 'M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18Z' },
-];
-
 function Wave({ flip = false }: { flip?: boolean }) {
     return (
         <svg className={`${s.wave} ${flip ? s.waveFlip : ''}`} viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
@@ -94,17 +86,11 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
             <style>{`html,body{height:auto!important;min-height:100%;overflow-y:visible!important;overflow-x:clip!important;background:#4f9ae6}`}</style>
             {/* ── Nav ─────────────────────────────────────────── */}
             <header className={s.nav}>
-                <Link href="/" className={s.brand}>KUMOLAB</Link>
-                <nav className={s.links} aria-label="Main">
-                    <a href="#trending">Discover</a>
-                    <Link href="/blog">News</Link>
-                    <Link href="/blog">Trailers</Link>
-                    <a href="#explore">Features</a>
-                    <Link href="/merch">Shop</Link>
-                </nav>
-                <Link href="/blog" className={s.search} aria-label="Search the feed">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+                <Link href="/" className={s.brand} aria-label="KumoLab home">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.brandLogo} />
                 </Link>
+                <Link href="/merch" className={s.navLink}>Shop</Link>
                 <a href="#forecast" className={s.navCta}>Join</a>
             </header>
 
@@ -117,30 +103,12 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     <img src="/home-v3/hero.webp" alt="" className={s.heroImg} fetchPriority="high" />
                 </picture>
                 <div className={s.heroInner}>
-                    <svg viewBox="0 0 32 24" className={s.heroCloud} aria-hidden="true"><path d="M9 21h15a6 6 0 0 0 .6-12A8 8 0 0 0 9.2 7.5 6.8 6.8 0 0 0 9 21Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-                    <p className={s.kicker}>Anime, above the noise.</p>
-                    <h1 className={s.wordmark}>KUMOLAB</h1>
+                    <h1 className={s.wordmark}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.heroLogo} />
+                    </h1>
                     <p className={s.tagline}>Your daily anime destination.</p>
-                    <p className={s.heroSub}>Fresh drops. New trailers. Real talk. A brighter view on what to watch next.</p>
-                    <div className={s.heroCtas}>
-                        <a href="#drops" className={s.btnGold}>Explore today&apos;s drops <span aria-hidden="true">→</span></a>
-                        <a href="#forecast" className={s.btnGhost}>
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-                            Join the forecast
-                        </a>
-                    </div>
-                    <div className={s.heroPills}>
-                        {HERO_PILLS.map((pl) => (
-                            <a key={pl.label} href={pl.href} className={s.heroPill} {...(pl.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d={pl.icon} /></svg>{pl.label}
-                            </a>
-                        ))}
-                    </div>
-                </div>
-                <p className={s.heroNote} aria-hidden="true">Same sky.<br />More to explore.</p>
-                <div className={s.heroJp} aria-hidden="true">
-                    <span className={s.heroJpBig}>雲の上へ</span>
-                    <span>Anime<br />community<br />culture<br />and beyond.</span>
+                    <a href="#drops" className={s.btnGold}>See today&apos;s drops <span aria-hidden="true">↓</span></a>
                 </div>
             </section>
 
@@ -152,7 +120,6 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                             <h2 className={s.h2}><CloudIcon />Today&apos;s Drops</h2>
                             <p className={s.sub}>Fresh anime news, trailers and releases, updated daily.</p>
                         </div>
-                        <Link href="/blog" className={s.pill}>See all drops →</Link>
                     </div>
                     <div className={s.dropGrid}>
                         {drops.map((p) => {
@@ -164,13 +131,12 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                                     <div className={s.dropBody}>
                                         <div className={s.dropMeta}><span className={`${s.chip} ${s[`tone_${c.tone}`]}`}>{c.label}</span><span>{ago(p.published_at || p.timestamp)}</span></div>
                                         <h3 className={s.dropTitle}>{p.title}</h3>
-                                        {p.excerpt && <p className={s.dropEx}>{p.excerpt}</p>}
-                                        <span className={s.arrow} aria-hidden="true">→</span>
                                     </div>
                                 </Link>
                             );
                         })}
                     </div>
+                    <Link href="/blog" className={s.seeAll}>See all</Link>
                 </section>
 
                 {/* ── Trending Now ─────────────────────────────── */}
@@ -192,6 +158,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                                 href: t.url || '#',
                             }))}
                         />
+                        <a href="https://anilist.co/search/anime/trending" target="_blank" rel="noopener noreferrer" className={s.seeAll}>See all</a>
                     </section>
                 )}
 
@@ -205,19 +172,10 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     </div>
                     <div className={s.exploreGrid}>
                         {EXPLORE.map((e) => (
-                            <a key={e.title} href={e.href} className={`${s.explore} ${s[`acc_${e.accent}`]}`} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
-                                <div className={s.exploreFrame}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={e.img} alt="" loading="lazy" className={s.exploreImg} />
-                                    <svg className={s.sticker} viewBox="0 0 48 34" aria-hidden="true"><path d="M13 31h24a9 9 0 0 0 1-18A12 12 0 0 0 15.4 10 10.5 10.5 0 0 0 13 31Z" fill="#fff" stroke="rgba(120,160,220,.5)" strokeWidth="1.5" /><circle cx="20" cy="21" r="1.6" fill="#3b4a6b" /><circle cx="30" cy="21" r="1.6" fill="#3b4a6b" /><path d="M23 24.5q2 1.8 4 0" stroke="#3b4a6b" strokeWidth="1.3" fill="none" strokeLinecap="round" /><circle cx="16.5" cy="24" r="2" fill="#ffb3c4" opacity=".8" /><circle cx="33.5" cy="24" r="2" fill="#ffb3c4" opacity=".8" /></svg>
-                                </div>
-                                <div className={s.exploreBody}>
-                                    <span className={s.exploreIcon}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={e.icon} /></svg></span>
-                                    <div>
-                                        <h3>{e.title}</h3>
-                                        <p>{e.line}</p>
-                                    </div>
-                                </div>
+                            <a key={e.title} href={e.href} className={s.explore} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={e.img} alt="" loading="lazy" className={s.exploreImg} />
+                                <span className={s.exploreName}>{e.title}</span>
                             </a>
                         ))}
                     </div>
@@ -293,7 +251,8 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                 <Wave flip />
                 <div className={s.footInner}>
                     <div>
-                        <div className={s.footBrand}>KUMOLAB</div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.footLogo} />
                         <div className={s.footTag}>Anime, above the noise.</div>
                     </div>
                     <nav className={s.footLinks} aria-label="Footer">
