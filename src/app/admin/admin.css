@@ -3329,3 +3329,4 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn--ok { background: r
 @media (min-width: 900px) and (max-width: 1279px) {
     .admin-root .ak-home-cols { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
 }
+.admin-root header.ak-home-top { flex-direction: row; align-items: flex-start; }
