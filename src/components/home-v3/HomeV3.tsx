@@ -86,10 +86,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
     const todayCount = posts.filter((p) => new Date(p.published_at || p.timestamp).getTime() > dayAgo).length;
     const soon = nextBig;
     const short = (raw: string) => { const t = raw.replace(/\s+(Season|Part|Cour)\s+\d+$/i, ''); return t.length > 28 ? `${t.slice(0, 26).trimEnd()}…` : t; };
-    const parts: string[] = [];
-    if (todayCount > 0) parts.push(`${todayCount} new ${todayCount === 1 ? 'drop' : 'drops'} today`);
-    if (soon) parts.push(`${short(soon.title)} ${airLine(soon).replace(/^Episode/, 'episode').replace(/^Premieres/, 'premieres')}`);
-    const liveLine = parts.join(' · ');
+    const airText = soon ? airLine(soon) : '';
 
     return (
         <div className={`${s.page} ${serif.variable}`}>
@@ -120,8 +117,20 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                 <div className={s.heroInner}>
                     <h1 className={s.headline}>Today in anime.</h1>
                     <p className={s.tagline}>New episodes, trailers and news, checked every morning.</p>
-                    {liveLine && <p className={s.live}><span className={s.liveDot} aria-hidden="true" />{liveLine}</p>}
-                    <a href="#drops" className={s.btnGold}>See what&apos;s new <span aria-hidden="true">↓</span></a>
+                    {(soon || todayCount > 0) && (
+                        <a href={soon?.url || '#drops'} className={s.today} {...(soon?.url ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                            {soon?.image && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={soon.image} alt="" className={s.todayPoster} />
+                            )}
+                            <span className={s.todayText}>
+                                {soon && <span className={s.todayLabel}><span className={s.liveDot} aria-hidden="true" />{airText}</span>}
+                                {soon && <span className={s.todayTitle}>{short(soon.title)}</span>}
+                                {todayCount > 0 && <span className={s.todayCount}>✦ {todayCount} new {todayCount === 1 ? 'drop' : 'drops'} today</span>}
+                            </span>
+                        </a>
+                    )}
+                    <a href="#drops" className={s.cta}>See what&apos;s new <span className={s.ctaArrow} aria-hidden="true">↓</span></a>
                 </div>
             </section>
 

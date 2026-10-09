@@ -333,3 +333,34 @@
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(125, 255, 176, 0.6); } 70% { box-shadow: 0 0 0 9px rgba(125, 255, 176, 0); } 100% { box-shadow: 0 0 0 0 rgba(125, 255, 176, 0); } }
 .heroInner > .btnGold { display: flex; width: max-content; }
 @media (max-width: 760px) { .headline { font-size: 50px; } .live { font-size: 13px; padding: 7px 12px; } }
+
+/* "Today" card: a small tilted frosted card with the airing show's poster. */
+.today {
+    display: inline-flex; align-items: center; gap: 14px; margin: 0 0 26px; padding: 10px 18px 10px 10px;
+    border-radius: 20px; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(8px);
+    box-shadow: 0 10px 30px rgba(20, 60, 120, 0.18); text-decoration: none; color: var(--ink);
+    transform: rotate(-1.5deg); transition: transform 0.3s ease;
+}
+.today:hover { transform: rotate(0deg) translateY(-2px); }
+.todayPoster { width: 50px; height: 68px; border-radius: 12px; object-fit: cover; flex: none; opacity: 1; animation: none; box-shadow: 0 3px 10px rgba(20, 60, 120, 0.2); }
+.todayText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.todayLabel { display: inline-flex; align-items: center; gap: 7px; font-family: var(--round); font-size: 12.5px; font-weight: 700; color: #2f6fc4; }
+.todayTitle { font-family: var(--round); font-size: 17px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.todayCount { font-family: var(--round); font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.today .liveDot { background: #31c46f; width: 7px; height: 7px; }
+
+/* Main button: soft rounded rectangle, arrow in a little bobbing circle. */
+.cta {
+    display: flex; width: max-content; align-items: center; gap: 12px; padding: 13px 14px 13px 24px; border-radius: 16px;
+    background: linear-gradient(180deg, #ffe58a, #f7c84f); color: #2a2208; text-decoration: none;
+    font-family: var(--round); font-size: 17px; font-weight: 700; box-shadow: 0 10px 24px rgba(160, 110, 10, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cta:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(160, 110, 10, 0.3); }
+.ctaArrow { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.75); font-size: 15px; animation: bobArrow 1.8s ease-in-out infinite; }
+@keyframes bobArrow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+@media (max-width: 760px) {
+    .today { margin-bottom: 22px; max-width: 100%; }
+    .todayTitle { font-size: 15.5px; max-width: 220px; }
+}
+@media (prefers-reduced-motion: reduce) { .ctaArrow { animation: none; } }
