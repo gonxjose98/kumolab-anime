@@ -58,10 +58,10 @@ function airLine(t: TrendingShow): string {
 const fmtK = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}K` : String(n));
 
 const EXPLORE = [
-    { title: 'Carousels', line: 'Curated lists, rankings and story spotlights.', img: '/home-v3/card-train.webp', href: IG, icon: 'M4 5h16v14H4zM8 3v4M16 3v4' },
-    { title: 'Fan Reels', line: 'Our favorite scenes, cut by fans for fans.', img: '/home-v3/card-sunset.webp', href: `${IG}reels/`, icon: 'M3 7h13v10H3zM16 10l5-3v10l-5-3' },
-    { title: 'News Reels', line: 'The week in anime, in 30 seconds.', img: '/home-v3/card-railing.webp', href: `${IG}reels/`, icon: 'M5 4h11l3 3v13H5zM8 10h8M8 14h8M8 18h5' },
-    { title: 'Website News', line: 'Every announcement, verified first.', img: '/home-v3/card-town.webp', href: '/blog', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18' },
+    { accent: 'pink', title: 'Carousels', line: 'Curated lists, rankings and story spotlights.', img: '/home-v3/card-train.webp', href: IG, icon: 'M4 5h16v14H4zM8 3v4M16 3v4' },
+    { accent: 'peach', title: 'Fan Reels', line: 'Our favorite scenes, cut by fans for fans.', img: '/home-v3/card-sunset.webp', href: `${IG}reels/`, icon: 'M3 7h13v10H3zM16 10l5-3v10l-5-3' },
+    { accent: 'sky', title: 'News Reels', line: 'The week in anime, in 30 seconds.', img: '/home-v3/card-railing.webp', href: `${IG}reels/`, icon: 'M5 4h11l3 3v13H5zM8 10h8M8 14h8M8 18h5' },
+    { accent: 'mint', title: 'Website News', line: 'Every announcement, verified first.', img: '/home-v3/card-town.webp', href: '/blog', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18' },
 ];
 
 const HERO_PILLS = [
@@ -205,13 +205,18 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
                     </div>
                     <div className={s.exploreGrid}>
                         {EXPLORE.map((e) => (
-                            <a key={e.title} href={e.href} className={s.explore} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={e.img} alt="" loading="lazy" className={s.exploreImg} />
+                            <a key={e.title} href={e.href} className={`${s.explore} ${s[`acc_${e.accent}`]}`} {...(e.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                                <div className={s.exploreFrame}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={e.img} alt="" loading="lazy" className={s.exploreImg} />
+                                    <svg className={s.sticker} viewBox="0 0 48 34" aria-hidden="true"><path d="M13 31h24a9 9 0 0 0 1-18A12 12 0 0 0 15.4 10 10.5 10.5 0 0 0 13 31Z" fill="#fff" stroke="rgba(120,160,220,.5)" strokeWidth="1.5" /><circle cx="20" cy="21" r="1.6" fill="#3b4a6b" /><circle cx="30" cy="21" r="1.6" fill="#3b4a6b" /><path d="M23 24.5q2 1.8 4 0" stroke="#3b4a6b" strokeWidth="1.3" fill="none" strokeLinecap="round" /><circle cx="16.5" cy="24" r="2" fill="#ffb3c4" opacity=".8" /><circle cx="33.5" cy="24" r="2" fill="#ffb3c4" opacity=".8" /></svg>
+                                </div>
                                 <div className={s.exploreBody}>
-                                    <svg viewBox="0 0 24 24" className={s.exploreIcon} aria-hidden="true"><path d={e.icon} /></svg>
-                                    <h3>{e.title}</h3>
-                                    <p>{e.line}</p>
+                                    <span className={s.exploreIcon}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={e.icon} /></svg></span>
+                                    <div>
+                                        <h3>{e.title}</h3>
+                                        <p>{e.line}</p>
+                                    </div>
                                 </div>
                             </a>
                         ))}
