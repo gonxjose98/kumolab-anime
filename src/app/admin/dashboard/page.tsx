@@ -146,6 +146,27 @@ export default async function DashboardPage() {
                             : <ul>{latest.map((w) => <WireItem key={w.id} w={w} />)}</ul>}
                     </section>
                     )}
+                    {/* 2. Today */}
+                    <section className="ak-card ak-home-card ak-home-todaycard">
+                        <div className="ak-home-h">
+                            <h2>Today</h2>
+                            <Link href="/admin/content/schedule">Schedule</Link>
+                        </div>
+                        {today.scheduled.length === 0 ? (
+                            <p className="ak-home-empty">Nothing scheduled today.</p>
+                        ) : (
+                            <ul className="ak-home-tl">
+                                {today.scheduled.map((r) => (
+                                    <li key={r.id} className={`ak-home-slot ${r.id === nextId ? 'ak-home-slot--next' : ''} ${r.isFuture ? '' : 'ak-home-slot--past'}`}>
+                                        <time>{r.slotLabel}</time>
+                                        <Pic srcs={r.cover ? [r.cover] : []} label={r.title} className="ak-home-slot__img" />
+                                        <Link href={`/admin/post/${r.id}`} className="ak-home-slot__title">{r.title}</Link>
+                                        <span className={`ak-home-fmt ${r.kind === 'video' ? 'ak-home-fmt--reel' : ''}`}>{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
                     </div>
 
                     {canDiscover && (
@@ -182,29 +203,6 @@ export default async function DashboardPage() {
                     )}
                 </div>
 
-                <aside className="ak-home-rail">
-                    {/* 2. Today */}
-                    <section className="ak-card ak-home-card">
-                        <div className="ak-home-h">
-                            <h2>Today</h2>
-                            <Link href="/admin/content/schedule">Schedule</Link>
-                        </div>
-                        {today.scheduled.length === 0 ? (
-                            <p className="ak-home-empty">Nothing scheduled today.</p>
-                        ) : (
-                            <ul className="ak-home-tl">
-                                {today.scheduled.map((r) => (
-                                    <li key={r.id} className={`ak-home-slot ${r.id === nextId ? 'ak-home-slot--next' : ''} ${r.isFuture ? '' : 'ak-home-slot--past'}`}>
-                                        <time>{r.slotLabel}</time>
-                                        <Pic srcs={r.cover ? [r.cover] : []} label={r.title} className="ak-home-slot__img" />
-                                        <Link href={`/admin/post/${r.id}`} className="ak-home-slot__title">{r.title}</Link>
-                                        <span className={`ak-home-fmt ${r.kind === 'video' ? 'ak-home-fmt--reel' : ''}`}>{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-                </aside>
             </div>
         </div>
     );
