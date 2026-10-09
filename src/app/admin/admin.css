@@ -1007,6 +1007,16 @@ body:has(.admin-root) {
     overflow: visible !important;
     background: #f4f7fb !important;
 }
+/* No sideways page swipe anywhere in the admin (Jose, 2026-10-09). `clip`
+   rather than `hidden` so it doesn't create a scroll container (sticky headers
+   keep working). Deliberate inner scrollers (sub-tabs, slide viewer) are
+   unaffected. */
+html:has(.admin-root),
+body:has(.admin-root),
+.admin-root {
+    overflow-x: clip !important;
+    overscroll-behavior-x: none;
+}
 
 /* ══ Merch placement manager ══════════════════════════════════════════════ */
 .admin-root .ak-merch__bar {
