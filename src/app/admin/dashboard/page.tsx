@@ -1,543 +1,143 @@
 import Link from 'next/link';
-import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import PendingReviewActions from '@/components/admin/dashboard/PendingReviewActions';
 import PendingPreview from '@/components/admin/dashboard/PendingPreview';
-import PendingScoreChip from '@/components/admin/dashboard/PendingScoreChip';
-import type { PostScore } from '@/lib/engine/scoring';
-import ErrorsPopover from '@/components/admin/dashboard/ErrorsPopover';
 import { getAccess } from '@/lib/auth/access';
 import WelcomeGate from '@/components/admin/dashboard/WelcomeGate';
-import { getHealthSnapshot, type HealthSnapshot, type HealthLevel } from '@/lib/engine/health-monitor';
-import { getScheduleRows } from '@/lib/schedule';
+import { getScheduleRows, etDayKey, type ScheduleKind } from '@/lib/schedule';
 import { fetchOrders } from '@/lib/orders';
-import { fetchIGDashboardData } from '@/lib/social/ig-insights';
+import { getNextBigPremieres, getWireItems } from '@/lib/discover/queries';
+import { RadarItem } from '@/components/admin/discover/RadarList';
+import { WireItem } from '@/components/admin/discover/WireFeed';
 
 export const dynamic = 'force-dynamic';
 
-// ─── Helpers ──────────────────────────────────────────────────
+/**
+ * Dashboard = exactly three calm blocks: Today, Radar, Wire.
+ * (System health, source health, social pulse, stat tiles and the activity log
+ * moved off the dashboard in the 2026-10 trim; their components live on in
+ * components/admin/dashboard/LegacyCards.tsx for the Explore tab.)
+ */
 
-function timeAgo(iso: string | null | undefined): string {
-    if (!iso) return '-';
-    const ms = Date.now() - new Date(iso).getTime();
-    if (ms < 60_000) return 'just now';
-    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-    if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-    return `${Math.floor(ms / 86_400_000)}d ago`;
-}
+const FORMAT_LABEL: Record<ScheduleKind, string> = { carousel: 'Carousel', video: 'Reel', image: 'Image' };
+const HIDDEN_STATUSES = new Set(['declined', 'rejected', 'deleted']);
 
-const CLAIM_LABEL: Record<string, string> = {
-    TRAILER_DROP: 'Trailer',
-    NEW_KEY_VISUAL: 'Key Visual',
-    NEW_SEASON_CONFIRMED: 'New Season',
-    DATE_ANNOUNCED: 'Release Date',
-    DELAY: 'Delay',
-    CAST_ADDITION: 'Cast',
-    STAFF_UPDATE: 'Staff',
-    OTHER: 'News',
-};
-
-// Health level → semantic dot color (sky palette)
-const LEVEL_DOT: Record<HealthLevel, string> = {
-    crit: '#c03d33',
-    warn: '#8a6420',
-    ok: '#2e9e63',
-};
-
-// ─── Data fetch ───────────────────────────────────────────────
-
-async function fetchDashboardData() {
-    const now = new Date();
-    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    // getHealthSnapshot() is intentionally NOT in this Promise.all — it can
-    // take up to 60s on a cold yt-dlp worker; it streams via <Suspense> below.
-    const [
-        { count: publishedTotal },
-        { count: published24h },
-        { count: pendingCount },
-        { count: scheduledCount },
-        { count: errors24h },
-        { data: recentErrors },
-        { data: pendingPosts },
-        { data: recentlyPublished },
-        { data: sourceHealth },
-        { data: recentActivity },
-    ] = await Promise.all([
-        supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-        supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).gte('published_at', last24h.toISOString()),
-        supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabaseAdmin.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'approved').gte('scheduled_post_time', now.toISOString()).lte('scheduled_post_time', next24h.toISOString()),
-        supabaseAdmin.from('error_logs').select('*', { count: 'exact', head: true }).gte('created_at', last24h.toISOString()),
-        supabaseAdmin.from('error_logs').select('id, source, error_message, context, created_at').gte('created_at', last24h.toISOString()).order('created_at', { ascending: false }).limit(20),
-        supabaseAdmin.from('posts').select('id, title, slug, image, source, source_url, claim_type, youtube_video_id, timestamp, post_score, score_breakdown').eq('status', 'pending').order('timestamp', { ascending: false }).limit(8),
-        supabaseAdmin.from('posts').select('id, title, slug, image, source, claim_type, published_at, social_ids, youtube_video_id').eq('status', 'published').order('published_at', { ascending: false }).limit(6),
-        supabaseAdmin.from('source_health').select('source_name, source_type, tier, health_score, consecutive_failures, is_enabled, last_success').order('source_name', { ascending: true }),
-        supabaseAdmin.from('scraper_logs').select('decision, reason, source_name, candidate_title, score, created_at').order('created_at', { ascending: false }).limit(15),
+async function fetchToday(canReview: boolean) {
+    const todayKey = etDayKey(new Date());
+    const [rows, pending, orders] = await Promise.all([
+        getScheduleRows({ pastHours: 24, futureHours: 24, limit: 60 }),
+        canReview
+            ? supabaseAdmin.from('posts')
+                .select('id, title, image, source, source_url, youtube_video_id', { count: 'exact' })
+                .eq('status', 'pending').order('timestamp', { ascending: false }).limit(5)
+            : Promise.resolve({ data: [] as any[], count: 0 }),
+        fetchOrders(150).catch(() => ({ orders: [] as any[] })),
     ]);
-
-    // Today's lineup with peak-hour flags (shares the Content > Schedule helper).
-    const lineup = await getScheduleRows({ pastHours: 6, futureHours: 24, limit: 8 });
-
-    // Commerce (live from Printful). Best-effort — degrades to 0 if unreachable.
-    const { orders } = await fetchOrders(150).catch(() => ({ orders: [] as any[] }));
-    const ordersToday = orders.filter((o: any) => o.createdAt && new Date(o.createdAt).getTime() >= last24h.getTime());
-    const revenueToday = ordersToday
-        .filter((o: any) => o.stage !== 'canceled')
-        .reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);
-    // Paid orders waiting for the operator to approve (before Printful charges).
-    const ordersAwaiting = orders.filter((o: any) => o.stage === 'awaiting').length;
-
     return {
-        stats: {
-            publishedTotal: publishedTotal ?? 0,
-            published24h: published24h ?? 0,
-            pending: pendingCount ?? 0,
-            scheduled24h: scheduledCount ?? 0,
-            errors24h: errors24h ?? 0,
-            ordersToday: ordersToday.length,
-            ordersAwaiting,
-            revenueToday,
-            currency: orders[0]?.currency || 'USD',
-        },
-        recentErrors: recentErrors || [],
-        pendingPosts: pendingPosts || [],
-        lineup,
-        recentlyPublished: recentlyPublished || [],
-        sourceHealth: sourceHealth || [],
-        recentActivity: recentActivity || [],
+        scheduled: rows.filter((r) => r.dayKey === todayKey && !HIDDEN_STATUSES.has((r.status || '').toLowerCase())),
+        pending: (pending.data || []) as any[],
+        pendingTotal: pending.count ?? 0,
+        ordersAwaiting: (orders.orders || []).filter((o: any) => o.stage === 'awaiting').length,
     };
 }
 
-async function StreamedHealthCard() {
-    const snapshot = await getHealthSnapshot().catch((e): HealthSnapshot => ({
-        overall: 'crit',
-        checks: [{ key: 'health', label: 'Health Monitor', level: 'crit', detail: `Snapshot failed: ${e?.message ?? 'unknown'}` }],
-        checkedAt: new Date().toISOString(),
-    }));
-    return <HealthCard snapshot={snapshot} />;
-}
-
-function HealthCardSkeleton() {
-    return (
-        <div className="ak-card flex items-center justify-between">
-            <span className="ak-title">System health</span>
-            <span className="ak-caption">Checking…</span>
-        </div>
-    );
-}
-
-async function StreamedSocialPulse() {
-    const ig = await fetchIGDashboardData().catch(() => null);
-    return <SocialPulseCard snapshot={ig?.snapshot} />;
-}
-
-function SocialPulseCard({ snapshot }: { snapshot?: { followers: number | null; reach28d: number | null; views28d: number | null } }) {
-    const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-US'));
-    return (
-        <div className="ak-card ak-pulse">
-            <div className="ak-pulse__head">
-                <span className="ak-overline">Social pulse · Instagram</span>
-                <Link href="/admin/analytics" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full analytics →</Link>
-            </div>
-            <div className="ak-pulse__grid">
-                <MiniPulse label="Followers" value={fmt(snapshot?.followers)} />
-                <MiniPulse label="Reach · 28d" value={fmt(snapshot?.reach28d)} />
-                <MiniPulse label="Views · 28d" value={fmt(snapshot?.views28d)} />
-            </div>
-        </div>
-    );
-}
-
-function MiniPulse({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="ak-pulse__stat">
-            <div className="ak-pulse__num">{value}</div>
-            <div className="ak-pulse__lbl">{label}</div>
-        </div>
-    );
-}
-
-function SocialPulseSkeleton() {
-    return (
-        <div className="ak-card flex items-center justify-between">
-            <span className="ak-title">Social pulse</span>
-            <span className="ak-caption">Loading…</span>
-        </div>
-    );
-}
-
-// ─── UI primitives (Clear Skies) ──────────────────────────────
-
-function ClaimPill({ claim }: { claim: string | null }) {
-    const key = (claim || 'OTHER').toUpperCase();
-    const label = CLAIM_LABEL[key] || CLAIM_LABEL.OTHER;
-    return (
-        <span
-            className="ak-badge ak-badge--bare"
-            style={{ background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--ink-2)', fontWeight: 600 }}
-        >
-            {label}
-        </span>
-    );
-}
-
-function PlatformBadge({ icon, on }: { icon: string; on: boolean }) {
-    return (
-        <span
-            className={`ak-badge ak-badge--bare`}
-            style={
-                on
-                    ? { color: '#1d7a4f', background: '#e2f4ea', borderColor: '#b9e0c9', fontWeight: 600 }
-                    : { color: 'var(--ink-3)', background: 'var(--surface-2)', borderColor: 'var(--line)', fontWeight: 600 }
-            }
-            title={on ? `Published to ${icon}` : `Not on ${icon}`}
-        >
-            {icon}
-        </span>
-    );
-}
-
-function EmptyState({ text, compact = false }: { text: string; compact?: boolean }) {
-    return (
-        <div className="text-center ak-caption" style={{ padding: compact ? '12px 0' : '28px 0' }}>
-            {text}
-        </div>
-    );
-}
-
-// ─── Page ─────────────────────────────────────────────────────
-
 export default async function DashboardPage() {
-    const data = await fetchDashboardData();
-    const { stats } = data;
     const access = await getAccess();
     const canReview = access.isOwner || access.perms.pending;
-    // First name only keeps the greeting tight ("Welcome back, Jonathan").
+    const canDiscover = access.isOwner || access.perms.content;
     const firstName = access.name ? access.name.trim().split(/\s+/)[0] : '';
     const showWelcome = access.welcomePending && !!access.name;
 
-    const stormy = stats.errors24h > 0;
+    const [today, premieres, wire] = await Promise.all([
+        fetchToday(canReview),
+        canDiscover ? getNextBigPremieres(5) : Promise.resolve([]),
+        canDiscover ? getWireItems({ limit: 8 }) : Promise.resolve([]),
+    ]);
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5 min-w-0">
             {showWelcome && <WelcomeGate name={access.name!.trim()} />}
-            {/* ── Weather-status hero ──────────────────────────────── */}
-            <div className={`ak-card ak-weather ${stormy ? 'ak-weather--storm' : 'ak-weather--clear'}`}>
-                <div>
-                    <div className="ak-overline" style={{ marginBottom: '4px' }}>本部 · Command Center</div>
-                    <div className="ak-display" style={{ fontSize: '22px' }}>{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
-                </div>
-                <div className="ak-weather__status">
-                    <span className="ak-weather__glyph" aria-hidden="true" />
-                    <div>
-                        <div className="ak-weather__headline">
-                            {stormy ? 'A few things need you' : 'Clear skies over KumoLab'}
-                        </div>
-                        <div className="ak-weather__sub">
-                            {stormy
-                                ? `${stats.errors24h} error${stats.errors24h === 1 ? '' : 's'} in the last 24h · ${stats.pending} awaiting review`
-                                : `${stats.pending} awaiting review · ${stats.scheduled24h} scheduled`}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div className="ak-display" style={{ fontSize: 22 }}>{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</div>
 
-            {/* ── Stat grid ────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <StatCard label="Published · 24h" value={stats.published24h} sub="posts live" />
-                <StatCard label="Pending review" value={stats.pending} tone={stats.pending > 0 ? 'attention' : undefined} sub={stats.pending > 0 ? 'awaiting you' : 'all reviewed'} />
-                <StatCard label="Scheduled · 24h" value={stats.scheduled24h} sub="in the queue" />
-                <StatCard label="Orders · 24h" value={stats.ordersToday} tone={stats.ordersToday > 0 ? 'attention' : undefined} sub={stats.revenueToday > 0 ? money(stats.revenueToday, stats.currency) : 'no sales yet'} />
-                <div className="ak-stat">
-                    <div className="flex items-start justify-between gap-2">
-                        <span className="ak-overline">Errors · 24h</span>
-                        <ErrorsPopover count={stats.errors24h} errors={data.recentErrors} />
-                    </div>
-                    <div className="ak-stat__num" style={stats.errors24h > 0 ? { color: 'var(--gold-text)' } : undefined}>{stats.errors24h}</div>
-                    <span className="ak-caption">{stats.errors24h > 0 ? 'needs a look' : 'all clear'}</span>
+            {/* ── 1. Today ─────────────────────────────────────────── */}
+            <section className="ak-card ak-card--flush">
+                <div className="ak-dash3__head">
+                    <span className="ak-title">Today</span>
+                    <Link href="/admin/content/schedule" className="ak-dash3__link">Schedule →</Link>
                 </div>
-            </div>
 
-            {/* ── Orders awaiting approval (time-sensitive: customer paid) ─────── */}
-            {stats.ordersAwaiting > 0 && (
-                <Link href="/admin/store/orders" className="ak-card ak-ord-approve-cta">
-                    <span className="ak-ord-approve__badge">{stats.ordersAwaiting}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="ak-heading">{stats.ordersAwaiting === 1 ? 'An order needs' : `${stats.ordersAwaiting} orders need`} your approval</div>
-                        <div className="ak-caption">Customer paid. Approve in Store to send it to Printful (that&apos;s when you get charged).</div>
-                    </div>
-                    <span className="ak-caption" style={{ color: 'var(--gold-text)', fontWeight: 700, whiteSpace: 'nowrap' }}>Review in Store →</span>
-                </Link>
-            )}
-
-            {/* ── Social pulse (streamed — light glance, heavy data in Analytics) ── */}
-            <Suspense fallback={<SocialPulseSkeleton />}>
-                <StreamedSocialPulse />
-            </Suspense>
-
-            {/* ── Pending review (hero) + right rail ──────────────── */}
-            {/* grid-cols-1 base = minmax(0,1fr) so children shrink on phones
-                instead of sizing to content and overflowing the viewport. */}
-            <div className={`grid grid-cols-1 ${canReview ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 items-start`}>
-                {canReview && (
-                <div className="ak-card ak-card--flush lg:col-span-2">
-                    <div className="flex items-center justify-between gap-3 p-5 pb-3">
-                        <div className="flex items-center gap-3">
-                            <span className="ak-title">Needs your review</span>
-                            {data.pendingPosts.length > 0 && (
-                                <span className="ak-pill__count">{data.pendingPosts.length}</span>
-                            )}
-                        </div>
-                    </div>
-                    {data.pendingPosts.length === 0 ? (
-                        <div className="ak-empty">
-                            <span className="ak-empty__glyph" aria-hidden="true">☁</span>
-                            <span className="ak-heading">Nothing waiting on you</span>
-                            <span className="ak-caption">Auto-publish handled everything that came through.</span>
-                        </div>
-                    ) : (
-                        <>
-                            <ul>
-                                {data.pendingPosts.slice(0, 6).map((p) => (
-                                    <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5" style={{ borderTop: '1px solid var(--line)' }}>
-                                        {/* Thumb + title share the top line; on phones the actions
-                                            wrap to their own full-width line beneath (see w-full below). */}
-                                        <div className="flex items-center gap-3 flex-1 min-w-0" style={{ minWidth: '180px' }}>
-                                            <PendingPreview image={p.image} youtubeId={p.youtube_video_id} sourceUrl={p.source_url} title={p.title} />
-                                            <div className="flex-1 min-w-0">
-                                                <Link href={`/admin/post/${p.id}`} className="block ak-heading truncate" style={{ textDecoration: 'none' }}>
-                                                    {p.title}
-                                                </Link>
-                                                <div className="flex items-center gap-2 mt-1.5 min-w-0">
-                                                    <ClaimPill claim={p.claim_type} />
-                                                    <PendingScoreChip
-                                                        postId={p.id}
-                                                        postTitle={p.title}
-                                                        postScore={typeof p.post_score === 'number' ? p.post_score : null}
-                                                        breakdown={(p.score_breakdown as PostScore | null) ?? null}
-                                                    />
-                                                    <span className="ak-caption truncate">{p.source} · {timeAgo(p.timestamp)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="ml-auto shrink-0">
-                                            <PendingReviewActions
-                                                postId={p.id}
-                                                originalFormat={(p.youtube_video_id || /youtube\.com|youtu\.be/.test(p.source_url || '')) ? 'reel' : 'landscape'}
-                                            />
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                            {stats.pending > 6 && (
-                                <Link href="/admin/content/posts" className="block text-center px-5 py-3 ak-caption" style={{ borderTop: '1px solid var(--line)', color: 'var(--gold-text)', textDecoration: 'none' }}>
-                                    View all {stats.pending} pending in Content →
-                                </Link>
-                            )}
-                        </>
-                    )}
-                </div>
+                {today.ordersAwaiting > 0 && (
+                    <Link href="/admin/store/orders" className="ak-dash3__orders">
+                        {today.ordersAwaiting} paid {today.ordersAwaiting === 1 ? 'order' : 'orders'} awaiting your approval →
+                    </Link>
                 )}
 
-                <div className="flex flex-col gap-6">
-                    {/* Today's lineup (peak-flagged) */}
-                    <div className="ak-card">
-                        <div className="ak-card__header">
-                            <span className="ak-title">Today&apos;s lineup</span>
-                            <Link href="/admin/content/schedule" className="ak-caption" style={{ color: 'var(--gold-text)', textDecoration: 'none' }}>Full schedule →</Link>
-                        </div>
-                        {data.lineup.length === 0 ? (
-                            <EmptyState text="Nothing slotted around now — the hourly queue fills through the day." compact />
-                        ) : (
-                            <ul className="flex flex-col gap-2.5">
-                                {data.lineup.map((r) => (
-                                    <li key={r.id} className="flex items-center gap-2">
-                                        <span className="ak-caption shrink-0" style={{ color: 'var(--blue)', fontWeight: 600, minWidth: '68px', fontVariantNumeric: 'tabular-nums' }}>
-                                            {r.slotLabel}
-                                        </span>
-                                        {r.isPeak && (
-                                            <span className="ak-badge ak-badge--bare" style={{ background: 'var(--gold-grad)', color: 'var(--gold-ink)', borderColor: 'transparent', fontWeight: 800, fontSize: '10px' }}>★ Peak</span>
-                                        )}
-                                        <span className="ak-body-sm truncate flex-1">{r.title}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
+                {today.scheduled.length === 0 ? (
+                    <div className="ak-dash3__empty">Nothing scheduled today.</div>
+                ) : (
+                    <ul style={{ marginTop: 6 }}>
+                        {today.scheduled.map((r) => (
+                            <li key={r.id} className="ak-dash3__line" style={r.isFuture ? undefined : { opacity: 0.55 }}>
+                                <span className="ak-dash3__time">{r.slotLabel}</span>
+                                <Link href={`/admin/post/${r.id}`} className="ak-dash3__title">{r.title}</Link>
+                                <span className="ak-dash3__fmt">{r.isFuture ? FORMAT_LABEL[r.kind] : 'Posted'}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-                    {/* Recently published */}
-                    <div className="ak-card">
-                        <div className="ak-card__header">
-                            <span className="ak-title">Recently published</span>
-                        </div>
-                        {data.recentlyPublished.length === 0 ? (
-                            <EmptyState text="Nothing published yet." compact />
-                        ) : (
-                            <ul className="flex flex-col gap-3">
-                                {data.recentlyPublished.map((p) => {
-                                    const onIG = !!p.social_ids?.instagram_id;
-                                    return (
-                                        <li key={p.id} className="flex items-start gap-2">
-                                            <span style={{ color: '#2e9e63' }} className="ak-body-sm mt-0.5 shrink-0">✓</span>
-                                            <div className="flex-1 min-w-0">
-                                                <Link href={`/blog/${p.slug}`} target="_blank" className="block ak-body-sm truncate" style={{ textDecoration: 'none' }}>
-                                                    {p.title}
-                                                </Link>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className="ak-caption">{timeAgo(p.published_at)}</span>
-                                                    <PlatformBadge icon="WEB" on={true} />
-                                                    <PlatformBadge icon="IG" on={onIG} />
-                                                </div>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── System health (streamed) ─────────────────────────── */}
-            <Suspense fallback={<HealthCardSkeleton />}>
-                <StreamedHealthCard />
-            </Suspense>
-
-            {/* ── Source health (collapsible) ──────────────────────── */}
-            <details className="ak-card ak-card--flush group">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none" style={{ transition: 'background 0.15s' }}>
-                        <div className="flex items-center gap-3">
-                            <span className="ak-title">Source health</span>
-                            <span className="ak-pill__count">{`${data.sourceHealth.filter((s) => s.is_enabled && s.consecutive_failures === 0).length}/${data.sourceHealth.length}`}</span>
-                        </div>
-                        <span className="ak-caption">
-                            <span className="group-open:hidden">Show</span>
-                            <span className="hidden group-open:inline">Hide</span>
-                        </span>
-                    </summary>
-                    <div className="px-5 pb-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                            {data.sourceHealth.map((s) => {
-                                const dot = !s.is_enabled ? '#c03d33' : (s.consecutive_failures > 0 ? '#8a6420' : '#2e9e63');
-                                return (
-                                    <div key={s.source_name} className="flex items-center gap-2.5">
-                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
-                                        <span className="flex-1 truncate ak-body-sm">{s.source_name}</span>
-                                        <span className="ak-caption shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                                            {s.last_success ? timeAgo(s.last_success) : 'never'}
-                                        </span>
+                {canReview && today.pending.length > 0 && (
+                    <>
+                        <div className="ak-dash3__sub">Needs approval · {today.pendingTotal}</div>
+                        <ul>
+                            {today.pending.map((p) => (
+                                <li key={p.id} className="ak-dash3__review">
+                                    <PendingPreview image={p.image} youtubeId={p.youtube_video_id} sourceUrl={p.source_url} title={p.title} />
+                                    <Link href={`/admin/post/${p.id}`} className="ak-dash3__title">{p.title}</Link>
+                                    <div className="ml-auto shrink-0">
+                                        <PendingReviewActions
+                                            postId={p.id}
+                                            originalFormat={(p.youtube_video_id || /youtube\.com|youtu\.be/.test(p.source_url || '')) ? 'reel' : 'landscape'}
+                                        />
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-            </details>
-
-            {/* ── Recent activity (collapsible) ────────────────────── */}
-            <details className="ak-card ak-card--flush group">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
-                        <div className="flex items-center gap-3">
-                            <span className="ak-title">Recent activity</span>
-                            <span className="ak-pill__count">{data.recentActivity.length}</span>
-                        </div>
-                        <span className="ak-caption">
-                            <span className="group-open:hidden">Show</span>
-                            <span className="hidden group-open:inline">Hide</span>
-                        </span>
-                    </summary>
-                    <div className="px-5 pb-5">
-                        {data.recentActivity.length === 0 ? (
-                            <EmptyState text="No recent pipeline activity." compact />
-                        ) : (
-                            <ul className="flex flex-col gap-1.5">
-                                {data.recentActivity.map((row, i) => {
-                                    const accepted = row.decision?.startsWith('accepted');
-                                    const cls = accepted ? 'ak-badge--published' : row.decision?.startsWith('rejected') ? 'ak-badge--draft' : 'ak-badge--pending';
-                                    return (
-                                        <li key={i} className="flex items-center gap-3">
-                                            <span className="ak-caption shrink-0" style={{ width: '48px', fontVariantNumeric: 'tabular-nums' }}>{timeAgo(row.created_at)}</span>
-                                            <span className={`ak-badge ${cls}`} style={{ minWidth: '84px', justifyContent: 'center' }}>
-                                                {row.decision?.replace('_', ' ') || '-'}
-                                            </span>
-                                            <span className="flex-1 truncate ak-body-sm">{row.candidate_title}</span>
-                                            <span className="ak-caption truncate max-w-xs hidden md:inline">{row.reason}</span>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
+                                </li>
+                            ))}
+                        </ul>
+                        {today.pendingTotal > today.pending.length && (
+                            <Link href="/admin/content/posts" className="ak-dash3__link" style={{ display: 'block', padding: '10px 16px 14px' }}>
+                                All {today.pendingTotal} pending →
+                            </Link>
                         )}
-                    </div>
-            </details>
-
-            {/* ── Footer ───────────────────────────────────────────── */}
-            <div className="text-center pt-1 pb-4">
-                <span className="ak-caption" style={{ letterSpacing: '0.1em' }}>
-                    {stats.publishedTotal} published all-time
-                </span>
-            </div>
-        </div>
-    );
-}
-
-// ─── Sub-components ───────────────────────────────────────────
-
-const money = (n: number, ccy: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: ccy || 'USD' }).format(n || 0);
-
-function StatCard({ label, value, tone, sub }: { label: string; value: number | string; tone?: 'attention'; sub?: string }) {
-    return (
-        <div className="ak-stat">
-            <span className="ak-overline">{label}</span>
-            <div className="ak-stat__num" style={tone === 'attention' ? { color: '#8a6420' } : undefined}>{value}</div>
-            <span className="ak-caption">{sub || ' '}</span>
-        </div>
-    );
-}
-
-function HealthCard({ snapshot }: { snapshot: HealthSnapshot }) {
-    const cls = snapshot.overall === 'crit' ? 'ak-badge--error' : snapshot.overall === 'warn' ? 'ak-badge--pending' : 'ak-badge--published';
-    const label = snapshot.overall === 'crit' ? 'Action needed' : snapshot.overall === 'warn' ? 'Degraded' : 'All systems go';
-
-    const issues = snapshot.checks.filter((c) => c.level !== 'ok').length;
-    // Collapsed when everything's healthy (declutter); auto-opens when there's
-    // something to look at, so problems are never hidden.
-    return (
-        <details className="ak-card ak-card--flush group" open={snapshot.overall !== 'ok'}>
-            <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
-                <div className="flex items-center gap-3">
-                    <span className="ak-title">System health</span>
-                    <span className={`ak-badge ${cls}`}>{label}</span>
-                    {issues > 0 && <span className="ak-caption">{issues} to check</span>}
-                </div>
-                <span className="ak-caption">
-                    <span className="group-open:hidden">Show</span>
-                    <span className="hidden group-open:inline">Hide</span>
-                </span>
-            </summary>
-            <div className="px-5 pb-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {snapshot.checks.map((c) => (
-                        <HealthRow key={c.key} level={c.level} label={c.label} detail={c.detail} actionable={c.actionable} />
-                    ))}
-                </div>
-            </div>
-        </details>
-    );
-}
-
-function HealthRow({ level, label, detail, actionable }: { level: HealthLevel; label: string; detail: string; actionable?: string }) {
-    const color = LEVEL_DOT[level];
-    return (
-        <div className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
-            <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: color }} />
-            <div className="flex-1 min-w-0">
-                <div className="ak-body-sm" style={{ color: 'var(--ink)', fontWeight: 600 }}>{label}</div>
-                <div className="ak-caption mt-0.5">{detail}</div>
-                {actionable && level !== 'ok' && (
-                    <div className="ak-caption mt-1" style={{ color }}>→ {actionable}</div>
+                    </>
                 )}
-            </div>
+                <div style={{ height: 8 }} />
+            </section>
+
+            {canDiscover && (
+                <>
+                    {/* ── 2. Radar ─────────────────────────────────── */}
+                    <section className="ak-card ak-card--flush">
+                        <div className="ak-dash3__head">
+                            <span className="ak-title">Radar · next big premieres</span>
+                            <Link href="/admin/discover?tab=radar" className="ak-dash3__link">Full Radar →</Link>
+                        </div>
+                        {premieres.length === 0
+                            ? <div className="ak-dash3__empty">No big premieres in the next 60 days.</div>
+                            : <ul>{premieres.map((r) => <RadarItem key={r.anilist_id} r={r} compact />)}</ul>}
+                    </section>
+
+                    {/* ── 3. Wire ──────────────────────────────────── */}
+                    <section className="ak-card ak-card--flush">
+                        <div className="ak-dash3__head">
+                            <span className="ak-title">Wire · latest</span>
+                            <Link href="/admin/discover?tab=wire" className="ak-dash3__link">Full Wire →</Link>
+                        </div>
+                        {wire.length === 0
+                            ? <div className="ak-dash3__empty">The wire fills every 30 minutes.</div>
+                            : <ul>{wire.map((w) => <WireItem key={w.id} w={w} compact />)}</ul>}
+                    </section>
+                </>
+            )}
         </div>
     );
 }

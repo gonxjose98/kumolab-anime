@@ -153,7 +153,7 @@ export async function upsertWireItems(items: WireItemInput[]): Promise<number> {
             }));
         // Don't overwrite a decision already recorded with null.
         const withDecision = rows.filter((r) => r.decision);
-        const without = rows.filter((r) => !r.decision).map(({ decision: _d, ...rest }) => rest);
+        const without = rows.filter((r) => !r.decision).map(({ decision: _d, ...rest }) => rest); // eslint-disable-line @typescript-eslint/no-unused-vars
         let written = 0;
         for (const batch of [withDecision, without]) {
             if (!batch.length) continue;
