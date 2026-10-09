@@ -122,7 +122,7 @@ export function validateCards(section: Digest['section'], raw: RawCard[], digest
         const badNum = extractNumbers(body).find((n) => !numberSupported(n, allowed));
         if (badNum) { drop(`number ${badNum.value} not in cited sources`); continue; }
 
-        const hype = [...body.matchAll(HYPE_RE)].map((m) => m[1].toLowerCase()).find((w) => !hayLower.includes(w));
+        const hype = [...body.replace(/\bfirst episode\b/gi, 'episode 1').matchAll(HYPE_RE)].map((m) => m[1].toLowerCase()).find((w) => !hayLower.includes(w));
         if (hype) { drop(`claim word "${hype}" not backed by a cited source`); continue; }
 
         // A recommendation must carry its action line; a "fact" that recommends

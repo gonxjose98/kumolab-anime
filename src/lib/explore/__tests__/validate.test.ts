@@ -96,6 +96,12 @@ describe('validateCards', () => {
         expect(bad.drops[0].reason).toMatch(/2019/);
     });
 
+    it('treats "first episode" as plain wording, not a claim', () => {
+        const { drops } = validateCards('ours', [card({ details: 'The first episode is out.' })], digest);
+        expect(drops).toEqual([]);
+        expect(validateCards('ours', [card({ details: 'Our first big week.' })], digest).drops[0].reason).toMatch(/first/);
+    });
+
     it('drops a type that does not belong to the section', () => {
         const { drops } = validateCards('ours', [card({ type: 'news' })], digest);
         expect(drops[0].reason).toMatch(/not allowed/);
