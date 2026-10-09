@@ -4,8 +4,8 @@ import { useCartStore } from '@/store/useCartStore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
-import SkyContentRoot from '@/components/sky-content';
-import SkyFooter from '@/components/redesign-sky/SkyFooter';
+import PageShell from '@/components/home-v3/PageShell';
+import pg from '@/components/home-v3/Pages.module.css';
 import styles from './cart.module.css';
 import { useEffect, useMemo, useState } from 'react';
 import { SHIP_COUNTRY_OPTIONS } from '@/lib/shipping';
@@ -71,7 +71,8 @@ export default function CartClient({ initialCountry }: { initialCountry: string 
     };
 
     return (
-        <SkyContentRoot>
+        <PageShell active="/merch">
+            <div className={pg.wrap}><div className={pg.flowCard}>
             {items.length === 0 ? (
                 <div className={styles.emptyContainer}>
                     <ShoppingBag size={64} className={styles.emptyIcon} />
@@ -166,7 +167,7 @@ export default function CartClient({ initialCountry }: { initialCountry: string 
                     </div>
                 </div>
             )}
-            <SkyFooter />
-        </SkyContentRoot>
+            </div></div>
+        </PageShell>
     );
 }

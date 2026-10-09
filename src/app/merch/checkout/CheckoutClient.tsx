@@ -6,8 +6,8 @@ import { useCartStore } from '@/store/useCartStore';
 import { trackEvent } from '@/lib/analytics/events';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripe-client';
-import SkyContentRoot from '@/components/sky-content';
-import SkyFooter from '@/components/redesign-sky/SkyFooter';
+import PageShell from '@/components/home-v3/PageShell';
+import pg from '@/components/home-v3/Pages.module.css';
 import styles from './checkout.module.css';
 
 /**
@@ -40,7 +40,8 @@ export default function CheckoutClient({ country }: { country: string }) {
     }, [country]);
 
     return (
-        <SkyContentRoot>
+        <PageShell active="/merch">
+            <div className={pg.wrap}><div className={pg.flowCard}>
             <div className={styles.wrap}>
                 <div className={styles.head}>
                     <h1 className={styles.title}>Checkout</h1>
@@ -60,7 +61,7 @@ export default function CheckoutClient({ country }: { country: string }) {
                     </div>
                 )}
             </div>
-            <SkyFooter />
-        </SkyContentRoot>
+            </div></div>
+        </PageShell>
     );
 }

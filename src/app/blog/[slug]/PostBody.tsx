@@ -192,9 +192,9 @@ export default function PostBody({ slug, initialPost }: { slug: string; initialP
                     )}
                     <time className={styles.date}>
                         {new Date(post.timestamp).toLocaleDateString(undefined, {
-                            weekday: 'long',
-                            year: 'numeric',
-                            day: 'numeric'
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
                         })}
                     </time>
                 </div>

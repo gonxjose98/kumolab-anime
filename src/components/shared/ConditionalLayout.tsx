@@ -16,8 +16,9 @@ export default function ConditionalLayout({
     // The link-in-bio hub (/links) is a focused, nav-free landing for social
     // bio traffic; it renders its own full-bleed layout.
     // Pages on the home v3 theme render their own nav + footer.
-    const V3_PAGES = ['/home-v3', '/blog', '/merch', '/about', '/privacy', '/terms'];
-    const isBare = isAdmin || pathname === '/links' || V3_PAGES.includes(pathname || '');
+    const V3_PAGES = ['/', '/blog', '/merch', '/about', '/privacy', '/terms'];
+    const isBare = isAdmin || pathname === '/links' || V3_PAGES.includes(pathname || '')
+        || !!pathname?.startsWith('/blog/') || !!pathname?.startsWith('/merch/');
 
     return (
         <>

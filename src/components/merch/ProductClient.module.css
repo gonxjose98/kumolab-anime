@@ -212,3 +212,8 @@
         font-size: 2rem;
     }
 }
+
+/* Home v3 type. */
+.title { font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: clamp(32px, 3vw, 48px); color: #13305e; }
+.price { font-family: "Quicksand", sans-serif; color: #2f6fc4; }
+.addToCartBtn { border-radius: 16px; font-family: "Quicksand", sans-serif; }

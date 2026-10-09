@@ -4,7 +4,7 @@ import styles from './SkyFooter.module.css';
 const SOCIALS = [
     { name: 'X', href: 'https://x.com/kumolabanime', label: 'X (Twitter)' },
     { name: 'IG', href: 'https://instagram.com/kumolabanime', label: 'Instagram' },
-    { name: 'TT', href: 'https://tiktok.com/@kumolabanime', label: 'TikTok' },
+    { name: 'TT', href: 'https://www.tiktok.com/@kumolab.anime', label: 'TikTok' },
     { name: 'YT', href: 'https://youtube.com/@kumolabanime', label: 'YouTube' },
     { name: 'TH', href: 'https://threads.net/@kumolabanime', label: 'Threads' },
 ];

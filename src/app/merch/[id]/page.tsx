@@ -1,10 +1,8 @@
-import Link from 'next/link';
 import { getProduct, getProductSetting } from '@/lib/merch';
 import ProductClient from '@/components/merch/ProductClient';
-import SkyContentRoot from '@/components/sky-content';
-import SkyFooter from '@/components/redesign-sky/SkyFooter';
+import PageShell from '@/components/home-v3/PageShell';
+import pg from '@/components/home-v3/Pages.module.css';
 import { notFound } from 'next/navigation';
-import styles from './product.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,18 +18,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     }
 
     return (
-        <SkyContentRoot>
-            <div className={styles.wrap}>
-                <Link href="/merch" className={styles.back}>
-                    <span aria-hidden="true">←</span> The Collection
-                </Link>
-                <ProductClient
-                    productData={productData}
-                    anchorPrice={setting?.anchor_price ?? null}
-                    label={setting?.label ?? null}
-                />
+        <PageShell active="/merch">
+            <div className={pg.wrap}>
+                <div className={pg.flowCard}>
+                    <ProductClient
+                        productData={productData}
+                        anchorPrice={setting?.anchor_price ?? null}
+                        label={setting?.label ?? null}
+                    />
+                </div>
             </div>
-            <SkyFooter />
-        </SkyContentRoot>
+        </PageShell>
     );
 }

@@ -332,3 +332,26 @@
 :global([data-sky='day']) .heroImage img {
     box-shadow: 0 30px 60px -20px rgba(20, 60, 120, 0.4);
 }
+/* ── Home v3 article theme (2026-10-09) ────────────────────────────────────
+   The article now sits inside a white reading card (PageShell + articleCard),
+   so these rules restyle it: navy text, rounded media, Quicksand body. */
+article.container { max-width: none; margin: 0; padding: 0; color: #13305e; }
+article.container .heroImage { margin-bottom: 26px; }
+article.container .heroImage img { max-height: 70vh; border-radius: 18px; box-shadow: 0 8px 26px rgba(40, 90, 160, 0.18); }
+article.container .header { text-align: left; border-bottom: 1px solid #e4edf9; margin-bottom: 24px; padding-bottom: 22px; }
+article.container .meta { justify-content: flex-start; gap: 12px; margin-bottom: 12px; }
+article.container .badge { background: #e3edff; color: #2f6fc4; font-family: 'Quicksand', sans-serif; font-size: 13.5px; font-weight: 700; letter-spacing: 0; padding: 5px 12px; }
+article.container .date { color: #6a82a8; font-family: 'Quicksand', sans-serif; font-size: 14.5px; font-weight: 600; }
+article.container .title { font-family: var(--hv3-serif), Georgia, serif; font-size: clamp(32px, 3vw, 52px); font-weight: 700; line-height: 1.1; background: none; color: #13305e; -webkit-text-fill-color: #13305e; }
+article.container .content { font-family: 'Quicksand', sans-serif; font-size: clamp(16.5px, 1.2vw, 19px); font-weight: 600; line-height: 1.7; color: #22457c; }
+article.container .paragraph { color: #22457c; }
+article.container .paragraph strong { color: #13305e; }
+article.container .videoSection { margin: 0 0 26px; }
+article.container .videoWrapper { border-radius: 18px; overflow: hidden; box-shadow: 0 8px 26px rgba(40, 90, 160, 0.18); }
+article.container .highlightBlock { background: #f1f6fe; border: 0; border-left: 4px solid #f6c64b; color: #13305e; border-radius: 12px; }
+article.container .sourceAttribution { color: #6a82a8; border-top: 1px solid #e4edf9; font-size: 15px; }
+article.container .dropItem { background: #f6f9fe; border: 0; border-radius: 14px; }
+article.container .dropTitle { color: #13305e; font-family: 'Quicksand', sans-serif; font-weight: 700; }
+article.container .dropSubline { color: #4c6a96; }
+article.container .watchButton { background: linear-gradient(180deg, #ffe58a, #f7c84f); color: #2a2208; border-radius: 14px; font-family: 'Quicksand', sans-serif; font-weight: 700; box-shadow: 0 8px 20px rgba(160, 110, 10, 0.2); }
+article.container a { color: #2f6fc4; }

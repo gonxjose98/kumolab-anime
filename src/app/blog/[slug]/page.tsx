@@ -4,9 +4,9 @@ import { getPostBySlug, getExpiredRedirect, getPosts } from '@/lib/blog';
 import { getFeaturedProducts } from '@/lib/merch';
 import { BlogPost, Product } from '@/types';
 import PostBody from './PostBody';
-import ArticleCTA from './ArticleCTA';
-import SkyContentRoot from '@/components/sky-content';
-import SkyFooter from '@/components/redesign-sky/SkyFooter';
+import PageShell from '@/components/home-v3/PageShell';
+import ArticleSide from '@/components/home-v3/ArticleSide';
+import pg from '@/components/home-v3/Pages.module.css';
 
 // ISR: cache each article's render, refresh at most every 5 min. Publishing
 // calls revalidatePath(`/blog/${slug}`) so edits/new posts appear immediately.
@@ -80,7 +80,7 @@ export async function generateMetadata({
     };
 }
 
-/** Up to 3 other recent published drops, current post excluded, title-deduped. */
+/** Up to 4 other recent published drops, current post excluded, title-deduped. */
 async function getRelated(slug: string): Promise<BlogPost[]> {
     try {
         const posts = await getPosts(); // published only, newest first
@@ -93,7 +93,7 @@ async function getRelated(slug: string): Promise<BlogPost[]> {
                 seen.add(key);
                 return true;
             })
-            .slice(0, 3);
+            .slice(0, 4);
     } catch {
         return [];
     }
@@ -126,10 +126,15 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         : [[], null];
 
     return (
-        <SkyContentRoot>
-            <PostBody slug={slug} initialPost={post ?? null} />
-            {post && <ArticleCTA related={related} product={product} />}
-            <SkyFooter />
-        </SkyContentRoot>
+        <PageShell active="/blog">
+            <div className={pg.wrap}>
+                <div className={pg.articleGrid}>
+                    <div className={pg.articleCard}>
+                        <PostBody slug={slug} initialPost={post ?? null} />
+                    </div>
+                    {post && <ArticleSide related={related} product={product} />}
+                </div>
+            </div>
+        </PageShell>
     );
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Cormorant_Garamond } from 'next/font/google';
 import Reveal from './Reveal';
+import CartLink from './CartLink';
 import BackButton from './BackButton';
 import s from './HomeV3.module.css';
 import p from './Pages.module.css';
@@ -24,7 +25,7 @@ export default function PageShell({
     active,
     children,
 }: {
-    title: string;
+    title?: string;
     sub?: string;
     active?: string;
     children: React.ReactNode;
@@ -43,16 +44,17 @@ export default function PageShell({
                         <Link key={n.href} href={n.href} className={`${p.navLink} ${active === n.href ? p.navActive : ''}`}>{n.label}</Link>
                     ))}
                 </nav>
+                <CartLink />
                 <Link href="/#forecast" className={s.navCta}>Join</Link>
             </header>
 
             <div className={p.skyWrap}>
-            <section className={p.band}>
+            <section className={`${p.band} ${title ? '' : p.bandCompact}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/home-v3/hero-1440-s3.webp" alt="" className={p.bandImg} />
                 <div className={p.bandInner}>
                     <BackButton />
-                    <h1 className={p.bandTitle}>{title}</h1>
+                    {title && <h1 className={p.bandTitle}>{title}</h1>}
                     {sub && <p className={p.bandSub}>{sub}</p>}
                 </div>
             </section>

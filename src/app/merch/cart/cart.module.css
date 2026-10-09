@@ -339,3 +339,9 @@
         position: static;
     }
 }
+
+/* Home v3: sits inside a white card under the shared nav, so no nav clearance. */
+.wrap { max-width: none; padding: 4px 0; min-height: 0; }
+.emptyContainer { padding: 40px 0; min-height: 0; }
+
+.pageTitle { font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; color: #13305e; }

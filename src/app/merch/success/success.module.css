@@ -107,3 +107,6 @@
 :global([data-sky='night']) .secondary:hover {
     background: rgba(180, 205, 255, 0.18);
 }
+
+/* Home v3: inside a white card under the shared nav. */
+.wrap { padding: 30px 0; min-height: 40vh; }

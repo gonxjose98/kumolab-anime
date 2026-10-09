@@ -129,3 +129,33 @@
     transition: background 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .back:hover { background: rgba(255, 255, 255, 0.35); transform: translateX(-3px); }
+
+/* Compact band (article/product/cart pages): just the Back button over the faded art. */
+.bandCompact { height: clamp(200px, 17vw, 260px); }
+.bandCompact .bandInner { padding-top: 96px; padding-bottom: 0; }
+.bandCompact + .body { margin-top: clamp(-70px, -4vw, -40px); }
+
+/* Article layout: reading card + sidebar. */
+.articleGrid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: clamp(20px, 2.4vw, 40px); align-items: start; }
+.articleCard { background: #fff; border-radius: 24px; padding: clamp(22px, 3vw, 52px); box-shadow: 0 6px 24px rgba(40, 90, 160, 0.12); min-width: 0; }
+.side { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 18px; }
+.sideCard { background: #fff; border-radius: 22px; padding: 20px; box-shadow: 0 4px 18px rgba(40, 90, 160, 0.1); }
+.sideTitle { margin: 0 0 12px; font-family: var(--hv3-serif), Georgia, serif; font-weight: 700; font-size: 26px; color: #13305e; }
+.mini { display: flex; gap: 12px; align-items: center; padding: 8px; margin: 0 -8px; border-radius: 14px; text-decoration: none; color: #13305e; transition: background 0.5s ease; }
+.mini:hover { background: #f1f6fe; }
+.miniImg { width: 84px; height: 60px; border-radius: 12px; object-fit: cover; flex: none; opacity: 1; animation: none; }
+.miniTitle { font-family: 'Quicksand', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sideText { margin: 0 0 12px; font-family: 'Quicksand', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.5; color: #4c6a96; }
+.teaser { display: flex; gap: 14px; align-items: center; text-decoration: none; color: #13305e; }
+.teaserImg { width: 96px; height: 96px; border-radius: 16px; object-fit: contain; background: radial-gradient(circle at 50% 42%, #fff 0%, #eef5fe 75%); flex: none; opacity: 1; animation: none; mix-blend-mode: multiply; }
+.teaserName { font-family: 'Quicksand', sans-serif; font-size: 16px; font-weight: 700; }
+.teaserPrice { display: inline-block; margin-top: 6px; padding: 5px 12px; border-radius: 12px; background: #e3edff; font-family: 'Quicksand', sans-serif; font-size: 15px; font-weight: 700; }
+
+/* Shop flow pages (product, cart, checkout, success): content on white cards. */
+.flowCard { background: #fff; border-radius: 24px; padding: clamp(20px, 2.6vw, 44px); box-shadow: 0 6px 24px rgba(40, 90, 160, 0.12); color: #13305e; }
+@media (max-width: 1100px) { .articleGrid { grid-template-columns: minmax(0, 1fr); } .side { position: static; } }
+
+/* Cart icon in the nav (only when the cart has items). */
+.cart { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-left: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.6); color: #fff; transition: background 0.4s ease; }
+.cart:hover { background: rgba(255, 255, 255, 0.36); }
+.cartBadge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #f6c64b; color: #2a2208; font-family: 'Quicksand', sans-serif; font-size: 12px; font-weight: 800; display: grid; place-items: center; }

@@ -97,3 +97,6 @@
         font-size: 0.85rem;
     }
 }
+
+/* Home v3: inside a white card under the shared nav. */
+.wrap { max-width: 760px; padding: 4px 0; }

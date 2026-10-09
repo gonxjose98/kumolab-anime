@@ -5,6 +5,7 @@ import { BlogPost, Product } from '@/types';
 import Forecast from './Forecast';
 import TrendingRow from './TrendingRow';
 import Reveal from './Reveal';
+import CartLink from './CartLink';
 import s from './HomeV3.module.css';
 
 const serif = Cormorant_Garamond({ subsets: ['latin'], weight: ['600', '700'], variable: '--hv3-serif' });
@@ -102,6 +103,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
                     <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.brandLogo} />
                 </Link>
                 <Link href="/merch" className={s.navLink}>Shop</Link>
+                <CartLink />
                 <a href="#forecast" className={s.navCta}>Join</a>
             </header>
 

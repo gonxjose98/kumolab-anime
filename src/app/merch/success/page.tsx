@@ -5,8 +5,8 @@ import { useCartStore } from '@/store/useCartStore';
 import { trackEvent } from '@/lib/analytics/events';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
-import SkyContentRoot from '@/components/sky-content';
-import SkyFooter from '@/components/redesign-sky/SkyFooter';
+import PageShell from '@/components/home-v3/PageShell';
+import pg from '@/components/home-v3/Pages.module.css';
 import styles from './success.module.css';
 
 export default function SuccessPage() {
@@ -30,7 +30,8 @@ export default function SuccessPage() {
     }, [clearCart]);
 
     return (
-        <SkyContentRoot>
+        <PageShell active="/merch">
+            <div className={pg.wrap}><div className={pg.flowCard}>
             <div className={styles.wrap}>
                 <CheckCircle size={80} className={styles.icon} />
                 <h1 className={styles.title}>Order Confirmed!</h1>
@@ -47,7 +48,7 @@ export default function SuccessPage() {
                     </Link>
                 </div>
             </div>
-            <SkyFooter />
-        </SkyContentRoot>
+            </div></div>
+        </PageShell>
     );
 }
