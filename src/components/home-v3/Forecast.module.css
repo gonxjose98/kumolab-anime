@@ -82,3 +82,12 @@
     .perkIcon { width: 40px; height: 40px; }
     .perkIcon svg { width: 20px; height: 20px; }
 }
+
+/* Colour accents: gold kicker, pastel perk badges. */
+.kicker { color: #ffe08a; text-shadow: 0 1px 8px rgba(120, 80, 0, 0.25); }
+.perkIcon { border: 0; box-shadow: 0 3px 10px rgba(20, 60, 120, 0.15); }
+.perkIcon svg { stroke: var(--pc); }
+.perk_gold { background: #fff3c8; --pc: #c48a00; }
+.perk_pink { background: #ffe1ec; --pc: #d94d82; }
+.perk_mint { background: #dcf7e9; --pc: #1d9a62; }
+.perk_sky { background: #e1edff; --pc: #2f6fc4; }

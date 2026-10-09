@@ -460,7 +460,7 @@
 :global(html.hv3-reveal) .page [data-reveal]:global(.is-in) { opacity: 1; translate: 0 0; scale: 1; }
 
 /* Subtitles: darker, a touch heavier, with a soft white halo so they read over clouds. */
-.sub { color: #22457c; font-weight: 700; text-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.8); }
+.sub { color: #22457c; font-weight: 700; text-shadow: none; }
 
 /* Under the Forecast: the cloud field fades into the regular sky (no hard seam). */
 .skyClouds::before { background: url('/home-v3/sky.webp') center top / 100% auto repeat-y, #9fcaf3; }

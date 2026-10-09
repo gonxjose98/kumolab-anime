@@ -7,10 +7,10 @@ import s from './Forecast.module.css';
 type Status = 'idle' | 'loading' | 'done' | 'error';
 
 const PERKS = [
-    { label: 'Weekly drop roundup', d: 'M5 5h14v14H5zM5 9h14M9 3v4M15 3v4' },
-    { label: 'New trailers and dates', d: 'M6 4h12v16H6zM10 9l5 3-5 3z' },
-    { label: 'Confirmed premieres only', d: 'M4 6l8-3 8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9z' },
-    { label: 'No spoilers, no spam', d: 'M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18Z' },
+    { tone: 'gold', label: 'Weekly drop roundup', d: 'M5 5h14v14H5zM5 9h14M9 3v4M15 3v4' },
+    { tone: 'pink', label: 'New trailers and dates', d: 'M6 4h12v16H6zM10 9l5 3-5 3z' },
+    { tone: 'mint', label: 'Confirmed premieres only', d: 'M4 6l8-3 8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9z' },
+    { tone: 'sky', label: 'No spoilers, no spam', d: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 12.5l2.7 2.7L16 9.8' },
 ];
 
 export default function Forecast() {
@@ -62,7 +62,7 @@ export default function Forecast() {
                 <ul className={s.perks} data-reveal data-reveal-i={2}>
                     {PERKS.map((p) => (
                         <li key={p.label}>
-                            <span className={s.perkIcon}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={p.d} /></svg></span>
+                            <span className={`${s.perkIcon} ${s[`perk_${p.tone}`]}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={p.d} /></svg></span>
                             {p.label}
                         </li>
                     ))}
