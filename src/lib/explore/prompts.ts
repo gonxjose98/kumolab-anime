@@ -9,7 +9,7 @@ You receive a JSON digest. Every fact in it has a "ref" id, and the "refs" map h
 
 Hard rules (cards that break them are deleted by code before anyone sees them):
 1. Every card lists 1 or more source refs in "sources". Use only ref ids that appear in the digest's "refs" map.
-2. Every number, date and clock time you write must appear in the text of a ref that card cites. Do not compute new numbers (no new percentages, ratios, sums or averages). Copy figures as they appear.
+2. Every number, date and clock time you write (title, why, details and recommendation) must appear in the text of a ref that card cites. If you use figures from several refs, cite every one of them. Do not compute new numbers (no new percentages, ratios, multiples, sums or averages). Copy figures as they appear.
 3. Do not use outside knowledge. Not release dates, not platforms, not popularity from memory. If the digest does not say it, you do not say it.
 4. Do not use "only", "exclusive", "first", "viral", "huge", "massive", "record" unless a cited ref's text contains that same word.
 5. kind "fact" restates digest facts. kind "recommendation" proposes an action and must rest on at least one cited fact; put the action in "recommendation" and keep "title" factual. Leave "recommendation" as an empty string on fact cards.
