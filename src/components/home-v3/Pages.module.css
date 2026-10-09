@@ -113,3 +113,9 @@
 .shopView { display: block; margin-top: 4px; font-family: 'Quicksand', sans-serif; font-size: 14px; font-weight: 700; color: #2f6fc4; }
 .shopPrice { flex: none; padding: 9px 16px; border-radius: 14px; background: #e3edff; color: #13305e; font-family: 'Quicksand', sans-serif; font-size: clamp(16px, 1.25vw, 19px); font-weight: 700; }
 @media (max-width: 760px) { .bandInner { padding-top: 60px; } .body { margin-top: -50px; } }
+
+/* Same smooth hover on inner-page cards. */
+.shopCard, .offerItem { transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.7s ease; }
+.shopCard:hover, .offerItem:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(40, 90, 160, 0.18); }
+.shopImg { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.chip { transition: background 0.4s ease, color 0.4s ease; }

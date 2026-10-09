@@ -506,9 +506,22 @@
 .today:hover { transform: translateY(-5px) rotate(0deg); box-shadow: 0 18px 38px rgba(20, 60, 120, 0.24); }
 @media (prefers-reduced-motion: reduce) { .introToday { animation: none; } }
 
-/* Content buckets read as categories, not posts: short banner tiles. */
-.explore { aspect-ratio: 2.5 / 1; border-radius: 16px; }
-.explore::after { background: linear-gradient(90deg, rgba(10, 40, 90, 0.55) 0%, rgba(10, 40, 90, 0.15) 60%, rgba(10, 40, 90, 0) 100%); }
-.exploreImg { object-position: center 40%; }
-.exploreName { top: 50%; bottom: auto; left: 18px; transform: translateY(-50%); font-size: clamp(16px, 1.25vw, 20px); }
-@media (max-width: 760px) { .explore { aspect-ratio: 1.9 / 1; } .exploreName { font-size: 15px; left: 12px; } }
+/* Content buckets: the same picture tiles, just a little shorter than the post cards. */
+.explore { aspect-ratio: 3 / 2; }
+.exploreName { font-size: clamp(16px, 1.3vw, 21px); }
+
+/* Smooth, springy hover on every card (same feel as the Today card). */
+.drop, .trend, .merch, .explore, .socialTile {
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.7s ease;
+}
+.drop:hover, .trend:hover, .merch:hover, .explore:hover, .socialTile:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 34px rgba(40, 90, 160, 0.2);
+}
+.exploreImg, .socialTile img { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.explore:hover .exploreImg { transform: scale(1.05); }
+.socialTile:hover img { transform: scale(1.04); }
+.followRow { transition: background 0.5s ease; }
+.followArrow { transition: translate 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), color 0.5s ease; }
+.followRow:hover .followArrow { translate: none; transform: translateX(3px); }
+.seeAll, .pill { transition: background 0.5s ease, color 0.5s ease; }

@@ -22,8 +22,16 @@ export default function Reveal() {
             (entries) => {
                 for (const e of entries) {
                     if (e.isIntersecting) {
-                        e.target.classList.add('is-in');
-                        io.unobserve(e.target);
+                        const el = e.target as HTMLElement;
+                        el.classList.add('is-in');
+                        io.unobserve(el);
+                        // Once it has risen in, hand the element back to its own styles
+                        // so hover transitions are smooth and not overridden.
+                        const delay = parseInt(el.style.getPropertyValue('--d') || '0', 10) || 0;
+                        window.setTimeout(() => {
+                            el.removeAttribute('data-reveal');
+                            el.classList.remove('is-in');
+                        }, delay + 950);
                     }
                 }
             },
