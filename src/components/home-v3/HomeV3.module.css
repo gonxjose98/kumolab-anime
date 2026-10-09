@@ -534,3 +534,6 @@
 :global(html.hv3-leaving) .page { opacity: 0; transform: translateY(-8px); transition: opacity 0.28s ease, transform 0.28s ease; }
 @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
 .socialTile:hover img { transform: none; }
+/* Bigger logo top-left (all v3 pages). */
+.brandLogo { height: 62px; }
+@media (max-width: 760px) { .brandLogo { height: 44px; } }

@@ -18,6 +18,8 @@ export default function Reveal() {
     useEffect(() => {
         const root = document.documentElement;
         root.classList.remove('hv3-leaving');
+        // Count pages seen in this tab so Back knows there is somewhere to go back to.
+        try { sessionStorage.setItem('hv3-pages', String(Number(sessionStorage.getItem('hv3-pages') || 0) + 1)); } catch { /* storage blocked */ }
         const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
         // ── Page transitions ──
