@@ -1,7 +1,7 @@
 /**
  * Anime Wire enrichment: plain-English headlines + pictures for the dashboard.
  *
- * Runs after the detection worker flushes the wire (and on `?worker=wire-enrich`).
+ * Runs after the detection worker flushes the wire (and on `?worker=diag-wire-enrich` for backfills).
  *   1. Text: rows missing plain_title go to Haiku ~20 at a time (JSON in, JSON
  *      out) for plain_title, is_anime, anime_title and a text-only importance
  *      1-5. The model sees ONLY the item's own headline + summary, so the

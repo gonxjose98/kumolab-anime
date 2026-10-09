@@ -55,7 +55,7 @@ const VALID_WORKERS = [
 
 // Ad-hoc diagnostics. Dispatchable, but not part of the scheduled cron surface
 // and deliberately absent from the invalid-worker hint below.
-const DIAGNOSTIC_WORKERS = ['diag-trailer', 'diag-image-reel', 'wire-enrich'];
+const DIAGNOSTIC_WORKERS = ['diag-trailer', 'diag-image-reel', 'diag-wire-enrich'];
 
 const DISPATCHABLE = new Set([...VALID_WORKERS, ...DIAGNOSTIC_WORKERS]);
 
@@ -461,13 +461,13 @@ async function dispatch(
         return { success: result.ok, worker: 'radar', ...result };
     }
 
-    if (worker === 'wire-enrich') {
+    if (worker === 'diag-wire-enrich') {
         // Anime Wire enrichment on demand (backfill / verification). Detection
         // runs the same step after every flush.
         const { runWireEnrich } = await import('@/lib/discover/enrich');
         const cap = Math.min(Number(searchParams.get('cap')) || 60, 200);
         const result = await runWireEnrich({ cap, budgetMs: 200_000 });
-        return { ...result, success: result.ok, worker: 'wire-enrich' };
+        return { ...result, success: result.ok, worker: 'diag-wire-enrich' };
     }
 
     if (worker === 'explore') {
