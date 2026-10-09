@@ -3,8 +3,10 @@
  *
  * Runs after the detection worker flushes the wire (and on `?worker=wire-enrich`).
  *   1. Text: rows missing plain_title go to Haiku ~20 at a time (JSON in, JSON
- *      out) for plain_title, is_anime, anime_title and importance 1-5. The
- *      model only sees facts we hand it, and is told never to add claims.
+ *      out) for plain_title, is_anime, anime_title and a text-only importance
+ *      1-5. The model sees ONLY the item's own headline + summary, so the
+ *      rewrite cannot borrow claims from anywhere else. Radar popularity and
+ *      multi-outlet coverage are then added deterministically (importanceBoost).
  *   2. Images: rows with no image get one GET of the article page (short
  *      timeout, size cap) and its og:image / twitter:image, checked with a HEAD
  *      so nothing huge gets hotlinked.
@@ -89,7 +91,6 @@ export interface EnrichInput {
     summary: string | null;
     source: string | null;
     kind: string;
-    facts: string[];
 }
 
 export interface EnrichOutput {
@@ -103,12 +104,17 @@ export interface EnrichOutput {
 export const ENRICH_SYSTEM = `You rewrite anime news headlines for a busy business owner who does not follow anime closely.
 
 For every item return:
-- plain_title: plain English, at most 90 characters, saying what happened and why it matters. Say what kind of thing it is ("New show", "Season 3 of", "Movie", "Manga") when the item says so. Drop Japanese romanizations when an English name or a plain description works. Translate jargon: "PV" = trailer, "OP" = opening song, "ED" = ending song, "cour" = part, "key visual" = poster.
+- plain_title: plain English, at most 90 characters, saying what happened in plain words. Say what kind of thing it is ("New show", "Season 3 of", "Movie", "Manga") only when the headline or summary says so. Drop Japanese romanizations when an English name or a plain description works. Translate jargon: "PV" = trailer, "OP" = opening song, "ED" = ending song, "cour" = part, "key visual" = poster.
 - is_anime: true when the item is about anime, manga, light novels, Japanese animation studios, voice actors or anime music. false for video games, arcade machines, live-action films and TV, Western comics, celebrities and general entertainment news.
 - anime_title: the main anime or manga the item is about, in its most common English or romaji form, without "Season N" or episode text. null when there is none.
-- importance: 1 to 5, using ONLY facts present in the item and its listed facts. Raise it for: a big show (listed AniList members, a top anticipated rank), a streaming platform involved, a new season or sequel, a premiere or release date, several outlets covering the same story. Routine merch, events, licensing lists and minor cast additions stay at 1 or 2. 5 is rare.
+- importance: 1 to 5, judged ONLY from the headline and summary. Raise it for: a famous franchise, a streaming platform named, a new season or sequel, a premiere or release date, a theatrical film. Routine merch, events, games, reviews, licensing lists, music videos and minor cast additions stay at 1 or 2. 5 is rare.
 
-Hard rules: never add facts, dates, platforms or claims that are not in the item. Never use em dashes. Keep proper names spelled as given. Return every id exactly once.`;
+Hard rules for plain_title:
+- Describe the SAME news as the headline. Do not swap the headline's news for a different detail from the summary (a trailer stays a trailer, "episode 2 preview" never becomes "premieres").
+- Every fact (dates, platforms, numbers, names) must appear in that item's headline or summary. Never guess or add a platform, date or claim.
+- When unsure, stay close to the original wording.
+- Never use em dashes. Keep proper names spelled as given.
+Return every id exactly once.`;
 
 export function enrichUserTurn(items: EnrichInput[]): string {
     return JSON.stringify({
@@ -116,8 +122,7 @@ export function enrichUserTurn(items: EnrichInput[]): string {
             id: i.id,
             headline: i.title,
             summary: i.summary ? i.summary.slice(0, 320) : undefined,
-            source: i.source || undefined,
-            facts: i.facts.length ? i.facts : undefined,
+            // No outlet name on purpose: "Crunchyroll News" made the model claim Crunchyroll streaming.
         })),
     });
 }
@@ -175,19 +180,16 @@ export function cleanModelItems(raw: unknown, askedIds: Set<number>): EnrichOutp
     return out;
 }
 
-const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M` : n >= 1000 ? `${Math.round(n / 1000)}K` : String(n));
-
-/** Plain facts about the matched radar show, for the importance call. */
-export function radarFacts(r: RadarLite | null, nowMs = Date.now()): string[] {
-    if (!r) return [];
-    const f: string[] = [];
-    if (r.popularity) f.push(`${compact(r.popularity)} AniList members`);
-    if (r.anticipation_rank && r.anticipation_rank <= 25) f.push(`#${r.anticipation_rank} most anticipated upcoming show on AniList`);
-    if (r.season_label) f.push(r.season_label);
-    const streams = (r.streaming || []).map((s) => s.name).slice(0, 3);
-    if (streams.length) f.push(`Streams on ${streams.join(', ')}`);
-    if (r.next_airing_at && r.next_episode === 1 && Date.parse(r.next_airing_at) > nowMs) f.push('Premieres within 60 days');
-    return f;
+/**
+ * Deterministic importance add-ons from facts we hold (never shown to the
+ * model): +1 for a big show on the radar (100K+ AniList members or a top-10
+ * anticipated rank), +1 when 3+ outlets covered the same show in 48h.
+ */
+export function importanceBoost(r: RadarLite | null, outlets: number): number {
+    let b = 0;
+    if (r && ((r.popularity || 0) >= 100_000 || (r.anticipation_rank != null && r.anticipation_rank <= 10))) b++;
+    if (outlets >= 3) b++;
+    return b;
 }
 
 // ─── Network steps ───────────────────────────────────────────
@@ -311,13 +313,7 @@ export async function runWireEnrich(opts: { cap?: number; budgetMs?: number } = 
                 outlets.get(k)!.add(String(r.source_name || ''));
             }
 
-            const inputs: EnrichInput[] = rows.map((r) => {
-                const m = matchRadar(r.anime_title, radar) || matchRadar(r.title, radar);
-                const facts = radarFacts(m);
-                const n = r.anime_title ? outlets.get(normTitle(r.anime_title))?.size ?? 0 : 0;
-                if (n >= 2) facts.push(`${n} outlets covered this show in the last 48 hours`);
-                return { id: r.id, title: r.title, summary: r.summary, source: r.source_name, kind: r.kind, facts };
-            });
+            const inputs: EnrichInput[] = rows.map((r) => ({ id: r.id, title: r.title, summary: r.summary, source: r.source_name, kind: r.kind }));
             const byId = new Map(rows.map((r) => [r.id, r]));
 
             const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 });
@@ -350,12 +346,14 @@ export async function runWireEnrich(opts: { cap?: number; budgetMs?: number } = 
                 const done = new Set<number>();
                 await Promise.all(cleaned.map(async (c) => {
                     const row = byId.get(c.id)!;
-                    const m = matchRadar(c.anime_title, radar) || matchRadar(row.anime_title, radar) || matchRadar(row.title, radar);
-                    const animeTitle = m ? (m.title_english || m.title_romaji) : (row.anime_title || c.anime_title);
+                    const m = c.is_anime ? (matchRadar(c.anime_title, radar) || matchRadar(row.anime_title, radar) || matchRadar(row.title, radar)) : null;
+                    const animeTitle = c.anime_title || row.anime_title || (m ? (m.title_english || m.title_romaji) : null);
+                    const n = animeTitle ? outlets.get(normTitle(animeTitle))?.size ?? 0 : 0;
+                    const importance = Math.min(5, c.importance + importanceBoost(m, n));
                     const { error } = await supabaseAdmin.from('wire_items').update({
                         plain_title: c.plain_title,
                         is_anime: c.is_anime,
-                        importance: c.importance,
+                        importance,
                         anime_title: animeTitle,
                         radar_id: m?.anilist_id ?? null,
                         enriched_at: now,

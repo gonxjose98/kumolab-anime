@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseOgImages, matchRadar, cleanModelItems, radarFacts, type RadarLite } from '../enrich';
+import { parseOgImages, matchRadar, cleanModelItems, importanceBoost, type RadarLite } from '../enrich';
 import { alertsFromSnapshot, tokenAlertText } from '../../dashboard/alerts';
 import { initialsOf, wireImages, wireHeadline, shortSource } from '../../../components/admin/discover/format';
 
@@ -61,11 +61,12 @@ describe('cleanModelItems', () => {
     });
 });
 
-describe('radarFacts', () => {
-    it('lists only facts present', () => {
-        const f = radarFacts(radar({ popularity: 84_000, anticipation_rank: 1, streaming: [{ name: 'Netflix' }], season_label: 'Season 2' }));
-        expect(f).toEqual(['84K AniList members', '#1 most anticipated upcoming show on AniList', 'Season 2', 'Streams on Netflix']);
-        expect(radarFacts(null)).toEqual([]);
+describe('importanceBoost', () => {
+    it('adds only for facts we hold', () => {
+        expect(importanceBoost(radar({ popularity: 250_000 }), 1)).toBe(1);
+        expect(importanceBoost(radar({ popularity: 5_000, anticipation_rank: 3 }), 3)).toBe(2);
+        expect(importanceBoost(radar({ popularity: 5_000 }), 2)).toBe(0);
+        expect(importanceBoost(null, 0)).toBe(0);
     });
 });
 
