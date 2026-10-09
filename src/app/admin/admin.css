@@ -3159,6 +3159,12 @@ html[data-admin-theme='dark'] .admin-root .ak-home-chip--rel { background: rgba(
 html[data-admin-theme='dark'] .admin-root .ak-home-chip--yt { background: rgba(255, 122, 107, .18); color: #ffb0a6; }
 html[data-admin-theme='dark'] .admin-root .ak-home-chip--trend { background: rgba(240, 198, 116, .18); color: #f5d590; }
 .admin-root .ak-home-chip.ak-home-chip--onimg { background: rgba(255, 255, 255, .92); }
+/* On a photo the chip is always the light pill, so keep light-theme text colors in dark mode too. */
+html[data-admin-theme='dark'] .admin-root .ak-home-chip.ak-home-chip--onimg { color: #4a5872; background: rgba(255, 255, 255, .92); }
+html[data-admin-theme='dark'] .admin-root .ak-home-chip--onimg.ak-home-chip--stream { color: #16824a; }
+html[data-admin-theme='dark'] .admin-root .ak-home-chip--onimg.ak-home-chip--rel { color: #2b5fd9; }
+html[data-admin-theme='dark'] .admin-root .ak-home-chip--onimg.ak-home-chip--yt { color: #c03030; }
+html[data-admin-theme='dark'] .admin-root .ak-home-chip--onimg.ak-home-chip--trend { color: #9a6a00; }
 
 /* 1. Needs you */
 .admin-root .ak-home-needs { display: flex; flex-direction: column; gap: 10px; }
