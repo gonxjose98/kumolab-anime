@@ -14,7 +14,7 @@ import {
     Menu,
     Cpu,
     Radar,
-    Compass,
+    Sparkles,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
 import ThemeToggle from './ThemeToggle';
@@ -38,7 +38,7 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     },
     {
         label: 'Insight', jp: '観測', items: [
-            { href: '/admin/explore', label: 'Explore', jp: '洞察', icon: Compass, perm: 'analytics' },
+            { href: '/admin/insights', label: 'AI Insights', jp: '洞察', icon: Sparkles, perm: 'analytics' },
             { href: '/admin/analytics', label: 'Analytics', jp: '分析', icon: BarChart3, perm: 'analytics' },
             { href: '/admin/discover', label: 'Discover', jp: '探索', icon: Radar, perm: 'content' },
         ],

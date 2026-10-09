@@ -88,6 +88,14 @@ describe('validateCards', () => {
         expect(drops[0].reason).toMatch(/viral/);
     });
 
+    it('allows a year named on its own when a cited date carries it', () => {
+        const d: Digest = { ...digest, section: 'world', refs: { 'anilist:1': { kind: 'anilist', label: 'Made in Abyss', text: 'Made in Abyss; prequel Made in Abyss S2 ended Sep 27, 2022; AniList popularity 43,120', values: [43120] } } };
+        const ok = validateCards('world', [card({ type: 'premiere', title: 'Made in Abyss returns, its last season ended in 2022', why: '43.1K AniList members are waiting for it', sources: ['anilist:1'] })], d);
+        expect(ok.drops).toEqual([]);
+        const bad = validateCards('world', [card({ type: 'premiere', title: 'Made in Abyss returns after the 2019 movie', why: '43.1K members', sources: ['anilist:1'] })], d);
+        expect(bad.drops[0].reason).toMatch(/2019/);
+    });
+
     it('drops a type that does not belong to the section', () => {
         const { drops } = validateCards('ours', [card({ type: 'news' })], digest);
         expect(drops[0].reason).toMatch(/not allowed/);

@@ -263,7 +263,7 @@ export async function buildWorldDigest(dismissedTitles: string[] = []): Promise<
     // Release Radar (AniList).
     const radarRes = await supabaseAdmin
         .from('release_radar')
-        .select('anilist_id, title_english, title_romaji, season_label, format, status, start_date, next_airing_at, next_episode, popularity, trending, favourites, average_score, streaming, prequel_title, prequel_end_date, site_url, anticipation_rank, studios')
+        .select('anilist_id, title_english, title_romaji, season_label, format, status, start_date, next_airing_at, next_episode, popularity, trending, favourites, average_score, streaming, prequel_title, prequel_end_date, site_url, anticipation_rank, studios, genres')
         .order('anticipation_rank', { ascending: true, nullsFirst: false })
         .order('popularity', { ascending: false })
         .limit(20);
@@ -281,6 +281,8 @@ export async function buildWorldDigest(dismissedTitles: string[] = []): Promise<
             r.popularity != null ? `AniList popularity ${nf(r.popularity)}` : null,
             r.trending != null ? `AniList trending score ${nf(r.trending)}` : null,
             r.average_score != null ? `average score ${r.average_score}` : null,
+            Array.isArray(r.genres) && r.genres.length ? `genres: ${r.genres.slice(0, 4).join(', ')}` : null,
+            Array.isArray(r.studios) && r.studios.length ? `studio: ${r.studios.slice(0, 2).join(', ')}` : null,
             streaming.length ? `listed streaming on AniList: ${streaming.join(', ')}` : null,
             r.prequel_title ? `prequel ${r.prequel_title}${r.prequel_end_date ? ` ended ${new Date(`${r.prequel_end_date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : ''}` : null,
             r.anticipation_rank != null ? `anticipation rank ${r.anticipation_rank}` : null,
@@ -295,13 +297,13 @@ export async function buildWorldDigest(dismissedTitles: string[] = []): Promise<
 
     // Anime Wire: everything scraped in the last 72h.
     const since = new Date(now - 72 * 3600_000).toISOString();
-    const wireRes = await supabaseAdmin
-        .from('wire_items')
-        .select('id, kind, title, url, source_name, published_at, detected_at, anime_title, summary')
-        .gte('detected_at', since)
-        .order('detected_at', { ascending: false })
-        .limit(400);
-    const wire = isMissingTable(wireRes.error) ? [] : (wireRes.data || []);
+    // plain_title / is_anime are added by the Wire redesign; fall back cleanly while they are absent.
+    const WIRE_BASE = 'id, kind, title, url, source_name, published_at, detected_at, anime_title, summary';
+    const wireQuery = (cols: string) => supabaseAdmin.from('wire_items').select(cols)
+        .gte('detected_at', since).order('detected_at', { ascending: false }).limit(400);
+    let wireRes: { data: any[] | null; error: { message?: string; code?: string } | null } = await wireQuery(`${WIRE_BASE}, plain_title, is_anime`);
+    if (wireRes.error && (wireRes.error.code === '42703' || /column/i.test(wireRes.error.message || ''))) wireRes = await wireQuery(WIRE_BASE);
+    const wire = (isMissingTable(wireRes.error) ? [] : (wireRes.data || [])).filter((w: any) => w.is_anime !== false);
     if (!wire.length) missing.push('anime wire');
 
     const itemRef = (w: any) => {
@@ -309,7 +311,7 @@ export async function buildWorldDigest(dismissedTitles: string[] = []): Promise<
         const when = w.published_at || w.detected_at;
         refs[ref] = {
             kind: 'url', label: `${clean(w.source_name, 40)}: ${clean(w.title, 120)}`, url: w.url || undefined,
-            text: `${clean(w.source_name, 40)} (${w.kind}), ${when ? `published ${etDay(when)}` : 'date unknown'}: ${clean(w.title, 160)}${w.summary ? `. Summary: ${clean(w.summary, 320)}` : ''}`,
+            text: `${clean(w.source_name, 40)} (${w.kind}), ${when ? `published ${etDay(when)}` : 'date unknown'}: ${clean(w.title, 160)}${w.plain_title ? `. Plain: ${clean(w.plain_title, 160)}` : ''}${w.summary ? `. Summary: ${clean(w.summary, 320)}` : ''}`,
             values: [],
         };
         return ref;
@@ -337,7 +339,7 @@ export async function buildWorldDigest(dismissedTitles: string[] = []): Promise<
         return { ref, anime, outlets: s.outlets.length, items: s.items.length, item_refs: s.items.slice(0, 3).map(itemRef) };
     });
     const grouped = new Set(stories.flatMap((s) => s.items.slice(0, 3).map((i) => i.id)));
-    facts.latest_items = wire.filter((w: any) => !grouped.has(w.id)).slice(0, 15).map((w: any) => ({ ref: itemRef(w), title: clean(w.title, 160), source: w.source_name, kind: w.kind, anime: w.anime_title || null }));
+    facts.latest_items = wire.filter((w: any) => !grouped.has(w.id)).slice(0, 15).map((w: any) => ({ ref: itemRef(w), title: clean(w.title, 160), plain: w.plain_title ? clean(w.plain_title, 160) : null, source: w.source_name, kind: w.kind, anime: w.anime_title || null }));
 
     // What we already posted, so the model can flag gaps without duplicating.
     const { data: ours } = await supabaseAdmin

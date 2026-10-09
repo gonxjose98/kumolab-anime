@@ -2921,6 +2921,204 @@ html[data-admin-theme='dark'] .admin-root .ak-xp-glance__chg.is-down { color: #f
 .admin-root .ak-xp-fold summary::-webkit-details-marker { display: none; }
 .admin-root .ak-xp-fold[open] summary { margin-bottom: 10px; }
 
+/* ══ AI Insights (ak-ai-*) ═════════════════════════════════════════════════
+   /admin/insights (was Explore). One feed of rows inside one card, a "This
+   week" rail on desktop. Phone: stat tiles above the feed, breakdown below.
+   Dark mode follows the reference: near-black surfaces, hairline borders,
+   colored chips. Light mode keeps the same structure on light surfaces. */
+.admin-root .ak-ai {
+    --ai-surface: rgba(255, 255, 255, 0.94);
+    --ai-surface-2: #f3f5f9;
+    --ai-line: rgba(16, 32, 64, 0.1);
+    --ai-ink: #141a26;
+    --ai-ink-2: #5b6474;
+    --ai-ink-3: #8a93a3;
+    --ai-news: #2f6fd6;      --ai-news-bg: rgba(47, 111, 214, 0.1);
+    --ai-premiere: #7a4fd8;  --ai-premiere-bg: rgba(122, 79, 216, 0.1);
+    --ai-trending: #b86a00;  --ai-trending-bg: rgba(214, 140, 20, 0.12);
+    --ai-up: #1d8a55;        --ai-up-bg: rgba(29, 138, 85, 0.1);
+    --ai-down: #c0392b;      --ai-down-bg: rgba(192, 57, 43, 0.09);
+    --ai-ours: #0f8a87;      --ai-ours-bg: rgba(15, 138, 135, 0.1);
+    --ai-system: #b86a00;    --ai-system-bg: rgba(214, 140, 20, 0.12);
+    --ai-idea-bg: rgba(122, 79, 216, 0.07);
+    --ai-idea-line: rgba(122, 79, 216, 0.18);
+    display: flex; flex-direction: column; gap: 16px; min-width: 0; width: 100%;
+    font-family: var(--ak-sans); color: var(--ai-ink);
+}
+html[data-admin-theme='dark'] .admin-root .ak-ai {
+    --ai-surface: rgba(20, 20, 23, 0.96);
+    --ai-surface-2: #222226;
+    --ai-line: rgba(255, 255, 255, 0.08);
+    --ai-ink: #ededf0;
+    --ai-ink-2: #a3a3ad;
+    --ai-ink-3: #74747e;
+    --ai-news: #7fb2ff;      --ai-news-bg: rgba(127, 178, 255, 0.1);
+    --ai-premiere: #b9a1ff;  --ai-premiere-bg: rgba(185, 161, 255, 0.12);
+    --ai-trending: #f5b85a;  --ai-trending-bg: rgba(245, 184, 90, 0.11);
+    --ai-up: #6ee0a2;        --ai-up-bg: rgba(110, 224, 162, 0.1);
+    --ai-down: #ff8f84;      --ai-down-bg: rgba(255, 143, 132, 0.1);
+    --ai-ours: #6fdad6;      --ai-ours-bg: rgba(111, 218, 214, 0.1);
+    --ai-system: #f5b85a;    --ai-system-bg: rgba(245, 184, 90, 0.11);
+    --ai-idea-bg: rgba(185, 161, 255, 0.08);
+    --ai-idea-line: rgba(185, 161, 255, 0.2);
+}
+
+.admin-root .ak-ai__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-root .ak-ai__title { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; color: var(--ai-ink); font-family: var(--ak-sans); }
+.admin-root .ak-ai__status { margin-top: 2px; font-size: 13px; color: var(--ai-ink-2); }
+.admin-root .ak-ai__foot { margin: 0; padding: 0 4px; font-size: 12px; color: var(--ai-ink-3); }
+
+.admin-root .ak-ai__grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "stats" "main" "brk"; gap: 14px; min-width: 0; }
+.admin-root .ak-ai__stats { grid-area: stats; min-width: 0; }
+.admin-root .ak-ai__main { grid-area: main; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.admin-root .ak-ai__brk { grid-area: brk; min-width: 0; }
+@media (min-width: 1024px) {
+    .admin-root .ak-ai__grid {
+        grid-template-columns: minmax(0, 1fr) 340px;
+        grid-template-areas: "main stats" "main brk" "main .";
+        grid-template-rows: auto auto 1fr; align-items: start; gap: 18px 20px;
+    }
+}
+
+/* System pill, quiet unless something is urgent. */
+.admin-root .ak-ai .ak-xp-pill { width: auto; align-self: flex-start; max-width: 100%; padding: 7px 12px; font-size: 13px; background: var(--ai-surface); border-color: var(--ai-line); color: var(--ai-ink); }
+.admin-root .ak-ai .ak-xp-pill:not(.ak-xp-pill--crit) .ak-xp-pill__sub { display: none; }
+.admin-root .ak-ai .ak-xp-pill--crit { align-self: stretch; border-radius: 14px; padding: 12px 14px; background: var(--ai-down-bg); border-color: color-mix(in srgb, var(--ai-down) 35%, transparent); }
+.admin-root .ak-ai .ak-xp-pill--crit .ak-xp-pill__text { white-space: normal; }
+
+/* Filter tabs: one segmented group. */
+.admin-root .ak-ai-feedwrap { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.admin-root .ak-ai-tabs {
+    display: flex; gap: 2px; align-self: flex-start; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+    padding: 4px; border-radius: 12px; background: var(--ai-surface-2); border: 1px solid var(--ai-line);
+}
+.admin-root .ak-ai-tabs::-webkit-scrollbar { display: none; }
+.admin-root .ak-ai-tab {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px;
+    border: 1px solid transparent; background: none; color: var(--ai-ink-2); font: 600 13.5px/1 var(--ak-sans); cursor: pointer; white-space: nowrap;
+}
+.admin-root .ak-ai-tab:hover { color: var(--ai-ink); }
+.admin-root .ak-ai-tab.is-active { background: var(--ai-surface); border-color: var(--ai-line); color: var(--ai-ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+.admin-root .ak-ai-tab__n { font-size: 11px; font-weight: 700; color: var(--ai-ink-3); font-variant-numeric: tabular-nums; }
+
+/* The feed: rows divided by hairlines inside one card. */
+.admin-root .ak-ai-feed { background: var(--ai-surface); border: 1px solid var(--ai-line); border-radius: 16px; overflow: hidden; min-width: 0; }
+.admin-root .ak-ai-row { display: flex; gap: 16px; padding: 20px 22px; min-width: 0; }
+.admin-root .ak-ai-row + .ak-ai-row { border-top: 1px solid var(--ai-line); }
+.admin-root .ak-ai-row__poster { flex: none; width: 56px; height: 78px; border-radius: 8px; object-fit: cover; background: var(--ai-surface-2); border: 1px solid var(--ai-line); }
+.admin-root .ak-ai-row__tile {
+    flex: none; width: 64px; height: 64px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    background: var(--ai-surface-2); color: var(--ai-ink); text-align: center; padding: 4px;
+}
+.admin-root .ak-ai-row__tile.is-up { background: var(--ai-up-bg); color: var(--ai-up); }
+.admin-root .ak-ai-row__tile.is-down { background: var(--ai-down-bg); color: var(--ai-down); }
+.admin-root .ak-ai-row__tilenum { font-size: 17px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.admin-root .ak-ai-row__tilesub { font-size: 9.5px; font-weight: 700; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.85; }
+.admin-root .ak-ai-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.admin-root .ak-ai-row__meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.admin-root .ak-ai-row__ago { margin-left: auto; font-size: 12px; color: var(--ai-ink-3); white-space: nowrap; }
+.admin-root .ak-ai-row__title { margin: 4px 0 0; font: 650 16px/1.35 var(--ak-sans); color: var(--ai-ink); overflow-wrap: anywhere; }
+.admin-root .ak-ai-row__why { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--ai-ink-2); overflow-wrap: anywhere; }
+.admin-root .ak-ai-row.is-acted .ak-ai-row__title { color: var(--ai-ink-2); }
+
+.admin-root .ak-ai-chip {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap;
+    border: 1px solid transparent; background: var(--ai-surface-2); color: var(--ai-ink-2);
+}
+.admin-root .ak-ai-chip.is-news { color: var(--ai-news); background: var(--ai-news-bg); }
+.admin-root .ak-ai-chip.is-premiere { color: var(--ai-premiere); background: var(--ai-premiere-bg); }
+.admin-root .ak-ai-chip.is-trending { color: var(--ai-trending); background: var(--ai-trending-bg); }
+.admin-root .ak-ai-chip.is-up { color: var(--ai-up); background: var(--ai-up-bg); }
+.admin-root .ak-ai-chip.is-down { color: var(--ai-down); background: var(--ai-down-bg); }
+.admin-root .ak-ai-chip.is-ours { color: var(--ai-ours); background: var(--ai-ours-bg); }
+.admin-root .ak-ai-chip.is-system { color: var(--ai-system); background: var(--ai-system-bg); }
+.admin-root .ak-ai-chip.is-plain { background: var(--ai-surface-2); color: var(--ai-ink-2); }
+.admin-root .ak-ai-chip.is-done { color: var(--ai-up); background: var(--ai-up-bg); }
+
+.admin-root .ak-ai-idea {
+    display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px;
+    background: var(--ai-idea-bg); border: 1px solid var(--ai-idea-line); font-size: 13.5px; line-height: 1.45; color: var(--ai-ink);
+}
+.admin-root .ak-ai-idea svg { flex: none; margin-top: 2px; color: var(--ai-premiere); }
+.admin-root .ak-ai-idea strong { color: var(--ai-premiere); font-weight: 700; }
+
+.admin-root .ak-ai-row__more { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--ai-line); font-size: 13.5px; line-height: 1.5; color: var(--ai-ink); }
+.admin-root .ak-ai-row__more p { margin: 0; }
+.admin-root .ak-ai-src { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-root .ak-ai-src li { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-root .ak-ai-src a { display: inline-flex; align-items: center; gap: 4px; color: var(--ai-news); font-size: 13px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.admin-root .ak-ai-src a:hover { text-decoration: underline; }
+.admin-root .ak-ai-src__label { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.admin-root .ak-ai-src__text { font-size: 12px; color: var(--ai-ink-3); overflow-wrap: anywhere; }
+
+.admin-root .ak-ai-row__actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.admin-root .ak-ai-act {
+    display: inline-flex; align-items: center; gap: 2px; padding: 6px 10px; border-radius: 8px;
+    font: 600 13px/1.2 var(--ak-sans); color: var(--ai-ink); text-decoration: none; cursor: pointer;
+    background: var(--ai-surface-2); border: 1px solid var(--ai-line);
+}
+.admin-root .ak-ai-act:hover { border-color: color-mix(in srgb, var(--ai-ink) 25%, transparent); }
+.admin-root .ak-ai-act.is-quiet { background: none; border-color: transparent; color: var(--ai-ink-2); }
+.admin-root .ak-ai-act.is-quiet:hover { color: var(--ai-ink); }
+.admin-root .ak-ai-act:disabled { opacity: 0.6; cursor: default; }
+.admin-root .ak-ai-act__chev { transition: transform 0.15s ease; }
+.admin-root .ak-ai-act__chev.is-open { transform: rotate(90deg); }
+
+.admin-root .ak-ai-empty { display: flex; flex-direction: column; gap: 4px; padding: 28px 22px; font-size: 13.5px; color: var(--ai-ink-2); }
+.admin-root .ak-ai-empty strong { font-size: 15px; color: var(--ai-ink); }
+
+/* Rail panels. */
+.admin-root .ak-ai-panel { background: var(--ai-surface); border: 1px solid var(--ai-line); border-radius: 16px; padding: 16px; min-width: 0; }
+.admin-root .ak-ai-panel__title { margin: 0 0 12px; font: 700 15px/1.2 var(--ak-sans); color: var(--ai-ink); }
+.admin-root .ak-ai-panel__sub { margin-bottom: 12px; font-size: 12.5px; font-weight: 600; color: var(--ai-ink-2); }
+.admin-root .ak-ai-panel__foot { margin-top: 10px; font-size: 11.5px; color: var(--ai-ink-3); }
+.admin-root .ak-ai-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.admin-root .ak-ai-tile { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 12px; border: 1px solid var(--ai-line); background: var(--ai-surface-2); min-width: 0; }
+.admin-root .ak-ai-tile__n { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ai-ink); }
+.admin-root .ak-ai-tile__l { font-size: 12px; color: var(--ai-ink-2); line-height: 1.25; }
+.admin-root .ak-ai-tile__wait { color: var(--ai-ink-3); }
+
+.admin-root .ak-ai-breakdown { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.admin-root .ak-ai-gauge__row { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.admin-root .ak-ai-gauge__svg { flex: none; width: 150px; height: auto; }
+.admin-root .ak-ai-gauge__track { fill: none; stroke: var(--ai-surface-2); stroke-width: 14; stroke-linecap: round; }
+.admin-root .ak-ai-gauge__seg { fill: none; stroke-width: 14; stroke-linecap: round; }
+.admin-root .ak-ai-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.admin-root .ak-ai-legend li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; border: 1px solid var(--ai-line); font-size: 12.5px; color: var(--ai-ink-2); white-space: nowrap; }
+.admin-root .ak-ai-legend__dot { width: 3px; height: 10px; border-radius: 2px; }
+.admin-root .ak-ai-legend__pct { font-weight: 700; color: var(--ai-ink); font-variant-numeric: tabular-nums; }
+
+.admin-root .ak-ai-bars { display: flex; flex-direction: column; gap: 14px; }
+.admin-root .ak-ai-bars .ak-ai-panel__sub { margin-bottom: 0; }
+.admin-root .ak-ai-bar { display: flex; flex-direction: column; gap: 8px; }
+.admin-root .ak-ai-bar__head { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ai-ink); }
+.admin-root .ak-ai-bar__n { color: var(--ai-ink-3); font-size: 12.5px; }
+.admin-root .ak-ai-bar__track { height: 6px; border-radius: 999px; background: var(--ai-surface-2); overflow: hidden; }
+.admin-root .ak-ai-bar__fill { height: 100%; border-radius: 999px; background: var(--ai-ink-3); }
+.admin-root .ak-ai-bar__fill.is-premiere { background: var(--ai-premiere); }
+.admin-root .ak-ai-bar__fill.is-news { background: var(--ai-news); }
+.admin-root .ak-ai-bar__fill.is-ours { background: var(--ai-ours); }
+
+.admin-root .ak-ai-note { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--ai-ink-2); }
+.admin-root .ak-ai-note svg { flex: none; margin-top: 1px; color: var(--ai-premiere); }
+
+@media (max-width: 640px) {
+    .admin-root .ak-ai__title { font-size: 21px; }
+    .admin-root .ak-ai-row { gap: 12px; padding: 16px 14px; }
+    .admin-root .ak-ai-row__poster { width: 46px; height: 64px; }
+    .admin-root .ak-ai-row__tile { width: 54px; height: 54px; border-radius: 10px; }
+    .admin-root .ak-ai-row__tilenum { font-size: 15px; }
+    .admin-root .ak-ai-row__tilesub { font-size: 8.5px; }
+    .admin-root .ak-ai-row__title { font-size: 15px; }
+    .admin-root .ak-ai-tab { padding: 7px 10px; font-size: 13px; }
+    .admin-root .ak-ai-stats { padding: 10px; }
+    .admin-root .ak-ai-stats .ak-ai-panel__title { display: none; }
+    .admin-root .ak-ai-tile { padding: 9px 10px; gap: 3px; }
+    .admin-root .ak-ai-tile__n { font-size: 18px; }
+    .admin-root .ak-ai-tile__l { font-size: 11px; }
+}
+
 /* ══ Dashboard home redesign (ak-home-*) ══════════════════════════════════
    Approved 2026-10 mock: Needs you, Today, Top stories, Coming up, Latest.
    Calm on purpose: one column on phones, generous spacing, one hierarchy.
@@ -3057,4 +3255,23 @@ html[data-admin-theme='dark'] .admin-root .ak-home-fmt--reel { background: rgba(
 .admin-root .ak-home-toggle[aria-pressed="true"] { background: var(--blue-soft); border-color: var(--blue); }
 @media (max-width: 420px) {
     .admin-root .ak-home-orig--row { padding-left: 0; }
+}
+/* AI Insights, phone row: the visual sits beside chips + title only; the
+   detail line, idea and actions use the full row width. */
+.admin-root .ak-ai-feed__foot { margin: 0; padding: 12px 22px; border-top: 1px solid var(--ai-line); font-size: 12px; color: var(--ai-ink-3); }
+@media (max-width: 640px) {
+    .admin-root .ak-ai-row { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 12px; row-gap: 6px; }
+    .admin-root .ak-ai-row.has-visual { grid-template-columns: auto minmax(0, 1fr); }
+    .admin-root .ak-ai-row__main { display: contents; }
+    .admin-root .ak-ai-row__poster, .admin-root .ak-ai-row__tile { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+    .admin-root .ak-ai-row.has-visual .ak-ai-row__meta, .admin-root .ak-ai-row.has-visual .ak-ai-row__title { grid-column: 2; }
+    .admin-root .ak-ai-row__why, .admin-root .ak-ai-idea, .admin-root .ak-ai-row__more, .admin-root .ak-ai-row__actions { grid-column: 1 / -1; }
+    .admin-root .ak-ai-row__title { margin-top: 0; }
+    .admin-root .ak-ai-row__actions { gap: 4px; margin-top: 4px; }
+    .admin-root .ak-ai-act { padding: 6px 9px; font-size: 12.5px; }
+    .admin-root .ak-ai-feed__foot { padding: 12px 14px; }
+}
+@media (max-width: 640px) {
+    .admin-root .ak-ai-tab { padding: 7px 8px; font-size: 12.5px; }
+    .admin-root .ak-ai-tab__n { display: none; }
 }

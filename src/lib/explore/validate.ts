@@ -116,6 +116,8 @@ export function validateCards(section: Digest['section'], raw: RawCard[], digest
             ...GLOBAL_NUMBERS,
             ...cited.flatMap((s) => s.values),
             ...extractNumbers(haystack).map((n) => n.value),
+            // Years inside cited dates ("ended Sep 13, 2022") may be named on their own.
+            ...[...haystack.matchAll(/\b(?:19|20)\d{2}\b/g)].map((m) => Number(m[0])),
         ];
         const badNum = extractNumbers(body).find((n) => !numberSupported(n, allowed));
         if (badNum) { drop(`number ${badNum.value} not in cited sources`); continue; }

@@ -1,8 +1,7 @@
 import AdminShell from '@/components/admin/AdminShell';
 import { requireAccess } from '@/lib/auth/access';
 
-// Explore is now AI Insights (/admin/insights); this layout only gates the redirect.
-export default async function ExploreLayout({ children }: { children: React.ReactNode }) {
+export default async function InsightsLayout({ children }: { children: React.ReactNode }) {
     const access = await requireAccess('analytics');
     return <AdminShell email={access.email} perms={access.perms} isOwner={access.isOwner}>{children}</AdminShell>;
 }
