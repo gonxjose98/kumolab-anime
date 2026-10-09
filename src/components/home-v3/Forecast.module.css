@@ -69,3 +69,16 @@
     .btn { padding: 14px; }
     .perks li { font-size: 13px; }
 }
+
+/* Larger pass: easier reading (desktop only, so the phone layout keeps its sizes). */
+@media (min-width: 961px) {
+    .kicker { font-size: 13.5px; }
+    .title { font-size: clamp(32px, 3.4vw, 56px); }
+    .sub { font-size: clamp(15px, 1.3vw, 20px); max-width: 640px; }
+    .form { max-width: 560px; }
+    .input { font-size: 17px; padding: 13px 20px; }
+    .btn { font-size: 14.5px; padding: 14px 30px; }
+    .perks li { font-size: clamp(15px, 1.25vw, 19px); }
+    .perkIcon { width: 40px; height: 40px; }
+    .perkIcon svg { width: 20px; height: 20px; }
+}
