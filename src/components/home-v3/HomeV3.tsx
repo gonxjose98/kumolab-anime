@@ -96,7 +96,7 @@ export default function HomeV3({ posts, products, trending, nextBig }: { posts: 
             <header className={s.nav}>
                 <Link href="/" className={s.brand} aria-label="KumoLab home">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/home-v3/logo-white.webp" alt="KumoLab" className={s.brandLogo} />
+                    <img src="/home-v3/logo-gold.webp" alt="KumoLab" className={s.brandLogo} />
                 </Link>
                 <Link href="/merch" className={s.navLink}>Shop</Link>
                 <a href="#forecast" className={s.navCta}>Join</a>
