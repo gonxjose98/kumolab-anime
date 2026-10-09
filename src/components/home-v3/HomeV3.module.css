@@ -74,6 +74,8 @@
     background: url('/home-v3/sky.webp') center top / 100% auto repeat-y, #9fcaf3;
 }
 .sky > * { position: relative; z-index: 1; }
+/* Under the Forecast: the cloud field from Jose's reference continues the band. */
+.skyClouds::before { background: url('/home-v3/clouds-field.webp') center top / 100% auto no-repeat, url('/home-v3/sky.webp') center 40vw / 100% auto repeat-y, #cfe4f8; }
 /* The first sky block rides up onto the hero's soft lower band (as in the
    reference) and fades in, so there is no seam under the wave line. */
 .hero + .sky { margin-top: -12vw; padding-top: 0; }

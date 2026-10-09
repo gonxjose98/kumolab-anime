@@ -36,21 +36,16 @@ export default function Forecast() {
 
     return (
         <section id="forecast" className={s.wrap}>
-            <svg className={s.edgeTop} viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0 0h1440v26c-120 18-240 22-360 10S840 4 720 14 480 46 360 42 120 18 0 24Z" fill="#fff" fillOpacity=".85" />
-            </svg>
+            {/* Jose's reference band (mascot, clouds, plane, note), text removed; copy sits on top. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/home-v3/forecast-band.webp" alt="" className={s.band} loading="lazy" />
             <div className={s.inner}>
-                <div className={s.art} aria-hidden="true">
-                    <span className={s.note}>Good anime<br />tomorrow.</span>
-                    <svg className={s.plane} viewBox="0 0 64 48"><path d="M2 22 62 2 40 46 30 30Z" fill="#fff" stroke="#7fa6d6" strokeWidth="1.6" strokeLinejoin="round" /><path d="M30 30 62 2" stroke="#7fa6d6" strokeWidth="1.6" /></svg>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/home-v3/mascot.webp" alt="" className={s.mascot} />
-                </div>
+                <div className={s.art} aria-hidden="true" />
 
                 <div className={s.copy}>
                     <p className={s.kicker}>The KumoLab Forecast</p>
                     <h2 className={s.title}>Tomorrow&apos;s Anime Weather,<br />In Your Inbox.</h2>
-                    <p className={s.sub}>The week&apos;s best new trailers, releases and stories, handpicked and delivered every Sunday.</p>
+                    <p className={s.sub}>The best new trailers, releases and stories, handpicked and delivered every Sunday.</p>
                     {status === 'done' ? (
                         <p className={s.done}>You&apos;re on the list. Clear skies ahead.</p>
                     ) : (
@@ -73,9 +68,6 @@ export default function Forecast() {
                     ))}
                 </ul>
             </div>
-            <svg className={s.edgeBottom} viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0 60h1440V30c-120-16-240-20-360-8S840 52 720 44 480 12 360 16 120 40 0 34Z" fill="#fff" fillOpacity=".85" />
-            </svg>
         </section>
     );
 }

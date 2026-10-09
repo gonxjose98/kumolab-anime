@@ -222,7 +222,7 @@ export default function HomeV3({ posts, products, trending }: { posts: BlogPost[
             {/* ── Email capture ───────────────────────────────── */}
             <Forecast />
 
-            <div className={s.sky}>
+            <div className={`${s.sky} ${s.skyClouds}`}>
                 {/* ── Merch ────────────────────────────────────── */}
                 {merch.length > 0 && (
                     <section className={s.section}>
