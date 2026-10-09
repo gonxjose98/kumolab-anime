@@ -494,12 +494,14 @@
 .navLink { text-shadow: 0 1px 3px rgba(10, 40, 90, 0.55), 0 2px 14px rgba(10, 40, 90, 0.45); }
 
 /* Today card: drops in, bounces twice and settles (uses translate/scale so the tilt stays). */
-.introToday { animation: hv3Fade 0.4s ease 1s both, todayBounce 0.8s ease-in-out 1s both; }
+.introToday { animation: hv3Fade 0.35s ease 1s both, todayBounce 0.85s cubic-bezier(0.33, 0, 0.3, 1) 1s both; }
 @keyframes todayBounce {
-    0% { translate: 0 -26px; }
-    55% { translate: 0 0; }
-    75% { translate: 0 -7px; }
-    100% { translate: 0 0; }
+    0% { translate: 0 -30px; rotate: 0deg; }
+    50% { translate: 0 0; rotate: -3deg; }
+    72% { translate: 0 -6px; rotate: -0.6deg; }
+    100% { translate: 0 0; rotate: -1.5deg; }
 }
-}
+/* The tilt is the landing's end state: no static transform, so the bounce owns it. */
+.today { transform: none; rotate: -1.5deg; transition: rotate 0.3s ease, translate 0.3s ease; }
+.today:hover { transform: none; rotate: 0deg; translate: 0 -2px; }
 @media (prefers-reduced-motion: reduce) { .introToday { animation: none; } }
