@@ -5,6 +5,7 @@ import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
 import { buildSocialCaption } from './caption';
 import { logError } from '../logging/structured-logger';
+import { xConfigured, uploadMediaFromUrl, postTweet } from './x-client';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const IG_USER_ID = process.env.META_IG_ID;
@@ -43,6 +44,8 @@ export interface SocialPublishResult {
     tiktok_url?: string;
     youtube_video_id?: string;
     youtube_url?: string;
+    x_id?: string;
+    x_url?: string;
     staged_video_url?: string;
 }
 
@@ -238,6 +241,8 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                     });
                 }
             }
+
+            Object.assign(result, await publishToX(post, { imageUrls: slideImageUrls }));
         } else {
             await logError({
                 source: 'publisher.ig.carousel',
@@ -261,6 +266,8 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
             if (result.facebook_url) ids.facebook_url = result.facebook_url;
             if (result.threads_id) ids.threads_id = result.threads_id;
             if (result.threads_url) ids.threads_url = result.threads_url;
+            if (result.x_id) ids.x_id = result.x_id;
+            if (result.x_url) ids.x_url = result.x_url;
             if (Object.keys(ids).length > 0) {
                 const { data: existing } = await supabaseAdmin
                     .from('posts').select('social_ids').eq('id', (post as any).id).maybeSingle();
@@ -280,7 +287,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
         // Operational trail, mirroring the other terminal branches.
         {
             const { supabaseAdmin } = await import('../supabase/admin');
-            const published = !!(result.instagram_id || result.facebook_id || result.threads_id);
+            const published = !!(result.instagram_id || result.facebook_id || result.threads_id || result.x_id);
             await supabaseAdmin.from('action_logs').insert({
                 action: published ? 'social_publish_carousel' : 'social_publish_skipped',
                 actor: 'system',
@@ -297,6 +304,7 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                     ig_id: result.instagram_id ?? null,
                     fb_id: result.facebook_id ?? null,
                     threads_id: result.threads_id ?? null,
+                    x_id: result.x_id ?? null,
                 },
             }).then(() => {}, () => {});
         }
@@ -616,6 +624,11 @@ async function publishToSocialsInner(post: BlogPost, result: SocialPublishResult
                 context: { post_id: (post as any).id, slug: post.slug, title: post.title },
             });
         }
+    }
+
+    // ── 4b. X: operator-built reels only (auto trailers stay off X) ──
+    if (stagedVideoUrl && (post as any).image_settings?.reel_source === 'kumolab-reels') {
+        Object.assign(result, await publishToX(post, { videoUrl: stagedVideoUrl }));
     }
 
     // ── 5. Video platforms for TRAILER_DROP only ───────────────
@@ -1075,6 +1088,65 @@ export async function publishToInstagramCarousel(
 // Per-platform caption text lives on the post itself so each one can be
 // tuned: image_settings.captions.{facebook,threads}. Anything not set falls
 // back to the shared social caption (caption_override first).
+// ── X (Twitter) ─────────────────────────────────────────────────
+// Operator content only: carousels and kumolab-reels. Gated by
+// X_AUTO_PUBLISH=true so a bad key or a billing pause can be switched off
+// without a deploy. Never throws: X failing must not affect other platforms.
+//
+// X allows 4 images per post, so a carousel goes out as the first 4 slides
+// plus a reply carrying the next 4 (Jose: every slide must go out).
+const X_TEXT_MAX = Number(process.env.X_TEXT_MAX ?? 280);
+
+function xCaption(post: BlogPost): string {
+    const caps = (post as any).image_settings?.captions || {};
+    const raw = (typeof caps.x === 'string' && caps.x.trim()) ? caps.x.trim()
+        : (typeof caps.threads === 'string' && caps.threads.trim()) ? caps.threads.trim()
+        : String(post.title || '').trim();
+    // Array.from counts an emoji as one char; X counts some as two, so leave headroom.
+    const chars = Array.from(raw);
+    return chars.length <= X_TEXT_MAX - 10 ? raw : chars.slice(0, X_TEXT_MAX - 11).join('').trimEnd() + '\u2026';
+}
+
+async function publishToX(post: BlogPost, media: { imageUrls?: string[]; videoUrl?: string }): Promise<SocialPublishResult> {
+    const result: SocialPublishResult = {};
+    if (process.env.X_AUTO_PUBLISH !== 'true' || !xConfigured()) return result;
+    if ((post as any).social_ids?.x_id) return result; // already on X (retry safety)
+    try {
+        const text = xCaption(post);
+        if (media.videoUrl) {
+            const id = await uploadMediaFromUrl(media.videoUrl, 'video');
+            const t = await postTweet({ text, mediaIds: [id] });
+            result.x_id = t.id; result.x_url = t.url;
+        } else if (media.imageUrls?.length) {
+            const urls = media.imageUrls.slice(0, 8);
+            const first: string[] = [];
+            for (const u of urls.slice(0, 4)) first.push(await uploadMediaFromUrl(u, 'image'));
+            const t = await postTweet({ text, mediaIds: first });
+            result.x_id = t.id; result.x_url = t.url;
+            if (urls.length > 4) {
+                try {
+                    const rest: string[] = [];
+                    for (const u of urls.slice(4, 8)) rest.push(await uploadMediaFromUrl(u, 'image'));
+                    await postTweet({ text: 'Part 2 \u{1F447}', mediaIds: rest, replyTo: t.id });
+                } catch (e: any) {
+                    await logError({
+                        source: 'publisher.x',
+                        errorMessage: `X carousel reply (slides 5-8) failed: ${e?.message || e}`,
+                        context: { post_id: (post as any).id, slug: post.slug, x_id: t.id },
+                    });
+                }
+            }
+        }
+    } catch (e: any) {
+        await logError({
+            source: 'publisher.x',
+            errorMessage: `X publish failed: ${String(e?.message || e).slice(0, 300)}`,
+            context: { post_id: (post as any).id, slug: post.slug, title: post.title },
+        });
+    }
+    return result;
+}
+
 function carouselCaption(post: BlogPost, platform: 'facebook' | 'threads'): string {
     const c = (post as any).image_settings?.captions?.[platform];
     if (typeof c === 'string' && c.trim()) return c.trim();

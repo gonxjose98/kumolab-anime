@@ -5,6 +5,7 @@
 // the metrics-sync cron and the Analytics page both refresh the last few days,
 // and scripts/analytics/backfill-daily-views.ts loads history once.
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { xConfigured, verifyX, getOwnTweets } from '@/lib/social/x-client';
 
 export type ViewPlatform = 'website' | 'instagram' | 'threads' | 'x';
 export const VIEW_PLATFORMS: ViewPlatform[] = ['website', 'instagram', 'threads', 'x'];
@@ -100,6 +101,47 @@ async function collectThreads(days: string[]): Promise<Row[]> {
     return [...rows.values()];
 }
 
+/**
+ * X has no account-level daily views in the API, so each post's impressions
+ * are credited to the UTC day it went up (most arrive within 48h). Reads are
+ * billed per post returned, so this runs at most every 6 hours and only looks
+ * back 7 days. Also writes each matched post's numbers to social_metrics.twitter.
+ */
+const X_MIN_INTERVAL_MS = 6 * 3600_000;
+async function collectX(): Promise<Row[]> {
+    if (!xConfigured()) return [];
+    const { data: last } = await supabaseAdmin
+        .from('daily_views').select('updated_at').eq('platform', 'x')
+        .order('updated_at', { ascending: false }).limit(1);
+    if (last?.[0]?.updated_at && Date.now() - Date.parse(last[0].updated_at) < X_MIN_INTERVAL_MS) return [];
+
+    const userId = process.env.X_USER_ID || (await verifyX()).id;
+    const today = dayKey(new Date());
+    const from = dayKey(new Date(Date.now() - 6 * DAY_MS));
+    const tweets = await getOwnTweets(userId, new Date(`${from}T00:00:00Z`));
+
+    const byDay = new Map<string, number>(daysBetween(from, today).map((d) => [d, 0]));
+    for (const t of tweets) {
+        const d = dayKey(new Date(t.created_at));
+        if (byDay.has(d)) byDay.set(d, (byDay.get(d) || 0) + t.impressions);
+    }
+
+    // Per-post numbers for Top posts. Only posts the publisher put on X carry x_id.
+    if (tweets.length) {
+        const { data: posts } = await supabaseAdmin
+            .from('posts').select('id, social_ids, social_metrics')
+            .in('social_ids->>x_id', tweets.map((t) => t.id));
+        const byId = new Map(tweets.map((t) => [t.id, t]));
+        for (const p of posts || []) {
+            const t = byId.get((p.social_ids as any)?.x_id);
+            if (!t) continue;
+            const twitter = { views: t.impressions, likes: t.likes, reposts: t.reposts, replies: t.replies, synced_at: new Date().toISOString() };
+            await supabaseAdmin.from('posts').update({ social_metrics: { ...((p.social_metrics as any) || {}), twitter } }).eq('id', p.id);
+        }
+    }
+    return [...byDay.entries()].map(([day, views]) => ({ day, platform: 'x' as const, views }));
+}
+
 /** Collect + store every platform for the given days. Each platform fails independently. */
 export async function collectDailyViews(days: string[]): Promise<Record<string, number | string>> {
     const result: Record<string, number | string> = {};
@@ -107,6 +149,7 @@ export async function collectDailyViews(days: string[]): Promise<Record<string, 
         ['website', () => collectWebsite(days)],
         ['instagram', () => collectInstagram(days)],
         ['threads', () => collectThreads(days)],
+        ['x', () => collectX()],
     ];
     await Promise.all(jobs.map(async ([name, run]) => {
         try {
