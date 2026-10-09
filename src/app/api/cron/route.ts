@@ -50,7 +50,7 @@ const VALID_WORKERS = [
     'detection', 'processing', 'publish', 'dailydrops', 'daily-report', 'cleanup',
     'render', 'refresh-meta-token', 'refresh-threads-token', 'republish-social',
     'metrics-sync', 'monthly-snapshot', 'health-monitor', 'newsletter', 'refresh-tiers',
-    'radar',
+    'radar', 'explore',
 ];
 
 // Ad-hoc diagnostics. Dispatchable, but not part of the scheduled cron surface
@@ -459,6 +459,14 @@ async function dispatch(
         const { runRadarWorker } = await import('@/lib/discover/radar');
         const result = await runRadarWorker();
         return { success: result.ok, worker: 'radar', ...result };
+    }
+
+    if (worker === 'explore') {
+        // Explore tab: digest -> Claude -> validated cards. Skips cleanly (and
+        // still snapshots token expiries) when ANTHROPIC_API_KEY is unset.
+        const { runExplore } = await import('@/lib/explore/generate');
+        const result = await runExplore({ trigger: 'cron' });
+        return { ...result, success: result.ok, worker: 'explore' };
     }
 
     if (worker === 'cleanup') {

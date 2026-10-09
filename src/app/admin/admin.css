@@ -2813,3 +2813,110 @@ html[data-admin-theme='dark'] .admin-root .ak-plat--facebook { color: #7fb2ff; }
     .admin-root .ak-disc__detail { padding: 2px 12px 14px 12px; }
     .admin-root .ak-disc__thumb { width: 32px; height: 44px; }
 }
+
+/* ══ Explore tab (ak-xp-*) ═══════════════════════════════════════════════
+   Calm by design: one System line, capped cards, generous spacing.
+   Phone: one column with section pills. Desktop: two columns, full width. */
+.admin-root .ak-xp { display: flex; flex-direction: column; gap: 20px; min-width: 0; width: 100%; }
+.admin-root .ak-xp__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.admin-root .ak-xp__title { font-size: 22px; margin: 2px 0 4px; }
+.admin-root .ak-xp__foot { padding: 0 4px; }
+.admin-root .ak-xp-regen { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.admin-root .ak-xp-regen .ak-btn { display: inline-flex; align-items: center; gap: 6px; }
+@keyframes ak-xp-spin { to { transform: rotate(360deg); } }
+.admin-root .ak-xp-spin { animation: ak-xp-spin 0.9s linear infinite; }
+
+/* System pill: the single status line. */
+.admin-root .ak-xp-pill {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0;
+    padding: 10px 14px; border-radius: 999px; text-align: left;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+    font-size: 14px; cursor: pointer;
+}
+.admin-root .ak-xp-pill:hover { border-color: var(--gold-hover); }
+.admin-root .ak-xp-pill--idle { cursor: default; color: var(--ink-3); }
+.admin-root .ak-xp-pill__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.admin-root .ak-xp-pill__sub { font-weight: 400; color: var(--ink-2); }
+.admin-root .ak-xp-pill__more { flex: none; font-size: 12px; font-weight: 700; color: var(--gold-text); }
+.admin-root .ak-xp-dot { flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--ink-3); }
+.admin-root .ak-xp-dot--ok { background: var(--ok); }
+.admin-root .ak-xp-dot--warn { background: var(--warn); }
+.admin-root .ak-xp-dot--crit { background: #c03d33; }
+.admin-root .ak-xp-dot--idle { background: var(--ink-3); opacity: 0.6; }
+html[data-admin-theme='dark'] .admin-root .ak-xp-dot--crit { background: #ff8a7d; }
+
+/* Section switch (phones) and columns. */
+.admin-root .ak-xp-tabs { display: flex; }
+.admin-root .ak-xp-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.admin-root .ak-xp-col { display: none; flex-direction: column; gap: 14px; min-width: 0; }
+.admin-root .ak-xp-col.is-active { display: flex; }
+.admin-root .ak-xp-col__label { display: none; }
+@media (min-width: 1024px) {
+    .admin-root .ak-xp-tabs { display: none; }
+    .admin-root .ak-xp-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+    .admin-root .ak-xp-col { display: flex; }
+    .admin-root .ak-xp-col__label { display: block; padding: 0 4px; }
+}
+
+/* Card anatomy: chips, one-line headline, one-line why, expand for the rest. */
+.admin-root .ak-xp-card { padding: 0; overflow: hidden; }
+.admin-root .ak-xp-card__toggle {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px;
+    width: 100%; padding: 16px 18px; text-align: left; background: none; border: 0; color: inherit; cursor: pointer;
+}
+.admin-root .ak-xp-card__chips { grid-column: 1; display: flex; gap: 6px; flex-wrap: wrap; }
+.admin-root .ak-xp-card__title { grid-column: 1; font-weight: 700; font-size: 15px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+.admin-root .ak-xp-card__why { grid-column: 1; font-size: 13px; line-height: 1.4; color: var(--ink-2); overflow-wrap: anywhere; }
+.admin-root .ak-xp-card__chev { grid-column: 2; grid-row: 1 / span 3; align-self: center; color: var(--ink-3); transition: transform 0.15s ease; }
+.admin-root .ak-xp-card__chev.is-open { transform: rotate(180deg); }
+.admin-root .ak-xp-card--compact .ak-xp-card__toggle { padding: 12px 14px; }
+.admin-root .ak-xp-card__body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px; border-top: 1px solid var(--line); }
+.admin-root .ak-xp-chip { background: var(--surface-2); border-color: var(--line); color: var(--ink-2); font-weight: 600; }
+.admin-root .ak-xp-rec { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); font-size: 14px; }
+.admin-root .ak-xp-rec__label { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-text); }
+.admin-root .ak-xp-sources ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-root .ak-xp-sources li { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-root .ak-xp-sources__link { display: inline-flex; align-items: center; gap: 4px; color: var(--gold-text); font-size: 13px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.admin-root .ak-xp-sources__link:hover { text-decoration: underline; }
+.admin-root .ak-xp-sources__label { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.admin-root .ak-xp-sources__text { overflow-wrap: anywhere; }
+.admin-root .ak-xp-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.admin-root .ak-xp-empty { display: flex; flex-direction: column; gap: 6px; padding: 22px 20px; }
+.admin-root .ak-xp-note { display: flex; align-items: flex-start; gap: 10px; padding: 4px 4px 0; }
+.admin-root .ak-xp-note .ak-badge { flex: none; }
+
+.admin-root .ak-xp-glance { display: flex; flex-direction: column; gap: 10px; }
+.admin-root .ak-xp-glance ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-root .ak-xp-glance li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 12px; }
+.admin-root .ak-xp-glance__name { font-weight: 600; font-size: 14px; }
+.admin-root .ak-xp-glance__num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.admin-root .ak-xp-glance__chg { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; min-width: 64px; text-align: right; }
+.admin-root .ak-xp-glance__chg.is-up { color: var(--ok); }
+.admin-root .ak-xp-glance__chg.is-down { color: #b03328; }
+html[data-admin-theme='dark'] .admin-root .ak-xp-glance__chg.is-down { color: #ff9184; }
+.admin-root .ak-xp-glance__thru { grid-column: 1 / -1; }
+
+/* System drawer (portaled to <body>, re-wrapped in .admin-root for tokens). */
+.ak-xp-portal.admin-root { position: fixed; inset: 0; z-index: 80; }
+.admin-root .ak-xp-scrim { position: absolute; inset: 0; background: rgba(10, 20, 40, 0.35); }
+.admin-root .ak-xp-drawer {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(440px, 100vw);
+    display: flex; flex-direction: column; gap: 18px; overflow-y: auto; overscroll-behavior: contain;
+    padding: 20px 18px 32px; background: var(--surface-solid); border-left: 1px solid var(--line);
+    box-shadow: var(--shadow-2); color: var(--ink);
+}
+.admin-root .ak-xp-drawer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.admin-root .ak-xp-dsec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.admin-root .ak-xp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-root .ak-xp-list > li { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.admin-root .ak-xp-list > li > .ak-xp-dot { position: relative; top: -1px; }
+.admin-root .ak-xp-token__row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.admin-root .ak-xp-token__name { font-weight: 600; }
+.admin-root .ak-xp-token__when { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-root .ak-xp-grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.admin-root .ak-xp-trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-xp-log__t { flex: none; width: 52px; font-variant-numeric: tabular-nums; }
+.admin-root .ak-xp-fold summary { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; }
+.admin-root .ak-xp-fold summary::-webkit-details-marker { display: none; }
+.admin-root .ak-xp-fold[open] summary { margin-bottom: 10px; }
