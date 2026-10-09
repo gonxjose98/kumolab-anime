@@ -3295,3 +3295,27 @@ html[data-admin-theme='dark'] .admin-root .ak-home-fmt--reel { background: rgba(
     .admin-root .ak-ai__headr { width: 100%; }
     .admin-root .ak-ai-feed__bar { padding: 10px; }
 }
+
+/* ── Dashboard layout v2 (Jose, 2026-10-09): alerts in a top-right dropdown,
+   Today in a right-hand column, content uses the full width. ── */
+.admin-root .ak-home { max-width: none; }
+.admin-root .ak-home-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.admin-root .ak-home-bell { position: relative; }
+.admin-root .ak-home-bell__btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid #f4d48a; background: #fff7e6; color: #3a2a08; font: 700 13px/1 var(--ak-sans); cursor: pointer; }
+.admin-root .ak-home-bell__btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+.admin-root .ak-home-bell__btn--ok { border-color: #bfe8cd; background: #eefaf2; color: #12452c; }
+.admin-root .ak-home-bell__badge { font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #e0a526; color: #fff; font-size: 12px; display: grid; place-items: center; }
+.admin-root .ak-home-bell__badge--crit { background: #d64545; }
+.admin-root .ak-home-bell__panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(420px, 92vw); padding: 10px; border-radius: 18px; background: var(--surface, #fff); border: 1px solid var(--line); box-shadow: 0 18px 44px rgba(20, 40, 80, .2); }
+html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn { background: rgba(240, 198, 116, .14); border-color: rgba(240, 198, 116, .4); color: #fbe7bd; }
+html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn--ok { background: rgba(53, 200, 138, .13); border-color: rgba(53, 200, 138, .38); color: #bff0d8; }
+@media (min-width: 900px) {
+    .admin-root .ak-home-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(300px, 0.8fr); align-items: start; gap: 18px; }
+    .admin-root .ak-home-col--today { position: sticky; top: 16px; }
+}
+@media (min-width: 900px) and (max-width: 1279px) {
+    .admin-root .ak-home-cols { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+    .admin-root .ak-home-cols > .ak-home-col:nth-child(2) { grid-column: 1; }
+    .admin-root .ak-home-col--today { grid-column: 2; grid-row: 1 / span 2; }
+}
+@media (max-width: 899px) { .admin-root .ak-home-col--today { order: -1; } }

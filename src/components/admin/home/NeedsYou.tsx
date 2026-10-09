@@ -38,18 +38,34 @@ export default function NeedsYou({ tokens, pending, pendingTotal, ordersAwaiting
         return () => window.removeEventListener('keydown', onKey);
     }, [sheetOpen]);
 
-    const nothing = tokens.length === 0 && pendingTotal === 0 && ordersAwaiting === 0;
-    if (nothing) {
-        return (
-            <div className="ak-home-need ak-home-need--ok" role="status">
-                <i className="ak-home-need__dot" aria-hidden="true" />
-                <p>All clear. Nothing needs you right now.</p>
-            </div>
-        );
-    }
+    const [open, setOpen] = useState(false);
+    useEffect(() => {
+        if (!open) return;
+        const close = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest?.('.ak-home-bell')) setOpen(false); };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', close);
+        window.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('mousedown', close); window.removeEventListener('keydown', onKey); };
+    }, [open]);
+
+    const count = tokens.length + (pendingTotal > 0 ? 1 : 0) + (ordersAwaiting > 0 ? 1 : 0);
+    const crit = tokens.some((t) => t.level === 'crit');
 
     return (
-        <div className="ak-home-needs">
+        <div className="ak-home-bell">
+            <button className={`ak-home-bell__btn ${count ? '' : 'ak-home-bell__btn--ok'}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>
+                <span>{count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} you` : 'All clear'}</span>
+                {count > 0 && <i className={`ak-home-bell__badge ${crit ? 'ak-home-bell__badge--crit' : ''}`}>{count}</i>}
+            </button>
+            {open && (
+        <div className="ak-home-needs ak-home-bell__panel">
+            {count === 0 && (
+                <div className="ak-home-need ak-home-need--ok" role="status">
+                    <i className="ak-home-need__dot" aria-hidden="true" />
+                    <p>All clear. Nothing needs you right now.</p>
+                </div>
+            )}
             {tokens.map((t) => (
                 <div key={t.key} className={`ak-home-need ${t.level === 'crit' ? 'ak-home-need--crit' : ''}`}>
                     <button className="ak-home-need__row" onClick={() => setOpenToken((k) => (k === t.key ? null : t.key))} aria-expanded={openToken === t.key}>
@@ -109,6 +125,8 @@ export default function NeedsYou({ tokens, pending, pendingTotal, ordersAwaiting
                     </div>
                 </div>,
                 document.body,
+            )}
+        </div>
             )}
         </div>
     );
