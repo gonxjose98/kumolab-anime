@@ -195,7 +195,7 @@ export async function getComingUp(limit = 4): Promise<RadarRow[]> {
 export async function getNewsPulse(): Promise<{ total: number; big: number }> {
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
     const base = () => supabaseAdmin.from('wire_items').select('id', { count: 'exact', head: true })
-        .neq('kind', 'trending').gte('detected_at', since).or('is_anime.is.null,is_anime.eq.true');
+        .neq('kind', 'trending').gte('published_at', since).or('is_anime.is.null,is_anime.eq.true');
     const [all, big] = await Promise.all([base(), base().gte('importance', 4)]);
     return { total: all.count ?? 0, big: big.count ?? 0 };
 }
