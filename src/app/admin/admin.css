@@ -3330,3 +3330,5 @@ html[data-admin-theme='dark'] .admin-root .ak-home-bell__btn--ok { background: r
     .admin-root .ak-home-cols { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
 }
 .admin-root header.ak-home-top { flex-direction: row; align-items: flex-start; }
+.admin-root .ak-home-bell__panel { background: #ffffff; z-index: 60; }
+html[data-admin-theme='dark'] .admin-root .ak-home-bell__panel { background: #131c38; border-color: rgba(255, 255, 255, .12); box-shadow: 0 18px 44px rgba(0, 0, 0, .5); }
