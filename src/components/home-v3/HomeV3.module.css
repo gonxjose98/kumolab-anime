@@ -491,3 +491,4 @@
 .followHandle { font-family: var(--round); font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .followArrow { color: #9db3d4; font-weight: 700; transition: translate 0.2s ease, color 0.2s ease; }
 .followIcon svg, .icon svg { fill-rule: evenodd; clip-rule: evenodd; }
+.navLink { text-shadow: 0 1px 3px rgba(10, 40, 90, 0.55), 0 2px 14px rgba(10, 40, 90, 0.45); }
