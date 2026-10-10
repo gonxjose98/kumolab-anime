@@ -252,7 +252,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                                 {items.length > 0 && (
                                     <div className="ak-ch-grid">
                                         {items.map((r) => (
-                                            <ContentCard key={r.id} row={r} busy={studio.busyId === r.id}
+                                            <ContentCard key={r.id} row={r} busy={studio.busyId === r.id} priority={rows.indexOf(r) < 8}
                                                 onOpen={() => onCard(r)} onStudio={() => studio.open(r)} />
                                         ))}
                                     </div>
@@ -295,14 +295,14 @@ export default function ContentHub({ data, initialView, newCarousel }: {
     );
 }
 
-function ContentCard({ row: r, busy, onOpen, onStudio }: { row: ContentRow; busy: boolean; onOpen: () => void; onStudio: () => void }) {
+function ContentCard({ row: r, busy, priority, onOpen, onStudio }: { row: ContentRow; busy: boolean; priority?: boolean; onOpen: () => void; onStudio: () => void }) {
     const live = isLive(r);
     return (
         <article className={`ak-ch-card${r.view === 'posted' && !r.social ? ' is-siteonly' : ''}`}>
             <button type="button" className="ak-ch-card__hit" onClick={onOpen} aria-label={`${r.view === 'posted' || r.view === 'next' ? 'Preview' : 'Open'} ${r.title}`}>
                 <span className="ak-ch-card__thumb">
                     {r.cover ? (
-                        <Image src={r.cover} alt="" fill sizes="(max-width: 700px) 46vw, 220px" unoptimized={!isOptimizable(r.cover)} draggable={false} />
+                        <Image src={r.cover} alt="" fill sizes="(max-width: 700px) 46vw, 200px" unoptimized={!isOptimizable(r.cover)} priority={priority} draggable={false} />
                     ) : (
                         <span className="ak-ch-card__noimg"><KindIcon kind={r.kind} size={22} /></span>
                     )}
