@@ -5,9 +5,9 @@ export const exploreConfig = {
     enabled: () => process.env.EXPLORE_ENABLED !== 'false',
     /** True when the Claude key exists. Never expose the key itself. */
     hasKey: () => !!process.env.ANTHROPIC_API_KEY,
-    /** Judgment-heavy section (Anime world). */
+    /** Anime world + Our numbers. */
     model: () => process.env.EXPLORE_MODEL || 'claude-sonnet-5',
-    /** Phrasing finished numbers (Our numbers, System) is Haiku-level work per the spec. */
+    /** System status phrasing only; Our numbers uses the main model. */
     lightModel: () => process.env.EXPLORE_MODEL_LIGHT || 'claude-haiku-4-5-20251001',
     maxManualPerDay: () => Number(process.env.EXPLORE_MAX_MANUAL_PER_DAY || 3),
     cooldownMinutes: () => Number(process.env.EXPLORE_COOLDOWN_MINUTES || 180),

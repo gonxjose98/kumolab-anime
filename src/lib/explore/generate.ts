@@ -160,7 +160,8 @@ export async function runExplore(opts: { trigger: 'cron' | 'manual' }): Promise<
         const digestHash = createHash('sha256').update(JSON.stringify(digests.map((d) => d.facts))).digest('hex').slice(0, 16);
 
         const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 150_000, maxRetries: 1 });
-        const modelFor: Record<Section, string> = { world: exploreConfig.model(), ours: exploreConfig.lightModel(), system: exploreConfig.lightModel() };
+        // Our numbers moved to the main model 2026-10-09: Haiku's cards kept failing the source check.
+        const modelFor: Record<Section, string> = { world: exploreConfig.model(), ours: exploreConfig.model(), system: exploreConfig.lightModel() };
         const attempted = digests.filter((d) => d.hasData);
         const outcomes = await Promise.all(attempted.map((d) => callSection(client, d.section, d, modelFor[d.section])));
 
