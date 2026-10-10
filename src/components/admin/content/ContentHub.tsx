@@ -237,8 +237,11 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                             </p>
                         </div>
                     ) : (
-                        groups.map(({ key, items }) => (
-                            <section key={key} id={`ch-day-${key}`} className={`ak-ch-day${items.length ? '' : ' is-empty'}`}>
+                        // Days flow side by side (a 1-post day doesn't eat a whole row) and wrap.
+                        <div className="ak-ch-days">
+                        {groups.map(({ key, items }) => (
+                            <section key={key} id={`ch-day-${key}`} className={`ak-ch-day${items.length ? '' : ' is-empty'}`}
+                                style={{ '--n': Math.max(1, items.length) } as React.CSSProperties}>
                                 <header className="ak-ch-day__head">
                                     <h2 className="ak-ch-day__name">
                                         {dayLabel(key) && <span className="ak-ch-day__rel">{dayLabel(key)}</span>}
@@ -255,7 +258,8 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                                     </div>
                                 )}
                             </section>
-                        ))
+                        ))}
+                        </div>
                     )}
                 </main>
 
