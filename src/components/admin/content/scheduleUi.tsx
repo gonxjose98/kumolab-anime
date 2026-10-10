@@ -1,7 +1,7 @@
 import { Film, GalleryHorizontal, ImageIcon } from 'lucide-react';
 import type { ScheduleRow, SchedulePlatform } from '@/lib/schedule';
 
-/* Small display helpers shared by ScheduleView and SchedulePreview. */
+/* Small display helpers shared by ContentHub and SchedulePreview. */
 
 export const PLATFORM_LABEL: Record<SchedulePlatform, string> = {
     instagram: 'IG', facebook: 'FB', threads: 'Threads', website: 'Site',

@@ -150,7 +150,7 @@ export default async function DashboardPage() {
                     <section className="ak-card ak-home-card ak-home-todaycard">
                         <div className="ak-home-h">
                             <h2>Today</h2>
-                            <Link href="/admin/content/schedule">Schedule</Link>
+                            <Link href="/admin/content?view=next">Schedule</Link>
                         </div>
                         {today.scheduled.length === 0 ? (
                             <p className="ak-home-empty">Nothing scheduled today.</p>

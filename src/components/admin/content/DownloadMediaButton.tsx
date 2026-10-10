@@ -9,7 +9,7 @@ import { fetchAllAsFiles, saveFiles } from '@/lib/client/save-to-photos';
  * soon as the card scrolls into view, so the tap can open the share sheet
  * instantly (iOS only allows that inside a fresh tap). Desktop downloads.
  */
-export default function DownloadMediaButton({ urls, baseName }: { urls: string[]; baseName: string }) {
+export default function DownloadMediaButton({ urls, baseName, label, className = '' }: { urls: string[]; baseName: string; label?: string; className?: string }) {
     const ref = useRef<HTMLButtonElement>(null);
     const files = useRef<File[] | null>(null);
     const loading = useRef<Promise<File[]> | null>(null);
@@ -63,8 +63,9 @@ export default function DownloadMediaButton({ urls, baseName }: { urls: string[]
 
     const title = state === 'error' ? 'Could not save, try again' : `Save to Photos${urls.length > 1 ? ` (${urls.length} files)` : ''}`;
     return (
-        <button ref={ref} type="button" className={`ak-dlbtn ak-dlbtn--${state}`} onClick={onClick} disabled={!urls.length || state === 'busy'} title={title} aria-label={title}>
+        <button ref={ref} type="button" className={`ak-dlbtn ak-dlbtn--${state} ${className}`} onClick={onClick} disabled={!urls.length || state === 'busy'} title={title} aria-label={title}>
             {state === 'busy' ? <Loader2 size={14} className="ak-spin" /> : state === 'done' ? <Check size={14} /> : state === 'error' ? <AlertTriangle size={14} /> : <Download size={14} />}
+            {label && <span>{state === 'done' ? 'Saved' : label}</span>}
         </button>
     );
 }

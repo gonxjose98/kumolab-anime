@@ -221,7 +221,7 @@ export default function MediaFolders() {
     }
 
     // Turn the picked library images into ONE draft post and open its editor.
-    // Same endpoint + shape ImageHub's multi-upload uses: 2+ urls → a draft
+    // Same endpoint + shape Content's New carousel uses: 2+ urls → a draft
     // whose image_settings.slides has one slide per picture (a carousel);
     // a single url stays the classic single-image draft. Thrown errors are
     // shown inside the picker (it stays open for a retry).

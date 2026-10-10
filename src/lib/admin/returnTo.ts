@@ -31,7 +31,7 @@ export function rememberRoute(path: string): void {
 }
 
 /** The remembered route, or `fallback` for a direct link / fresh tab. */
-export function getReturnTo(fallback = '/admin/content/posts'): string {
+export function getReturnTo(fallback = '/admin/content'): string {
     try {
         const v = sessionStorage.getItem(KEY);
         return v && isReturnable(v) ? v : fallback;

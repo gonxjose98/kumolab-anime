@@ -101,10 +101,67 @@ function derivePlatforms(kind: ScheduleKind, claim: string | null, isReel = fals
     return kind === 'video' ? ['instagram', 'facebook', 'threads', 'website'] : ['facebook', 'website'];
 }
 
+/** ET hours of the live peak slots (7:30/13:00/21:30 ET by default). Empty on failure. */
+export async function loadPeakHours(): Promise<Set<number>> {
+    // Derive "peak" from the LIVE peak-slot config, not the retired hourly-grid
+    // PREMIUM_HOURS_ET, otherwise the real slots render as "off-peak".
+    const peakHours = new Set<number>();
+    try {
+        for (const s of await getPeakSlots()) {
+            const h = parseInt((s.time || '').slice(0, 2), 10);
+            if (Number.isFinite(h)) peakHours.add(h);
+        }
+    } catch { /* fall back to isPeakSlot */ }
+    return peakHours;
+}
+
+/** Columns toScheduleRow needs. image_settings may be selected whole or as slides/captions/reel_source paths. */
+export const SCHEDULE_COLUMNS = 'id, title, slug, status, claim_type, scheduled_post_time, image, excerpt, caption_override, image_settings, social_ids, youtube_video_id, youtube_url';
+
+/**
+ * One posts row to a ScheduleRow. `when` is the time the row is placed at
+ * (defaults to scheduled_post_time).
+ */
+export function toScheduleRow(p: any, peakHours: Set<number>, now = Date.now(), when?: string): ScheduleRow {
+    const is = p.image_settings || { slides: p.slides, captions: p.captions, reel_source: p.reel_source };
+    const at: string = when || p.scheduled_post_time;
+    const urls = slideUrls(is);
+    const videoUrl = isHttp(p.social_ids?.staged_video_url) ? p.social_ids.staged_video_url : null;
+    // Mirrors the publisher's operator-reel exception (posts even in carousels-only mode).
+    const isReel = is.reel_source === 'kumolab-reels' && !!videoUrl;
+    const kind: ScheduleKind = urls.length >= 2 ? 'carousel' : (p.youtube_video_id || videoUrl) ? 'video' : 'image';
+    const cover = kind === 'carousel' ? urls[0] : isHttp(p.image) ? p.image : null;
+    const ig = typeof p.caption_override === 'string' && p.caption_override.trim() ? p.caption_override.trim() : null;
+    const excerpt = typeof p.excerpt === 'string' && p.excerpt.trim() ? p.excerpt.trim() : null;
+    const cap = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    return {
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        status: p.status ?? null,
+        claim: p.claim_type ?? null,
+        scheduledPostTime: at,
+        slotLabel: etSlotLabel(at),
+        dayLabel: etDayLabel(at),
+        isPeak: peakHours.size ? peakHours.has(etHour(at)) : isPeakSlot(at),
+        isFuture: new Date(at).getTime() > now,
+        dayKey: etDayKey(at),
+        kind,
+        slides: kind === 'carousel' ? urls : cover ? [cover] : [],
+        cover,
+        caption: ig ?? excerpt,
+        captionIsExcerpt: !ig && !!excerpt,
+        fbCaption: cap(is.captions?.facebook),
+        threadsCaption: cap(is.captions?.threads),
+        youtubeUrl: isHttp(p.youtube_url) ? p.youtube_url : p.youtube_video_id ? `https://www.youtube.com/watch?v=${p.youtube_video_id}` : null,
+        videoUrl,
+        platforms: derivePlatforms(kind, p.claim_type ?? null, isReel),
+    };
+}
+
 /**
  * Posts slotted in a window around now (default: last 24h → next 48h), ordered by
- * slot time, each flagged for peak vs off-peak. Used for the Schedule view and the
- * dashboard's "today's lineup".
+ * slot time, each flagged for peak vs off-peak. Used by the dashboard's "today's lineup".
  */
 export async function getScheduleRows(opts?: { pastHours?: number; futureHours?: number; limit?: number }): Promise<ScheduleRow[]> {
     const pastHours = opts?.pastHours ?? 24;
@@ -112,61 +169,17 @@ export async function getScheduleRows(opts?: { pastHours?: number; futureHours?:
     const since = new Date(Date.now() - pastHours * 3600_000).toISOString();
     const until = new Date(Date.now() + futureHours * 3600_000).toISOString();
     try {
-        // Derive "peak" from the LIVE peak-slot config (7:30/13:00/21:30 ET by
-        // default), not the retired hourly-grid PREMIUM_HOURS_ET — otherwise the
-        // real slots render as "off-peak" in the schedule view.
-        const peakHours = new Set<number>();
-        try {
-            for (const s of await getPeakSlots()) {
-                const h = parseInt((s.time || '').slice(0, 2), 10);
-                if (Number.isFinite(h)) peakHours.add(h);
-            }
-        } catch { /* fall back to isPeakSlot below */ }
-
+        const peakHours = await loadPeakHours();
         const { data } = await supabaseAdmin
             .from('posts')
-            .select('id, title, slug, status, claim_type, scheduled_post_time, image, excerpt, caption_override, image_settings, social_ids, youtube_video_id, youtube_url')
+            .select(SCHEDULE_COLUMNS)
             .not('scheduled_post_time', 'is', null)
             .gte('scheduled_post_time', since)
             .lte('scheduled_post_time', until)
             .order('scheduled_post_time', { ascending: true })
             .limit(opts?.limit ?? 200);
         const now = Date.now();
-        return (data || []).map((p: any) => {
-            const is = p.image_settings || {};
-            const urls = slideUrls(is);
-            const videoUrl = isHttp(p.social_ids?.staged_video_url) ? p.social_ids.staged_video_url : null;
-            // Mirrors the publisher's operator-reel exception (posts even in carousels-only mode).
-            const isReel = is.reel_source === 'kumolab-reels' && !!videoUrl;
-            const kind: ScheduleKind = urls.length >= 2 ? 'carousel' : (p.youtube_video_id || videoUrl) ? 'video' : 'image';
-            const cover = kind === 'carousel' ? urls[0] : isHttp(p.image) ? p.image : null;
-            const ig = typeof p.caption_override === 'string' && p.caption_override.trim() ? p.caption_override.trim() : null;
-            const excerpt = typeof p.excerpt === 'string' && p.excerpt.trim() ? p.excerpt.trim() : null;
-            const cap = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-            return {
-            id: p.id,
-            title: p.title,
-            slug: p.slug,
-            status: p.status ?? null,
-            claim: p.claim_type ?? null,
-            scheduledPostTime: p.scheduled_post_time,
-            slotLabel: etSlotLabel(p.scheduled_post_time),
-            dayLabel: etDayLabel(p.scheduled_post_time),
-            isPeak: peakHours.size ? peakHours.has(etHour(p.scheduled_post_time)) : isPeakSlot(p.scheduled_post_time),
-            isFuture: new Date(p.scheduled_post_time).getTime() > now,
-            dayKey: etDayKey(p.scheduled_post_time),
-            kind,
-            slides: kind === 'carousel' ? urls : cover ? [cover] : [],
-            cover,
-            caption: ig ?? excerpt,
-            captionIsExcerpt: !ig && !!excerpt,
-            fbCaption: cap(is.captions?.facebook),
-            threadsCaption: cap(is.captions?.threads),
-            youtubeUrl: isHttp(p.youtube_url) ? p.youtube_url : p.youtube_video_id ? `https://www.youtube.com/watch?v=${p.youtube_video_id}` : null,
-            videoUrl,
-            platforms: derivePlatforms(kind, p.claim_type ?? null, isReel),
-            };
-        });
+        return (data || []).map((p: any) => toScheduleRow(p, peakHours, now));
     } catch {
         return [];
     }

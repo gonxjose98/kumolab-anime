@@ -120,7 +120,7 @@ export default function NeedsYou({ tokens, pending, pendingTotal, ordersAwaiting
                             ))}
                         </ul>
                         {pendingTotal > pending.length && (
-                            <Link href="/admin/content/posts" className="ak-home-sheet__more">See all {pendingTotal} pending</Link>
+                            <Link href="/admin/content?view=review" className="ak-home-sheet__more">See all {pendingTotal} pending</Link>
                         )}
                     </div>
                 </div>,

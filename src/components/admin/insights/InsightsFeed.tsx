@@ -52,7 +52,8 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
 
     async function makeCarousel() {
         if (!acted) { setActed(true); void postAction(item.id, 'act'); }
-        router.push('/admin/studio/images');
+        // Opens Content's New carousel sheet with this story as the title.
+        router.push(`/admin/content?new=carousel&topic=${encodeURIComponent(item.title)}`);
     }
 
     return (

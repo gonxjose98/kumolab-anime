@@ -8,7 +8,6 @@ import {
     FileText,
     BarChart3,
     Store,
-    Clapperboard,
     Users,
     Mail,
     Menu,
@@ -22,7 +21,7 @@ import AdminSky from './AdminSky';
 
 // perm = the permission a member needs to see this tab (owner always sees all).
 // Undefined perm = always visible to any signed-in user. ownerOnly = owner only.
-interface NavItem { href: string; label: string; jp: string; icon: typeof LayoutDashboard; perm?: string; ownerOnly?: boolean }
+interface NavItem { href: string; label: string; jp: string; icon: typeof LayoutDashboard; perm?: string; anyPerm?: string[]; ownerOnly?: boolean }
 
 // Dashboard sits alone at the top (it's the room you're in, not a category);
 // the rest are bilingual groups — Publishing / Insight / Shop / Admin.
@@ -31,8 +30,8 @@ const TOP: NavItem = { href: '/admin/dashboard', label: 'Dashboard', jp: '本部
 const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
     {
         label: 'Publishing', jp: '発信', items: [
-            { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText, perm: 'content' },
-            { href: '/admin/studio', label: 'Studio', jp: '制作', icon: Clapperboard, perm: 'studio' },
+            // Content + Studio are one tab: either permission shows it.
+            { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText, anyPerm: ['content', 'studio'] },
             { href: '/admin/engine', label: 'Engine', jp: '頭脳', icon: Cpu, perm: 'content' },
         ],
     },
@@ -72,17 +71,17 @@ export default function AdminShell({
     // Show a tab only if the member holds its permission (owner sees all).
     // Undefined perm = always visible; ownerOnly = owner only.
     const canSee = (it: NavItem) =>
-        it.ownerOnly ? isOwner : (!it.perm || isOwner || !!perms?.[it.perm]);
+        it.ownerOnly ? isOwner
+        : it.anyPerm ? isOwner || it.anyPerm.some((p) => !!perms?.[p])
+        : (!it.perm || isOwner || !!perms?.[it.perm]);
     const visibleGroups = GROUPS
         .map((g) => ({ ...g, items: g.items.filter(canSee) }))
         .filter((g) => g.items.length > 0);
 
     const isActive = (href: string) => {
         if (href === '/admin/dashboard') return pathname === href;
-        // The video editor (/admin/post/[id]/studio) lights up Studio, not Posts.
-        if (href === '/admin/studio') return pathname.startsWith('/admin/studio') || pathname.endsWith('/studio');
-        // Content owns the old Posts + Calendar routes and the post editor.
-        if (href === '/admin/content') return (pathname.startsWith('/admin/content') || pathname.startsWith('/admin/posts') || pathname.startsWith('/admin/post/') || pathname.startsWith('/admin/calendar')) && !pathname.endsWith('/studio');
+        // Content owns the post editor, the Studio editor and the old Studio/Posts/Calendar routes.
+        if (href === '/admin/content') return ['/admin/content', '/admin/studio', '/admin/posts', '/admin/post/', '/admin/calendar'].some((p) => pathname.startsWith(p));
         return pathname.startsWith(href);
     };
     const title = ALL.find((i) => isActive(i.href))?.label ?? 'Admin';

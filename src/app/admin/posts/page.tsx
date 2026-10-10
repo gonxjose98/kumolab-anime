@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-// Posts moved under the unified Content tab.
-export default function LegacyPostsRedirect() {
-    redirect('/admin/content/posts');
+// Posts moved under Content.
+export default function Page() {
+    redirect('/admin/content');
 }

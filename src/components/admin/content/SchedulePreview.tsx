@@ -15,8 +15,9 @@ import { KindIcon, PLATFORM_LABEL, kindLabel } from './scheduleUi';
  * JS on the touch path. JS only reads scrollLeft (rAF-throttled) to update the
  * counter/dots, and drives scrollTo for the arrow buttons and keyboard.
  *
- * Deliberately no edit actions and no link into the editor/Studio: opening a
- * carousel there has auto-saved and corrupted posts before.
+ * No in-place edit link: opening a live carousel in the editor has auto-saved
+ * and corrupted posts before. The Content tab passes `actions` (Download, and a
+ * Studio button that opens an editable COPY of live posts).
  */
 
 const ET = 'America/New_York';
@@ -38,7 +39,7 @@ function relLabel(iso: string): string {
     return ms >= 0 ? `in ${span}` : `${span} ago`;
 }
 
-export default function SchedulePreview({ row, onClose }: { row: ScheduleRow; onClose: () => void }) {
+export default function SchedulePreview({ row, onClose, actions }: { row: ScheduleRow; onClose: () => void; actions?: React.ReactNode }) {
     const trackRef = useRef<HTMLDivElement>(null);
     const closeRef = useRef<HTMLButtonElement>(null);
     const [idx, setIdx] = useState(0);
@@ -174,6 +175,7 @@ export default function SchedulePreview({ row, onClose }: { row: ScheduleRow; on
 
                     <div className="ak-pv__info">
                         <h2 className="ak-pv__title">{row.title}</h2>
+                        {actions && <div className="ak-pv__actions">{actions}</div>}
                         <div className="ak-pv__when">
                             <strong>{whenLabel(row.scheduledPostTime)}</strong>
                             <span>{row.status === 'published' ? 'Posted' : 'Scheduled'} {relLabel(row.scheduledPostTime)}</span>

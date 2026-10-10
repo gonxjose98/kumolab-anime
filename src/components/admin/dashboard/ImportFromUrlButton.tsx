@@ -21,13 +21,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
 
 type Step = 'idle' | 'downloading' | 'drafting' | 'done';
 
-export default function ImportFromUrlButton() {
+/** Controlled by the Content tab's New menu: mounted = open, onClose unmounts it. */
+export default function ImportFromUrlButton({ onClose }: { onClose: () => void }) {
     const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const open = true;
+    const setOpen = (v: boolean) => { if (!v) onClose(); };
     const [url, setUrl] = useState('');
     const [notes, setNotes] = useState('');
     const [step, setStep] = useState<Step>('idle');
@@ -90,9 +91,6 @@ export default function ImportFromUrlButton() {
 
     return (
         <>
-            <button onClick={() => setOpen(true)} className="ak-btn ak-btn--secondary ak-btn--sm">
-                <Plus size={13} /> Import from URL
-            </button>
 
             {open && (
                 <div className="ak-modal__scrim" onClick={closeModal}>

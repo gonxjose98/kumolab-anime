@@ -1033,7 +1033,7 @@ export default function PostEditor() {
 
     // Return the operator to wherever they came from (e.g. the Drafts tab),
     // not always the dashboard. router.back() pops the editor's history entry,
-    // restoring the previous list and its active tab. PostsList persists the
+    // restoring the previous list and its active tab. ContentHub persists the
     // tab in sessionStorage so it survives the round trip. Falls back to the
     // posts list when the editor was opened via a direct link / refresh (no
     // in-app history). Used by Cancel, Save, and Save draft alike.
