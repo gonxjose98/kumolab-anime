@@ -373,7 +373,7 @@ async function checkTierListFreshness(): Promise<HealthCheck> {
             label: 'Anime Tiers',
             level: 'crit',
             detail: 'No active tier entries',
-            actionable: 'Add current-season shows at /admin/engine — every post will fall back to AniList popularity',
+            actionable: 'Add current-season shows to the anime_tiers table (ask Claude). Otherwise every post will fall back to AniList popularity',
         };
     }
     const days = Math.floor((Date.now() - new Date(newest).getTime()) / 86_400_000);
@@ -383,7 +383,7 @@ async function checkTierListFreshness(): Promise<HealthCheck> {
             label: 'Anime Tiers',
             level: 'crit',
             detail: `Not updated in ${days} days`,
-            actionable: 'The weekly refresh-tiers cron should hold this under 7 days — check its last run before adding shows by hand at /admin/engine',
+            actionable: 'The weekly refresh-tiers cron should hold this under 7 days. Check its last run before adding shows by hand to anime_tiers',
         };
     }
     if (days >= 10) {
@@ -392,7 +392,7 @@ async function checkTierListFreshness(): Promise<HealthCheck> {
             label: 'Anime Tiers',
             level: 'warn',
             detail: `Not updated in ${days} days`,
-            actionable: 'The weekly refresh-tiers cron should hold this under 7 days — check its last run before adding shows by hand at /admin/engine',
+            actionable: 'The weekly refresh-tiers cron should hold this under 7 days. Check its last run before adding shows by hand to anime_tiers',
         };
     }
     return { key: 'tier_list', label: 'Anime Tiers', level: 'ok', detail: `Updated ${days}d ago` };

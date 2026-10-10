@@ -6,7 +6,7 @@
  * involved, and where posts end up.
  *
  * This file is the single source of truth for three consumers:
- *   1. The blueprint canvas (/admin/engine) renders it.
+ *   1. The blueprint canvas (/admin/engine, retired 2026-10-09) rendered it.
  *   2. GET /api/admin/engine/state serves it to connected AI agents.
  *   3. The architecture brief is generated from it.
  *

@@ -11,7 +11,6 @@ import {
     Users,
     Mail,
     Menu,
-    Cpu,
     Radar,
     Sparkles,
 } from 'lucide-react';
@@ -32,7 +31,6 @@ const GROUPS: { label: string; jp: string; items: NavItem[] }[] = [
         label: 'Publishing', jp: '発信', items: [
             // Content + Studio are one tab: either permission shows it.
             { href: '/admin/content', label: 'Content', jp: '記事', icon: FileText, anyPerm: ['content', 'studio'] },
-            { href: '/admin/engine', label: 'Engine', jp: '頭脳', icon: Cpu, perm: 'content' },
         ],
     },
     {

@@ -2,7 +2,7 @@
 //
 // Read/write access to the `anime_tiers` table — KumoLab's engine priority
 // tiers (which anime the pipeline should favor). This is the canonical source
-// of truth edited via /admin/engine; the engine's posting-priority logic reads
+// of truth, refreshed weekly by the refresh-tiers cron; the engine's posting-priority logic reads
 // from here (see getAnimeTierForTitle) instead of the old hardcoded studio
 // allowlist. All server-side via supabaseAdmin (RLS: service-role only).
 

@@ -1,11 +1,7 @@
 import { redirect } from 'next/navigation';
 
-/**
- * The blueprint shipped behind this preview route while it was being built.
- * It is now the live Engine tab, so this exists only to keep any link or
- * bookmark from the preview period working. Safe to delete once nothing
- * points here.
- */
-export default function EngineBlueprintRedirect() {
-    redirect('/admin/engine');
+// The Engine tab was retired 2026-10-09. System health lives in AI Insights' system drawer;
+// the automation, its data and /api/admin/engine/* are untouched.
+export default function Page() {
+    redirect('/admin/insights');
 }

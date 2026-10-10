@@ -2,7 +2,7 @@
 //
 // The pipeline's human-editable operating rules (the posting formula and the
 // peak time slots), read from the engine_config table. This is the canonical
-// spec both the /admin/engine tab and any AI agent should follow + verify
+// spec any AI agent should follow + verify (the /admin/engine tab was retired 2026-10-09)
 // against. Plus a read of the live scheduled queue (mirrors what Content →
 // Schedule holds, read-only). All server-side via supabaseAdmin.
 
