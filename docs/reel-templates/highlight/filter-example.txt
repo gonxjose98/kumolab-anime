@@ -1,0 +1,16 @@
+[0:v]trim=start=73:end=117,setpts=PTS-STARTPTS,crop=1618:910:151:105,scale=1080:608[c];
+[c]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='R-Rem?':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,2.20,3.41)'[s0];
+[s0]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem...':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,9.33,10.12)'[s1];
+[s1]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem...':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,11.08,11.96)'[s2];
+[s2]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem...':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,13.80,15.09)'[s3];
+[s3]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem!':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,15.84,17.51)'[s4];
+[s4]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem...':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,23.51,25.26)'[s5];
+[s5]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='It’s okay.':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,25.93,27.14)'[s6];
+[s6]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='You can take it slow.':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,30.23,31.85)'[s7];
+[s7]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='...are you?':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,32.90,34.27)'[s8];
+[s8]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Rem?':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,36.23,37.07)'[s9];
+[s9]drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='Who... are you?':fontsize=40:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-38:enable='between(t,39.07,43.30)'[s10];
+color=c=black:s=1080x1920:d=44[bg];
+[bg][s10]overlay=0:656[v1];
+[v1][1:v]overlay=0:0,format=yuv420p[v];
+[0:a]atrim=start=73:end=117,asetpts=PTS-STARTPTS,afade=t=in:d=0.3,afade=t=out:st=43:d=1[a]
