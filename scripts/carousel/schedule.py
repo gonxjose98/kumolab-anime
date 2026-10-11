@@ -20,6 +20,19 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
+def extra_captions(read_opt):
+    """Optional caption files: threads_reply.txt (first reply under the Threads
+    post, e.g. the title list), tiktok_title.txt + tiktok.txt (copy-paste for
+    Jose's manual TikTok post; long with keywords + exactly 5 hashtags)."""
+    out = {}
+    for key, fname in (('threads_reply', 'threads_reply.txt'), ('tiktok_title', 'tiktok_title.txt'), ('tiktok', 'tiktok.txt')):
+        v = read_opt(fname)
+        if v:
+            out[key] = v
+    if 'threads_reply' in out:
+        assert len(out['threads_reply']) <= 500, 'threads_reply.txt over 500 chars'
+    return out
+
 def env():
     f = os.path.join(tempfile.gettempdir(), f'kl-{os.getpid()}.env')
     subprocess.run('vercel env pull "%s" --environment=production --yes' % f, shell=True, capture_output=True)
@@ -47,6 +60,7 @@ def add(workdir, slug, title, day, hhmm='08:30'):
     jpgs = sorted([f for f in os.listdir(workdir) if re.match(r'f-slide-\d+\.jpg$', f)], key=lambda f: int(re.findall(r'\d+', f)[0]))
     assert 5 <= len(jpgs) <= 8, f'{len(jpgs)} slides: rule is 5-8'
     read = lambda n: open(os.path.join(workdir, n), encoding='utf-8').read().strip()
+    read_opt = lambda n: read(n) if os.path.exists(os.path.join(workdir, n)) else ''
     ig, fb, th = read('ig.txt'), read('fb.txt'), read('threads.txt')
     assert len(th) <= 500, 'threads.txt over 500 chars'
     for t in (ig, fb, th, title):
@@ -66,7 +80,7 @@ def add(workdir, slug, title, day, hhmm='08:30'):
         'caption_override': ig,
         'image_settings': {'sourceUrl': urls[0], 'carousel_source': 'claude-cloud-bank',
                            'slides': [{'sourceUrl': u, 'renderedUrl': u, 'title': '', 'excerpt': '', 'settings': {}} for u in urls],
-                           'captions': {'facebook': fb, 'threads': th}},
+                           'captions': {'facebook': fb, 'threads': th, **extra_captions(read_opt)}},
     }
     out = json.loads(req('POST', f'{SB}/rest/v1/posts', json.dumps(row).encode(),
                          {'Content-Type': 'application/json', 'Prefer': 'return=representation'}))
@@ -90,6 +104,7 @@ def upload(workdir, slug):
 def replace(workdir, post_id, title=None):
     """Swap an already-scheduled carousel's slides + captions (+ title) in place; keeps its time."""
     read = lambda n: open(os.path.join(workdir, n), encoding='utf-8').read().strip()
+    read_opt = lambda n: read(n) if os.path.exists(os.path.join(workdir, n)) else ''
     ig, fb, th = read('ig.txt'), read('fb.txt'), read('threads.txt')
     assert len(th) <= 500, 'threads.txt over 500 chars'
     for t in (ig, fb, th, title or ''):
@@ -97,7 +112,7 @@ def replace(workdir, post_id, title=None):
     row = json.loads(req('GET', f'{SB}/rest/v1/posts?id=eq.{post_id}&select=slug,image_settings'))[0]
     urls = upload(workdir, row['slug'])
     ims = row['image_settings'] or {}
-    ims.update({'sourceUrl': urls[0], 'captions': {'facebook': fb, 'threads': th},
+    ims.update({'sourceUrl': urls[0], 'captions': {'facebook': fb, 'threads': th, **extra_captions(read_opt)},
                 'slides': [{'sourceUrl': u, 'renderedUrl': u, 'title': '', 'excerpt': '', 'settings': {}} for u in urls]})
     hook = ig.split('\n')[0]
     patch = {'image': urls[0], 'caption_override': ig, 'content': hook, 'excerpt': hook, 'image_settings': ims}

@@ -104,7 +104,12 @@ the hard rules.** Fix and re-render until clean.
 
 ### 6. Captions
 In the workdir: `ig.txt` (hook + CTA + 3-5 hashtags), `fb.txt` (same, no hashtags),
-`threads.txt` (hook + question, max 500 chars).
+`threads.txt` (hook + question only, NO title list, max 500 chars),
+`threads_reply.txt` (the title list, posted automatically as the first reply under
+the Threads post; max 500 chars), `tiktok_title.txt` + `tiktok.txt` (TikTok is posted
+by hand: LONG keyword caption, hook + one line per slide with title, creator/studio and
+a fan-voice detail, comment + share CTA, then EXACTLY 5 hashtags). All of them show in
+the Content tab's Captions popup for copy-paste.
 
 ### 7. Approval
 Send Jose the slides + captions. **Nothing is scheduled without his OK** (until he
