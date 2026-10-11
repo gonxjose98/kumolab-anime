@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Play, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Play, X } from 'lucide-react';
 import type { ScheduleRow } from '@/lib/schedule';
 import { KindIcon, PLATFORM_LABEL, kindLabel } from './scheduleUi';
 
@@ -183,26 +183,6 @@ export default function SchedulePreview({ row, onClose, actions }: { row: Schedu
                         <div className="ak-pv__plats">
                             {row.platforms.map((p) => <span key={p} className={`ak-plat ak-plat--${p}`}>{PLATFORM_LABEL[p]}</span>)}
                         </div>
-
-                        <div className="ak-pv__caption">
-                            <div className="ak-pv__caplbl">{row.captionIsExcerpt ? 'Website excerpt' : 'Instagram caption'}</div>
-                            {row.caption
-                                ? <p className="ak-pv__captext">{row.caption}</p>
-                                : <p className="ak-pv__captext ak-pv__captext--none">No caption set.</p>}
-                        </div>
-
-                        {row.fbCaption && row.fbCaption !== row.caption && (
-                            <details className="ak-pv__more">
-                                <summary>Facebook caption <ChevronDown size={14} /></summary>
-                                <p className="ak-pv__captext">{row.fbCaption}</p>
-                            </details>
-                        )}
-                        {row.threadsCaption && row.threadsCaption !== row.caption && (
-                            <details className="ak-pv__more">
-                                <summary>Threads caption <ChevronDown size={14} /></summary>
-                                <p className="ak-pv__captext">{row.threadsCaption}</p>
-                            </details>
-                        )}
 
                         {row.kind === 'video' && row.youtubeUrl && (
                             <a className="ak-pv__link" href={row.youtubeUrl} target="_blank" rel="noopener noreferrer">

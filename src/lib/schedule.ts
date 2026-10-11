@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeakSlots } from '@/lib/engine/engine-config';
+import { platformCaptions, type PlatformCaptions } from '@/lib/social/platform-captions';
 
 /*
  * Posting schedule + peak-hour helpers.
@@ -80,6 +81,8 @@ export interface ScheduleRow {
     videoUrl: string | null;
     /** Where this post is expected to go when it fires (derived, best effort). */
     platforms: SchedulePlatform[];
+    /** Exactly what each platform gets (same helper the publisher uses). */
+    captions: PlatformCaptions;
 }
 
 const isHttp = (u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u);
@@ -116,7 +119,7 @@ export async function loadPeakHours(): Promise<Set<number>> {
 }
 
 /** Columns toScheduleRow needs. image_settings may be selected whole or as slides/captions/reel_source paths. */
-export const SCHEDULE_COLUMNS = 'id, title, slug, status, claim_type, scheduled_post_time, image, excerpt, caption_override, image_settings, social_ids, youtube_video_id, youtube_url';
+export const SCHEDULE_COLUMNS = 'id, title, slug, status, claim_type, anime_id, hashtags, scheduled_post_time, image, excerpt, caption_override, image_settings, social_ids, youtube_video_id, youtube_url';
 
 /**
  * One posts row to a ScheduleRow. `when` is the time the row is placed at
@@ -156,6 +159,7 @@ export function toScheduleRow(p: any, peakHours: Set<number>, now = Date.now(), 
         youtubeUrl: isHttp(p.youtube_url) ? p.youtube_url : p.youtube_video_id ? `https://www.youtube.com/watch?v=${p.youtube_video_id}` : null,
         videoUrl,
         platforms: derivePlatforms(kind, p.claim_type ?? null, isReel),
+        captions: platformCaptions({ ...p, captions: is.captions }),
     };
 }
 

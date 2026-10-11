@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
     ChevronDown, ChevronLeft, ChevronRight, Clapperboard, ExternalLink, Film, Folder, GalleryHorizontal,
-    Link2, Plus, Search, Sparkles, Star, Upload, X,
+    Link2, Plus, Search, Sparkles, Star, Type, Upload, X,
 } from 'lucide-react';
 // Type-only: lib/content/hub pulls in the service-role client.
 import type { ContentHubData, ContentRow, ContentView } from '@/lib/content/hub';
@@ -14,6 +14,7 @@ import { KindIcon, PLATFORM_LABEL, isOptimizable } from './scheduleUi';
 import ScheduleSlotButton from './ScheduleSlotButton';
 import SchedulePreview from './SchedulePreview';
 import DownloadMediaButton from './DownloadMediaButton';
+import CaptionsSheet from './CaptionsSheet';
 import { AiAssistModal, UploadModal } from './ContentModals';
 import ImportFromUrlButton from '@/components/admin/dashboard/ImportFromUrlButton';
 import MediaPickerModal from '@/components/admin/studio/MediaPickerModal';
@@ -100,6 +101,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
     const [q, setQ] = useState('');
     const [socialsOnly, setSocialsOnly] = useState(true);
     const [previewId, setPreviewId] = useState<string | null>(null);
+    const [captionsId, setCaptionsId] = useState<string | null>(null);
     const [modal, setModal] = useState<'carousel' | 'import' | 'upload' | 'ai' | null>(newCarousel ? 'carousel' : null);
     const [jump, setJump] = useState<string | null>(null);
     const [todayKey] = useState(() => etDayKey(Date.now()));
@@ -180,6 +182,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
 
     const all = [...data.posted, ...data.next, ...data.review, ...data.drafts];
     const preview = previewId ? all.find((r) => r.id === previewId) ?? null : null;
+    const captionsRow = captionsId ? all.find((r) => r.id === captionsId) ?? null : null;
 
     function onCard(r: ContentRow) {
         if (r.view === 'posted' || r.view === 'next') setPreviewId(r.id);
@@ -253,7 +256,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                                     <div className="ak-ch-grid">
                                         {items.map((r) => (
                                             <ContentCard key={r.id} row={r} busy={studio.busyId === r.id} priority={rows.indexOf(r) < 8}
-                                                onOpen={() => onCard(r)} onStudio={() => studio.open(r)} />
+                                                onOpen={() => onCard(r)} onStudio={() => studio.open(r)} onCaptions={() => setCaptionsId(r.id)} />
                                         ))}
                                     </div>
                                 )}
@@ -274,6 +277,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                 <SchedulePreview row={preview} onClose={() => setPreviewId(null)} actions={
                     <>
                         <DownloadMediaButton urls={mediaUrls(preview)} baseName={preview.slug || 'kumolab-post'} label="Download" className="ak-ch-act" />
+                        <button type="button" className="ak-ch-act" onClick={() => setCaptionsId(preview.id)}><Type size={14} /> Captions</button>
                         <button type="button" className="ak-ch-act" onClick={() => studio.open(preview)} disabled={studio.busyId === preview.id}
                             title={isLive(preview) ? 'Opens an editable copy. The live post stays as it is.' : 'Open in Studio'}>
                             <Clapperboard size={14} /> {studio.busyId === preview.id ? 'Making a copy…' : isLive(preview) ? 'Edit a copy in Studio' : 'Open in Studio'}
@@ -287,6 +291,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
                 } />
             )}
 
+            {captionsRow && <CaptionsSheet title={captionsRow.title} captions={captionsRow.captions} onClose={() => setCaptionsId(null)} />}
             {modal === 'carousel' && <NewCarouselSheet topic={newCarousel?.topic ?? ''} onClose={() => setModal(null)} />}
             {modal === 'import' && <ImportFromUrlButton onClose={() => setModal(null)} />}
             {modal === 'upload' && <UploadModal onClose={() => setModal(null)} onSuccess={() => { setModal(null); router.refresh(); }} />}
@@ -295,7 +300,7 @@ export default function ContentHub({ data, initialView, newCarousel }: {
     );
 }
 
-function ContentCard({ row: r, busy, priority, onOpen, onStudio }: { row: ContentRow; busy: boolean; priority?: boolean; onOpen: () => void; onStudio: () => void }) {
+function ContentCard({ row: r, busy, priority, onOpen, onStudio, onCaptions }: { row: ContentRow; busy: boolean; priority?: boolean; onOpen: () => void; onStudio: () => void; onCaptions: () => void }) {
     const live = isLive(r);
     return (
         <article className={`ak-ch-card${r.view === 'posted' && !r.social ? ' is-siteonly' : ''}`}>
@@ -316,6 +321,9 @@ function ContentCard({ row: r, busy, priority, onOpen, onStudio }: { row: Conten
             </button>
             <div className="ak-ch-card__acts">
                 <DownloadMediaButton urls={mediaUrls(r)} baseName={r.slug || 'kumolab-post'} />
+                <button type="button" className="ak-ch-card__studio" onClick={onCaptions} title="Captions for each platform" aria-label={`Captions for ${r.title}`}>
+                    <Type size={14} />
+                </button>
                 <button type="button" className="ak-ch-card__studio" onClick={onStudio} disabled={busy}
                     title={live ? 'Edit a copy in Studio (the live post stays as it is)' : 'Open in Studio'}
                     aria-label={live ? `Edit a copy of ${r.title} in Studio` : `Open ${r.title} in Studio`}>

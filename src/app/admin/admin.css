@@ -3479,3 +3479,18 @@ html[data-admin-theme='dark'] .admin-root .ak-ch-new__menu { background: #131c38
 @media (prefers-reduced-motion: reduce) {
     .admin-root .ak-ch-card, .admin-root .ak-ch-card__thumb img, .admin-root .ak-ch-card__acts { transition: none; }
 }
+
+/* Captions popup (per-platform text, Content tab) */
+.admin-root .ak-modal__scrim.ak-caps__scrim { z-index: 1200; }
+.admin-root .ak-caps { width: min(560px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.admin-root .ak-caps__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .ak-caps__tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 20px 10px; border-bottom: 1px solid var(--line); }
+.admin-root .ak-caps__tab { padding: 7px 13px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-3); font-size: 13px; font-weight: 600; cursor: pointer; }
+.admin-root .ak-caps__tab:hover { color: var(--ink); }
+.admin-root .ak-caps__tab.is-on { background: var(--blue-soft); color: var(--blue); }
+.admin-root .ak-caps__body { overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.admin-root .ak-caps__blockhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.admin-root .ak-caps__copy { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.admin-root .ak-caps__copy:hover { border-color: var(--gold); }
+.admin-root .ak-caps__text { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line-2); color: var(--ink); font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.admin-root .ak-caps__text.is-none { color: var(--ink-3); font-style: italic; }

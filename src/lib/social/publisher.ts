@@ -5,6 +5,7 @@ import { publishToYouTubeShorts } from './youtube-publisher';
 import { fetchWithTimeout } from '../http';
 import { buildSocialCaption } from './caption';
 import { logError } from '../logging/structured-logger';
+import { platformCaptions } from './platform-captions';
 import { xConfigured, uploadMediaFromUrl, postTweet } from './x-client';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -1098,10 +1099,7 @@ export async function publishToInstagramCarousel(
 const X_TEXT_MAX = Number(process.env.X_TEXT_MAX ?? 280);
 
 function xCaption(post: BlogPost): string {
-    const caps = (post as any).image_settings?.captions || {};
-    const raw = (typeof caps.x === 'string' && caps.x.trim()) ? caps.x.trim()
-        : (typeof caps.threads === 'string' && caps.threads.trim()) ? caps.threads.trim()
-        : String(post.title || '').trim();
+    const raw = platformCaptions(post).x;
     // Array.from counts an emoji as one char; X counts some as two, so leave headroom.
     const chars = Array.from(raw);
     return chars.length <= X_TEXT_MAX - 10 ? raw : chars.slice(0, X_TEXT_MAX - 11).join('').trimEnd() + '\u2026';
@@ -1148,9 +1146,7 @@ async function publishToX(post: BlogPost, media: { imageUrls?: string[]; videoUr
 }
 
 function carouselCaption(post: BlogPost, platform: 'facebook' | 'threads'): string {
-    const c = (post as any).image_settings?.captions?.[platform];
-    if (typeof c === 'string' && c.trim()) return c.trim();
-    return buildSocialCaption(post as any);
+    return platformCaptions(post)[platform];
 }
 
 // Facebook has no carousel container: upload every slide as an UNPUBLISHED
@@ -1194,6 +1190,28 @@ async function publishFacebookCarousel(post: BlogPost, slideImageUrls: string[])
         });
     }
     return result;
+}
+
+// Optional first reply under a Threads post (captions.threads_reply), e.g. the
+// title list, so the main post stays a short hook + question. Never fails the post.
+async function postThreadsReply(post: BlogPost, parentId: string): Promise<void> {
+    const reply = platformCaptions(post).threadsReply;
+    if (!reply || !THREADS_ACCESS_TOKEN || !THREADS_USER_ID) return;
+    try {
+        const base = `https://graph.threads.net/v1.0/${THREADS_USER_ID}`;
+        const c = await fetchWithTimeout(`${base}/threads`, {
+            method: 'POST',
+            body: new URLSearchParams({ media_type: 'TEXT', text: reply.substring(0, 500), reply_to_id: parentId, access_token: THREADS_ACCESS_TOKEN }),
+        }, 20_000).then(r => r.json()).catch(() => ({}));
+        if (!c.id) throw new Error(c?.error?.message || 'reply container failed');
+        await new Promise(r => setTimeout(r, 3_000));
+        const p = await fetchWithTimeout(`${base}/threads_publish`, {
+            method: 'POST', body: new URLSearchParams({ creation_id: c.id, access_token: THREADS_ACCESS_TOKEN }),
+        }, 20_000).then(r => r.json()).catch(() => ({}));
+        if (!p.id) throw new Error(p?.error?.message || 'reply publish failed');
+    } catch (e: any) {
+        await logError({ source: 'publisher.threads.reply', errorMessage: `Threads first reply failed: ${e?.message || e}`, context: { post_slug: post.slug, parent_id: parentId } });
+    }
 }
 
 // Threads carousel: one IMAGE child per slide (is_carousel_item), then a
@@ -1268,6 +1286,7 @@ async function publishThreadsCarousel(post: BlogPost, slideImageUrls: string[]):
         result.threads_id = pub.id;
         result.threads_url = `https://www.threads.net/@kumolabanime/post/${pub.id}`;
         console.log(`✅ [Threads] Published ${children.length}-image carousel: ${pub.id}`);
+        await postThreadsReply(post, pub.id);
     } else {
         await logError({
             source: 'publisher.threads.carousel',

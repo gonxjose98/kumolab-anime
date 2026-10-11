@@ -33,7 +33,7 @@ export interface ContentHubData {
 
 // image_settings is selected by path: video_project can be megabytes.
 const COLUMNS = [
-    'id, title, slug, status, claim_type, source, scheduled_post_time, published_at, timestamp, image, excerpt, caption_override',
+    'id, title, slug, status, claim_type, anime_id, hashtags, source, scheduled_post_time, published_at, timestamp, image, excerpt, caption_override',
     'slides:image_settings->slides, captions:image_settings->captions',
     'reel_source:image_settings->>reel_source, edited_at:image_settings->>studio_edited_at, edited_by:image_settings->>edited_by',
     'social_ids, youtube_video_id, youtube_url',
