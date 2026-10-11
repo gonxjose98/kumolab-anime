@@ -122,7 +122,15 @@ async function dispatch(
             console.warn('[Cron] slot selection failed (non-fatal):', e?.message || e);
         }
         await publishScheduledPosts();
-        return { success: true, worker: 'publish', selection };
+        // Approved Threads text posts (takes, questions, polls). Never blocks the main publisher.
+        let threadsText = null;
+        try {
+            const { publishDueThreadsText } = await import('@/lib/social/threads-text');
+            threadsText = await publishDueThreadsText();
+        } catch (e: any) {
+            console.warn('[Cron] threads text failed (non-fatal):', e?.message || e);
+        }
+        return { success: true, worker: 'publish', selection, threadsText };
     }
 
     if (worker === 'dailydrops') {
