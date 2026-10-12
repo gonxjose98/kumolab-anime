@@ -24,3 +24,7 @@ No em dashes anywhere.
    35 to 50s, one full moment ending on the payoff. Original audio, loudnorm -14 LUFS. No voiceover (Jose's call).
    IG caption = synopsis naming show + characters, "Clip: Crunchyroll", exactly 5 hashtags. Schedule with
    `image_settings.reel_source='kumolab-reels'`, `reel_format='highlight-v1'` so the test can be measured.
+   **Branded variant "highlight-v1-branded"** (2026-10-12): same Crunchyroll clip + burned subs (wrapped to 2 lines at 44 chars,
+   line_spacing -14), but in the widescreen night template (#2) with the SAME crop `crop=1618:910:151:105,scale=1080:608` so the
+   Crunchyroll logo + copyright are hidden (Jose rejected the visible logo). Original audio, no VO. Tag `reel_format='highlight-v1-branded'`;
+   the bare control is `highlight-v1`. Test week compares: Rem + One Piece (bare) vs Mushoku + Tanya (branded).
