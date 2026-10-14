@@ -10,13 +10,33 @@ Label key: **Jose** = his report, **Measured** = pulled from the platform or dat
 - **Jose:** the old account was fully automated (trailer reposts) and sat at zero views for 30+ days. Since he started a new account and uploads only carousels, it is doing much better.
 - **Measured (logged out, @kumolab.anime):** 7 followers, 324 likes, 10 photo carousels at 476 to 1,439 views each (avg ~650, ~6.5k total), no videos. About 13x our Instagram carousels (avg 49).
 - **Related history:** old account had 15 posts restricted as "unoriginal, low-quality" (raw trailer reposts) and 0 to 5 views even on non-restricted posts. See `kumolab-platform-performance` memory.
+- **Top post (Measured, 2026-10-12):** "Six anime movies that are pure peak" (Spirited Away, Perfect Blue, Wolf Children), posted Wed 10/07 1:34 PM ET: 1,439 views, 61 likes, 23 saves, 4 comments, 3 shares. **Jose:** TikTok boosted it twice (notice said lots of shares and favorites, "genuinely useful"), which is how it passed 1,000. The same carousel did 42 views on Instagram (10/05).
+- **All 10 carousels, confirmed 2026-10-12 (Measured, logged out; times ET; saves = TikTok "favorites"):**
+
+  | Posted | Caption opener | Views | Likes | Saves | Save % | Shares | Comments |
+  |---|---|---|---|---|---|---|---|
+  | Sun 10/04 2:11 PM | Romance anime that will ruin you | 476 | 41 | 9 | 1.9% | 5 | 1 |
+  | Mon 10/05 7:59 AM | Our top 5 anime of 2026 so far | 558 | 16 | 4 | 0.7% | 4 | 6 |
+  | Tue 10/06 4:41 PM | Anime you can finish before sunrise | 537 | 24 | 12 | 2.2% | 4 | 1 |
+  | Wed 10/07 11:27 AM | Six love stories that broke our hearts | 517 | 27 | 19 | 3.7% | 5 | 2 |
+  | Wed 10/07 1:34 PM | **Six anime movies that are pure peak** | **1,439** | 61 | 23 | 1.6% | 3 | 4 |
+  | Wed 10/07 5:08 PM | Frieren's cast (voice actor overlaps) | 541 | 30 | 4 | 0.7% | 3 | 2 |
+  | Thu 10/08 12:09 PM | Anime to watch right now, Fall 2026 | 566 | 37 | 8 | 1.4% | 3 | 0 |
+  | Thu 10/08 6:54 PM | Day 1 vs now: biggest glow up | 494 | 16 | 2 | 0.4% | 2 | 2 |
+  | Sat 10/10 11:52 AM | Six anime GOATs by women mangaka | 875 | 46 | 8 | 0.9% | 2 | 4 |
+  | Sat 10/10 11:56 AM | Six action anime, every frame a wallpaper | 499 | 28 | 10 | 2.0% | 0 | 1 |
+
+- **Caption shape on the winner:** the full ranked list in the caption (studio plus a one-line synopsis per film), a closing question ("Which one is YOUR peak? And what film did we miss?"), and 5 hashtags including #studioghibli and #animemovies.
+- **Read (hypothesis):** the winner's lead is NOT explained by save rate (it was mid-pack at 1.6%; "love stories" saved at 3.7% and got 517 views) or by shares (3, same as others). Its edge is absolute likes/saves plus topic (anime movies and Ghibli have a wider audience), and Jose says TikTok boosted it. Shares are tiny everywhere (0 to 5). Sample is too small to name a cause. Hashtags on the other 9 were not captured.
+- **TikTok "helpful post" boost notice (Jose's screenshot, 2026-10-13):** "Your post has been boosted!" on "Six anime movies that are pure peak": **+241 extra views**. "Why it stood out: viewers found your post very helpful." TikTok's own checklist for getting boosted: (1) show real experiences, at least 2 photos or a video over 20s; (2) add useful details, photo posts should have 50+ characters (limit 4,000); (3) give your honest review, opinions and practical tips; (4) provide actionable advice, a clear takeaway of what to do, buy or try. The winner already met all four (8 slides, ~1,150 char caption with studio and one-line take per film, a closing question). One boost was +241, so it does not explain all 1,439 views by itself.
+- **2026-10-13 batch (Jose's profile screenshot, 5:53 PM ET, same day as posting; Jose, not exact post times):** all three posted. Movies ("Anime movies that will change your life") 544 views, hidden gems ("Great anime you totally slept on") 345, fights ("Anime fights we have rewatched 50 times") 304. Account: 7 followers, 401 likes (324 on 10/12). Same-day views already near the old per-post average (~650), and follows still did not move. Re-pull at 24 hours.
 - **Decision:** carousels only on TikTok, no raw-clip reels (Jose, 2026-10-12).
 - **Open:** views are not converting to follows (7 followers on ~6.5k views). Test search-phrase first lines in captions. Find out why the 1,439 post won.
 
 ### Instagram (early spike, now flat)
 - **Jose:** big growth at the start, when we were reposting trailers and posting more reels and carousels. Now carousels get basically no views.
 - **Measured (30 days to 2026-10-12):** carousels avg ~49 views (16 posts); reels since 9/12 avg ~1,038 but 3 posts drive most of it. About 95% of views came from non-followers; follows are the weak spot (21 from followers, 101 from non-followers). Followers 2,431.
-- **Plan (Jose):** keep 1 carousel a day and 2 reels a day on Instagram and watch how the data moves with time and growth.
+- **Plan (Jose, 2026-10-12):** reels consistently outperform carousels, so Instagram runs 3 posts a day: the morning carousel stays (kept open on purpose) plus 2 reels. Fits the strict-slot model: carousel 7:30 AM ET, reels 1:00 PM and 9:30 PM ET. Watch how the data moves with time and growth.
 - **Test running:** highlight-format reels, bare (`highlight-v1`) vs branded (`highlight-v1-branded`). First point: the bare Rem reel did 428 views, 346 reach in ~15 hours, third best of October. See `docs/reel-templates/README.md` #3.
 
 ### Threads (slow start, engagement agent helped)
@@ -29,12 +49,12 @@ Label key: **Jose** = his report, **Measured** = pulled from the platform or dat
 - **Prior notes:** page uploads got ~0 interactions; the only activity came from group comments. Keep/kill call is set for 2026-11-07 in `platforms/facebook.md`.
 
 ### X (moderate growth)
-- **Jose:** moderate growth now that we actually post there. We have not yet been monitoring to reply to comments and engagement.
-- **Open:** add the comment-and-engagement monitoring that helped Threads, and see if X growth follows.
+- **Jose:** moderate growth now that we actually post there. The same engagement agent runs here too (corrected 2026-10-12; an earlier note wrongly said it did not).
+- **Open:** need per-platform numbers to see whether the agent helps X as much as it did Threads.
 
 ## Takeaways so far (hypotheses, not facts)
 1. Account history matters: the same platform gave 0 views on the automated account and ~650 per post on a fresh, manual, carousel-only account. Format and account state are tangled together, so we cannot say which mattered more.
-2. The engagement agent is the one clear causal change we have (Threads). Worth extending to X.
+2. The engagement agent (replies to all comments and engagement) runs on X, Instagram, Threads and Facebook, but NOT TikTok (Jose, 2026-10-12). Threads is where it clearly helped. Facebook has it and still shows no growth, so it is not a cure-all. TikTok's growth came without it.
 3. Carousels do not work everywhere: strong on TikTok, weak on Instagram. Do not assume a format transfers between platforms.
 4. Instagram reels have the best reach spikes but few follows, so conversion (bio, profile, series) is the next problem, not reach.
 
