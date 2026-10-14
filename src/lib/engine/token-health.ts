@@ -125,6 +125,14 @@ export async function refreshMetaToken(): Promise<RefreshResult> {
         return { ok: false, rotated: false, reason: 'META_APP_ID / META_APP_SECRET missing — cannot refresh' };
     }
 
+    // 0. A system-user token (or a page token derived from one) never expires
+    // and has no data-access window. Exchanging it would swap in a user-derived
+    // token that DOES expire, so leave it alone.
+    const current = await checkMetaTokenHealth();
+    if (current.ok && current.expiresAt === 0 && !current.dataAccessExpiresAt) {
+        return { ok: true, rotated: false, reason: 'non-expiring system-user token, no rotation needed', daysUntilDataAccessExpiry: null };
+    }
+
     // 1. Exchange the current token for a fresh long-lived one.
     const exchangeUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token');
     exchangeUrl.searchParams.set('grant_type', 'fb_exchange_token');
