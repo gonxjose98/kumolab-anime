@@ -34,6 +34,23 @@ export interface AnalyticsData {
     claimPerf: ClaimPerf[];
     postedTotal: number;
     range: number;                // active time-range in days (0 = all-time)
+    tiktok: ManualStats | null;   // hand-entered all-time totals (no TikTok API)
+}
+
+/** A manual_platform_stats row: totals Jose asks Claude to update by hand. */
+export interface ManualStats {
+    views: number | null;
+    followers: number | null;
+    likes: number | null;
+    posts: number | null;
+    updatedAt: string;
+}
+
+async function manualStats(platform: string): Promise<ManualStats | null> {
+    const { data } = await supabaseAdmin
+        .from('manual_platform_stats').select('views, followers, likes, posts, updated_at').eq('platform', platform).maybeSingle();
+    if (!data) return null;
+    return { views: data.views, followers: data.followers, likes: data.likes, posts: data.posts, updatedAt: data.updated_at };
 }
 
 const FALLBACK_IG: IGDashboardData = {
@@ -138,12 +155,13 @@ async function refreshQuietly(ms = 4000) {
 export async function getAnalyticsData(rangeDays = 30): Promise<AnalyticsData> {
     const sinceIso = rangeDays === 0 ? null : new Date(Date.now() - rangeDays * 86_400_000).toISOString();
     const webDays = rangeDays === 0 ? 365 : rangeDays;
-    const [ig, threads, posts] = await Promise.all([
+    const [ig, threads, posts, , tiktok] = await Promise.all([
         fetchIGDashboardData(30).catch((e) => ({ ...FALLBACK_IG, snapshot: { ...FALLBACK_IG.snapshot, reason: e?.message ?? 'IG fetch failed' } })),
         fetchThreadsSnapshot(30).catch((e) => DEAD_SNAP(e?.message ?? 'Threads fetch failed')),
         topPostsAndClaims(sinceIso, webDays),
         refreshQuietly(),
+        manualStats('tiktok').catch(() => null),
     ]);
     const views = await getViewsSummary(rangeDays);
-    return { ig, threads, views, ...posts, range: rangeDays };
+    return { ig, threads, views, ...posts, range: rangeDays, tiktok };
 }
