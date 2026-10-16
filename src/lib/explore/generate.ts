@@ -169,9 +169,10 @@ export async function runExplore(opts: { trigger: 'cron' | 'manual' }): Promise<
         const okSections = outcomes.filter((o) => o.ok).map((o) => o.section);
         const cards = outcomes.flatMap((o) => o.cards);
         // A fresh read replaces the previous one for every section that succeeded.
+        // Claude-authored cards (type 'claude') are written by hand and keep their own expiry.
         if (okSections.length) {
             await supabaseAdmin.from('explore_insights').update({ expires_at: new Date(now).toISOString() })
-                .in('section', okSections).eq('state', 'new').gt('expires_at', new Date(now).toISOString());
+                .in('section', okSections).eq('state', 'new').neq('type', 'claude').gt('expires_at', new Date(now).toISOString());
         }
         if (cards.length) {
             const rows = cards.map((c) => ({

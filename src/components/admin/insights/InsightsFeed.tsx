@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     AlertTriangle, BarChart3, CalendarDays, ChevronRight, ExternalLink, Flame, Lightbulb,
-    Newspaper, TrendingDown, TrendingUp, Check,
+    Newspaper, Sparkles, TrendingDown, TrendingUp, Check,
 } from 'lucide-react';
 import { FEED_TABS, agoText, inTab, type FeedItem, type FeedTab } from '@/lib/explore/feed';
 
@@ -21,6 +21,7 @@ const TYPE_META: Record<string, { label: string; tone: Tone; Icon: typeof Newspa
     top_post: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
     followers: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
     system: { label: 'Needs you', tone: 'system', Icon: AlertTriangle },
+    claude: { label: 'From Claude', tone: 'ours', Icon: Sparkles },
 };
 
 const CONF: Record<string, string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -100,7 +101,7 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
                 )}
 
                 <div className="ak-ai-row__actions">
-                    {world ? (
+                    {item.type === 'claude' ? null : world ? (
                         <button type="button" className="ak-ai-act is-primary" onClick={makeCarousel}>Make a carousel<ChevronRight size={14} aria-hidden="true" /></button>
                     ) : (
                         <button type="button" className="ak-ai-act is-primary" onClick={() => router.push('/admin/analytics')}>Open analytics<ChevronRight size={14} aria-hidden="true" /></button>

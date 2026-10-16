@@ -122,7 +122,9 @@ export default async function InsightsPage() {
     const rows = (insRes.data || []) as (InsightRow & { state: 'new' | 'acted' })[];
     const posters = await posterMap(rows).catch(() => new Map<string, string>());
     const withVisual = (r: (typeof rows)[number]): FeedItem => ({ ...r, poster: posters.get(r.id) ?? null, tile: tileFor(r) });
-    const feed = orderFeed(rows.filter((r) => r.section === 'world').map(withVisual), rows.filter((r) => r.section === 'ours').map(withVisual));
+    // Claude-authored cards (type 'claude', written from Claude Code sessions) lead the feed.
+    const claude = rows.filter((r) => r.type === 'claude').sort((a, b) => a.rank - b.rank).map(withVisual);
+    const feed = [...claude, ...orderFeed(rows.filter((r) => r.section === 'world').map(withVisual), rows.filter((r) => r.section === 'ours' && r.type !== 'claude').map(withVisual))];
     const systemCards = rows.filter((r) => r.section === 'system');
 
     const hasKey = exploreConfig.hasKey();

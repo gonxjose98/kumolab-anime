@@ -10,6 +10,9 @@
 const CloudBank = (() => {
     const BG = 'background:linear-gradient(180deg,#9FD2FF 0%,#EEF5FE 62%,#D3E6FB 100%)';
     const NAVY = '#0B2A5B', AMBER = '#D98E12', AMBER2 = '#E09A1E', GOLD = '#FFD27A';
+    // TikTok is @kumolab.anime; call CloudBank.setHandle('@kumolab.anime') before building a TikTok-only carousel.
+    let HANDLE = '@kumolabanime';
+    const setHandle = (h) => { HANDLE = h; };
 
     const cloud = (x, y, w, o = 1, flip = false, z = 1) =>
         `<svg class="cloud" style="left:${x}px;top:${y}px;width:${w}px;opacity:${o};z-index:${z};${flip ? 'transform:scaleX(-1)' : ''}"><use href="#cloud"/></svg>`;
@@ -57,17 +60,17 @@ const CloudBank = (() => {
           ${watch ? `<div style="margin-left:auto;text-align:right"><div style="font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85">Watch on</div><div style="color:${AMBER};margin-top:6px;font-size:26px;font-weight:800">${watch}</div></div>` : ''}</div>
         ${kicker ? `<div style="margin-top:22px;font-size:26px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${AMBER2}">${kicker}</div>` : ''}
         <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${line}</div></div>
-      ${foot(n, total, '@kumolabanime')}</section>`;
+      ${foot(n, total, HANDLE)}</section>`;
 
     // Share slide, always last.
     const share = ({ id, n, total, strip: items, question, prompt, footRight = 'Save for later' }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 640)}${bank(500)}${header('Save + share')}
       <div style="position:absolute;top:780px;left:70px;right:70px;text-align:center;z-index:4;color:${NAVY}">
         <div class="serif" style="font-size:80px;font-weight:700;line-height:1.04">${question}</div>
         <div class="serif" style="font-size:54px;font-weight:600;font-style:italic;margin-top:18px;color:${AMBER2}">${prompt}</div>
-        <div style="margin-top:34px"><span class="btn" style="font-size:24px;padding:24px 44px">Follow @kumolabanime</span></div></div>
+        <div style="margin-top:34px"><span class="btn" style="font-size:24px;padding:24px 44px">Follow ${HANDLE}</span></div></div>
       ${foot(n, total, footRight)}</section>`;
 
-    return { BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, share };
+    return { setHandle, BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, share };
 })();
 
 if (typeof module !== 'undefined') module.exports = CloudBank;
