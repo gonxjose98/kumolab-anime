@@ -62,6 +62,15 @@ const CloudBank = (() => {
         <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${line}</div></div>
       ${foot(n, total, HANDLE)}</section>`;
 
+    // Story slide (Jose, 2026-10-16): ONE big headline + ONE sentence, nothing else.
+    // The text carries the story, so it is big; art is a little shorter to make room.
+    // Use for trend/story posts; `content` (stats, watch-on) stays for list posts.
+    const story = ({ id, n, total, label, img, title, line }) => `<section class="slide" id="${id}" style="${BG}">${hero(img, 790)}${bank(650)}${header(label)}
+      <div style="position:absolute;left:60px;right:60px;top:830px;z-index:4;color:${NAVY}">
+        <div class="serif" style="font-size:${title.length > 24 ? 70 : 82}px;font-weight:700;line-height:1.02">${title}</div>
+        <div style="margin-top:24px;font-size:42px;line-height:1.28;font-weight:600">${line}</div></div>
+      ${foot(n, total, HANDLE)}</section>`;
+
     // Share slide, always last.
     const share = ({ id, n, total, strip: items, question, prompt, footRight = 'Save for later' }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 640)}${bank(500)}${header('Save + share')}
       <div style="position:absolute;top:780px;left:70px;right:70px;text-align:center;z-index:4;color:${NAVY}">
@@ -70,7 +79,7 @@ const CloudBank = (() => {
         <div style="margin-top:34px"><span class="btn" style="font-size:24px;padding:24px 44px">Follow ${HANDLE}</span></div></div>
       ${foot(n, total, footRight)}</section>`;
 
-    return { setHandle, BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, share };
+    return { setHandle, BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, story, share };
 })();
 
 if (typeof module !== 'undefined') module.exports = CloudBank;
