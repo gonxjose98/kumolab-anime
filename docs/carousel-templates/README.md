@@ -1,6 +1,7 @@
 # KumoLab carousels: Cloud Bank (LOCKED)
 
 **Every KumoLab carousel uses the Cloud Bank theme. No exceptions, no new looks.**
+The **Pop** layer (rule 2c: red accent word, gold highlighter, emoji stickers) is LOCKED too (Jose, 2026-10-16: "lock this in"). Every carousel ships with it.
 Jose chose it on 2026-09-28 after reviewing 9 alternatives, and approved four
 production carousels in it (Fall 2026, Same Voice, Romance, Apothecary S3).
 Changing the theme is Jose's call only. Do not "refresh", restyle, or propose a
@@ -41,7 +42,7 @@ Chosen by Jose 2026-09-29 over 5 alternatives; the light variants were rejected 
    overlapping the art, then title, a meta line, stats in amber, "Watch on", and one
    short line of copy.
 2b. **Story slides (Jose, 2026-10-16), for trend and story posts:** `story()` in `cloud-bank.js`. ONE big headline (the plot beat) plus ONE sentence, both large. No kicker, meta line, stats or "watch on". Small, sectioned text made the twist slide "look meaningless". Plain story, no insider references that need explaining (rejected: "Shigaraki is the husband now", "Pancreas girl, part two").
-2c. **Pop, every story slide (Jose, 2026-10-16):** "all one color, one font" reads flat to low-attention viewers; every slide needs something that pops. In `story()` text, `[word]` = red accent italic with brush underline (headline, 1 per slide), `{phrase}` = bold gold highlighter (sentence, 1 per slide). Add a tilted `sticker: {icon, text, color?, ink?, side?}` on the art edge ("Red flag", "Plot twist", "Episode 2 out now"); alternate sides and colors (red, navy, gold with navy ink, pink) slide to slide. `cover` and `share` take a sticker too. Per-post accent: `CloudBank.setAccent()`.
+2c. **Pop, LOCKED on every slide type (Jose, 2026-10-16):** "all one color, one font" reads flat to low-attention viewers; every slide needs something that pops. In `story()` text, `[word]` = red accent italic with brush underline (headline, 1 per slide), `{phrase}` = bold gold highlighter (sentence, 1 per slide). Add a tilted `sticker: {icon, text, color?, ink?, side?}` on the art edge ("Red flag", "Plot twist", "Episode 2 out now"); alternate sides and colors (red, navy, gold with navy ink, pink) slide to slide. `cover`, `content` and `share` take a sticker too; `content` lines take the same markup. Per-post accent: `CloudBank.setAccent()`.
 3. **Share slide (always last):** an art strip above the clouds, a question headline,
    an italic amber share prompt ("Send this to..."), and a gold "Follow @kumolabanime" button.
 

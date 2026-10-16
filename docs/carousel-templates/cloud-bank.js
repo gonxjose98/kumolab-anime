@@ -50,7 +50,7 @@ const CloudBank = (() => {
       ${foot(0, total, 'Swipe &nbsp;→')}</section>`;
 
     // Content slide. stats = [[value, label], ...]; watch optional; kicker = short bold amber hook above the line (optional).
-    const content = ({ id, n, total, label, img, rankNo, title, meta, stats = [], watch, kicker, line }) => `<section class="slide" id="${id}" style="${BG}">${hero(img)}${bank(680)}${header(label)}
+    const content = ({ id, n, total, label, img, rankNo, title, meta, stats = [], watch, kicker, line, sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${hero(img)}${bank(680)}${header(label)}${sticker(st, 620)}
       ${rankNo != null ? rank(rankNo) : ''}
       <div style="position:absolute;left:72px;right:72px;top:900px;z-index:4;color:${NAVY}">
         <div class="serif" style="font-size:${title.length > 30 ? 54 : title.length > 20 ? 66 : 78}px;font-weight:700;line-height:1">${title}</div>
@@ -59,7 +59,7 @@ const CloudBank = (() => {
           ${stats.map(([v, l]) => `<div><div class="serif" style="color:${AMBER};font-size:58px;font-weight:700;line-height:1">${v}</div><div style="margin-top:6px;font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">${l}</div></div>`).join('')}
           ${watch ? `<div style="margin-left:auto;text-align:right"><div style="font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85">Watch on</div><div style="color:${AMBER};margin-top:6px;font-size:26px;font-weight:800">${watch}</div></div>` : ''}</div>
         ${kicker ? `<div style="margin-top:22px;font-size:26px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${AMBER2}">${kicker}</div>` : ''}
-        <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${line}</div></div>
+        <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${pop(line)}</div></div>
       ${foot(n, total, HANDLE)}</section>`;
 
     // Pop (Jose, 2026-10-16): "all one color, one font" loses low-attention viewers.
