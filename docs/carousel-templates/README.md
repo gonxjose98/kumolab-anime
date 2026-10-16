@@ -61,6 +61,12 @@ Chosen by Jose 2026-09-29 over 5 alternatives; the light variants were rejected 
   recognize, humor and emotional hooks. Good: "Return by Death? More like return by pain.
   Subaru suffers, we scream... We are not okay." Bad: "A former soldier learns what love
   means." Every claim true to the show, no spoilers beyond what's public.
+- **Slide text is the content (Jose, 2026-10-16).** Titles and captions are already optimized; the words ON the slides are what keep people swiping, saving and sharing. Generic slide text is a fail. Every pick slide needs:
+  1. A **kicker people would quote**, never a genre label. Bad: "PURE SEROTONIN", "BODYGUARD WITH A SPEAR". Good: "WE CRIED AT A CROSSWALK. TWICE."
+  2. **One specific detail** (a moment, a number, a comparison like "if you liked X"), never an adjective pile ("gorgeous, quiet and so warm").
+  3. **A save reason:** time to finish, the episode where it clicks, or "watch if you liked...".
+  4. **A share reason:** a relatable line that makes someone think of a friend.
+  5. **A pull to the next slide** where it fits. Trend posts tell a story that builds slide to slide and stay 100% on the trending show (no "watch next" detours).
 - **Voice: we ARE fans.** Say we/us/our ("we can't stop watching", "Our Top 5"), never "fans love it" or "fans' top 5". Label stats by source ("AniList score").
 - **Conviction, no hedging:** "anime that ARE masterpieces", never "anime that feel like
   a masterpiece". Hedged phrasing reads AI-generated; fans state it flat (Jose, 2026-09-29).
