@@ -94,7 +94,8 @@ export async function refreshThreadsToken(): Promise<ThreadsTokenRefreshResult> 
             reason: 'rotated and pushed to Vercel env',
         };
     } catch (e: any) {
-        return { ok: false, rotated: false, reason: `threw: ${e?.message || e}` };
+        // Log it: an unlogged throw here (2026-10-13) left the health check saying "Rotating cleanly".
+        return await fail(`threw: ${e?.message || e}`);
     }
 }
 
@@ -104,8 +105,12 @@ async function updateVercelEnv(name: string, newValue: string): Promise<boolean>
         `https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env${teamQ}`,
         { headers: { authorization: `Bearer ${VERCEL_TOKEN}` } },
     );
-    const listData = await listRes.json();
-    const envs = (listData.envs || listData) as Array<{ id: string; key: string; target?: string[] }>;
+    const listData = await listRes.json().catch(() => ({}));
+    // A rejected VERCEL_TOKEN returns an { error } object, not a list.
+    if (!listRes.ok || !Array.isArray(listData.envs)) {
+        throw new Error(`Vercel env list failed (HTTP ${listRes.status}): ${JSON.stringify(listData?.error ?? listData).slice(0, 160)}`);
+    }
+    const envs = listData.envs as Array<{ id: string; key: string; target?: string[] }>;
     const targets = envs.filter(e => e.key === name);
     if (targets.length === 0) return false;
     let allOk = true;
