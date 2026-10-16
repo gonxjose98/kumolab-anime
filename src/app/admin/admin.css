@@ -3287,7 +3287,10 @@ html[data-admin-theme='dark'] .admin-root .ak-home-fmt--reel { background: rgba(
    rail start on the same line. */
 .admin-root .ak-ai__headr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .admin-root .ak-ai__headr .ak-xp-pill { align-self: center; }
-.admin-root .ak-ai-feed__bar { padding: 12px 14px; border-bottom: 1px solid var(--ai-line); min-width: 0; }
+.admin-root .ak-ai-feed__bar { padding: 12px 14px; border-bottom: 1px solid var(--ai-line); min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-root .ak-ai-authors .ak-ai-tab { display: inline-flex; align-items: center; gap: 6px; }
+.admin-root .ak-ai-chip.is-idea { color: var(--ai-trending); background: var(--ai-trending-bg); }
+.admin-root .ak-ai-bar__fill.is-idea { background: var(--ai-trending); }
 .admin-root .ak-ai-feed__bar .ak-ai-tabs { align-self: auto; }
 .admin-root .ak-ai-feed__bar + .ak-ai-row { border-top: 0; }
 @media (max-width: 640px) {

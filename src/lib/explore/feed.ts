@@ -3,15 +3,41 @@
 
 import type { InsightRow } from './types';
 
-export type FeedTab = 'all' | 'news' | 'premieres' | 'ours' | 'ideas';
+/** Container run for cards Claude writes by hand from Claude Code sessions. The cron never expires them. */
+export const CLAUDE_RUN_ID = '00000000-0000-4000-8000-00000000c1a0';
+
+export type Author = 'auto' | 'claude';
+export const authorOf = (row: Pick<InsightRow, 'run_id'>): Author => (row.run_id === CLAUDE_RUN_ID ? 'claude' : 'auto');
+
+/**
+ * Every card lands in exactly ONE category (Jose, 2026-10-15):
+ *  - upcoming: premieres, returning seasons, episodes airing soon, release-radar anticipation
+ *  - news: announcements and stories outlets covered
+ *  - recommendation: our-numbers cards whose point is an action (what to post or do next)
+ *  - data: facts from our own numbers
+ * A premiere or news card that carries a post idea stays in its own category; the idea shows on the card.
+ * Claude-authored cards set the category directly as their type.
+ */
+export type Category = 'data' | 'recommendation' | 'upcoming' | 'news';
+const DIRECT = new Set<string>(['data', 'recommendation', 'upcoming', 'news']);
+
+export function categoryOf(row: Pick<InsightRow, 'section' | 'type' | 'kind'>): Category {
+    if (DIRECT.has(row.type)) return row.type as Category;
+    if (row.section === 'world') return row.type === 'news' ? 'news' : 'upcoming';
+    return row.kind === 'recommendation' ? 'recommendation' : 'data';
+}
+
+export type FeedTab = 'all' | Category;
 
 export const FEED_TABS: { key: FeedTab; label: string }[] = [
     { key: 'all', label: 'All' },
+    { key: 'data', label: 'Data' },
+    { key: 'recommendation', label: 'Recommendations' },
+    { key: 'upcoming', label: 'Upcoming' },
     { key: 'news', label: 'News' },
-    { key: 'premieres', label: 'Premieres' },
-    { key: 'ours', label: 'Our numbers' },
-    { key: 'ideas', label: 'Ideas' },
 ];
+
+export const CATEGORY_LABEL = { data: 'Data', recommendation: 'Recommendation', upcoming: 'Upcoming', news: 'News' } as const;
 
 export interface NumberTile {
     text: string;
@@ -28,13 +54,7 @@ export interface FeedItem extends InsightRow {
 }
 
 export function inTab(row: Pick<InsightRow, 'section' | 'type' | 'kind'>, tab: FeedTab): boolean {
-    switch (tab) {
-        case 'all': return true;
-        case 'news': return row.section === 'world' && row.type === 'news';
-        case 'premieres': return row.section === 'world' && (row.type === 'premiere' || row.type === 'trending');
-        case 'ours': return row.section === 'ours';
-        case 'ideas': return row.kind === 'recommendation';
-    }
+    return tab === 'all' || categoryOf(row) === tab;
 }
 
 /**
@@ -101,8 +121,7 @@ export function agoText(iso: string, now: number): string {
 }
 
 /** Topic for the "Insights by topic" bars and the dismissed note. */
-export function topicOf(row: Pick<InsightRow, 'section' | 'type'>): 'News' | 'Premieres' | 'Our numbers' | 'System' {
+export function topicOf(row: Pick<InsightRow, 'section' | 'type' | 'kind'>): 'System' | (typeof CATEGORY_LABEL)[Category] {
     if (row.section === 'system') return 'System';
-    if (row.section === 'ours') return 'Our numbers';
-    return row.type === 'news' ? 'News' : 'Premieres';
+    return CATEGORY_LABEL[categoryOf(row)];
 }

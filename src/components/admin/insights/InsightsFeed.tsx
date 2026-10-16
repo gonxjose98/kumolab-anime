@@ -3,26 +3,34 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    AlertTriangle, BarChart3, CalendarDays, ChevronRight, ExternalLink, Flame, Lightbulb,
+    BarChart3, Bot, CalendarDays, ChevronRight, ExternalLink, Lightbulb,
     Newspaper, Sparkles, TrendingDown, TrendingUp, Check,
 } from 'lucide-react';
-import { FEED_TABS, agoText, inTab, type FeedItem, type FeedTab } from '@/lib/explore/feed';
+import { FEED_TABS, agoText, authorOf, categoryOf, inTab, type Author, type Category, type FeedItem, type FeedTab } from '@/lib/explore/feed';
 
-type Tone = 'news' | 'premiere' | 'trending' | 'up' | 'down' | 'ours' | 'system';
+type Tone = 'news' | 'premiere' | 'idea' | 'up' | 'down' | 'ours';
 
-const TYPE_META: Record<string, { label: string; tone: Tone; Icon: typeof Newspaper }> = {
+// One chip per card: its single category (growth/drop keep their color inside Data).
+const CAT_META: Record<Category, { label: string; tone: Tone; Icon: typeof Newspaper }> = {
+    data: { label: 'Data', tone: 'ours', Icon: BarChart3 },
+    recommendation: { label: 'Recommendation', tone: 'idea', Icon: Lightbulb },
+    upcoming: { label: 'Upcoming', tone: 'premiere', Icon: CalendarDays },
     news: { label: 'News', tone: 'news', Icon: Newspaper },
-    premiere: { label: 'Premiere', tone: 'premiere', Icon: CalendarDays },
-    trending: { label: 'Trending', tone: 'trending', Icon: Flame },
-    trend_up: { label: 'Growth', tone: 'up', Icon: TrendingUp },
-    trend_down: { label: 'Drop', tone: 'down', Icon: TrendingDown },
-    format: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
-    timing: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
-    top_post: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
-    followers: { label: 'Our numbers', tone: 'ours', Icon: BarChart3 },
-    system: { label: 'Needs you', tone: 'system', Icon: AlertTriangle },
-    claude: { label: 'From Claude', tone: 'ours', Icon: Sparkles },
 };
+
+function chipFor(item: FeedItem) {
+    const cat = categoryOf(item);
+    if (cat === 'data' && item.type === 'trend_up') return { ...CAT_META.data, tone: 'up' as Tone, Icon: TrendingUp };
+    if (cat === 'data' && item.type === 'trend_down') return { ...CAT_META.data, tone: 'down' as Tone, Icon: TrendingDown };
+    return CAT_META[cat];
+}
+
+const AUTHORS: { key: Author; label: string; Icon: typeof Newspaper }[] = [
+    { key: 'auto', label: 'Auto agent', Icon: Bot },
+    { key: 'claude', label: 'From Claude', Icon: Sparkles },
+];
+
+const sentence = (s: string) => s.replace(/[.\s]+$/, '');
 
 const CONF: Record<string, string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 
@@ -41,8 +49,11 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [acted, setActed] = useState(item.state === 'acted');
-    const meta = TYPE_META[item.type] ?? { label: item.type, tone: 'ours' as Tone, Icon: BarChart3 };
+    const meta = chipFor(item);
     const world = item.section === 'world';
+    const claude = authorOf(item) === 'claude';
+    // A Recommendation leads with the action; the number it rests on becomes the reason.
+    const leadWithIdea = categoryOf(item) === 'recommendation' && !!item.recommendation;
 
     async function dismiss() {
         setBusy(true);
@@ -77,10 +88,10 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
                     <span className="ak-ai-row__ago">{agoText(item.created_at, now)}</span>
                 </div>
 
-                <h3 className="ak-ai-row__title">{item.title}</h3>
-                <p className="ak-ai-row__why">{item.why}</p>
+                <h3 className="ak-ai-row__title">{leadWithIdea ? item.recommendation : item.title}</h3>
+                <p className="ak-ai-row__why">{leadWithIdea ? `${sentence(item.title)}. ${item.why}` : item.why}</p>
 
-                {item.recommendation && (
+                {item.recommendation && !leadWithIdea && (
                     <p className="ak-ai-idea"><Lightbulb size={14} aria-hidden="true" /><span><strong>Idea:</strong> {item.recommendation}</span></p>
                 )}
 
@@ -101,7 +112,7 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
                 )}
 
                 <div className="ak-ai-row__actions">
-                    {item.type === 'claude' ? null : world ? (
+                    {claude ? null : world ? (
                         <button type="button" className="ak-ai-act is-primary" onClick={makeCarousel}>Make a carousel<ChevronRight size={14} aria-hidden="true" /></button>
                     ) : (
                         <button type="button" className="ak-ai-act is-primary" onClick={() => router.push('/admin/analytics')}>Open analytics<ChevronRight size={14} aria-hidden="true" /></button>
@@ -118,9 +129,12 @@ function Row({ item, now, onDismiss }: { item: FeedItem; now: number; onDismiss:
 }
 
 export default function InsightsFeed({ items, now, empty, footnote }: { items: FeedItem[]; now: number; empty: { title: string; line: string }; footnote?: string | null }) {
+    const [author, setAuthor] = useState<Author>('auto');
     const [tab, setTab] = useState<FeedTab>('all');
     const [gone, setGone] = useState<Set<string>>(new Set());
-    const live = useMemo(() => items.filter((i) => !gone.has(i.id)), [items, gone]);
+    const notGone = useMemo(() => items.filter((i) => !gone.has(i.id)), [items, gone]);
+    const byAuthor = { auto: notGone.filter((i) => authorOf(i) === 'auto').length, claude: notGone.filter((i) => authorOf(i) === 'claude').length };
+    const live = notGone.filter((i) => authorOf(i) === author);
     const shown = live.filter((i) => inTab(i, tab));
     const counts = Object.fromEntries(FEED_TABS.map((t) => [t.key, live.filter((i) => inTab(i, t.key)).length])) as Record<FeedTab, number>;
 
@@ -128,6 +142,15 @@ export default function InsightsFeed({ items, now, empty, footnote }: { items: F
         <div className="ak-ai-feedwrap">
             <section className="ak-ai-feed" aria-label="Insights">
                 <div className="ak-ai-feed__bar">
+                    <div className="ak-ai-tabs ak-ai-authors" role="tablist" aria-label="Who wrote it">
+                        {AUTHORS.map((a) => (
+                            <button key={a.key} type="button" role="tab" aria-selected={author === a.key}
+                                className={`ak-ai-tab${author === a.key ? ' is-active' : ''}`} onClick={() => setAuthor(a.key)}>
+                                <a.Icon size={13} aria-hidden="true" />{a.label}
+                                {byAuthor[a.key] > 0 && <span className="ak-ai-tab__n">{byAuthor[a.key]}</span>}
+                            </button>
+                        ))}
+                    </div>
                     <div className="ak-ai-tabs" role="tablist" aria-label="Filter insights">
                         {FEED_TABS.map((t) => (
                             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key}
@@ -140,8 +163,8 @@ export default function InsightsFeed({ items, now, empty, footnote }: { items: F
                 </div>
                 {shown.length === 0 ? (
                     <div className="ak-ai-empty">
-                        <strong>{live.length === 0 ? empty.title : 'Nothing here right now'}</strong>
-                        <span>{live.length === 0 ? empty.line : 'Try another filter.'}</span>
+                        <strong>{author === 'claude' && live.length === 0 ? 'No notes from Claude right now' : live.length === 0 ? empty.title : 'Nothing here right now'}</strong>
+                        <span>{author === 'claude' && live.length === 0 ? 'Claude adds cards here after scans, experiments and strategy calls.' : live.length === 0 ? empty.line : 'Try another filter.'}</span>
                     </div>
                 ) : (
                     shown.map((i) => <Row key={i.id} item={i} now={now} onDismiss={(id) => setGone((s) => new Set(s).add(id))} />)

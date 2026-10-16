@@ -69,6 +69,8 @@ export interface Drop {
 /** Row shape of explore_insights as the page reads it. */
 export interface InsightRow {
     id: string;
+    /** explore_runs id; CLAUDE_RUN_ID (feed.ts) marks a Claude-authored card. */
+    run_id?: string;
     section: Section;
     type: string;
     kind: 'fact' | 'recommendation';

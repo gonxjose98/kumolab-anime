@@ -4,7 +4,7 @@ import { exploreConfig } from '@/lib/explore/config';
 import { manualGate } from '@/lib/explore/generate';
 import { viewsDigest } from '@/lib/explore/digest';
 import { getSystemReport } from '@/lib/explore/system';
-import { orderFeed, tileFor, topicOf, type FeedItem } from '@/lib/explore/feed';
+import { authorOf, orderFeed, tileFor, topicOf, type FeedItem } from '@/lib/explore/feed';
 import type { InsightRow } from '@/lib/explore/types';
 import InsightsFeed from '@/components/admin/insights/InsightsFeed';
 import { WeekStats, WeekBreakdown, type ViewShare } from '@/components/admin/insights/WeekRail';
@@ -98,7 +98,7 @@ async function posterMap(rows: InsightRow[]): Promise<Map<string, string>> {
     return out;
 }
 
-const TOPIC_NOTE: Record<string, string> = { News: 'news', Premieres: 'premiere', 'Our numbers': 'our-numbers', System: 'system' };
+const TOPIC_NOTE: Record<string, string> = { Data: 'data', Recommendation: 'recommendation', Upcoming: 'upcoming', News: 'news', System: 'system' };
 const PN: Record<string, string> = { threads: 'Threads', instagram: 'Instagram', website: 'Website', x: 'X' };
 
 export default async function InsightsPage() {
@@ -107,7 +107,7 @@ export default async function InsightsPage() {
     const weekAgo = new Date(now - 7 * DAY_MS).toISOString();
     const [insRes, gate, views, radarCount, wireCount, actedRes, dismissedRes, lastRunRes] = await Promise.all([
         supabaseAdmin.from('explore_insights')
-            .select('id, section, type, kind, title, why, details, recommendation, sources, anime, confidence, rank, created_at, state')
+            .select('id, run_id, section, type, kind, title, why, details, recommendation, sources, anime, confidence, rank, created_at, state')
             .in('state', ['new', 'acted']).gt('expires_at', nowIso)
             .order('rank', { ascending: true }).limit(40),
         manualGate().catch(() => ({ allowed: false, usedToday: 0, limit: 3 } as Awaited<ReturnType<typeof manualGate>>)),
@@ -115,16 +115,17 @@ export default async function InsightsPage() {
         tableCount('release_radar'),
         tableCount('wire_items'),
         supabaseAdmin.from('explore_insights').select('id', { count: 'exact', head: true }).eq('state', 'acted').gte('state_at', weekAgo),
-        supabaseAdmin.from('explore_insights').select('section, type').eq('state', 'dismissed').gte('state_at', weekAgo).limit(200),
+        supabaseAdmin.from('explore_insights').select('section, type, kind').eq('state', 'dismissed').gte('state_at', weekAgo).limit(200),
         supabaseAdmin.from('explore_runs').select('digest_stats').in('status', ['ok', 'partial']).order('started_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     const rows = (insRes.data || []) as (InsightRow & { state: 'new' | 'acted' })[];
     const posters = await posterMap(rows).catch(() => new Map<string, string>());
     const withVisual = (r: (typeof rows)[number]): FeedItem => ({ ...r, poster: posters.get(r.id) ?? null, tile: tileFor(r) });
-    // Claude-authored cards (type 'claude', written from Claude Code sessions) lead the feed.
-    const claude = rows.filter((r) => r.type === 'claude').sort((a, b) => a.rank - b.rank).map(withVisual);
-    const feed = [...claude, ...orderFeed(rows.filter((r) => r.section === 'world').map(withVisual), rows.filter((r) => r.section === 'ours' && r.type !== 'claude').map(withVisual))];
+    // Claude-authored cards (written from Claude Code sessions) get their own page in the feed.
+    const auto = rows.filter((r) => authorOf(r) === 'auto');
+    const claude = rows.filter((r) => authorOf(r) === 'claude' && r.section !== 'system').sort((a, b) => a.rank - b.rank).map(withVisual);
+    const feed = [...claude, ...orderFeed(auto.filter((r) => r.section === 'world').map(withVisual), auto.filter((r) => r.section === 'ours').map(withVisual))];
     const systemCards = rows.filter((r) => r.section === 'system');
 
     const hasKey = exploreConfig.hasKey();
@@ -146,12 +147,13 @@ export default async function InsightsPage() {
     const through = (Object.values(views).map((v: any) => v?.data_through).filter(Boolean)[0] as string | undefined) ?? null;
     const topicCount = (label: string) => feed.filter((f) => topicOf(f) === label).length;
     const topics = [
-        { label: 'Premieres', count: topicCount('Premieres'), tone: 'premiere' },
+        { label: 'Data', count: topicCount('Data'), tone: 'ours' },
+        { label: 'Recommendations', count: topicCount('Recommendation'), tone: 'idea' },
+        { label: 'Upcoming', count: topicCount('Upcoming'), tone: 'premiere' },
         { label: 'News', count: topicCount('News'), tone: 'news' },
-        { label: 'Our numbers', count: topicCount('Our numbers'), tone: 'ours' },
     ];
     const dismissedBy = new Map<string, number>();
-    for (const d of (dismissedRes.data || []) as Pick<InsightRow, 'section' | 'type'>[]) {
+    for (const d of (dismissedRes.data || []) as Pick<InsightRow, 'section' | 'type' | 'kind'>[]) {
         const t = topicOf(d);
         dismissedBy.set(t, (dismissedBy.get(t) ?? 0) + 1);
     }
