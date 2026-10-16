@@ -41,7 +41,7 @@ const CloudBank = (() => {
     const rank = (n) => `<div class="serif" style="position:absolute;left:66px;top:540px;font-size:150px;font-weight:700;line-height:1;z-index:5;color:${GOLD};-webkit-text-stroke:2.5px rgba(11,42,91,.55);text-shadow:0 4px 0 rgba(11,42,91,.35),0 8px 30px rgba(6,24,70,.7)">${String(n).padStart(2, '0')}</div>`;
 
     // Cover: strip + hook. hook = {jp, line1, line2Html, sub}.
-    const cover = ({ id = 's0', label, strip: items, hook, total }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 900)}${bank(760)}${header(label)}
+    const cover = ({ id = 's0', label, strip: items, hook, total, sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 900)}${bank(760)}${header(label)}${sticker(st, 690)}
       <div style="position:absolute;top:985px;left:50px;right:50px;text-align:center;z-index:4;color:${NAVY}">
         <div class="jp" style="font-size:22px;opacity:.8">${hook.jp}</div>
         <div class="serif" style="font-size:88px;font-weight:700;line-height:1;margin-top:6px">${hook.line1}</div>
@@ -62,24 +62,42 @@ const CloudBank = (() => {
         <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${line}</div></div>
       ${foot(n, total, HANDLE)}</section>`;
 
+    // Pop (Jose, 2026-10-16): "all one color, one font" loses low-attention viewers.
+    // Inline markup for story text: [word] = accent color, italic, brush underline;
+    // {phrase} = gold highlighter. One or two marks per slide, never the whole line.
+    let ACCENT = '#E0344F';
+    const setAccent = (c) => { ACCENT = c; };
+    const plain = (s) => s.replace(/[[\]{}]/g, '');
+    const pop = (s) => s
+        .replace(/\[([^\]]+)\]/g, (_, w) => `<span style="color:${ACCENT};font-style:italic;background:linear-gradient(transparent 82%,${ACCENT}55 82%,${ACCENT}55 96%,transparent 96%);padding:0 .06em">${w}</span>`)
+        .replace(/\{([^}]+)\}/g, (_, w) => `<span style="font-weight:800;background:linear-gradient(transparent 50%,${GOLD} 50%,${GOLD} 94%,transparent 94%);padding:0 .1em;box-decoration-break:clone;-webkit-box-decoration-break:clone">${w}</span>`);
+    // Tilted sticker slapped on the art edge: {text, icon?, color?, ink?, side?: 'left'|'right'}.
+    // icon (an emoji) sits in a white bubble so it reads on any sticker color.
+    const sticker = (s, top = 600) => {
+        if (!s) return '';
+        const c = s.color || ACCENT, right = s.side !== 'left';
+        return `<div style="position:absolute;top:${top}px;${right ? 'right:54px' : 'left:54px'};z-index:6;transform:rotate(${right ? 4 : -4}deg);background:${c};color:${s.ink || '#fff'};font-family:Manrope,sans-serif;font-weight:800;font-size:30px;letter-spacing:.06em;text-transform:uppercase;padding:12px 26px 12px ${s.icon ? 12 : 26}px;border-radius:14px;border:4px solid #fff;box-shadow:0 10px 26px rgba(6,24,70,.35);display:flex;align-items:center;gap:14px">${s.icon ? `<span style="width:52px;height:52px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px">${s.icon}</span>` : ''}${s.text}</div>`;
+    };
+
     // Story slide (Jose, 2026-10-16): ONE big headline + ONE sentence, nothing else.
     // The text carries the story, so it is big; art is a little shorter to make room.
     // Use for trend/story posts; `content` (stats, watch-on) stays for list posts.
-    const story = ({ id, n, total, label, img, title, line }) => `<section class="slide" id="${id}" style="${BG}">${hero(img, 790)}${bank(650)}${header(label)}
+    // Add color with pop() markup and an optional sticker; see README "Pop".
+    const story = ({ id, n, total, label, img, title, line, sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${hero(img, 790)}${bank(650)}${header(label)}${sticker(st)}
       <div style="position:absolute;left:60px;right:60px;top:830px;z-index:4;color:${NAVY}">
-        <div class="serif" style="font-size:${title.length > 24 ? 70 : 82}px;font-weight:700;line-height:1.02">${title}</div>
-        <div style="margin-top:24px;font-size:42px;line-height:1.28;font-weight:600">${line}</div></div>
+        <div class="serif" style="font-size:${plain(title).length > 24 ? 80 : 96}px;font-weight:700;line-height:1.02">${pop(title)}</div>
+        <div style="margin-top:28px;font-size:48px;line-height:1.3;font-weight:600">${pop(line)}</div></div>
       ${foot(n, total, HANDLE)}</section>`;
 
     // Share slide, always last.
-    const share = ({ id, n, total, strip: items, question, prompt, footRight = 'Save for later' }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 640)}${bank(500)}${header('Save + share')}
+    const share = ({ id, n, total, strip: items, question, prompt, footRight = 'Save for later', sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${strip(items, 640)}${bank(500)}${header('Save + share')}${sticker(st, 440)}
       <div style="position:absolute;top:780px;left:70px;right:70px;text-align:center;z-index:4;color:${NAVY}">
-        <div class="serif" style="font-size:80px;font-weight:700;line-height:1.04">${question}</div>
+        <div class="serif" style="font-size:80px;font-weight:700;line-height:1.04">${pop(question)}</div>
         <div class="serif" style="font-size:54px;font-weight:600;font-style:italic;margin-top:18px;color:${AMBER2}">${prompt}</div>
         <div style="margin-top:34px"><span class="btn" style="font-size:24px;padding:24px 44px">Follow ${HANDLE}</span></div></div>
       ${foot(n, total, footRight)}</section>`;
 
-    return { setHandle, BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, story, share };
+    return { setHandle, setAccent, pop, sticker, BG, NAVY, AMBER, AMBER2, GOLD, cloud, header, bank, dots, foot, hero, strip, rank, cover, content, story, share };
 })();
 
 if (typeof module !== 'undefined') module.exports = CloudBank;
