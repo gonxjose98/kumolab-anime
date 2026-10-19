@@ -258,7 +258,12 @@ const Halloween = (() => {
           .dots i.on{background:${T.acc} !important}
           .cloud{filter:${T.shadow} !important}
           .pill{${T.pill}}
-          .btn{background:${T.btn} !important;color:${T.btnText} !important;box-shadow:0 14px 34px rgba(255,120,40,.4) !important}`;
+          .btn{background:${T.btn} !important;color:${T.btnText} !important;box-shadow:0 14px 34px rgba(255,120,40,.4) !important}
+          /* Pop layer + list pills (2026-10-19): keep navy ink on gold, re-tint navy and white pills, warm highlighter. */
+          .slide [style*="background:#FFD27A"]{color:#0B2A5B !important}
+          .slide [style*="background:#0B2A5B;"]{background:${T.acc} !important;color:#1A0A04 !important}
+          .slide [style*="background:#FFFFFFB3"]{background:rgba(255,255,255,.08) !important;box-shadow:inset 0 0 0 2px ${T.acc}88}
+          .slide [style*="#FFD27A 50%"]{background:linear-gradient(transparent 55%,${T.acc}8C 55%,${T.acc}8C 94%,transparent 94%) !important;color:#FFFFFF !important}`;
         const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
         const stops = document.querySelectorAll('#cg stop');
         T.cloud.forEach((c, i) => stops[i].setAttribute('stop-color', c));
@@ -268,7 +273,7 @@ const Halloween = (() => {
         const slides = [...document.querySelectorAll('section.slide')];
         slides.forEach((s, i) => {
             const kind = i === 0 ? 'cover' : i === slides.length - 1 ? 'share' : 'content';
-            const bank = { cover: 760, content: 680, share: 500 }[kind];
+            const bank = { cover: 760, content: 650, share: 500 }[kind]; // content/story bank moved to 650 (2026-10-19)
             s.insertAdjacentHTML('beforeend', T.deco(kind, bank));
             if (T.post) T.post(s, kind, bank);
         });
