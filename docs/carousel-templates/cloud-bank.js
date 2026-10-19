@@ -49,17 +49,19 @@ const CloudBank = (() => {
         <div style="margin-top:12px;font-size:21px;font-weight:700;letter-spacing:.04em;opacity:.8">${hook.sub}</div></div>
       ${foot(0, total, 'Swipe &nbsp;→')}</section>`;
 
-    // Content slide. stats = [[value, label], ...]; watch optional; kicker = short bold amber hook above the line (optional).
-    const content = ({ id, n, total, label, img, rankNo, title, meta, stats = [], watch, kicker, line, sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${hero(img)}${bank(680)}${header(label)}${sticker(st, 620)}
-      ${rankNo != null ? rank(rankNo) : ''}
-      <div style="position:absolute;left:72px;right:72px;top:900px;z-index:4;color:${NAVY}">
-        <div class="serif" style="font-size:${title.length > 30 ? 54 : title.length > 20 ? 66 : 78}px;font-weight:700;line-height:1">${title}</div>
-        <div style="margin-top:12px;font-size:22px;font-weight:700;letter-spacing:.06em;opacity:.9">${meta}</div>
-        <div style="margin-top:22px;display:flex;gap:44px;align-items:flex-end">
-          ${stats.map(([v, l]) => `<div><div class="serif" style="color:${AMBER};font-size:58px;font-weight:700;line-height:1">${v}</div><div style="margin-top:6px;font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">${l}</div></div>`).join('')}
-          ${watch ? `<div style="margin-left:auto;text-align:right"><div style="font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85">Watch on</div><div style="color:${AMBER};margin-top:6px;font-size:26px;font-weight:800">${watch}</div></div>` : ''}</div>
-        ${kicker ? `<div style="margin-top:22px;font-size:26px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${AMBER2}">${kicker}</div>` : ''}
-        <div style="margin-top:${kicker ? 8 : 20}px;font-size:27px;line-height:1.4;font-weight:600">${pop(line)}</div></div>
+    // List slide (Jose, 2026-10-19): same reading size as story slides, so every post reads alike.
+    // Title, one row of pills (meta, stats, where to watch), a kicker, one sentence (~110 chars max).
+    const pill = (html, bg, ink) => `<span style="display:inline-flex;align-items:baseline;gap:8px;background:${bg};color:${ink};border-radius:999px;padding:8px 20px;font-size:26px;font-weight:800;white-space:nowrap">${html}</span>`;
+    const content = ({ id, n, total, label, img, rankNo, title, meta, stats = [], watch, kicker, line, sticker: st }) => `<section class="slide" id="${id}" style="${BG}">${hero(img, 790)}${bank(650)}${header(label)}${sticker(st, 600)}
+      ${rankNo != null ? rank(rankNo).replace('top:540px', 'top:500px') : ''}
+      <div style="position:absolute;left:60px;right:60px;top:820px;z-index:4;color:${NAVY}">
+        <div class="serif" style="font-size:${title.length > 26 ? 66 : title.length > 18 ? 76 : 86}px;font-weight:700;line-height:1">${title}</div>
+        <div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          ${meta ? pill(meta, '#FFFFFFB3', NAVY) : ''}
+          ${stats.map(([v, l]) => pill(`${v}<span style="font-size:19px;font-weight:700;opacity:.85">${l}</span>`, GOLD, NAVY)).join('')}
+          ${watch ? pill(`&#9654; ${watch}`, NAVY, '#fff') : ''}</div>
+        ${kicker ? `<div style="margin-top:22px;font-size:34px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:${ACCENT}">${kicker}</div>` : ''}
+        <div style="margin-top:${kicker ? 8 : 20}px;font-size:40px;line-height:1.28;font-weight:600">${pop(line)}</div></div>
       ${foot(n, total, HANDLE)}</section>`;
 
     // Pop (Jose, 2026-10-16): "all one color, one font" loses low-attention viewers.
