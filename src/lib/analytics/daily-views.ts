@@ -6,9 +6,10 @@
 // and scripts/analytics/backfill-daily-views.ts loads history once.
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { xConfigured, verifyX, getOwnTweets } from '@/lib/social/x-client';
+import { tiktokConnected, listTikTokVideos } from '@/lib/social/tiktok-api';
 
-export type ViewPlatform = 'website' | 'instagram' | 'threads' | 'x';
-export const VIEW_PLATFORMS: ViewPlatform[] = ['website', 'instagram', 'threads', 'x'];
+export type ViewPlatform = 'website' | 'instagram' | 'threads' | 'x' | 'tiktok';
+export const VIEW_PLATFORMS: ViewPlatform[] = ['website', 'instagram', 'threads', 'x', 'tiktok'];
 
 const GRAPH = 'https://graph.facebook.com/v22.0';
 const THREADS = 'https://graph.threads.net/v1.0';
@@ -142,6 +143,25 @@ async function collectX(): Promise<Row[]> {
     return [...byDay.entries()].map(([day, views]) => ({ day, platform: 'x' as const, views }));
 }
 
+/**
+ * TikTok has no daily account views in the Display API, so (like X) each
+ * post's lifetime views are credited to the UTC day it went up. Every run
+ * rewrites every day from the first post to today, since old posts keep
+ * growing. Free API, so no throttle beyond the cron cadence.
+ */
+async function collectTikTok(): Promise<Row[]> {
+    if (!(await tiktokConnected())) return [];
+    const videos = await listTikTokVideos();
+    if (!videos.length) return [];
+    const first = dayKey(new Date(Math.min(...videos.map((v) => v.create_time)) * 1000));
+    const byDay = new Map<string, number>(daysBetween(first, dayKey(new Date())).map((d) => [d, 0]));
+    for (const v of videos) {
+        const d = dayKey(new Date(v.create_time * 1000));
+        byDay.set(d, (byDay.get(d) || 0) + v.view_count);
+    }
+    return [...byDay.entries()].map(([day, views]) => ({ day, platform: 'tiktok' as const, views }));
+}
+
 /** Collect + store every platform for the given days. Each platform fails independently. */
 export async function collectDailyViews(days: string[]): Promise<Record<string, number | string>> {
     const result: Record<string, number | string> = {};
@@ -150,6 +170,7 @@ export async function collectDailyViews(days: string[]): Promise<Record<string, 
         ['instagram', () => collectInstagram(days)],
         ['threads', () => collectThreads(days)],
         ['x', () => collectX()],
+        ['tiktok', () => collectTikTok()],
     ];
     await Promise.all(jobs.map(async ([name, run]) => {
         try {
@@ -172,7 +193,7 @@ export function refreshRecentDailyViews(n = 3) {
 
 // ── Reader ─────────────────────────────────────────────────────────────────
 
-export interface ViewsDay { day: string; label: string; website: number; instagram: number; threads: number; x: number; total: number; }
+export interface ViewsDay { day: string; label: string; website: number; instagram: number; threads: number; x: number; tiktok: number; total: number; }
 export interface ViewsSummary {
     series: ViewsDay[];
     totals: Record<ViewPlatform, number> & { total: number };
@@ -181,7 +202,7 @@ export interface ViewsSummary {
     since: string;
 }
 
-const zero = () => ({ website: 0, instagram: 0, threads: 0, x: 0, total: 0 });
+const zero = () => ({ website: 0, instagram: 0, threads: 0, x: 0, tiktok: 0, total: 0 });
 
 /** Views per day for the range (0 = all time) plus the previous period for deltas. */
 export async function getViewsSummary(rangeDays: number): Promise<ViewsSummary> {
@@ -211,7 +232,7 @@ export async function getViewsSummary(rangeDays: number): Promise<ViewsSummary> 
     }
     const totals = zero();
     const prev = zero();
-    const hasData = { website: false, instagram: false, threads: false, x: false };
+    const hasData = { website: false, instagram: false, threads: false, x: false, tiktok: false };
     for (const r of data || []) {
         const p = r.platform as ViewPlatform;
         if (!VIEW_PLATFORMS.includes(p)) continue;

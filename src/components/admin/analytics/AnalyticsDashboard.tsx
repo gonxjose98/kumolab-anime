@@ -11,12 +11,13 @@ import type { ViewPlatform } from '@/lib/analytics/daily-views';
 const AXIS = 'rgba(112,130,165,0.95)'; // mid-tone: readable in light and dark
 const GRID = 'rgba(125,140,168,0.16)';
 
-// Shown platforms, in tile + stack order. FB and TikTok stay hidden until they pull real views.
+// Shown platforms, in tile + stack order. FB stays hidden until it pulls real views.
 const PLATFORMS: { key: ViewPlatform; label: string; color: string }[] = [
     { key: 'threads', label: 'Threads', color: '#6d7fc4' },
     { key: 'instagram', label: 'Instagram', color: '#e0457b' },
     { key: 'website', label: 'Website', color: '#16a3a6' },
     { key: 'x', label: 'X', color: '#9aa3b2' },
+    { key: 'tiktok', label: 'TikTok', color: '#f59e0b' },
 ];
 // Not wired up yet: shown grayed so the full picture is always on screen.
 const COMING: { key: string; label: string; note: string }[] = [
@@ -49,7 +50,7 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
     const headlinePrev = focus ? views.prevTotals?.[focus] : views.prevTotals?.total;
     const headlineDelta = pctChange(headline, headlinePrev);
     const followers: Partial<Record<ViewPlatform, number | null>> = {
-        instagram: ig.snapshot.followers, threads: threads.followers,
+        instagram: ig.snapshot.followers, threads: threads.followers, tiktok: tiktok?.followers ?? null,
     };
 
     return (
@@ -104,16 +105,6 @@ export default function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                                     </button>
                                 );
                             })}
-                            {tiktok && (
-                                // Hand-entered (no TikTok API): all-time totals, kept out of the range total above.
-                                <div className="ak-an__tile" style={{ ['--tile' as any]: '#111827', cursor: 'default' }} title="Updated by hand when Jose asks">
-                                    <span className="ak-an__tilehead"><i />TikTok</span>
-                                    <span className="ak-an__tilenum">{compact(tiktok.views ?? 0)}</span>
-                                    <span className="ak-an__tilesub"><span>All time · manual</span></span>
-                                    <span className="ak-caption">{fmt(tiktok.followers)} followers · {fmt(tiktok.likes)} likes</span>
-                                    <span className="ak-caption">Updated {new Date(tiktok.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</span>
-                                </div>
-                            )}
                             {COMING.map((c) => (
                                 <div key={c.key} className="ak-an__tile ak-an__tile--off">
                                     <span className="ak-an__tilehead"><i />{c.label}</span>

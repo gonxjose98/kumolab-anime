@@ -84,21 +84,36 @@ export interface TikTokStats {
     views: number; followers: number; likes: number; posts: number; listed: number;
 }
 
+export async function tiktokConnected(): Promise<boolean> {
+    const { data } = await supabaseAdmin.from('oauth_tokens').select('refresh_token').eq('provider', 'tiktok').maybeSingle();
+    return !!data?.refresh_token;
+}
+
+export interface TikTokVideo { id: string; create_time: number; view_count: number; }
+
+/** Every post on the account (photo carousels included), newest first. */
+export async function listTikTokVideos(token?: string): Promise<TikTokVideo[]> {
+    token ||= await accessToken();
+    const out: TikTokVideo[] = [];
+    let cursor: number | undefined;
+    for (let page = 0; page < 20; page++) {
+        const d = await api('/video/list/?fields=id,create_time,view_count', token, {
+            method: 'POST', body: JSON.stringify({ max_count: 20, ...(cursor ? { cursor } : {}) }),
+        });
+        for (const v of d.videos || []) out.push({ id: v.id, create_time: v.create_time, view_count: v.view_count || 0 });
+        if (!d.has_more) break;
+        cursor = d.cursor;
+    }
+    return out;
+}
+
 /** Profile totals plus summed views across every post the API lists. */
 export async function fetchTikTokStats(): Promise<TikTokStats> {
     const token = await accessToken();
     const info = await api('/user/info/?fields=follower_count,likes_count,video_count', token);
-    let views = 0, listed = 0, cursor: number | undefined;
-    for (let page = 0; page < 20; page++) {
-        const d = await api('/video/list/?fields=id,view_count', token, {
-            method: 'POST', body: JSON.stringify({ max_count: 20, ...(cursor ? { cursor } : {}) }),
-        });
-        for (const v of d.videos || []) { views += v.view_count || 0; listed++; }
-        if (!d.has_more) break;
-        cursor = d.cursor;
-    }
+    const videos = await listTikTokVideos(token);
     const u = info.user;
-    return { views, followers: u.follower_count, likes: u.likes_count, posts: u.video_count, listed };
+    return { views: videos.reduce((a, v) => a + v.view_count, 0), followers: u.follower_count, likes: u.likes_count, posts: u.video_count, listed: videos.length };
 }
 
 /** Pull from the API and write the Analytics tile row (manual_platform_stats 'tiktok'). */
