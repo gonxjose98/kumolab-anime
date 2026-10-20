@@ -303,7 +303,10 @@ async function dispatch(
         const result = await syncSocialMetrics(limit);
         // Daily views per platform for the Analytics chart (last 3 days, idempotent).
         const dailyViews = await refreshRecentDailyViews(3).catch((e) => ({ error: String(e?.message || e) }));
-        return { success: result.ok, worker: 'metrics-sync', ...result, dailyViews };
+        // TikTok tile via the Display API (reports an error until connected).
+        const { syncTikTokTile } = await import('@/lib/social/tiktok-api');
+        const tiktok = await syncTikTokTile().catch((e) => ({ error: String(e?.message || e).slice(0, 200) }));
+        return { success: result.ok, worker: 'metrics-sync', ...result, dailyViews, tiktok };
     }
 
     // Monthly analytics snapshot → monthly_metrics. Scheduled for 00:30 UTC
