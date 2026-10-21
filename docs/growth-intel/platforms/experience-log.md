@@ -71,3 +71,7 @@ Label key: **Jose** = his report, **Measured** = pulled from the platform or dat
 - 2026-11-02: raw-trailer repost history may age off the Instagram originality window; compare reach before and after.
 - 2026-11-07: Facebook keep/kill call.
 - End of reel test week (~2026-10-18): bare vs branded reel results.
+
+## 2026-10-21: TikTok hit 100 followers; Search Insights read
+- 100 followers, 123.6K lifetime views. Overnight +21K views.
+- TikTok suggested "anime character" as our next topic. Full read and the agreed playbook (character rankings, "Guess the anime character" series, #animecharacters, a follow reason on every post) live in `platforms/tiktok.md`.
