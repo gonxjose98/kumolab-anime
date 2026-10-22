@@ -39,6 +39,11 @@ Our fastest-growing platform. Manual photo carousels in the Cloud Bank theme, po
 
 - Hashtags: #animecharacters (136K posts, low competition), #animeedit (40M posts).
 
+## Jose's read of the "anime character" related videos (2026-10-22)
+- Topic now 696K searches in 7 days (+54.3%), 65.5K creators. Top related videos: Killua "aura farming" 1.1M likes, JJK fight 496.6K, "unique character design" 1.2M.
+- ALL of them use the same recipe: a short highlight clip of ONE character's moment, the anime's own audio removed, a trending sound added on top, and the caption + hashtags all about that one character (an opinion line burned on screen, e.g. "Killua was genuinely aura farming the whole series").
+- These are videos, not carousels. Our carousels can ride the topic, but the format that blows up here is the character highlight clip.
+
 ## Similar posts doing big (TikTok Studio > Inspiration > Recommended, 2026-10-21)
 - "3 anime I genuinely consider MASTERPIECES" 195K (bold opinion).
 - "Tell me the anime where getting what you wanted cost too much" 183K (question hook).
